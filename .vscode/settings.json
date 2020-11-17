@@ -1,0 +1,9 @@
+{
+    "files.exclude": {
+        "**/node_modules": true,
+        "target": true,
+        "editor/dist": true,
+        "editor/pkg": true,
+        "Cargo.lock": true,
+    }
+}

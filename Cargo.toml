@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "editor",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1 # slow, but makes more optimisations possible
+opt-level = "z" # tiny code size
+panic = "abort"
+
+[profile.dev]
+incremental = true
