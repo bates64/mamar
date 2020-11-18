@@ -1,5 +1,5 @@
 use std::io::{self, prelude::*, SeekFrom};
-use std::convert::AsMut;
+use std::fmt;
 use crate::*;
 
 #[derive(Debug)]
@@ -17,12 +17,33 @@ impl From<io::Error> for Error {
     }
 }
 
-// TODO
-/*
-impl std::error::Error for Error {
-
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::InvalidMagic => write!(f, "Missing 'BGM' signature at start of file"),
+            Error::SizeMismatch {
+                true_size, internal_size,
+            } => write!(f, "The file says it is {}B, but it is actually {}B", internal_size, true_size),
+            Error::InvalidNumSegments(num_segments) =>
+                write!(f, "Exactly 4 segment slots are supported, but this file has {}", num_segments),
+            Error::NonZeroPadding => write!(f, "Expected padding but found non-zero byte(s)"),
+            Error::Io(source) => if let io::ErrorKind::UnexpectedEof = source.kind() {
+                write!(f, "Unexpected end-of-file")
+            } else {
+                write!(f, "{}", source)
+            }
+        }
+    }
 }
-*/
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Io(source) => Some(source),
+            _ => None,
+        }
+    }
+}
 
 trait ReadExt: Read {
     fn read_u8(&mut self) -> io::Result<u8>;
