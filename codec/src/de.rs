@@ -113,7 +113,7 @@ impl Bgm {
         debug_assert!(f.stream_position()? == 0x04);
         let internal_size = f.read_u32_be()?;
         let true_size = f.stream_len()? as u32;
-        if internal_size != true_size && align(internal_size, 8) != true_size {
+        if internal_size != true_size && align(internal_size, 16) != true_size {
             return Err(Error::SizeMismatch { true_size, internal_size });
         }
 
@@ -231,6 +231,7 @@ impl Track {
 mod test {
     use super::*;
     use pretty_assertions::assert_eq;
+    use std::{path::Path, fs::File};
 
     #[test]
     fn cloudy_climb() {
@@ -342,5 +343,26 @@ mod test {
     fn garbage() {
         let data = include_bytes!("../bin/extract.py");
         Bgm::from_bytes(data).unwrap();
+    }
+
+    /// Parses every BGM file at bin/*.bin. We don't check that they match any expected output (unlike `cloudy_climb`),
+    /// but if the parsing were unsound something would almost certainly explode (e.g. seek and read past EOF).
+    #[test]
+    fn all_songs_ok() {
+        let bin_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bin");
+
+        for entry in bin_dir.read_dir().expect("bin dir") {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Some(ext) = path.extension() {
+                    if ext == "bin" && path.is_file() {
+                        println!("reading {:?}", path.file_name().unwrap());
+
+                        let mut file = File::open(path).expect("bin file");
+                        Bgm::parse(&mut file).unwrap();
+                    }
+                }
+            }
+        }
     }
 }
