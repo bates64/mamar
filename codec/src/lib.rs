@@ -11,25 +11,39 @@ pub const MAGIC: &[u8; 4] = b"BGM ";
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Bgm {
     pub name: [u8; 4], // ASCII
-    pub segments: [Vec<Segment>; 4],
+    pub segments: [Option<Segment>; 4],
     // TODO: percussion, instruments
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct Segment {
-    pub flags: u16, // TODO: better representation (bitfields? enum?)
-    pub tracks: Option<[Track; 16]>,
+type Segment = Vec<Subsegment>;
+
+// TODO: better representation for `flags`
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Subsegment {
+    Tracks {
+        flags: u8,
+        tracks: [Track; 16],
+    },
+    Unknown {
+        flags: u8,
+        data: [u8; 3], // Is this always padding?
+    },
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Track {
     pub flags: u16, // TODO: better representation
-    pub commands: u32, // TODO
+    pub commands: Vec<Command>,
 }
 
-impl Segment {
-    fn is_terminator(&self) -> bool {
-        true
+type Command = u8; // TODO
+
+impl Subsegment {
+    pub fn flags(&self) -> u8 {
+        match *self {
+            Subsegment::Tracks  { flags, .. } => flags,
+            Subsegment::Unknown { flags, .. } => flags,
+        }
     }
 }
 

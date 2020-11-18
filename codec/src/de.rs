@@ -1,4 +1,5 @@
 use std::io::{self, prelude::*, SeekFrom};
+use std::convert::AsMut;
 use crate::*;
 
 #[derive(Debug)]
@@ -61,6 +62,41 @@ impl<R: Read> ReadExt for R {
     }
 }
 
+trait CollectArray<T, E, U: Default + AsMut<[T]>>: Sized + Iterator<Item = Result<T, E>> {
+    /// Doesn't panic if the iterator is too large or too small for the output array. If the iterator is too short,
+    /// the remaining elements have their default value.
+    fn collect_array(mut self) -> Result<U, E> {
+        let mut container = U::default();
+
+        for a in container.as_mut().iter_mut() {
+            match self.next() {
+                None => break,
+                Some(v) => *a = v?,
+            }
+        }
+
+        Ok(container)
+    }
+
+    /// Same as `collect_array`, but panics if the iterator is not exactly the same size as the array.
+    /// Based on https://stackoverflow.com/a/60572615
+    fn collect_array_pedantic(mut self) -> Result<U, E> {
+        let mut container = U::default(); // Could use std::mem::zerored and drop Default requirement here
+
+        for a in container.as_mut().iter_mut() {
+            match self.next() {
+                None => panic!("iterator has too few members"),
+                Some(v) => *a = v?,
+            }
+        }
+
+        assert!(self.next().is_none(), "iterator has too many members");
+        Ok(container)
+    }
+}
+
+impl<T, E, U: Iterator<Item = Result<T, E>>, V: Default + AsMut<[T]>> CollectArray<T, E, V> for U {}
+
 impl Bgm {
     pub fn from_bytes(f: &[u8]) -> Result<Self, Error> {
         Self::parse(&mut std::io::Cursor::new(f))
@@ -83,7 +119,7 @@ impl Bgm {
 
         debug_assert!(f.stream_position()? == 0x08);
         let mut name = [0; 4];
-        f.read_exact(&mut name);
+        f.read_exact(&mut name)?;
 
         debug_assert!(f.stream_position()? == 0x0C);
         f.read_padding(4)?;
@@ -98,55 +134,95 @@ impl Bgm {
         f.read_padding(3)?;
 
         debug_assert!(f.stream_position()? == 0x14);
-        let mut segments = (0..4)
+        let segment_offsets: [u16; 4] = (0..4)
             .into_iter()
-            .map(|_| Ok(f.read_u16_be()? << 2)) // 4 contiguous u16 offsets
-            .collect::<io::Result<Vec<u16>>>()? // We need to obtain all offsets before seeking to any
-            .into_iter()
-            .map(|pos| -> Result<Vec<Segment>, Error> {
-                if pos == 0 {
-                    // Null (no segments)
-                    Ok(vec![])
-                } else {
-                    // Seek to the offset and parse the segment(s) there
-                    f.seek(SeekFrom::Start(pos.into()))?;
-                    let mut segments = vec![];
-
-                    loop {
-                        let segment = Segment::parse(f)?;
-                        let terminate = segment.is_terminator();
-
-                        segments.push(segment);
-
-                        if terminate { break }
-                    }
-
-                    Ok(segments)
-                }
-            });
+            .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
+            .collect_array()?; // We need to obtain all offsets before seeking to any
 
         // TODO: percussion, instruments
         //debug_assert!(f.stream_position()? == 0x24);
 
         Ok(Self {
             name,
-            segments: [
-                // We know `segments` has 4 elements, so these unwraps are safe.
-                segments.next().unwrap()?,
-                segments.next().unwrap()?,
-                segments.next().unwrap()?,
-                segments.next().unwrap()?,
-            ],
+            segments: segment_offsets
+                .iter()
+                .map(|&pos| -> Result<Option<Segment>, Error> {
+                    if pos == 0 {
+                        // Null (no segments)
+                        Ok(None)
+                    } else {
+                        // Seek to the offset and parse the segment(s) there
+                        let pos = pos as u64;
+                        f.seek(SeekFrom::Start(pos))?;
+
+                        let mut segment = vec![];
+                        let mut i = 0;
+                        while {
+                            f.seek(SeekFrom::Start(pos + i * 4))?;
+
+                            // Peek for null terminator
+                            let byte = f.read_u8()?;
+                            f.seek(SeekFrom::Current(-1))?;
+                            byte != 0
+                        } {
+                            segment.push(Subsegment::parse(f, pos)?);
+
+                            i += 1;
+                        }
+
+                        Ok(Some(segment))
+                    }
+                })
+                .collect_array_pedantic()?,
         })
     }
 }
 
-impl Segment {
-    fn parse<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
-        // TODO
+impl Subsegment {
+    fn parse<R: Read + Seek>(f: &mut R, start: u64) -> Result<Self, Error> {
+        let flags = f.read_u8()?;
+
+        if flags & 0x70 == 0x10 {
+            f.read_padding(1)?;
+            let offset = (f.read_u16_be()? as u64) << 2;
+
+            let tracks_start = start + offset;
+
+            Ok(Subsegment::Tracks {
+                flags,
+                tracks: (0..16)
+                    .into_iter()
+                    .map(|track_no| {
+                        f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
+                        Track::parse(f, tracks_start)
+                    })
+                    .collect_array_pedantic()?
+            })
+        } else {
+            let mut data = [0; 3];
+            f.read_exact(&mut data)?;
+
+            Ok(Subsegment::Unknown {
+                flags,
+                data,
+            })
+        }
+    }
+}
+
+impl Track {
+    fn parse<R: Read + Seek>(f: &mut R, segment_start: u64) -> Result<Self, Error> {
+        let commands_offset = f.read_u16_be()?;
+        let flags = f.read_u16_be()?;
+
         Ok(Self {
-            flags: 0,
-            tracks: None,
+            flags,
+            commands: if commands_offset == 0 {
+                vec![]
+            } else {
+                f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
+                vec![] // TODO
+            },
         })
     }
 }
@@ -154,6 +230,7 @@ impl Segment {
 #[cfg(test)]
 mod test {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn cloudy_climb() {
@@ -163,20 +240,101 @@ mod test {
         assert_eq!(bgm, Bgm {
             name: *b"139 ",
             segments: [
-                vec![
-                    // TODO
-                    Segment {
-                        flags: 0,
-                        tracks: None,
+                // 0x24
+                Some(vec![
+                    Subsegment::Unknown {
+                        flags: 0x30,
+                        data: [0x00, 0x00, 0x00],
                     },
-                ],
-                vec![],
-                vec![],
-                vec![],
+
+                    Subsegment::Tracks {
+                        flags: 0x10,
+                        tracks: [
+                            // 0x34
+                            Track {
+                                flags: 0x0000,
+                                // 0x74
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x38
+                            Track {
+                                flags: 0x2000,
+                                // 0x8D
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x3C
+                            Track {
+                                flags: 0x2000,
+                                // 0x159
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x40
+                            Track {
+                                flags: 0xE000, // Percussion
+                                // 0x22D
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x44
+                            Track {
+                                flags: 0xE000, // Percussion
+                                // 0x2D0
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x48
+                            Track {
+                                flags: 0x2000,
+                                // 0x374
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            // 0x4C
+                            Track {
+                                flags: 0x2000,
+                                // 0x3A7
+                                commands: vec![
+                                    // TODO
+                                ],
+                            },
+
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                            Track::default(),
+                        ],
+                    },
+
+                    Subsegment::Unknown {
+                        flags: 0x50,
+                        data: [0x00, 0x00, 0x00],
+                    },
+                ]),
+                None,
+                None,
+                None,
             ],
         });
-
-        //assert_eq!(bgm.to_bytes().unwrap(), data);
     }
 
     #[test]
