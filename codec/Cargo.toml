@@ -1,0 +1,5 @@
+[package]
+name = "codec"
+version = "0.1.0"
+authors = ["Alex Bates <hi@imalex.xyz>"]
+edition = "2018"

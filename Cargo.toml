@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "editor",
+    "codec",
 ]
 
 [profile.release]
