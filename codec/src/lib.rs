@@ -1,11 +1,16 @@
 #![feature(seek_convenience)] // Requires nightly Rust
 
-/// Encoder (Bgm -> .bin)
-pub mod en;
+/// Encoder ([Bgm] -> .bin)
+mod en;
 
-/// Decoder (.bin -> Bgm)
-pub mod de;
+/// Decoder (.bin -> [Bgm])
+mod de;
+pub use de::Error as DecodeError;
 
+mod cmd;
+pub use cmd::*;
+
+/// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &[u8; 4] = b"BGM ";
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
@@ -33,10 +38,8 @@ pub enum Subsegment {
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Track {
     pub flags: u16, // TODO: better representation
-    pub commands: Vec<Command>,
+    pub commands: CommandSeq,
 }
-
-type Command = u8; // TODO
 
 impl Subsegment {
     pub fn flags(&self) -> u8 {
