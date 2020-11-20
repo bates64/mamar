@@ -313,6 +313,13 @@ impl From<Vec<Command>> for CommandSeq {
     }
 }
 
+
+impl iter::FromIterator<Command> for CommandSeq {
+    fn from_iter<T: IntoIterator<Item = Command>>(iter: T) -> Self {
+        Self { vec: iter.into_iter().collect() }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum DelayLookup {
     /// The index of the [Delay] that introduces the time being looked up. That is, the command (if any) immediately
