@@ -120,10 +120,10 @@ impl<T, E, U: Iterator<Item = Result<T, E>>, V: Default + AsMut<[T]>> CollectArr
 
 impl Bgm {
     pub fn from_bytes(f: &[u8]) -> Result<Self, Error> {
-        Self::parse(&mut std::io::Cursor::new(f))
+        Self::decode(&mut std::io::Cursor::new(f))
     }
 
-    pub fn parse<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+    pub fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         f.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 4];
         f.read_exact(&mut magic)?;
@@ -172,7 +172,7 @@ impl Bgm {
                         // Null (no segments)
                         Ok(None)
                     } else {
-                        // Seek to the offset and parse the segment(s) there
+                        // Seek to the offset and decode the segment(s) there
                         let pos = pos as u64;
                         f.seek(SeekFrom::Start(pos))?;
 
@@ -186,7 +186,7 @@ impl Bgm {
                             f.seek(SeekFrom::Current(-1))?;
                             byte != 0
                         } {
-                            segment.push(Subsegment::parse(f, pos)?);
+                            segment.push(Subsegment::decode(f, pos)?);
 
                             i += 1;
                         }
@@ -200,7 +200,7 @@ impl Bgm {
 }
 
 impl Subsegment {
-    fn parse<R: Read + Seek>(f: &mut R, start: u64) -> Result<Self, Error> {
+    fn decode<R: Read + Seek>(f: &mut R, start: u64) -> Result<Self, Error> {
         let flags = f.read_u8()?;
 
         if flags & 0x70 == 0x10 {
@@ -215,7 +215,7 @@ impl Subsegment {
                     .into_iter()
                     .map(|track_no| {
                         f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
-                        Track::parse(f, tracks_start)
+                        Track::decode(f, tracks_start)
                     })
                     .collect_array_pedantic()?
             })
@@ -232,7 +232,7 @@ impl Subsegment {
 }
 
 impl Track {
-    fn parse<R: Read + Seek>(f: &mut R, segment_start: u64) -> Result<Self, Error> {
+    fn decode<R: Read + Seek>(f: &mut R, segment_start: u64) -> Result<Self, Error> {
         let commands_offset = f.read_u16_be()?;
         let flags = f.read_u16_be()?;
 
@@ -392,7 +392,7 @@ mod test {
                         println!("reading {:?}", path.file_name().unwrap());
 
                         let mut file = File::open(path).expect("bin file");
-                        Bgm::parse(&mut file).unwrap();
+                        Bgm::decode(&mut file).unwrap();
                     }
                 }
             }
