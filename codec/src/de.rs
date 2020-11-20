@@ -47,9 +47,10 @@ impl std::error::Error for Error {
 
 trait ReadExt: Read {
     fn read_u8(&mut self) -> io::Result<u8>;
+    fn read_i8(&mut self) -> io::Result<i8>;
     fn read_u16_be(&mut self) -> io::Result<u16>;
     fn read_u32_be(&mut self) -> io::Result<u32>;
-    fn read_padding(&mut self, num_bytes: usize) -> Result<(), Error>;
+    fn read_padding(&mut self, num_bytes: u32) -> Result<(), Error>;
 }
 
 impl<R: Read> ReadExt for R {
@@ -57,6 +58,10 @@ impl<R: Read> ReadExt for R {
         let mut buffer = [0; 1];
         self.read_exact(&mut buffer)?;
         Ok(buffer[0])
+    }
+
+    fn read_i8(&mut self) -> io::Result<i8> {
+        self.read_u8().map(|i| i as i8)
     }
 
     fn read_u16_be(&mut self) -> io::Result<u16> {
@@ -72,7 +77,7 @@ impl<R: Read> ReadExt for R {
         Ok(u32::from_be_bytes(buffer))
     }
 
-    fn read_padding(&mut self, num_bytes: usize) -> Result<(), Error> {
+    fn read_padding(&mut self, num_bytes: u32) -> Result<(), Error> {
         for _ in 0..num_bytes {
             if self.read_u8()? != 0 {
                 return Err(Error::NonZeroPadding);
@@ -134,7 +139,15 @@ impl Bgm {
         debug_assert!(f.stream_position()? == 0x04);
         let internal_size = f.read_u32_be()?;
         let true_size = f.stream_len()? as u32;
-        if internal_size != true_size && align(internal_size, 16) != true_size {
+        if internal_size == true_size {
+            // Ok
+        } else if align(internal_size, 16) == true_size {
+            // Make sure the trailing bytes are all zero
+            f.seek(SeekFrom::Start(internal_size as u64))?;
+            f.read_padding(true_size - internal_size)?;
+
+            f.seek(SeekFrom::Start(0x08))?; // Back to where we were
+        } else {
             return Err(Error::SizeMismatch { true_size, internal_size });
         }
 
@@ -242,146 +255,97 @@ impl Track {
                 CommandSeq::with_capacity(0)
             } else {
                 f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
-                let mut commands = CommandSeq::with_capacity(1);
-
-                // TODO
-                commands.push(Command::default()); // TEMP
+                let seq = CommandSeq::decode(f)?;
 
                 // Assumption; structure will need changing if false for matching.
                 // Maybe use command "groups" which can be represented in UI also
-                assert_ne!(commands.len(), 0);
+                assert_ne!(seq.len(), 0, "CommandSeq assumption wrong");
 
-                commands
+                seq
             },
         })
+    }
+}
+
+impl CommandSeq {
+    fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        let mut seq = CommandSeq::with_capacity(1);
+
+        loop {
+            let cmd_byte = f.read_u8()?;
+            match cmd_byte {
+                // Sentinel (zero-terminator)
+                0x00 => break,
+
+                // Delay
+                0x01..=0x77 => seq.push(Command::Delay(cmd_byte)),
+
+                // TODO: this doesn't seem like a long delay; needs testing. Leaving as Unknown for now
+                /*
+                // Long delay
+                0x78..=0x7F => {
+                    /*
+                    // This logic taken from N64MidiTool
+                    seq.push(Command::Delay(0x78 + cmd_byte + (f.read_u8()? & 0x7) << 8));
+                    */
+                },
+                */
+
+                // Note
+                0x80..=0xD3 => {
+                    let flag = (cmd_byte & 1) != 0;
+                    let pitch = cmd_byte & !1;
+
+                    let velocity = f.read_u8()?;
+
+                    let length = {
+                        let first_byte = f.read_u8()? as u16;
+
+                        // This logic taken from N64MidiTool
+                        if first_byte < 0xC0 {
+                            first_byte
+                        } else {
+                            let second_byte = f.read_u8()? as u16;
+
+                            debug_assert_eq!(first_byte & 0xC0, 0xC0);
+
+                            0xC0 + (((first_byte & !0xC0) << 8) | second_byte)
+                        }
+                    };
+                    //assert!(length < 0x4000, "{:#X}", length);
+
+                    seq.push(Command::Note { pitch, flag, velocity, length });
+                },
+
+                0xE0 => seq.push(Command::MasterTempo(f.read_u16_be()?)),
+                0xE1 => seq.push(Command::MasterVolume(f.read_u8()?)),
+                0xE2 => seq.push(Command::MasterTranspose(f.read_i8()?)),
+
+                _ => seq.push(Command::Unknown(cmd_byte)),
+            }
+        }
+
+        Ok(seq)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use pretty_assertions::assert_eq;
     use std::{path::Path, fs::File};
+    use insta::assert_yaml_snapshot;
 
+    /// Make sure that parsing garbage data returns an error.
     #[test]
-    fn cloudy_climb() {
-        // TODO
-        /*
-        let data = include_bytes!("../bin/Cloudy_Climb_32.bin");
-        let bgm = Bgm::from_bytes(data).unwrap();
-
-        assert_eq!(bgm, Bgm {
-            name: *b"139 ",
-            segments: [
-                // 0x24
-                Some(vec![
-                    Subsegment::Unknown {
-                        flags: 0x30,
-                        data: [0x00, 0x00, 0x00],
-                    },
-
-                    Subsegment::Tracks {
-                        flags: 0x10,
-                        tracks: [
-                            // 0x34
-                            Track {
-                                flags: 0x0000,
-                                // 0x74
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x38
-                            Track {
-                                flags: 0x2000,
-                                // 0x8D
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x3C
-                            Track {
-                                flags: 0x2000,
-                                // 0x159
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x40
-                            Track {
-                                flags: 0xE000, // Percussion
-                                // 0x22D
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x44
-                            Track {
-                                flags: 0xE000, // Percussion
-                                // 0x2D0
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x48
-                            Track {
-                                flags: 0x2000,
-                                // 0x374
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            // 0x4C
-                            Track {
-                                flags: 0x2000,
-                                // 0x3A7
-                                commands: vec![
-                                    // TODO
-                                ],
-                            },
-
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                            Track::default(),
-                        ],
-                    },
-
-                    Subsegment::Unknown {
-                        flags: 0x50,
-                        data: [0x00, 0x00, 0x00],
-                    },
-                ]),
-                None,
-                None,
-                None,
-            ],
-        });
-        */
-    }
-
-    #[test]
-    #[should_panic]
     fn garbage() {
         let data = include_bytes!("../bin/extract.py");
-        Bgm::from_bytes(data).unwrap();
+        assert!(Bgm::from_bytes(data).is_err());
     }
 
-    /// Parses every BGM file at bin/*.bin. We don't check that they match any expected output (unlike `cloudy_climb`),
-    /// but if the parsing were unsound something would almost certainly explode (e.g. seek and read past EOF).
+    /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).
+    /// Use `cargo install cargo-install` then `cargo insta test` to run.
     #[test]
-    fn all_songs_ok() {
+    fn all_songs_snapshot() {
         let bin_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bin");
 
         for entry in bin_dir.read_dir().expect("bin dir") {
@@ -389,10 +353,12 @@ mod test {
                 let path = entry.path();
                 if let Some(ext) = path.extension() {
                     if ext == "bin" && path.is_file() {
-                        println!("reading {:?}", path.file_name().unwrap());
+                        let mut file = File::open(&path).expect("bin file");
+                        let bgm = Bgm::decode(&mut file).unwrap();
 
-                        let mut file = File::open(path).expect("bin file");
-                        Bgm::decode(&mut file).unwrap();
+                        let test_name = path.file_stem().unwrap().to_string_lossy().to_string();
+
+                        assert_yaml_snapshot!(test_name, bgm);
                     }
                 }
             }

@@ -1,4 +1,5 @@
 use std::iter;
+use serde::{Serialize, Deserialize};
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -15,9 +16,9 @@ use std::iter;
 ///
 /// let mut sequence = CommandSeq::new();
 ///
-/// sequence.push(Command::SetMasterTempo(120)); // Executed at relative-time 0
+/// sequence.push(Command::MasterTempo(120)); // Executed at relative-time 0
 /// sequence.push(Command::Delay(50));           // Executed at relative-time 0
-/// sequence.push(Command::SetMasterTempo(80));  // Executed at relative-time 50
+/// sequence.push(Command::MasterTempo(80));  // Executed at relative-time 50
 /// ```
 ///
 /// ## Time efficiency
@@ -33,7 +34,8 @@ use std::iter;
 /// that this collection is not equivalent to [Vec] - in many ways it acts more like a
 /// [HashMap](std::collections::HashMap) (i.e. a dictionary) with relative-time keys and [Command] values (for
 /// example, you cannot lookup by vector index, because ordering is undefined between [Delay] partitions).
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+#[serde(transparent)]
 pub struct CommandSeq {
     /// List of [Command]s in time order. Sets of [Command]s at the same time value have undefined ordering, so this
     /// is not a public field. Similarly, [CommandSeq] does not [Deref](std::ops::Deref) to the [Vec] it wraps
@@ -71,13 +73,13 @@ impl CommandSeq {
     ///     Command::Delay(10),
     /// ]);
     ///
-    /// sequence.insert(15, Command::SetMasterTempo(120));
+    /// sequence.insert(15, Command::MasterTempo(120));
     ///
     /// assert_eq!(sequence, CommandSeq::from(vec![
     ///     Command::Delay(10),
     ///
     ///     Command::Delay(5), // Inserted automatically to reach t = 15
-    ///     Command::SetMasterTempo(120),
+    ///     Command::MasterTempo(120),
     ///
     ///     Command::Delay(10),
     ///     Command::Delay(10),
@@ -92,13 +94,13 @@ impl CommandSeq {
     /// # use codec::*;
     /// let mut sequence = CommandSeq::new();
     ///
-    /// sequence.insert(10, Command::SetMasterTempo(60));  // (1)
-    /// sequence.insert(10, Command::SetMasterTempo(120)); // (2)
+    /// sequence.insert(10, Command::MasterTempo(60));  // (1)
+    /// sequence.insert(10, Command::MasterTempo(120)); // (2)
     ///
     /// assert_eq!(sequence, CommandSeq::from(vec![
     ///     Command::Delay(10),           // Inserted during (1)
-    ///     Command::SetMasterTempo(120), // (2)
-    ///     Command::SetMasterTempo(60),  // (1) - Oh no! This overrides (2)!
+    ///     Command::MasterTempo(120), // (2)
+    ///     Command::MasterTempo(60),  // (1) - Oh no! This overrides (2)!
     /// ]));
     /// ```
     ///
@@ -117,14 +119,14 @@ impl CommandSeq {
     /// let mut sequence = CommandSeq::new();
     ///
     /// sequence.insert_many(10, vec![
-    ///     Command::SetMasterTempo(120),
-    ///     Command::SetMasterTempo(60),
+    ///     Command::MasterTempo(120),
+    ///     Command::MasterTempo(60),
     /// ]);
     ///
     /// assert_eq!(sequence, CommandSeq::from(vec![
     ///     Command::Delay(10),
-    ///     Command::SetMasterTempo(120),
-    ///     Command::SetMasterTempo(60),
+    ///     Command::MasterTempo(120),
+    ///     Command::MasterTempo(60),
     /// ]));
     /// ```
     pub fn insert_many<I: IntoIterator<Item = Command>>(&mut self, time: usize, subsequence: I) {
@@ -217,7 +219,7 @@ impl CommandSeq {
     /// sounds the same).
     pub fn shrink(&mut self) {
         // TODO: remove Delay(0) commands
-        // TODO: combine redundant subsequences (e.g. multiple Delay, multiple SetMasterTempo without a delay between)
+        // TODO: combine redundant subsequences (e.g. multiple Delay, multiple MasterTempo without a delay between)
         self.vec.shrink_to_fit();
     }
 
@@ -227,7 +229,7 @@ impl CommandSeq {
 
     /// Returns the number of commands ("length") in the sequece.
     /// See [Vec::len].
-    pub fn len(&mut self) -> usize { self.vec.len() }
+    pub fn len(&self) -> usize { self.vec.len() }
 
     // TODO
     /*
@@ -337,7 +339,7 @@ enum DelayLookup {
 /// not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
 /// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
 /// relative time positioning.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
     ///
@@ -346,12 +348,35 @@ pub enum Command {
     /// See [`Command::delays(delta_time)`](Command::delays) to create delays longer than [u8::MAX] ticks.
     Delay(u8),
 
-    /// Sets the beats-per-minute of the composition globally.
-    SetMasterTempo(u8),
+    /// Plays a note or drum sound. Non-blocking(?), i.e. does **not** act like a [`Delay(length)`](Command::Delay) and
+    /// only continue execution once the note has finished playing.
+    Note {
+        // TODO: make Pitch type
+        pitch: u8,
 
-    Note, // TODO
+        // TODO: determine bounds etc
+        velocity: u8,
 
-    // TODO: all other commands
+        // TODO: determine max value (it's not u16::MAX)
+        length: u16,
+
+        /// Unknown flag.
+        flag: bool,
+    },
+
+    /// Sets the beats-per-minute of the composition.
+    MasterTempo(u16),
+
+    /// Sets the composition volume.
+    MasterVolume(u8),
+
+    /// Sets the composition transpose value. It is currently unknown exactly how this adjusts pitch.
+    MasterTranspose(i8),
+
+    // TODO: more commands
+
+    /// An unknown/unimplemented command (or part of one).
+    Unknown(u8),
 }
 
 use Command::Delay;
@@ -365,7 +390,7 @@ impl Default for Command {
 
 impl Command {
     /// Returns a Command iterator producing a series of [Delay] commands in order to reach the specified delta time.
-    /// This is required for any delta time greater than [0xFF](u8::MAX) ticks (which a [Delay] is unable to hold).
+    /// This is required for any delta time greater than [`0xFF`](u8::MAX) ticks (which a [Delay] is unable to hold).
     ///
     /// ```
     /// # use codec::*;

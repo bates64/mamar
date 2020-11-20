@@ -1,5 +1,7 @@
 #![feature(seek_convenience)] // Requires nightly Rust
 
+use serde::{Serialize, Deserialize};
+
 /// Encoder ([Bgm] -> .bin)
 mod en;
 
@@ -13,9 +15,12 @@ pub use cmd::*;
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &[u8; 4] = b"BGM ";
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, Debug)]
 pub struct Bgm {
-    pub name: [u8; 4], // ASCII
+    // TODO: convert from/to string this when [de]serializing
+    /// ASCII song index.
+    pub name: [u8; 4],
+
     pub segments: [Option<Segment>; 4],
     // TODO: percussion, instruments
 }
@@ -23,7 +28,7 @@ pub struct Bgm {
 type Segment = Vec<Subsegment>;
 
 // TODO: better representation for `flags`
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Subsegment {
     Tracks {
         flags: u8,
@@ -35,7 +40,7 @@ pub enum Subsegment {
     },
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, Debug)]
 pub struct Track {
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,

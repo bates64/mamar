@@ -6,5 +6,8 @@
         "editor/pkg": true,
         "Cargo.lock": true,
     },
+    "files.associations": {
+        "**/snapshots/*": "yaml",
+    },
     "editor.rulers": [120],
 }
