@@ -57,9 +57,24 @@ impl Subsegment {
 
 /// Aligns a value to the next multiple of n.
 fn align(value: u32, n: u32) -> u32 {
+    if n <= 1 {
+        return value;
+    }
+
     if value % n == 0 {
         n
     } else {
         value + (n - value % n)
     }
+}
+
+#[test]
+fn test_align() {
+    assert_eq!(align(0, 5), 5);
+    assert_eq!(align(5, 5), 5);
+    assert_eq!(align(6, 5), 10);
+
+    // 0 and 1 values for `n` should be a no-op
+    assert_eq!(align(36, 0), 36);
+    assert_eq!(align(36, 1), 36);
 }
