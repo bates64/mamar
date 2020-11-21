@@ -6,9 +6,10 @@ members = [
 
 [profile.release]
 lto = true
-codegen-units = 1 # slow, but makes more optimisations possible
-opt-level = "z" # tiny code size
+codegen-units = 1 # slow compile, but makes more optimisations possible
+opt-level = "s" # optimise for code size
 panic = "abort"
+debug = true # needed for wasm-snip, stripped in production
 
 [profile.dev]
 incremental = true

@@ -16,6 +16,7 @@ module.exports = env => ({
     devServer: {
         contentBase: dist,
         overlay: true,
+        stats: 'errors-warnings',
     },
     plugins: [
         new CopyPlugin([
