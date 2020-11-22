@@ -274,14 +274,20 @@ impl CommandSeq {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         let start = f.stream_position()? as usize;
 
-        let mut commands = BTreeMap::new(); // offset -> command tree
-        let mut uninit = BTreeMap::new(); // offset -> command with reference
+        // A binary tree mapping input offset -> Command. This is then trivially converted to a
+        // CommandSeq by performing an in-order traversal.
+        let mut commands = BTreeMap::new();
+
+        // Tree offset keys are shifted from the input to make space for abstract commands such as Command::Label to
+        // be inserted between. This is fine, because, in the end, only the order of the keys matter (not their values).
+        let offset_key_command = |offset: usize| (offset + 1) << 1;
+        let offset_key_label= |offset: usize| offset_key_command(offset) - 1;
 
         loop {
             let cmd_offset = (f.stream_position()? as usize) - start;
             let cmd_byte = f.read_u8()?;
 
-            commands.insert(cmd_offset, Rc::new(match cmd_byte {
+            let command = match cmd_byte {
                 // Sentinel (zero-terminator)
                 0x00 => break,
 
@@ -362,36 +368,34 @@ impl CommandSeq {
                 },
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
-                    // Subroutine contains an offset reference to another command, so we'll resolve it after we're
-                    // finished decoding the rest of the sequence.
-                    uninit.insert(cmd_offset, UninitCommand::Subroutine {
-                        target_offset: f.read_u16_be()?,
-                        length: f.read_u8()?,
-                    });
+                    // Create or reuse a Label pointing to the target offset.
+                    let target_offset = f.read_u16_be()? as usize;
+                    let label = commands
+                        .entry(offset_key_label(target_offset)) // Label immediately before the target offset
+                        .or_insert_with(|| Command::Label(
+                            Rc::new(Label::new(format!("Offset {:#X}", target_offset))))
+                        );
 
-                    Command::default() // Will be replaced later
+                    if let Command::Label(label) = label {
+                        Command::Subroutine {
+                            target: label.clone(),
+                            length: f.read_u8()?,
+                        }
+                    } else {
+                        // There may not be a non-label at any (x << 1) - 1 index.
+                        unreachable!();
+                    }
                 },
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
                 _ => Command::Unknown(smallvec![cmd_byte]),
-            }));
-        }
+            };
 
-        if uninit.len() > 0 {
-            // TODO: handle uninit
-            todo!();
+            commands.insert(offset_key_command(cmd_offset), command);
         }
 
         Ok(commands.into_values().collect())
     }
-}
-
-/// A [Command] with unresolved references.
-enum UninitCommand {
-    Subroutine {
-        target_offset: u16,
-        length: u8,
-    },
 }
 
 #[cfg(test)]
@@ -411,18 +415,24 @@ mod test {
     fn decode_subroutine() {
         let bytecode: Vec<u8> = vec![
             0x01, // Delay(1) - at offset 0
-            0x10, // Delay(0x10)
-            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 }
+            0x09, // Delay(9)
+            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 } - at t=10
             0x00, // End
         ];
 
         let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
 
-        if let Command::Subroutine { ref target, length } = **seq.at_time(0x11).iter().next().unwrap() {
-            assert!(Rc::ptr_eq(&target, &seq.at_time(0).iter().next().unwrap()));
-            assert_eq!(length, 0x10);
+        let label = seq.at_time(0)[0];
+
+        if let Command::Label(label) = label {
+            if let Command::Subroutine { target, length } = seq.at_time(10)[0] {
+                assert!(Rc::ptr_eq(label, target));
+                assert_eq!(*length, 0x10);
+            } else {
+                panic!("subroutine should be inserted at t=10");
+            }
         } else {
-            panic!();
+            panic!("label should be inserted at t=0");
         }
     }
 
