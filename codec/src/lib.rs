@@ -1,4 +1,4 @@
-#![feature(seek_convenience)] // Requires nightly Rust
+#![feature(seek_convenience, map_into_keys_values)] // Requires nightly Rust
 
 use serde::{Serialize, Deserialize};
 
@@ -22,7 +22,7 @@ pub struct Bgm {
     pub name: [u8; 4],
 
     pub segments: [Option<Segment>; 4],
-    // TODO: percussion, instruments
+    // TODO: percussion, voices (instruments)
 }
 
 type Segment = Vec<Subsegment>;

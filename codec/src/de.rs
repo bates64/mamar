@@ -1,5 +1,8 @@
 use std::io::{self, prelude::*, SeekFrom};
 use std::fmt;
+use std::collections::BTreeMap;
+use std::rc::Rc;
+use smallvec::smallvec;
 use crate::*;
 
 #[derive(Debug)]
@@ -269,27 +272,31 @@ impl Track {
 
 impl CommandSeq {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
-        let mut seq = CommandSeq::with_capacity(1);
+        let start = f.stream_position()? as usize;
+
+        let mut commands = BTreeMap::new(); // offset -> command tree
+        let mut uninit = BTreeMap::new(); // offset -> command with reference
 
         loop {
+            let cmd_offset = (f.stream_position()? as usize) - start;
             let cmd_byte = f.read_u8()?;
-            match cmd_byte {
+
+            commands.insert(cmd_offset, Rc::new(match cmd_byte {
                 // Sentinel (zero-terminator)
                 0x00 => break,
 
                 // Delay
-                0x01..=0x77 => seq.push(Command::Delay(cmd_byte)),
+                0x01..=0x77 => Command::Delay(cmd_byte),
 
                 // TODO: this doesn't seem like a long delay; needs testing. Leaving as Unknown for now
-                /*
                 // Long delay
                 0x78..=0x7F => {
                     /*
                     // This logic taken from N64MidiTool
-                    seq.push(Command::Delay(0x78 + cmd_byte + (f.read_u8()? & 0x7) << 8));
+                    Command::Delay(0x78 + cmd_byte + (f.read_u8()? & 0x7) << 8));
                     */
+                    Command::Unknown(smallvec![cmd_byte, f.read_u8()?])
                 },
-                */
 
                 // Note
                 0x80..=0xD3 => {
@@ -314,25 +321,83 @@ impl CommandSeq {
                     };
                     //assert!(length < 0x4000, "{:#X}", length);
 
-                    seq.push(Command::Note { pitch, flag, velocity, length });
+                    Command::Note { pitch, flag, velocity, length }
                 },
 
-                0xE0 => seq.push(Command::MasterTempo(f.read_u16_be()?)),
-                0xE1 => seq.push(Command::MasterVolume(f.read_u8()?)),
-                0xE2 => seq.push(Command::MasterTranspose(f.read_i8()?)),
+                0xE0 => Command::MasterTempo(f.read_u16_be()?),
+                0xE1 => Command::MasterVolume(f.read_u8()?),
+                0xE2 => Command::MasterTranspose(f.read_i8()?),
+                0xE3 => Command::Unknown(smallvec![0xE3, f.read_u8()?]),
+                0xE4 => Command::MasterTempoFade { time: f.read_u16_be()?, bpm: f.read_u16_be()? },
+                0xE5 => Command::MasterVolumeFade { time: f.read_u16_be()?, volume: f.read_u8()? },
+                0xE6 => Command::MasterEffect(f.read_u8()?),
+                0xE7 => Command::Unknown(smallvec![0xE7]),
+                0xE8 => Command::TrackOverridePatch { bank: f.read_u8()?, patch: f.read_u8()? },
+                0xE9 => Command::SubTrackVolume(f.read_u8()?),
+                0xEA => Command::SubTrackPan(f.read_u8()?),
+                0xEB => Command::SubTrackReverb(f.read_u8()?),
+                0xEC => Command::SegTrackVolume(f.read_u8()?),
+                0xED => Command::SubTrackCoarseTune(f.read_u8()?),
+                0xEE => Command::SubTrackFineTune(f.read_u8()?),
+                0xEF => Command::SegTrackTune { coarse: f.read_u8()?, fine: f.read_u8()? },
+                0xF0 => Command::TrackTremolo {
+                    amount: f.read_u8()?,
+                    speed: f.read_u8()?,
+                    unknown: f.read_u8()?,
+                },
+                0xF1 => Command::Unknown(smallvec![0xF1, f.read_u8()?]),
+                0xF2 => Command::Unknown(smallvec![0xF2, f.read_u8()?]),
+                0xF3 => Command::TrackTremoloStop,
+                0xF4 => Command::Unknown(smallvec![0xF4, f.read_u8()?, f.read_u8()?]),
+                0xF5 => Command::TrackVoice(f.read_u8()?),
+                0xF6 => Command::TrackVolumeFade { time: f.read_u16_be()?, volume: f.read_u8()? },
+                0xF7 => Command::SubTrackReverbType(f.read_u8()?),
+                0xF8 => Command::Unknown(smallvec![0xF8]),
+                0xF9 => Command::Unknown(smallvec![0xF9]),
+                0xFA => Command::Unknown(smallvec![0xFA]),
+                0xFB => Command::Unknown(smallvec![0xFB]),
+                0xFC => {
+                    // TODO Jump random
+                    Command::Unknown(smallvec![0xFC, f.read_u8()?, f.read_u8()?, f.read_u8()?, f.read_u8()?])
+                },
+                0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xFE => {
+                    // Subroutine contains an offset reference to another command, so we'll resolve it after we're
+                    // finished decoding the rest of the sequence.
+                    uninit.insert(cmd_offset, UninitCommand::Subroutine {
+                        target_offset: f.read_u16_be()?,
+                        length: f.read_u8()?,
+                    });
 
-                _ => seq.push(Command::Unknown(cmd_byte)),
-            }
+                    Command::default() // Will be replaced later
+                },
+                0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+
+                _ => Command::Unknown(smallvec![cmd_byte]),
+            }));
         }
 
-        Ok(seq)
+        if uninit.len() > 0 {
+            // TODO: handle uninit
+            todo!();
+        }
+
+        Ok(commands.into_values().collect())
     }
+}
+
+/// A [Command] with unresolved references.
+enum UninitCommand {
+    Subroutine {
+        target_offset: u16,
+        length: u8,
+    },
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{path::Path, fs::File};
+    use std::{path::Path, fs::File, io::Cursor};
     use insta::assert_yaml_snapshot;
 
     /// Make sure that parsing garbage data returns an error.
@@ -340,6 +405,25 @@ mod test {
     fn garbage() {
         let data = include_bytes!("../bin/extract.py");
         assert!(Bgm::from_bytes(data).is_err());
+    }
+
+    #[test]
+    fn decode_subroutine() {
+        let bytecode: Vec<u8> = vec![
+            0x01, // Delay(1) - at offset 0
+            0x10, // Delay(0x10)
+            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 }
+            0x00, // End
+        ];
+
+        let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
+
+        if let Command::Subroutine { ref target, length } = **seq.at_time(0x11).iter().next().unwrap() {
+            assert!(Rc::ptr_eq(&target, &seq.at_time(0).iter().next().unwrap()));
+            assert_eq!(length, 0x10);
+        } else {
+            panic!();
+        }
     }
 
     /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).

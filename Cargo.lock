@@ -70,6 +70,7 @@ version = "0.1.0"
 dependencies = [
  "insta",
  "serde",
+ "smallvec",
 ]
 
 [[package]]
@@ -508,6 +509,15 @@ name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
+
+[[package]]
+name = "smallvec"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7acad6f34eb9e8a259d3283d1e8c1d34d7415943d4895f65cc73813c7396fc85"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "syn"
