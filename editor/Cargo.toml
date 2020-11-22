@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
 
-[features]
-default = ["wee_alloc"]
-
 [lib]
 crate-type = ["cdylib", "rlib"]
 
