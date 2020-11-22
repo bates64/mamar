@@ -1,17 +1,18 @@
-const path = require("path")
-const CopyPlugin = require("copy-webpack-plugin")
-const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin")
+const path = require('path')
+const HtmlPlugin = require('html-webpack-plugin')
+const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
-const dist = path.resolve(__dirname, "dist")
+const dist = path.resolve(__dirname, 'dist')
 
 module.exports = env => ({
     mode: env,
     entry: {
-        index: "./src/index.js",
+        entry: './src/entry.js',
     },
     output: {
         path: dist,
-        filename: "[name].js",
+        filename: '[name].js',
     },
     devServer: {
         contentBase: dist,
@@ -19,13 +20,25 @@ module.exports = env => ({
         stats: 'errors-warnings',
     },
     plugins: [
-        new CopyPlugin([
-            path.resolve(__dirname, "static"),
-        ]),
+        new HtmlPlugin({
+            title: 'BGM Editor',
+            scriptLoading: 'defer',
+            hash: true,
+        }),
+
+        new MiniCssExtractPlugin(),
 
         new WasmPackPlugin({
             crateDirectory: __dirname,
             forceMode: env,
         }),
-    ]
+    ],
+    module: {
+        rules: [
+            {
+                test: /\.css$/,
+                use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader'],
+            },
+        ],
+    },
 })

@@ -1,0 +1,66 @@
+button {
+    all: unset; /* reset user-agent <button/> styling */
+
+    /* Center child elements */
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+
+    border-radius: .25em;
+
+    cursor: pointer;
+
+    &[disabled] {
+        cursor: not-allowed;
+    }
+
+    padding: calc(.6em - 1px) .9em;
+
+    font-size: 14px;
+    font-weight: 500;
+    /*text-shadow: 0 0 6px #000000cc;*/
+    user-select: none;
+
+    color: var(--mono-3) #555F6E;
+
+    &.primary {
+        color: var(--mono-1) #7F83FF;
+    }
+
+    /*
+    --color: var(--mono-7);
+    color: var(--mono-3) var(--color);
+
+    box-shadow: 0;
+    transition: box-shadow 80ms ease-out;
+    &:hover {
+        box-shadow: 0 1px 6px var(--color);
+    }
+
+    &.subtle {
+        --color: var(--mono-6);
+        color: var(--color) var(--shade-20);
+        text-shadow: none;
+
+        &:hover {
+            box-shadow: none;
+        }
+    }
+
+    &.red {
+        --color: var(--red-6);
+    }
+    &.green {
+        --color: var(--green-6);
+    }
+    &.purple {
+        --color: var(--purple-6);
+    }
+    &.magenta {
+        --color: var(--magenta-6);
+    }
+    &.cyan {
+        --color: var(--cyan-6);
+    }
+    */
+}

@@ -1,0 +1,78 @@
+@import-glob "./elements/*.css";
+
+:root {
+    /* Neutral blue-grey scale */
+    --mono-0: #f9f9fa; /* Lightest */
+    --mono-1: #eaecf0;
+    --mono-2: #e2e4e9;
+    --mono-3: #d7dae1;
+    --mono-4: #c8ccd5;
+    --mono-5: #a1a9b9;
+    --mono-6: #7c879d;
+    --mono-7: #5d677b;
+    --mono-8: #444c5b;
+    --mono-9: #23272f; /* Darkest */
+
+    /*
+    --red-4: #e28da1;
+    --red-5: #e35574;
+    --red-6: #c03153;
+    --red-7: #832f45;
+
+    --green-4: #95dac4;
+    --green-5: #2fc07a;
+    --green-6: #359678;
+    --green-7: #357068;
+
+    --purple-4: #c9c9f3;
+    --purple-5: #a2a2ea;
+    --purple-6: #7b7be1;
+    --purple-7: #5555d9;
+
+    --magenta-4: #ffb6e6;
+    --magenta-5: #ff7cc4;
+    --magenta-6: #ff2181;
+    --magenta-7: #c8006d;
+
+    --cyan-4: #affefe;
+    --cyan-5: #87fdfd;
+    --cyan-6: #3cfbfb;
+    --cyan-7: #03dddd;
+    */
+
+    /* Shade in % */
+    --shade-20: #00000031;
+    --shade-50: #00000080;
+}
+
+/* See https://github.com/madprops/Kya/blob/master/themes/Kya-color-theme.json for colors */
+
+body {
+    box-sizing: border-box;
+
+    color: #8599b3 #14161a;
+
+    /* Inherit font-size from user */
+    font-family: system-ui;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    line-height: 1.2;
+
+    margin: 0;
+    padding: 0;
+}
+
+::selection {
+    background: #333470f8;
+}
+
+.light { color: #C1C1F1 }
+
+/* Atoms (utility classes) */
+.pad  { padding: 1em }
+.padx { padding-left: 1em; padding-right: 1em }
+.padl { padding-left: 1em }
+.padr { padding-right: 1em }
+.pady { padding-top: 1em; padding-bottom: 1em }
+.padt { padding-top: 1em }
+.padb { padding-bottom: 1em }

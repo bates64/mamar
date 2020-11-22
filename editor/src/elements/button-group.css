@@ -1,0 +1,22 @@
+button-group {
+    display: inline-block;
+
+    /*
+    & > button {
+        border-radius: 0;
+    }
+
+    & > button:first-child {
+        border-left-radius: .25em;
+        border-right: 0;
+    }
+
+    & > button:last-child  {
+        border-right-radius: .25em;
+        border-left: 0;
+    }*/
+
+    & > button:not(:last-child) {
+        margin-right: .5em;
+    }
+}
