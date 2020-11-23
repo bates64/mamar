@@ -51,6 +51,7 @@ body {
     box-sizing: border-box;
 
     color: #8599b3 #14161a;
+    scrollbar-color: var(--mono-8) var(--mono-9);
 
     /* Inherit font-size from user */
     font-family: system-ui;
