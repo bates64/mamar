@@ -8,6 +8,7 @@ use crate::*;
 #[derive(Debug)]
 pub enum Error {
     InvalidMagic,
+    InvalidName(tinystr::Error),
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumSegments(u8),
     NonZeroPadding,
@@ -24,6 +25,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::InvalidMagic => write!(f, "Missing 'BGM' signature at start of file"),
+            // TODO(blocked): output source error too; see https://github.com/zbraniecki/tinystr/issues/29
+            Error::InvalidName(_source) => write!(f, "Invalid name string, must be 4 ASCII bytes"),
             Error::SizeMismatch {
                 true_size, internal_size,
             } => write!(f, "The file says it is {}B, but it is actually {}B", internal_size, true_size),
@@ -42,6 +45,8 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            // TODO(blocked); see https://github.com/zbraniecki/tinystr/issues/29
+            //Error::InvalidName(source) => Some(source),
             Error::Io(source) => Some(source),
             _ => None,
         }
@@ -155,8 +160,10 @@ impl Bgm {
         }
 
         debug_assert!(f.stream_position()? == 0x08);
-        let mut name = [0; 4];
-        f.read_exact(&mut name)?;
+        let mut index = [0; 4];
+        f.read_exact(&mut index)?;
+        let index = tinystr::TinyStr4::from_bytes(&index)
+            .map_err(|source| Error::InvalidName(source))?;
 
         debug_assert!(f.stream_position()? == 0x0C);
         f.read_padding(4)?;
@@ -180,7 +187,7 @@ impl Bgm {
         //debug_assert!(f.stream_position()? == 0x24);
 
         Ok(Self {
-            name,
+            index,
             segments: segment_offsets
                 .iter()
                 .map(|&pos| -> Result<Option<Segment>, Error> {
@@ -448,7 +455,6 @@ impl Deref for OffsetCommandMap {
 mod test {
     use super::*;
     use std::{path::Path, fs::File, io::Cursor};
-    use insta::assert_yaml_snapshot;
 
     /// Make sure that parsing garbage data returns an error.
     #[test]
@@ -509,11 +515,13 @@ mod test {
         assert!(Weak::ptr_eq(subroutine_labels[2].1, &end_labels[0]));
     }
 
-    /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).
-    /// Use `cargo install cargo-install` then `cargo insta test` to run.
+    /// Decodes every BGM file at bin/*.bin (extract these with bin/extract.py), simply asserting that they don't
+    /// error or panic.
+    // TODO(en): re-encode them and assert that nothing changed
     #[test]
-    fn all_songs_snapshot() {
+    fn all_songs_ok() {
         let bin_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bin");
+        let mut bins_extracted = false;
 
         for entry in bin_dir.read_dir().expect("bin dir") {
             if let Ok(entry) = entry {
@@ -521,14 +529,18 @@ mod test {
                 if let Some(ext) = path.extension() {
                     if ext == "bin" && path.is_file() {
                         let mut file = File::open(&path).expect("bin file");
-                        let bgm = Bgm::decode(&mut file).unwrap();
+                        let file_name = path.file_stem().unwrap().to_string_lossy();
 
-                        let test_name = path.file_stem().unwrap().to_string_lossy().to_string();
+                        Bgm::decode(&mut file).expect(&file_name);
 
-                        assert_yaml_snapshot!(test_name, bgm);
+                        bins_extracted = true;
                     }
                 }
             }
+        }
+
+        if !bins_extracted {
+            panic!("Test cases not extracted! Please extract them from an original Paper Mario (U) ROM using `./bin/extract.py path/to/rom.z64`.");
         }
     }
 }

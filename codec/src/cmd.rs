@@ -1,6 +1,5 @@
 use std::iter;
 use std::rc::{Rc, Weak};
-use serde::{Serialize, Deserialize};
 use smallvec::SmallVec;
 use by_address::ByAddress;
 
@@ -57,18 +56,6 @@ pub struct CommandSeq {
     /// have a reference to it leaked.
     time_index_map: RefCell<BTreeMap<usize, usize>>,
     */
-}
-
-// TODO. Need a representation (e.g. an array index) for references.
-impl Serialize for CommandSeq {
-    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
-        todo!("CommandSeq::serialize");
-    }
-}
-impl<'de> Deserialize<'de> for CommandSeq {
-    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
-        todo!("CommandSeq::deserialize")
-    }
 }
 
 impl CommandSeq {
