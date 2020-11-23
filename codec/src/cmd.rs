@@ -599,12 +599,7 @@ pub enum Command {
     /// stable during [CommandSeq] mutation.
     Label(Rc<Label>),
 
-    Subroutine {
-        /// Make sure to check that the command hasn't been moved from the parent [CommandSeq] when accessing.
-        /// You can do this using [CommandSeq::find_ref].
-        target: Rc<Label>, // XXX: would prefer to use Weak<_> but it doesn't impl Eq/PartialEq
-        length: u8,
-    },
+    Subroutine(Rc<Label>), // XXX: would prefer Weak<_> but it doesn't impl Eq
 
     /// An unknown/unimplemented command.
     Unknown(SmallVec<[u8; 4]>),
@@ -727,12 +722,21 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Label {
     pub name: String,
+
+    /// When `length > 0`, this is a subroutine. If the length is zero, this is just a jump point.
+    // TODO: figure out exactly how a subroutine behaves (does it return after completion..?)
+    pub length: u8,
 }
 
 impl Label {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, length: u8) -> Self {
         Self {
             name,
+            length,
         }
+    }
+
+    pub fn is_subroutine(&self) -> bool {
+        self.length == 0
     }
 }

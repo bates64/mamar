@@ -1,9 +1,13 @@
 use std::io::{self, prelude::*, SeekFrom};
 use std::fmt;
-use std::collections::BTreeMap;
+use std::collections::btree_map::{BTreeMap, Entry};
 use std::rc::Rc;
 use smallvec::smallvec;
 use crate::*;
+
+/// The number of labels allowed at the same command offset.
+/// A new label is generated for each unique-length Subroutine and for the first Jump command. Any others are shared.
+const LABEL_LIMIT: usize = 8;
 
 #[derive(Debug)]
 pub enum Error {
@@ -11,6 +15,10 @@ pub enum Error {
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumSegments(u8),
     NonZeroPadding,
+
+    /// If this happens often, [LABEL_LIMIT] can be trivially increased to resolve it.
+    LabelOverload,
+
     Io(io::Error),
 }
 
@@ -30,6 +38,7 @@ impl fmt::Display for Error {
             Error::InvalidNumSegments(num_segments) =>
                 write!(f, "Exactly 4 segment slots are supported, but this file has {}", num_segments),
             Error::NonZeroPadding => write!(f, "Expected padding but found non-zero byte(s)"),
+            Error::LabelOverload => write!(f, "Per-offset label limit of {} exceeded", LABEL_LIMIT),
             Error::Io(source) => if let io::ErrorKind::UnexpectedEof = source.kind() {
                 write!(f, "Unexpected end-of-file")
             } else {
@@ -276,12 +285,7 @@ impl CommandSeq {
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
         // CommandSeq by performing an in-order traversal.
-        let mut commands = BTreeMap::new();
-
-        // Tree offset keys are shifted from the input to make space for abstract commands such as Command::Label to
-        // be inserted between. This is fine, because, in the end, only the order of the keys matter (not their values).
-        let offset_key_command = |offset: usize| (offset + 1) << 1;
-        let offset_key_label= |offset: usize| offset_key_command(offset) - 1;
+        let mut commands = OffsetCommandMap::new();
 
         loop {
             let cmd_offset = (f.stream_position()? as usize) - start;
@@ -368,35 +372,100 @@ impl CommandSeq {
                 },
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
-                    // Create or reuse a Label pointing to the target offset.
                     let target_offset = f.read_u16_be()? as usize;
-                    let label = commands
-                        .entry(offset_key_label(target_offset)) // Label immediately before the target offset
-                        .or_insert_with(|| Command::Label(
-                            Rc::new(Label::new(format!("Offset {:#X}", target_offset))))
-                        );
+                    let subroutine_length = f.read_u8()?;
 
-                    if let Command::Label(label) = label {
-                        Command::Subroutine {
-                            target: label.clone(),
-                            length: f.read_u8()?,
-                        }
-                    } else {
-                        // There may not be a non-label at any (x << 1) - 1 index.
-                        unreachable!();
-                    }
+                    Command::Subroutine(commands.upsert_label(
+                        target_offset,
+                        Label::new(format!("Offset {:#X}", target_offset), subroutine_length),
+                    )?)
                 },
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
                 _ => Command::Unknown(smallvec![cmd_byte]),
             };
 
-            commands.insert(offset_key_command(cmd_offset), command);
+            commands.insert(cmd_offset, command);
         }
 
-        Ok(commands.into_values().collect())
+        Ok(commands.into())
     }
 }
+
+/// Temporary struct for [CommandSeq::decode].
+struct OffsetCommandMap(BTreeMap<usize, Command>);
+
+impl OffsetCommandMap {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    /// Tree offset keys are shifted from the input to make space for abstract commands such as Command::Label to
+    /// be inserted between. This is fine, because, in the end, only the order of the keys matters (not their values).
+    fn atob(offset: usize) -> usize {
+        (offset + 1) * LABEL_LIMIT
+    }
+
+    pub fn insert(&mut self, offset: usize, command: Command) {
+        self.0.insert(Self::atob(offset), command);
+    }
+
+    /// Find a Label with the specified length and offset, or make one if it doesn't exist.
+    pub fn upsert_label(&mut self, offset: usize, label: Label) -> Result<Rc<Label>, Error> {
+        for i in 1..LABEL_LIMIT {
+            let shifted_offset = Self::atob(offset) - i;
+
+            match self.0.entry(shifted_offset) {
+                Entry::Vacant(entry) => {
+                    // Insert a new label here.
+                    let label = Rc::new(label);
+                    entry.insert(Command::Label(label.clone()));
+                    return Ok(label);
+                },
+                Entry::Occupied(entry) => match entry.get() {
+                    Command::Label(l) => {
+                        if **l == label {
+                            // Re-use matching label `l`, discarding `label`.
+                            return Ok(l.clone());
+                        } else {
+                            // A non-matching label is here; skip it.
+                        }
+                    },
+                    other_command => {
+                        // This shouldn't happen - panic on debug builds.
+                        debug_assert!(
+                            false,
+                            "non-label command {:?} found in label range (shifted_offset = {:#X})",
+                            other_command,
+                            shifted_offset,
+                        );
+
+                        // In release it should be safe to ignore the unexpected non-Label entry; we also have the
+                        // secondary LABEL_LIMIT check erroring with Error::LabelOverload, which is more user-friendly
+                        // than a crashing panic.
+                    },
+                },
+            }
+        }
+
+        Err(Error::LabelOverload)
+    }
+}
+
+impl From<OffsetCommandMap> for CommandSeq {
+    fn from(map: OffsetCommandMap) -> CommandSeq {
+        map.0.into_values().collect()
+    }
+}
+
+/*
+impl Deref for OffsetCommandMap {
+    type Target = BTreeMap<usize, Command>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+*/
 
 #[cfg(test)]
 mod test {
@@ -425,15 +494,51 @@ mod test {
         let label = seq.at_time(0)[0];
 
         if let Command::Label(label) = label {
-            if let Command::Subroutine { target, length } = seq.at_time(10)[0] {
+            if let Command::Subroutine(target) = seq.at_time(10)[0] {
                 assert!(Rc::ptr_eq(label, target));
-                assert_eq!(*length, 0x10);
+                assert_eq!(label.length, 0x10);
             } else {
                 panic!("subroutine should be inserted at t=10");
             }
         } else {
             panic!("label should be inserted at t=0");
         }
+    }
+
+    #[test]
+    fn decode_subroutine_multiple_same_offset() {
+        let bytecode: Vec<u8> = vec![
+            0x01, // Delay(1) - at offset 0
+            0x09, // Delay(9)
+            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 }
+            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 } - same as above, should have shared label
+            0xFE, 0x00, 0x00, 0x20, // Subroutine { offset = 0, length = 0x20 } - different length, requires unique label
+            0x00, // End
+        ];
+
+        let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
+        dbg!(&seq);
+
+        let labels: Vec<&Rc<Label>> = seq.at_time(0)
+            .into_iter()
+            .take(2)
+            .map(|cmd| match cmd {
+                Command::Label(label) => label,
+                _ => panic!("labels should be inserted at t=0"),
+            })
+            .collect();
+
+        let subroutine_labels: Vec<&Rc<Label>> = seq.at_time(10)
+            .into_iter()
+            .map(|cmd| match cmd {
+                Command::Subroutine(label) => label,
+                _ => panic!("subroutine should be inserted at t=10"),
+            })
+            .collect();
+
+        assert!(Rc::ptr_eq(subroutine_labels[0], labels[1])); // Share
+        assert!(Rc::ptr_eq(subroutine_labels[1], labels[1])); // Share
+        assert!(Rc::ptr_eq(subroutine_labels[2], labels[0])); // Unique, because length is different
     }
 
     /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).

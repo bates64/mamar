@@ -8,7 +8,7 @@
     },
     "files.associations": {
         "**/snapshots/*": "yaml",
-        "*.css": "postcss"
+        //"*.css": "postcss"
     },
     "editor.rulers": [120],
 
