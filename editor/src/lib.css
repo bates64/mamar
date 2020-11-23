@@ -63,6 +63,10 @@ body {
     padding: 0;
 }
 
+::-webkit-scrollbar-thumb { background-color: var(--mono-8) }
+::-webkit-scrollbar-track { background-color: var(--mono-9) }
+::-webkit-scrollbar-corner { background-color: var(--mono-9) }
+
 ::selection {
     background: #333470f8;
 }
