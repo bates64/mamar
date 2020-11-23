@@ -1,13 +1,9 @@
 use std::io::{self, prelude::*, SeekFrom};
 use std::fmt;
 use std::collections::btree_map::{BTreeMap, Entry};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use smallvec::smallvec;
 use crate::*;
-
-/// The number of labels allowed at the same command offset.
-/// A new label is generated for each unique-length Subroutine and for the first Jump command. Any others are shared.
-const LABEL_LIMIT: usize = 8;
 
 #[derive(Debug)]
 pub enum Error {
@@ -15,10 +11,6 @@ pub enum Error {
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumSegments(u8),
     NonZeroPadding,
-
-    /// If this happens often, [LABEL_LIMIT] can be trivially increased to resolve it.
-    LabelOverload,
-
     Io(io::Error),
 }
 
@@ -38,7 +30,6 @@ impl fmt::Display for Error {
             Error::InvalidNumSegments(num_segments) =>
                 write!(f, "Exactly 4 segment slots are supported, but this file has {}", num_segments),
             Error::NonZeroPadding => write!(f, "Expected padding but found non-zero byte(s)"),
-            Error::LabelOverload => write!(f, "Per-offset label limit of {} exceeded", LABEL_LIMIT),
             Error::Io(source) => if let io::ErrorKind::UnexpectedEof = source.kind() {
                 write!(f, "Unexpected end-of-file")
             } else {
@@ -375,20 +366,11 @@ impl CommandSeq {
                     let start_offset = f.read_u16_be()? as usize;
                     let end_offset = start_offset + (f.read_u8()? as usize);
 
-                    Command::Subroutine {
-                        start: commands.upsert_label(
-                            start_offset,
-                            Label {
-                                name: Some(format!("Offset {:#X}", start_offset)),
-                            },
-                        )?,
-                        end: commands.upsert_label(
-                            end_offset,
-                            Label {
-                                name: Some(format!("Offset {:#X}", end_offset)),
-                            },
-                        )?,
-                    }
+                    Command::Subroutine(CommandRange {
+                        name: format!("Subroutine {:#X}", cmd_offset),
+                        start: commands.upsert_marker(start_offset, Marker),
+                        end: commands.upsert_marker(end_offset, Marker),
+                    })
                 },
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
@@ -410,55 +392,40 @@ impl OffsetCommandMap {
         Self(BTreeMap::new())
     }
 
-    /// Tree offset keys are shifted from the input to make space for abstract commands such as Command::Label to
+    /// Tree offset keys are shifted from the input to make space for abstract commands such as Command::Marker to
     /// be inserted between. This is fine, because, in the end, only the order of the keys matters (not their values).
     fn atob(offset: usize) -> usize {
-        (offset + 1) * LABEL_LIMIT
+        (offset + 1) * 2
     }
 
     pub fn insert(&mut self, offset: usize, command: Command) {
         self.0.insert(Self::atob(offset), command);
     }
 
-    /// Finds the given label at `offset`, or inserts it if it cannot be found.
-    pub fn upsert_label(&mut self, offset: usize, label: Label) -> Result<Rc<Label>, Error> {
-        for i in 1..LABEL_LIMIT {
-            let shifted_offset = Self::atob(offset) - i;
+    /// Finds the given marker at `offset`, or inserts it if it cannot be found.
+    pub fn upsert_marker(&mut self, offset: usize, marker: Marker) -> Weak<Marker> {
+        let shifted_offset = Self::atob(offset) - 1;
 
-            match self.0.entry(shifted_offset) {
-                Entry::Vacant(entry) => {
-                    // Insert a new label here.
-                    let label = Rc::new(label);
-                    entry.insert(Command::Label(label.clone()));
-                    return Ok(label);
+        match self.0.entry(shifted_offset) {
+            Entry::Vacant(entry) => {
+                // Insert the new marker here.
+                let marker = Rc::new(marker);
+                let marker_weak = Rc::downgrade(&marker);
+                entry.insert(Command::Marker(marker.into()));
+                marker_weak
+            },
+            Entry::Occupied(entry) => match entry.get() {
+                Command::Marker(l) => {
+                    // Re-use matching label `l`, discarding `label`.
+                    Rc::downgrade(&**l)
                 },
-                Entry::Occupied(entry) => match entry.get() {
-                    Command::Label(l) => {
-                        if **l == label {
-                            // Re-use matching label `l`, discarding `label`.
-                            return Ok(l.clone());
-                        } else {
-                            // A non-matching label is here; skip it.
-                        }
-                    },
-                    other_command => {
-                        // This shouldn't happen - panic on debug builds.
-                        debug_assert!(
-                            false,
-                            "non-label command {:?} found in label range (shifted_offset = {:#X})",
-                            other_command,
-                            shifted_offset,
-                        );
-
-                        // In release it should be safe to ignore the unexpected non-Label entry; we also have the
-                        // secondary LABEL_LIMIT check erroring with Error::LabelOverload, which is more user-friendly
-                        // than a crashing panic.
-                    },
-                },
-            }
+                other_command => panic!(
+                    "non-label command {:?} found in label range (shifted_offset = {:#X})",
+                    other_command,
+                    shifted_offset,
+                ),
+            },
         }
-
-        Err(Error::LabelOverload)
     }
 }
 
@@ -505,24 +472,24 @@ mod test {
         let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
         dbg!(&seq);
 
-        let start_labels: Vec<&Rc<Label>> = seq.at_time(0)
+        let start_labels: Vec<Weak<Marker>> = seq.at_time(0)
             .into_iter()
             .map_while(|cmd| match cmd {
-                Command::Label(label) => Some(label),
+                Command::Marker(label) => Some(Rc::downgrade(&**label)),
                 _ => None,
             })
             .collect();
-        let end_labels: Vec<&Rc<Label>> = seq.at_time(11)
+        let end_labels: Vec<Weak<Marker>> = seq.at_time(11)
             .into_iter()
             .map_while(|cmd| match cmd {
-                Command::Label(label) => Some(label),
+                Command::Marker(label) => Some(Rc::downgrade(&**label)),
                 _ => None,
             })
             .collect();
-        let subroutine_labels: Vec<(&Rc<Label>, &Rc<Label>)> = seq.at_time(10)
+        let subroutine_labels: Vec<(&Weak<Marker>, &Weak<Marker>)> = seq.at_time(10)
             .into_iter()
             .map_while(|cmd| match cmd {
-                Command::Subroutine { start, end } => Some((start, end)),
+                Command::Subroutine(CommandRange { start, end, .. }) => Some((start, end)),
                 _ => None,
             })
             .collect();
@@ -532,14 +499,14 @@ mod test {
         assert_eq!(subroutine_labels.len(), 3);
 
         // Check start labels
-        assert!(Rc::ptr_eq(subroutine_labels[0].0, start_labels[0]));
-        assert!(Rc::ptr_eq(subroutine_labels[1].0, start_labels[0]));
-        assert!(Rc::ptr_eq(subroutine_labels[2].0, start_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[0].0, &start_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[1].0, &start_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[2].0, &start_labels[0]));
 
         // Check end labels
-        assert!(Rc::ptr_eq(subroutine_labels[0].1, end_labels[0]));
-        assert!(Rc::ptr_eq(subroutine_labels[1].1, end_labels[0]));
-        assert!(Rc::ptr_eq(subroutine_labels[2].1, end_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[0].1, &end_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[1].1, &end_labels[0]));
+        assert!(Weak::ptr_eq(subroutine_labels[2].1, &end_labels[0]));
     }
 
     /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).

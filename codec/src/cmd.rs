@@ -1,7 +1,8 @@
 use std::iter;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use serde::{Serialize, Deserialize};
 use smallvec::SmallVec;
+use by_address::ByAddress;
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -530,7 +531,7 @@ pub enum Command {
     /// `Delay(0)` is considered a no-op, but cannot be encoded.
     ///
     /// See [`Command::delays(delta_time)`](Command::delays) to create delays longer than [u8::MAX] ticks.
-    Delay(u8),
+    Delay(u8), // TODO: use bounded-integer and add None for no-op instead of invalid Delay(0)
 
     /// Plays a note or drum sound. Non-blocking(?), i.e. does **not** act like a [`Delay(length)`](Command::Delay) and
     /// only continue execution once the note has finished playing.
@@ -594,16 +595,11 @@ pub enum Command {
     /// Sets the track's voice. Field is an index into [Bgm::voices].
     TrackVoice(u8),
 
-    /// Marks a specific place in a [CommandSeq]. `Command::Label`s don't actually exist in the BGM binary format
-    /// (instead, file offsets are used); we use this abstraction rather than CommandSeq indices because they stay
-    /// stable during [CommandSeq] mutation.
-    Label(Rc<Label>),
+    /// Marks a specific place in a [CommandSeq].
+    Marker(ByAddress<Rc<Marker>>),
 
     /// Jumps to the start label and executes until the end label is found.
-    Subroutine {
-        start: Rc<Label>,
-        end: Rc<Label>,
-    },
+    Subroutine(CommandRange),
 
     /// An unknown/unimplemented command.
     Unknown(SmallVec<[u8; 4]>),
@@ -723,9 +719,26 @@ impl<'a> Iterator for TimeGroupIter<'a> {
     }
 }
 
-/// Labels don't actually exist in the BGM binary format (instead, file offsets are used); we use this abstraction
+/// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this abstraction
 /// rather than [CommandSeq] indices because they stay stable during mutation.
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct Label {
-    pub name: Option<String>,
+#[derive(Debug)]
+pub struct Marker;
+
+#[derive(Debug, Clone)]
+pub struct CommandRange {
+    pub name: String,
+
+    // These are Weak<_> so they become None if the relevant Command::Marker is dropped.
+    pub(crate) start: Weak<Marker>,
+    pub(crate) end: Weak<Marker>, // Must come after `start`
 }
+
+impl PartialEq for CommandRange {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && Weak::ptr_eq(&self.start, &other.start)
+            && Weak::ptr_eq(&self.end, &other.end)
+    }
+}
+
+impl Eq for CommandRange {}
