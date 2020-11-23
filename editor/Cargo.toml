@@ -8,14 +8,14 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
-wee_alloc = { version = "0.4", optional = true } # slower but much smaller
-console_error_panic_hook = "0.1"
-log = "0.4"
-console_log = { version = "0.2", features = ["color"] }
-yew = "0.17"
-lazy_static = "1.4"
+wasm-bindgen = "0.2.68"
+wasm-bindgen-futures = "0.4.18"
+js-sys = "0.3.45"
+web-sys = { version = "0.3.45", features = ["console"] }
+wee_alloc = { version = "0.4.5", optional = true } # slower but much smaller
+console_error_panic_hook = "0.1.6"
+log = "0.4.11"
+console_log = { version = "0.2.0", features = ["color"] }
+yew = "0.17.4"
+lazy_static = "1.4.0"
 codec = { path = "../codec" }
