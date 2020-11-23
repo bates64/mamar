@@ -372,13 +372,23 @@ impl CommandSeq {
                 },
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
-                    let target_offset = f.read_u16_be()? as usize;
-                    let subroutine_length = f.read_u8()?;
+                    let start_offset = f.read_u16_be()? as usize;
+                    let end_offset = start_offset + (f.read_u8()? as usize);
 
-                    Command::Subroutine(commands.upsert_label(
-                        target_offset,
-                        Label::new(format!("Offset {:#X}", target_offset), subroutine_length),
-                    )?)
+                    Command::Subroutine {
+                        start: commands.upsert_label(
+                            start_offset,
+                            Label {
+                                name: Some(format!("Offset {:#X}", start_offset)),
+                            },
+                        )?,
+                        end: commands.upsert_label(
+                            end_offset,
+                            Label {
+                                name: Some(format!("Offset {:#X}", end_offset)),
+                            },
+                        )?,
+                    }
                 },
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
@@ -410,7 +420,7 @@ impl OffsetCommandMap {
         self.0.insert(Self::atob(offset), command);
     }
 
-    /// Find a Label with the specified length and offset, or make one if it doesn't exist.
+    /// Finds the given label at `offset`, or inserts it if it cannot be found.
     pub fn upsert_label(&mut self, offset: usize, label: Label) -> Result<Rc<Label>, Error> {
         for i in 1..LABEL_LIMIT {
             let shifted_offset = Self::atob(offset) - i;
@@ -483,62 +493,53 @@ mod test {
     #[test]
     fn decode_subroutine() {
         let bytecode: Vec<u8> = vec![
-            0x01, // Delay(1) - at offset 0
+            0x01, // Delay(1) - at offset 0 (subroutine start)
             0x09, // Delay(9)
-            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 } - at t=10
-            0x00, // End
-        ];
-
-        let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
-
-        let label = seq.at_time(0)[0];
-
-        if let Command::Label(label) = label {
-            if let Command::Subroutine(target) = seq.at_time(10)[0] {
-                assert!(Rc::ptr_eq(label, target));
-                assert_eq!(label.length, 0x10);
-            } else {
-                panic!("subroutine should be inserted at t=10");
-            }
-        } else {
-            panic!("label should be inserted at t=0");
-        }
-    }
-
-    #[test]
-    fn decode_subroutine_multiple_same_offset() {
-        let bytecode: Vec<u8> = vec![
-            0x01, // Delay(1) - at offset 0
-            0x09, // Delay(9)
-            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 }
-            0xFE, 0x00, 0x00, 0x10, // Subroutine { offset = 0, length = 0x10 } - same as above, should have shared label
-            0xFE, 0x00, 0x00, 0x20, // Subroutine { offset = 0, length = 0x20 } - different length, requires unique label
-            0x00, // End
+            0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
+            0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
+            0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
+            0x01, // Delay(1)
+            0x00, // End - at offset 15
         ];
 
         let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
         dbg!(&seq);
 
-        let labels: Vec<&Rc<Label>> = seq.at_time(0)
+        let start_labels: Vec<&Rc<Label>> = seq.at_time(0)
             .into_iter()
-            .take(2)
-            .map(|cmd| match cmd {
-                Command::Label(label) => label,
-                _ => panic!("labels should be inserted at t=0"),
+            .map_while(|cmd| match cmd {
+                Command::Label(label) => Some(label),
+                _ => None,
+            })
+            .collect();
+        let end_labels: Vec<&Rc<Label>> = seq.at_time(11)
+            .into_iter()
+            .map_while(|cmd| match cmd {
+                Command::Label(label) => Some(label),
+                _ => None,
+            })
+            .collect();
+        let subroutine_labels: Vec<(&Rc<Label>, &Rc<Label>)> = seq.at_time(10)
+            .into_iter()
+            .map_while(|cmd| match cmd {
+                Command::Subroutine { start, end } => Some((start, end)),
+                _ => None,
             })
             .collect();
 
-        let subroutine_labels: Vec<&Rc<Label>> = seq.at_time(10)
-            .into_iter()
-            .map(|cmd| match cmd {
-                Command::Subroutine(label) => label,
-                _ => panic!("subroutine should be inserted at t=10"),
-            })
-            .collect();
+        assert_eq!(start_labels.len(), 1);
+        assert_eq!(end_labels.len(), 1);
+        assert_eq!(subroutine_labels.len(), 3);
 
-        assert!(Rc::ptr_eq(subroutine_labels[0], labels[1])); // Share
-        assert!(Rc::ptr_eq(subroutine_labels[1], labels[1])); // Share
-        assert!(Rc::ptr_eq(subroutine_labels[2], labels[0])); // Unique, because length is different
+        // Check start labels
+        assert!(Rc::ptr_eq(subroutine_labels[0].0, start_labels[0]));
+        assert!(Rc::ptr_eq(subroutine_labels[1].0, start_labels[0]));
+        assert!(Rc::ptr_eq(subroutine_labels[2].0, start_labels[0]));
+
+        // Check end labels
+        assert!(Rc::ptr_eq(subroutine_labels[0].1, end_labels[0]));
+        assert!(Rc::ptr_eq(subroutine_labels[1].1, end_labels[0]));
+        assert!(Rc::ptr_eq(subroutine_labels[2].1, end_labels[0]));
     }
 
     /// Parses every BGM file at bin/*.bin (extract these with bin/extract.py).

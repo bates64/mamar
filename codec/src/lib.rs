@@ -1,4 +1,4 @@
-#![feature(seek_convenience, map_into_keys_values)] // Requires nightly Rust
+#![feature(seek_convenience, map_into_keys_values, iter_map_while)] // Requires nightly Rust
 
 use serde::{Serialize, Deserialize};
 
