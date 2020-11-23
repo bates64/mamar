@@ -5,6 +5,7 @@
         "editor/dist": true,
         "editor/pkg": true,
         "Cargo.lock": true,
+        "editor/package-lock.json": true,
     },
     "files.associations": {
         "**/snapshots/*": "yaml",
