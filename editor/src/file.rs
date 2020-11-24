@@ -41,9 +41,9 @@ pub struct FileTypes<'a> {
 #[derive(Debug)]
 pub struct File {
     name: String,
-    pub blob: Blob,
+    blob: Blob,
     handle: JsValue,
-    types: FileTypes<'static>,
+    pub types: FileTypes<'static>,
 }
 
 impl File {

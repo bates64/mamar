@@ -155,7 +155,7 @@ impl Component for Model {
                             if let Some(file) = File::open(FileTypes {
                                 // TODO: also support .bgm (custom) and .midi
                                 extensions: ".bin",
-                                mime_types: "text/plain",
+                                mime_types: "application/octect-stream",
                             }).await {
                                 let link = unsafe { &(*model).link };
 
