@@ -90,13 +90,10 @@ impl File {
         Uint8Array::new(&buffer).to_vec()
     }
 
-    pub async fn write(&mut self, data: &[u8]) -> Result<(), JsValue> {
-        self.blob = Blob::new_with_u8_array_sequence(unsafe { &Uint8Array::view(data) })?;
-        Ok(())
-    }
-
     /// Saves the file to disk. May prompt the user for permission (and Err if they say no).
-    pub async fn save(&self) -> Result<(), JsValue> {
+    pub async fn save(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.blob = Blob::new_with_u8_array_sequence(unsafe { &Uint8Array::view(data) })?;
+
         save_file(
             &self.blob,
             &self.name,
@@ -107,20 +104,14 @@ impl File {
     }
 
     /// Saves the file to disk, but prompts the user to change the filename first.
-    pub async fn save_as(&mut self) -> Result<(), JsValue> {
-        match save_file(
-            &self.blob,
-            &self.name,
-            &self.types.extensions,
-            &self.types.mime_types,
-            &JsValue::UNDEFINED,
-        ).await {
-            Ok(_) => {
-                self.handle = recent_file_handle();
-                self.name = recent_file_name();
-                Ok(())
-            },
-            err => err,
-        }
+    pub async fn save_as(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.handle = JsValue::UNDEFINED;
+
+        self.save(data).await?;
+
+        self.handle = recent_file_handle();
+        self.name = recent_file_name();
+
+        Ok(())
     }
 }

@@ -171,11 +171,12 @@ impl Component for Model {
 
                         return true;
                     },
+                    /*
                     FileOperation::Save => spawn_local(async {
                         let cell = MODEL_PTR.try_lock().unwrap();
                         let model = cell.get();
 
-                        let file = unsafe { &(*model).file };
+                        let file = unsafe { &mut (*model).file };
                         if let FileState::Open(file, _bgm) = file {
                             // TODO: file.write(_bgm.encode());
                             file.save().await.unwrap();
@@ -199,6 +200,8 @@ impl Component for Model {
                             }
                         }
                     }),
+                    */
+                    _ => web_sys::window().unwrap().alert_with_message("Not yet implemented :(").unwrap(),
                 };
                 false
             },
