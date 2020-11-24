@@ -22,7 +22,9 @@ pub struct Bgm {
     pub index: TinyStr4,
 
     pub segments: [Option<Segment>; 4],
-    // TODO: percussion, voices (instruments)
+
+    pub drums: Vec<Drum>,
+    pub voices: Vec<Voice>,
 }
 
 impl Default for Bgm {
@@ -30,6 +32,8 @@ impl Default for Bgm {
         Self {
             index: tinystr4!("xxx "), // TODO: check engine accepts this
             segments: [None, None, None, None],
+            drums: Vec::new(),
+            voices: Vec::new(),
         }
     }
 }
@@ -62,6 +66,36 @@ impl Subsegment {
             Subsegment::Unknown { flags, .. } => flags,
         }
     }
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct Drum {
+    pub bank: u8,
+    pub patch: u8,
+    pub coarse_tune: u8,
+    pub fine_tune: u8,
+    pub volume: u8,
+    pub pan: u8,
+    pub reverb: u8,
+    pub unk_07: u8,
+
+    // The following are possibly just padding, or they just have unused uses. Needs testing
+    pub unk_08: u8, // Unused; zero in all original songs
+    pub unk_09: u8, // Unused
+    pub unk_0a: u8, // Unused
+    pub unk_0b: u8, // Unused
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct Voice {
+    pub bank: u8,
+    pub patch: u8,
+    pub volume: u8,
+    pub pan: u8,
+    pub reverb: u8,
+    pub coarse_tune: u8,
+    pub fine_tune: u8,
+    pub unk_07: u8,
 }
 
 /// Aligns a value to the next multiple of n.

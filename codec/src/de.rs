@@ -184,7 +184,13 @@ impl Bgm {
             .collect_array()?; // We need to obtain all offsets before seeking to any
 
         // TODO: percussion, instruments
-        //debug_assert!(f.stream_position()? == 0x24);
+        debug_assert!(f.stream_position()? == 0x1C);
+        let drums_offset = (f.read_u16_be()? as u64) << 2;
+        let drums_count = f.read_u16_be()?;
+        let voices_offset = (f.read_u16_be()? as u64) << 2;
+        let voices_count = f.read_u16_be()?;
+
+        debug_assert!(f.stream_position()? == 0x24); // End of struct
 
         Ok(Self {
             index,
@@ -218,6 +224,24 @@ impl Bgm {
                     }
                 })
                 .collect_array_pedantic()?,
+            drums: if drums_offset != 0 {
+                f.seek(SeekFrom::Start(drums_offset))?;
+                (0..drums_count)
+                    .into_iter()
+                    .map(|_| Drum::decode(f))
+                    .collect::<Result<_, _>>()?
+            } else {
+                Vec::new()
+            },
+            voices: if voices_offset != 0 {
+                f.seek(SeekFrom::Start(voices_offset))?;
+                (0..voices_count)
+                    .into_iter()
+                    .map(|_| Voice::decode(f))
+                    .collect::<Result<_, _>>()?
+            } else {
+                Vec::new()
+            },
         })
     }
 }
@@ -450,6 +474,41 @@ impl Deref for OffsetCommandMap {
     }
 }
 */
+
+
+impl Drum {
+    fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        Ok(Self {
+            bank: f.read_u8()?,
+            patch: f.read_u8()?,
+            coarse_tune: f.read_u8()?,
+            fine_tune: f.read_u8()?,
+            volume: f.read_u8()?,
+            pan: f.read_u8()?,
+            reverb: f.read_u8()?,
+            unk_07: f.read_u8()?,
+            unk_08: f.read_u8()?,
+            unk_09: f.read_u8()?,
+            unk_0a: f.read_u8()?,
+            unk_0b: f.read_u8()?,
+        })
+    }
+}
+
+impl Voice {
+    fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        Ok(Self {
+            bank: f.read_u8()?,
+            patch: f.read_u8()?,
+            volume: f.read_u8()?,
+            pan: f.read_u8()?,
+            reverb: f.read_u8()?,
+            coarse_tune: f.read_u8()?,
+            fine_tune: f.read_u8()?,
+            unk_07: f.read_u8()?,
+        })
+    }
+}
 
 #[cfg(test)]
 mod test {
