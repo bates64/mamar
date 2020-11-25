@@ -25,7 +25,7 @@ jobs:
         BASEROM_URL: ${{ secrets.BASEROM_URL }}
 
     - name: Extract assets from baserom
-      run: ./codec/bin/extract.py baserom.z64
+      run: python3 codec/tests/bin/extract.py baserom.z64
 
     - name: Build
       uses: actions-rs/cargo@v1
