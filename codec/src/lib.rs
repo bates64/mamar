@@ -1,4 +1,4 @@
-#![feature(seek_convenience, map_into_keys_values, iter_map_while)] // Requires nightly Rust
+#![feature(seek_convenience, map_into_keys_values, iter_map_while, test)] // Requires nightly Rust
 #![deny(unused_crate_dependencies)]
 
 use tinystr::{tinystr4, TinyStr4};
@@ -111,13 +111,19 @@ fn align(value: u32, n: u32) -> u32 {
     }
 }
 
-#[test]
-fn test_align() {
-    assert_eq!(align(0, 5), 5);
-    assert_eq!(align(5, 5), 5);
-    assert_eq!(align(6, 5), 10);
+#[cfg(test)]
+mod test {
+    use super::*;
 
-    // 0 and 1 values for `n` should be a no-op
-    assert_eq!(align(36, 0), 36);
-    assert_eq!(align(36, 1), 36);
+
+    #[test]
+    fn test_align() {
+        assert_eq!(align(0, 5), 5);
+        assert_eq!(align(5, 5), 5);
+        assert_eq!(align(6, 5), 10);
+
+        // 0 and 1 values for `n` should be a no-op
+        assert_eq!(align(36, 0), 36);
+        assert_eq!(align(36, 1), 36);
+    }
 }

@@ -11,7 +11,7 @@ pub enum Error {
     InvalidName(tinystr::Error),
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumSegments(u8),
-    NonZeroPadding,
+    NonZeroPadding, // TODO: add { position: u64 }
     Io(io::Error),
 }
 
@@ -77,7 +77,6 @@ impl<R: Read> ReadExt for R {
         self.read_exact(&mut buffer)?;
         Ok(u16::from_be_bytes(buffer))
     }
-
 
     fn read_u32_be(&mut self) -> io::Result<u32> {
         let mut buffer = [0; 4];
@@ -183,7 +182,6 @@ impl Bgm {
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
             .collect_array()?; // We need to obtain all offsets before seeking to any
 
-        // TODO: percussion, instruments
         debug_assert!(f.stream_position()? == 0x1C);
         let drums_offset = (f.read_u16_be()? as u64) << 2;
         let drums_count = f.read_u16_be()?;
@@ -204,6 +202,8 @@ impl Bgm {
                         // Seek to the offset and decode the segment(s) there
                         let pos = pos as u64;
                         f.seek(SeekFrom::Start(pos))?;
+
+                        println!("segment {:#X}", pos);
 
                         let mut segment = vec![];
                         let mut i = 0;
@@ -248,13 +248,15 @@ impl Bgm {
 
 impl Subsegment {
     fn decode<R: Read + Seek>(f: &mut R, start: u64) -> Result<Self, Error> {
+        println!("subsegment {:#X}", f.stream_position()?);
         let flags = f.read_u8()?;
 
         if flags & 0x70 == 0x10 {
             f.read_padding(1)?;
-            let offset = (f.read_u16_be()? as u64) << 2;
 
+            let offset = (f.read_u16_be()? as u64) << 2;
             let tracks_start = start + offset;
+            println!("tracks start = {:#X} (offset = {:#X})", tracks_start, offset);
 
             Ok(Subsegment::Tracks {
                 flags,
@@ -290,6 +292,7 @@ impl Track {
             } else {
                 f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
                 let seq = CommandSeq::decode(f)?;
+                println!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
 
                 // Assumption; structure will need changing if false for matching.
                 // Maybe use command "groups" which can be represented in UI also
@@ -389,8 +392,11 @@ impl CommandSeq {
                 0xFA => Command::Unknown(smallvec![0xFA]),
                 0xFB => Command::Unknown(smallvec![0xFB]),
                 0xFC => {
+                    //let set_pos = f.read_u16_be()?;
+                    //let count = f.read_u8()?;
+
                     // TODO Jump random
-                    Command::Unknown(smallvec![0xFC, f.read_u8()?, f.read_u8()?, f.read_u8()?, f.read_u8()?])
+                    Command::Unknown(smallvec![0xFC, f.read_u8()?, f.read_u8()?, f.read_u8()?])
                 },
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
@@ -513,12 +519,12 @@ impl Voice {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{path::Path, fs::File, io::Cursor};
+    use std::io::Cursor;
 
     /// Make sure that parsing garbage data returns an error.
     #[test]
     fn garbage() {
-        let data = include_bytes!("../bin/extract.py");
+        let data = include_bytes!("de.rs");
         assert!(Bgm::from_bytes(data).is_err());
     }
 
@@ -572,34 +578,5 @@ mod test {
         assert!(Weak::ptr_eq(subroutine_labels[0].1, &end_labels[0]));
         assert!(Weak::ptr_eq(subroutine_labels[1].1, &end_labels[0]));
         assert!(Weak::ptr_eq(subroutine_labels[2].1, &end_labels[0]));
-    }
-
-    /// Decodes every BGM file at bin/*.bin (extract these with bin/extract.py), simply asserting that they don't
-    /// error or panic.
-    // TODO(en): re-encode them and assert that nothing changed
-    #[test]
-    fn all_songs_ok() {
-        let bin_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bin");
-        let mut bins_extracted = false;
-
-        for entry in bin_dir.read_dir().expect("bin dir") {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if let Some(ext) = path.extension() {
-                    if ext == "bin" && path.is_file() {
-                        let mut file = File::open(&path).expect("bin file");
-                        let file_name = path.file_stem().unwrap().to_string_lossy();
-
-                        Bgm::decode(&mut file).expect(&file_name);
-
-                        bins_extracted = true;
-                    }
-                }
-            }
-        }
-
-        if !bins_extracted {
-            panic!("Test cases not extracted! Please extract them from an original Paper Mario (U) ROM using `./bin/extract.py path/to/rom.z64`.");
-        }
     }
 }

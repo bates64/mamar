@@ -8,3 +8,4 @@ edition = "2018"
 smallvec = { version = "1.5.0", features = ["write"] }
 by_address = "1.0.4"
 tinystr = "0.4.1"
+#log = "0.4.11"

@@ -1,0 +1,6 @@
+*.bin
+*.z64
+
+# debug output from failed tests
+*.decoded.txt
+*.nonmatching.bin
