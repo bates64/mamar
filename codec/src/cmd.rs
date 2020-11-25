@@ -1,5 +1,6 @@
 use std::iter;
 use std::rc::{Rc, Weak};
+use std::hash::{Hash, Hasher};
 use smallvec::SmallVec;
 use by_address::ByAddress;
 
@@ -36,7 +37,7 @@ use by_address::ByAddress;
 /// that this collection is not equivalent to [Vec] - in many ways it acts more like a
 /// [HashMap](std::collections::HashMap) (i.e. a dictionary) with relative-time keys and [Command] values (for
 /// example, you cannot lookup by vector index, because ordering is undefined between [Delay] partitions).
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone)]
 pub struct CommandSeq {
     /// List of [Command]s in time order. Sets of [Command]s at the same time value have undefined ordering, so this
     /// is not a public field. Similarly, [CommandSeq] does not [Deref](std::ops::Deref) to the [Vec] it wraps
@@ -511,7 +512,7 @@ enum DelayLookup {
 /// not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
 /// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
 /// relative time positioning.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
     ///
@@ -734,3 +735,11 @@ impl PartialEq for CommandRange {
 }
 
 impl Eq for CommandRange {}
+
+impl Hash for CommandRange {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.start.as_ptr().hash(state);
+        self.end.as_ptr().hash(state);
+    }
+}

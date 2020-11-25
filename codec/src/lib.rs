@@ -1,5 +1,6 @@
 #![feature(seek_convenience, map_into_keys_values, map_first_last, iter_map_while)] // Requires nightly Rust
 
+use std::rc::Rc;
 use tinystr::{tinystr4, TinyStr4};
 
 /// Encoder ([Bgm] -> .bin)
@@ -44,7 +45,8 @@ type Segment = Vec<Subsegment>;
 pub enum Subsegment {
     Tracks {
         flags: u8,
-        tracks: [Track; 16],
+        tracks: Rc<[Track; 16]>,
+        de_pos: u64, // TEMP
     },
     Unknown {
         flags: u8,
@@ -56,6 +58,7 @@ pub enum Subsegment {
 pub struct Track {
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,
+    pub de_commands_size: usize, // TEMP
 }
 
 impl Subsegment {

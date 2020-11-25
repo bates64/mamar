@@ -1,7 +1,7 @@
-use std::io::{self, prelude::*, SeekFrom};
+use std::{collections::HashMap, io::{self, prelude::*, SeekFrom}};
 use std::fmt;
 use by_address::ByAddress;
-use log::debug;
+use log::{debug, info};
 use crate::*;
 
 #[derive(Debug)]
@@ -210,20 +210,33 @@ impl Bgm {
         }
 
         // Write segment data
+        let mut encoded_tracks = HashMap::new();
         for (segment_start, todo_tracks) in todo_segments.into_iter() {
             for (offset, tracks) in todo_tracks.into_iter() {
+                // If we've seen these tracks already, just point to the already-encoded tracks.
+                if let Some(track_data_start) = encoded_tracks.get(&Rc::as_ptr(tracks)) {
+                    info!("sharing tracks at {:#X}", track_data_start);
+
+                    // Write offset in header
+                    let pos = ((track_data_start - segment_start) >> 2) as u16;
+                    f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
+
+                    continue;
+                }
+
                 f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
                 let track_data_start = f.stream_position()?;
                 debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
 
                 // Write offset in header
-                let pos = (track_data_start - segment_start) >> 2;
-                f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
+                let pos = ((track_data_start - segment_start) >> 2) as u16;
+                f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
+                encoded_tracks.insert(Rc::as_ptr(tracks), track_data_start);
 
                 // Write flags
                 let mut todo_commands = Vec::new();
-                for Track { flags, commands } in tracks {
+                for Track { flags, commands, de_commands_size: _ } in tracks.iter() {
                     //debug!("write commands_offset {:#X}", f.stream_position()?);
                     if commands.len() > 0 {
                         // Need to write command data after the track
@@ -236,7 +249,7 @@ impl Bgm {
 
                 // Write command sequences
                 for (offset, seq) in todo_commands.into_iter() {
-                    debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
+                    //debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
 
                     // Write pointer to here
                     let pos = f.stream_position()? - track_data_start; // Notice no shift
@@ -245,10 +258,6 @@ impl Bgm {
                     seq.encode(f)?;
                 }
             }
-
-            //debug!("command sequences {:#X}", f.stream_position()?);
-
-
         }
 
         // Write file size
@@ -301,7 +310,7 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a [Track; 16])>, Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a Rc<[Track; 16]>)>, Error<'a>> {
         f.write_u8(self.flags())?;
 
         match self {
@@ -323,10 +332,6 @@ impl Subsegment {
 
 impl CommandSeq {
     pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
-        use std::collections::HashMap;
-
-        let start_of_seq = f.stream_position()?;
-
         let mut marker_to_offset = HashMap::new();
         let mut todo_subroutines = Vec::new();
 
@@ -445,7 +450,7 @@ impl CommandSeq {
             }
         }
 
-        debug!("end commandseq {:#X}", f.stream_position()?);
+        //debug!("end commandseq {:#X}", f.stream_position()?);
         let end_pos = SeekFrom::Start(f.stream_position()?);
 
         // Update the start/length of any subroutine commands. We have to do this after everything else, because
