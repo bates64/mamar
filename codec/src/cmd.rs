@@ -591,6 +591,10 @@ pub enum Command {
 
     /// An unknown/unimplemented command.
     Unknown(SmallVec<[u8; 4]>),
+
+    /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
+    /// via a [`Subroutine`](Command::Subroutine) jump.
+    End,
 }
 
 use Command::Delay;

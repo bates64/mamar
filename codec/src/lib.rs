@@ -1,5 +1,4 @@
-#![feature(seek_convenience, map_into_keys_values, iter_map_while, test)] // Requires nightly Rust
-#![deny(unused_crate_dependencies)]
+#![feature(seek_convenience, map_into_keys_values, map_first_last, iter_map_while)] // Requires nightly Rust
 
 use tinystr::{tinystr4, TinyStr4};
 

@@ -96,7 +96,7 @@ songs = [
     (0xF69640, "Shooting_Star_Summit_61.bin"),
     (0xF6A050, "Legendary_Star_Ship_62.bin"),
     (0xF6C270, "Star_Sanctuary_63.bin"),
-    (0xF6CED0, "Bowser_s_Castle_-_Caves_65.bin"),
+    (0xF6CED0, "Bowser_s_Castle___Caves_65.bin"),
     (0xF6EE40, "Bowser_s_Castle_64.bin"),
     (0xF73390, "Star_Elevator_2B.bin"),
     (0xF751F0, "Goomba_Bros_Defeated_7E.bin"),

@@ -1,6 +1,7 @@
 use std::io::{self, prelude::*, SeekFrom};
 use std::fmt;
 use by_address::ByAddress;
+use log::debug;
 use crate::*;
 
 #[derive(Debug)]
@@ -153,6 +154,7 @@ impl Bgm {
 
         // Write drums
         if self.drums.len() > 0 {
+            f.align(4)?;
             let pos = (f.stream_position()? >> 2) as u16;
             f.write_u16_be_at(pos, drums_offset)?;
             for drum in self.drums.iter() {
@@ -162,6 +164,7 @@ impl Bgm {
 
         // Write voices
         if self.voices.len() > 0 {
+            f.align(4)?;
             let pos = (f.stream_position()? >> 2) as u16;
             f.write_u16_be_at(pos, voices_offset)?;
             for voice in self.voices.iter() {
@@ -183,7 +186,8 @@ impl Bgm {
         let mut todo_segments = Vec::new();
         for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
             if let Some(subsegments) = segment {
-                println!("segment {:#X}", f.stream_position()?);
+                f.align(4)?;
+                debug!("segment {:#X}", f.stream_position()?);
                 // Write offset in header
                 let pos = (f.stream_position()? >> 2) as u16;
                 f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
@@ -192,7 +196,7 @@ impl Bgm {
                 let segment_start = f.stream_position()?;
                 let mut todo_tracks = Vec::new();
                 for subsegment in subsegments {
-                    println!("subsegment {:#X}", f.stream_position()?);
+                    debug!("subsegment {:#X}", f.stream_position()?);
                     if let Some(tracks) = subsegment.encode(f)? {
                         todo_tracks.push(tracks); // Need to write track data after the header
                     }
@@ -208,17 +212,19 @@ impl Bgm {
         // Write segment data
         for (segment_start, todo_tracks) in todo_segments.into_iter() {
             for (offset, tracks) in todo_tracks.into_iter() {
+                f.align(4)?; // This position needs to be right-shifted by 2 without loss
+
                 let track_data_start = f.stream_position()?;
-                println!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
+                debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
 
                 // Write offset in header
-                let pos = (track_data_start- segment_start) >> 2;
+                let pos = (track_data_start - segment_start) >> 2;
                 f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
 
                 // Write flags
                 let mut todo_commands = Vec::new();
                 for Track { flags, commands } in tracks {
-                    //println!("write commands_offset {:#X}", f.stream_position()?);
+                    //debug!("write commands_offset {:#X}", f.stream_position()?);
                     if commands.len() > 0 {
                         // Need to write command data after the track
                         todo_commands.push((f.stream_position()?, commands));
@@ -230,7 +236,8 @@ impl Bgm {
 
                 // Write command sequences
                 for (offset, seq) in todo_commands.into_iter() {
-                    println!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
+                    debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
+
                     // Write pointer to here
                     let pos = f.stream_position()? - track_data_start; // Notice no shift
                     f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
@@ -239,7 +246,7 @@ impl Bgm {
                 }
             }
 
-            //println!("command sequences {:#X}", f.stream_position()?);
+            //debug!("command sequences {:#X}", f.stream_position()?);
 
 
         }
@@ -249,9 +256,9 @@ impl Bgm {
         f.write_u32_be_at(file_size, file_size_offset)?;
 
         // Pad to 16 alignment (not actually required - ld does this anyway - but makes testing for matches easier)
-        println!("end = {:#X}", f.stream_position()?);
+        debug!("end = {:#X}", f.stream_position()?);
         f.align(16)?;
-        println!("end (aligned) = {:#X}", f.stream_position()?);
+        debug!("end (aligned) = {:#X}", f.stream_position()?);
 
         Ok(())
     }
@@ -433,10 +440,12 @@ impl CommandSeq {
                     let offset = f.stream_position()?;
                     marker_to_offset.insert(marker, offset);
                 },
+
+                Command::End => f.write_u8(0)?,
             }
         }
 
-        f.write_u8(0)?; // Sentinel
+        debug!("end commandseq {:#X}", f.stream_position()?);
         let end_pos = SeekFrom::Start(f.stream_position()?);
 
         // Update the start/length of any subroutine commands. We have to do this after everything else, because
@@ -444,24 +453,18 @@ impl CommandSeq {
         for (abs_subroutine_pos, range) in todo_subroutines.into_iter() {
             // Try to get the file offset of `range.start`. If it is a dropped Weak<_> or we didn't see the Marker in
             // the loop above, raise an error.
-            let start_offset: u64 = *range.start.upgrade().and_then(|marker| {
+            let start_offset = *range.start.upgrade().and_then(|marker| {
                 marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingStartMarker(range))?;
+            }).ok_or(Error::MissingStartMarker(range))? as u16;
 
             // Ditto for `range.end`.
-            let end_offset: u64 = *range.end.upgrade().and_then(|marker| {
+            let end_offset = *range.end.upgrade().and_then(|marker| {
                 marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingEndMarker(range))?;
+            }).ok_or(Error::MissingEndMarker(range))? as u16;
 
-            // Convert both offsets to u16s relative to the start of the CommandSeq.
-            // FIXME, see pleasant path test
-            let start_offset = (start_offset - start_of_seq) as u16;
-            let end_offset = (end_offset - start_of_seq) as u16;
-
-            // Calculate the length (delta between start_offset and end_offset). If this overflows or underflows,
-            // raise an error [rather than panicking], because that would mean end_offset > start_offset or the end
-            // offset is too far away.
-            let length = start_offset.checked_sub(end_offset)
+            // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
+            // [rather than panicking on debug / wrapping on release], because that would mean end_offset > start_offset.
+            let length = end_offset.checked_sub(start_offset)
                 .ok_or(Error::UnorderedMarkers(range))?;
 
             // Convert the length to a u8 if possible.

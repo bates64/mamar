@@ -3,6 +3,7 @@ use std::fmt;
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::rc::{Rc, Weak};
 use smallvec::smallvec;
+use log::debug;
 use crate::*;
 
 #[derive(Debug)]
@@ -203,7 +204,7 @@ impl Bgm {
                         let pos = pos as u64;
                         f.seek(SeekFrom::Start(pos))?;
 
-                        println!("segment {:#X}", pos);
+                        debug!("segment {:#X}", pos);
 
                         let mut segment = vec![];
                         let mut i = 0;
@@ -219,6 +220,8 @@ impl Bgm {
 
                             i += 1;
                         }
+
+                        debug!("segment end {:#X}", f.stream_position()?);
 
                         Ok(Some(segment))
                     }
@@ -248,7 +251,7 @@ impl Bgm {
 
 impl Subsegment {
     fn decode<R: Read + Seek>(f: &mut R, start: u64) -> Result<Self, Error> {
-        println!("subsegment {:#X}", f.stream_position()?);
+        debug!("subsegment {:#X}", f.stream_position()?);
         let flags = f.read_u8()?;
 
         if flags & 0x70 == 0x10 {
@@ -256,7 +259,7 @@ impl Subsegment {
 
             let offset = (f.read_u16_be()? as u64) << 2;
             let tracks_start = start + offset;
-            println!("tracks start = {:#X} (offset = {:#X})", tracks_start, offset);
+            debug!("tracks start = {:#X} (offset = {:#X})", tracks_start, offset);
 
             Ok(Subsegment::Tracks {
                 flags,
@@ -291,8 +294,8 @@ impl Track {
                 CommandSeq::with_capacity(0)
             } else {
                 f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
+                debug!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
                 let seq = CommandSeq::decode(f)?;
-                println!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
 
                 // Assumption; structure will need changing if false for matching.
                 // Maybe use command "groups" which can be represented in UI also
@@ -312,13 +315,27 @@ impl CommandSeq {
         // CommandSeq by performing an in-order traversal.
         let mut commands = OffsetCommandMap::new();
 
+        let mut seen_terminator = false;
+
         loop {
             let cmd_offset = (f.stream_position()? as usize) - start;
+
+            if seen_terminator {
+                // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
+                // keep reading until every marker has been passed.
+                if cmd_offset >= commands.last_offset() {
+                    break;
+                }
+            }
+
             let cmd_byte = f.read_u8()?;
 
             let command = match cmd_byte {
                 // Sentinel (zero-terminator)
-                0x00 => break,
+                0x00 => {
+                    seen_terminator = true;
+                    Command::End
+                },
 
                 // Delay
                 0x01..=0x77 => Command::Delay(cmd_byte),
@@ -392,16 +409,18 @@ impl CommandSeq {
                 0xFA => Command::Unknown(smallvec![0xFA]),
                 0xFB => Command::Unknown(smallvec![0xFB]),
                 0xFC => {
-                    //let set_pos = f.read_u16_be()?;
-                    //let count = f.read_u8()?;
+                    let _set_pos = f.read_u16_be()?;
+                    let _count = f.read_u8()?;
 
                     // TODO Jump random
-                    Command::Unknown(smallvec![0xFC, f.read_u8()?, f.read_u8()?, f.read_u8()?])
+                    todo!("Jump random");
                 },
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
-                    let start_offset = f.read_u16_be()? as usize;
+                    let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
+
+                    //debug!("subroutine @ {:#X} (start = {:#X}; end = {:#X})", cmd_offset, start_offset, end_offset);
 
                     Command::Subroutine(CommandRange {
                         name: format!("Subroutine {:#X}", cmd_offset),
@@ -417,12 +436,21 @@ impl CommandSeq {
             commands.insert(cmd_offset, command);
         }
 
+        let size = f.stream_position()? as usize - start;
+        debug!("end commandseq {:#X}", f.stream_position()?);
+
+        // Explode if there are no commands (must be markers) past the end of the file
+        for (offset, command) in commands.0.split_off(&OffsetCommandMap::atob(size)).into_iter() {
+            panic!("command after end of parsed sequence {:?} @ {:#X}", command, offset);
+        }
+
         Ok(commands.into())
     }
 }
 
 /// Temporary struct for [CommandSeq::decode].
-struct OffsetCommandMap(BTreeMap<usize, Command>);
+#[derive(Debug)]
+struct OffsetCommandMap(pub(self) BTreeMap<usize, Command>);
 
 impl OffsetCommandMap {
     pub fn new() -> Self {
@@ -431,8 +459,13 @@ impl OffsetCommandMap {
 
     /// Tree offset keys are shifted from the input to make space for abstract commands such as Command::Marker to
     /// be inserted between. This is fine, because, in the end, only the order of the keys matters (not their values).
-    fn atob(offset: usize) -> usize {
+    pub(self) fn atob(offset: usize) -> usize {
         (offset + 1) * 2
+    }
+
+    /// Performs the inverse of [`atob`](OffsetCommandMap::atob). Lossy.
+    pub(self) fn btoa(key: usize) -> usize {
+        key / 2
     }
 
     pub fn insert(&mut self, offset: usize, command: Command) {
@@ -464,6 +497,10 @@ impl OffsetCommandMap {
             },
         }
     }
+
+    pub fn last_offset(&self) -> usize {
+        self.0.last_key_value().map_or(0, |(&k, _)| Self::btoa(k))
+    }
 }
 
 impl From<OffsetCommandMap> for CommandSeq {
@@ -484,6 +521,7 @@ impl Deref for OffsetCommandMap {
 
 impl Drum {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        debug!("drum = {:#X}", f.stream_position()?);
         Ok(Self {
             bank: f.read_u8()?,
             patch: f.read_u8()?,
@@ -503,6 +541,7 @@ impl Drum {
 
 impl Voice {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        debug!("drum = {:#X}", f.stream_position()?);
         Ok(Self {
             bank: f.read_u8()?,
             patch: f.read_u8()?,
