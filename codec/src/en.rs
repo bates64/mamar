@@ -183,7 +183,7 @@ impl Bgm {
         */
 
         // Write segments
-        let mut todo_segments = Vec::new();
+        let mut todo_tracks = Vec::new();
         for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
             if let Some(subsegments) = segment {
                 f.align(4)?;
@@ -194,16 +194,14 @@ impl Bgm {
 
                 // Write segment header
                 let segment_start = f.stream_position()?;
-                let mut todo_tracks = Vec::new();
+
                 for subsegment in subsegments {
                     debug!("subsegment {:#X}", f.stream_position()?);
                     if let Some(tracks) = subsegment.encode(f)? {
-                        todo_tracks.push(tracks); // Need to write track data after the header
+                        todo_tracks.push((segment_start, tracks)); // Need to write track data after the header
                     }
                 }
                 f.write_all(&[0, 0, 0, 0])?; // Terminator
-
-                todo_segments.push((segment_start, todo_tracks));
             } else {
                 // Offset in header is already 0 (null)
             }
@@ -211,54 +209,52 @@ impl Bgm {
 
         // Write segment data
         let mut encoded_tracks = HashMap::new();
-        for (segment_start, mut todo_tracks) in todo_segments.into_iter() {
-            todo_tracks.sort_by_key(|(_, tracks)| tracks.decoded_pos.unwrap_or_default());
+        todo_tracks.sort_by_key(|(_, (_, tracks))| tracks.decoded_pos.unwrap_or_default());
 
-            for (offset, tracks) in todo_tracks.into_iter() {
-                // If we've seen these tracks already, just point to the already-encoded tracks.
-                if let Some(track_data_start) = encoded_tracks.get(&Rc::as_ptr(tracks)) {
-                    info!("sharing tracks at {:#X}", track_data_start);
-
-                    // Write offset in header
-                    let pos = ((track_data_start - segment_start) >> 2) as u16;
-                    f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
-
-                    continue;
-                }
-
-                f.align(4)?; // This position needs to be right-shifted by 2 without loss
-
-                let track_data_start = f.stream_position()?;
-                debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
+        for (segment_start, (offset, tracks)) in todo_tracks.into_iter() {
+            // If we've seen these tracks already, just point to the already-encoded tracks.
+            if let Some(track_data_start) = encoded_tracks.get(&Rc::as_ptr(tracks)) {
+                info!("sharing tracks at {:#X}", track_data_start);
 
                 // Write offset in header
                 let pos = ((track_data_start - segment_start) >> 2) as u16;
                 f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
-                encoded_tracks.insert(Rc::as_ptr(tracks), track_data_start);
 
-                // Write flags
-                let mut todo_commands = Vec::new();
-                for Track { flags, commands } in tracks.iter() {
-                    //debug!("write commands_offset {:#X}", f.stream_position()?);
-                    if commands.len() > 0 {
-                        // Need to write command data after the track
-                        todo_commands.push((f.stream_position()?, commands));
-                    }
-                    f.write_u16_be(0)?; // Replaced later if commands.len() > 0
+                continue;
+            }
 
-                    f.write_u16_be(*flags)?;
+            f.align(4)?; // This position needs to be right-shifted by 2 without loss
+
+            let track_data_start = f.stream_position()?;
+            debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
+
+            // Write offset in header
+            let pos = ((track_data_start - segment_start) >> 2) as u16;
+            f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
+            encoded_tracks.insert(Rc::as_ptr(tracks), track_data_start);
+
+            // Write flags
+            let mut todo_commands = Vec::new();
+            for Track { flags, commands } in tracks.iter() {
+                //debug!("write commands_offset {:#X}", f.stream_position()?);
+                if commands.len() > 0 {
+                    // Need to write command data after the track
+                    todo_commands.push((f.stream_position()?, commands));
                 }
+                f.write_u16_be(0)?; // Replaced later if commands.len() > 0
 
-                // Write command sequences
-                for (offset, seq) in todo_commands.into_iter() {
-                    //debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
+                f.write_u16_be(*flags)?;
+            }
 
-                    // Write pointer to here
-                    let pos = f.stream_position()? - track_data_start; // Notice no shift
-                    f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
+            // Write command sequences
+            for (offset, seq) in todo_commands.into_iter() {
+                //debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
 
-                    seq.encode(f)?;
-                }
+                // Write pointer to here
+                let pos = f.stream_position()? - track_data_start; // Notice no shift
+                f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
+
+                seq.encode(f)?;
             }
         }
 

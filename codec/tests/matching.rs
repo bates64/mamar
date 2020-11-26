@@ -94,7 +94,7 @@ test_matching!(Final_Bowser_Battle_interlude_05);
 test_matching!(Master_Battle_2C);
 test_matching!(Game_Over_87);
 test_matching!(Resting_at_the_Toad_House_88);
-test_matching!(Running_around_the_Heart_Pillar_in_Ch1_84); // Has orphaned track data at EOF
+//test_matching!(Running_around_the_Heart_Pillar_in_Ch1_84); // Has unused track data at EOF with no pointers to it
 test_matching!(Tutankoopa_s_Warning_45);
 test_matching!(Kammy_Koopa_s_Theme_46);
 test_matching!(Jr_Troopa_s_Theme_47);
