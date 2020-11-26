@@ -3,7 +3,7 @@ use std::fmt;
 use std::collections::{HashMap, btree_map::{BTreeMap, Entry}};
 use std::rc::{Rc, Weak};
 use smallvec::smallvec;
-use log::debug;
+use log::{debug, warn};
 use crate::*;
 
 #[derive(Debug)]
@@ -194,8 +194,9 @@ impl Bgm {
         debug_assert!(f.stream_position()? == 0x24); // End of struct
 
         let mut tracks_map = TracksMap::new();
+        let mut furthest_read_pos = 0;
 
-        let ret = Ok(Self {
+        let bgm = Self {
             index,
             segments: segment_offsets
                 .iter()
@@ -216,11 +217,11 @@ impl Bgm {
                             f.seek(SeekFrom::Start(pos + i * 4))?;
 
                             // Peek for null terminator
-                            let byte = f.read_u8()?;
-                            f.seek(SeekFrom::Current(-1))?;
+                            let byte = f.read_u32_be()?;
+                            f.seek(SeekFrom::Current(-4))?;
                             byte != 0
                         } {
-                            segment.push(Subsegment::decode(f, pos, &mut tracks_map)?);
+                            segment.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos)?);
 
                             i += 1;
                         }
@@ -249,13 +250,19 @@ impl Bgm {
             } else {
                 Vec::new()
             },
-        });
-        ret
+        };
+
+        let eof_pos = f.seek(SeekFrom::End(0))?;
+        if align(furthest_read_pos as u32, 16) < eof_pos as u32 {
+            warn!("unused data at {:#X}", furthest_read_pos);
+        }
+
+        Ok(bgm)
     }
 }
 
 impl Subsegment {
-    fn decode<R: Read + Seek>(f: &mut R, start: u64, tracks_map: &mut TracksMap) -> Result<Self, Error> {
+    fn decode<R: Read + Seek>(f: &mut R, start: u64, tracks_map: &mut TracksMap, furthest_read_pos: &mut u64) -> Result<Self, Error> {
         debug!("subsegment {:#X}", f.stream_position()?);
         let flags = f.read_u8()?;
 
@@ -276,7 +283,14 @@ impl Subsegment {
                                 .into_iter()
                                 .map(|track_no| {
                                     f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
-                                    Track::decode(f, tracks_start)
+                                    let track = Track::decode(f, tracks_start);
+
+                                    let pos = f.stream_position()?;
+                                    if pos > *furthest_read_pos {
+                                        *furthest_read_pos = pos;
+                                    }
+
+                                    track
                                 })
                                 .collect_array_pedantic()?),
                         }
@@ -306,7 +320,6 @@ impl Track {
                 CommandSeq::with_capacity(0)
             } else {
                 f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
-                //debug!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
                 let seq = CommandSeq::decode(f)?;
 
                 // Assumption; structure will need changing if false for matching.
