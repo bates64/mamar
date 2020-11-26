@@ -44,14 +44,7 @@ macro_rules! test_matching {
                     if let Some(seg) = seg {
                         for (subseg_no, subseg) in seg.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, de_pos, tracks } => {
-                                    println!("    {}.{} flags={:#X} -> tracks @ {:#X}", seg_no, subseg_no, flags, de_pos);
-                                    for (t, track) in tracks.iter().enumerate() {
-                                        if track.de_commands_size != 0 {
-                                            println!("        track {} flags={:#X} size={:#X}", t, track.flags, track.de_commands_size);
-                                        }
-                                    }
-                                },
+                                Subsegment::Tracks { flags, tracks } => println!("    {}.{} flags={:#X} -> tracks @ {:#X}", seg_no, subseg_no, flags, tracks.decoded_pos.unwrap()),
                                 Subsegment::Unknown { flags, data } => println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data),
                             }
                         }
@@ -64,7 +57,7 @@ macro_rules! test_matching {
                     if let Some(seg) = seg {
                         for (subseg_no, subseg) in seg.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, de_pos, .. } => println!("    {}.{} flags={:#X} -> tracks @ {:#X}", seg_no, subseg_no, flags, de_pos),
+                                Subsegment::Tracks { flags, .. } => println!("    {}.{} flags={:#X} -> tracks", seg_no, subseg_no, flags),
                                 Subsegment::Unknown { flags, data } => println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data),
                             }
                         }
@@ -101,7 +94,7 @@ test_matching!(Final_Bowser_Battle_interlude_05);
 test_matching!(Master_Battle_2C);
 test_matching!(Game_Over_87);
 test_matching!(Resting_at_the_Toad_House_88);
-test_matching!(Running_around_the_Heart_Pillar_in_Ch1_84);
+test_matching!(Running_around_the_Heart_Pillar_in_Ch1_84); // Has orphaned track data at EOF
 test_matching!(Tutankoopa_s_Warning_45);
 test_matching!(Kammy_Koopa_s_Theme_46);
 test_matching!(Jr_Troopa_s_Theme_47);

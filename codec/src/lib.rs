@@ -1,6 +1,6 @@
 #![feature(seek_convenience, map_into_keys_values, map_first_last, iter_map_while)] // Requires nightly Rust
 
-use std::rc::Rc;
+use std::{ops::Deref, rc::Rc};
 use tinystr::{tinystr4, TinyStr4};
 
 /// Encoder ([Bgm] -> .bin)
@@ -45,8 +45,7 @@ type Segment = Vec<Subsegment>;
 pub enum Subsegment {
     Tracks {
         flags: u8,
-        tracks: Rc<[Track; 16]>,
-        de_pos: u64, // TEMP
+        tracks: TaggedRc<[Track; 16]>,
     },
     Unknown {
         flags: u8,
@@ -58,7 +57,6 @@ pub enum Subsegment {
 pub struct Track {
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,
-    pub de_commands_size: usize, // TEMP
 }
 
 impl Subsegment {
@@ -98,6 +96,21 @@ pub struct Voice {
     pub coarse_tune: u8,
     pub fine_tune: u8,
     pub unk_07: u8,
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct TaggedRc<T> {
+    /// The original file position T was decoded from.
+    pub decoded_pos: Option<u64>,
+    pub rc: Rc<T>,
+}
+
+impl<T> Deref for TaggedRc<T> {
+    type Target = Rc<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.rc
+    }
 }
 
 /// Aligns a value to the next multiple of n.

@@ -211,7 +211,9 @@ impl Bgm {
 
         // Write segment data
         let mut encoded_tracks = HashMap::new();
-        for (segment_start, todo_tracks) in todo_segments.into_iter() {
+        for (segment_start, mut todo_tracks) in todo_segments.into_iter() {
+            todo_tracks.sort_by_key(|(_, tracks)| tracks.decoded_pos.unwrap_or_default());
+
             for (offset, tracks) in todo_tracks.into_iter() {
                 // If we've seen these tracks already, just point to the already-encoded tracks.
                 if let Some(track_data_start) = encoded_tracks.get(&Rc::as_ptr(tracks)) {
@@ -236,7 +238,7 @@ impl Bgm {
 
                 // Write flags
                 let mut todo_commands = Vec::new();
-                for Track { flags, commands, de_commands_size: _ } in tracks.iter() {
+                for Track { flags, commands } in tracks.iter() {
                     //debug!("write commands_offset {:#X}", f.stream_position()?);
                     if commands.len() > 0 {
                         // Need to write command data after the track
@@ -310,7 +312,7 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a Rc<[Track; 16]>)>, Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error<'a>> {
         f.write_u8(self.flags())?;
 
         match self {
@@ -425,7 +427,7 @@ impl CommandSeq {
                     f.write_u8(*volume)?;
                 },
                 Command::SubTrackReverbType(a) => {
-                    f.write_u8(0xF5)?;
+                    f.write_u8(0xF7)?;
                     f.write_u8(*a)?;
                 },
                 Command::Subroutine(range) => {

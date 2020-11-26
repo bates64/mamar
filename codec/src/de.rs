@@ -131,7 +131,7 @@ trait CollectArray<T, E, U: Default + AsMut<[T]>>: Sized + Iterator<Item = Resul
 
 impl<T, E, U: Iterator<Item = Result<T, E>>, V: Default + AsMut<[T]>> CollectArray<T, E, V> for U {}
 
-type TracksMap = HashMap<u64, Rc<[Track; 16]>>;
+type TracksMap = HashMap<u64, TaggedRc<[Track; 16]>>;
 
 impl Bgm {
     pub fn from_bytes(f: &[u8]) -> Result<Self, Error> {
@@ -268,18 +268,18 @@ impl Subsegment {
 
             Ok(Subsegment::Tracks {
                 flags,
-                de_pos: tracks_start,
                 tracks: tracks_map.entry(tracks_start)
                     .or_insert({ // TODO(speed): use or_insert_with; need to figure out how to return Result
-                        Rc::new(
-                            (0..16)
+                        TaggedRc {
+                            decoded_pos: Some(tracks_start),
+                            rc: Rc::new((0..16)
                                 .into_iter()
                                 .map(|track_no| {
                                     f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
                                     Track::decode(f, tracks_start)
                                 })
-                                .collect_array_pedantic()?
-                        )
+                                .collect_array_pedantic()?),
+                        }
                     })
                     .clone(), // New reference
             })
@@ -300,30 +300,27 @@ impl Track {
         let commands_offset = f.read_u16_be()?;
         let flags = f.read_u16_be()?;
 
-        let (de_commands_size, commands) = if commands_offset == 0 {
-            (0, CommandSeq::with_capacity(0))
-        } else {
-            f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
-            //debug!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
-            let (size, seq) = CommandSeq::decode(f)?;
-
-            // Assumption; structure will need changing if false for matching.
-            // Maybe use command "groups" which can be represented in UI also
-            assert_ne!(seq.len(), 0, "CommandSeq assumption wrong");
-
-            (size, seq)
-        };
-
         Ok(Self {
             flags,
-            commands,
-            de_commands_size,
+            commands: if commands_offset == 0 {
+                CommandSeq::with_capacity(0)
+            } else {
+                f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
+                //debug!("commandseq = {:#X} (offset = {:#X})", segment_start + commands_offset as u64, commands_offset);
+                let seq = CommandSeq::decode(f)?;
+
+                // Assumption; structure will need changing if false for matching.
+                // Maybe use command "groups" which can be represented in UI also
+                assert_ne!(seq.len(), 0, "CommandSeq assumption wrong");
+
+                seq
+            },
         })
     }
 }
 
 impl CommandSeq {
-    fn decode<R: Read + Seek>(f: &mut R) -> Result<(usize, Self), Error> {
+    fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         let start = f.stream_position()? as usize;
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
@@ -459,7 +456,7 @@ impl CommandSeq {
             panic!("command after end of parsed sequence {:?} @ {:#X}", command, offset);
         }
 
-        Ok((size, commands.into()))
+        Ok(commands.into())
     }
 }
 
@@ -594,7 +591,7 @@ mod test {
             0x00, // End - at offset 15
         ];
 
-        let (_, seq) = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
+        let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
         dbg!(&seq);
 
         let start_labels: Vec<Weak<Marker>> = seq.at_time(0)
