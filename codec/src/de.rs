@@ -146,52 +146,50 @@ impl Bgm {
             return Err(Error::InvalidMagic);
         }
 
-        debug_assert!(f.stream_position()? == 0x04);
+        debug_assert!(f.pos()? == 0x04);
         let internal_size = f.read_u32_be()?;
-        let true_size = f.stream_len()? as u32;
+        let true_size = f.seek(SeekFrom::End(0))? as u32;
         if internal_size == true_size {
             // Ok
         } else if align(internal_size, 16) == true_size {
             // Make sure the trailing bytes are all zero
             f.seek(SeekFrom::Start(internal_size as u64))?;
             f.read_padding(true_size - internal_size)?;
-
-            f.seek(SeekFrom::Start(0x08))?; // Back to where we were
         } else {
             return Err(Error::SizeMismatch { true_size, internal_size });
         }
 
-        debug_assert!(f.stream_position()? == 0x08);
+        f.seek(SeekFrom::Start(0x08))?;
         let mut index = [0; 4];
         f.read_exact(&mut index)?;
         let index = tinystr::TinyStr4::from_bytes(&index)
             .map_err(|source| Error::InvalidName(source))?;
 
-        debug_assert!(f.stream_position()? == 0x0C);
+        debug_assert!(f.pos()? == 0x0C);
         f.read_padding(4)?;
 
-        debug_assert!(f.stream_position()? == 0x10);
+        debug_assert!(f.pos()? == 0x10);
         let num_segments = f.read_u8()?;
         if num_segments != 4 {
             return Err(Error::InvalidNumSegments(num_segments));
         }
 
-        debug_assert!(f.stream_position()? == 0x11);
+        debug_assert!(f.pos()? == 0x11);
         f.read_padding(3)?;
 
-        debug_assert!(f.stream_position()? == 0x14);
+        debug_assert!(f.pos()? == 0x14);
         let segment_offsets: [u16; 4] = (0..4)
             .into_iter()
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
             .collect_array()?; // We need to obtain all offsets before seeking to any
 
-        debug_assert!(f.stream_position()? == 0x1C);
+        debug_assert!(f.pos()? == 0x1C);
         let drums_offset = (f.read_u16_be()? as u64) << 2;
         let drums_count = f.read_u16_be()?;
         let voices_offset = (f.read_u16_be()? as u64) << 2;
         let voices_count = f.read_u16_be()?;
 
-        debug_assert!(f.stream_position()? == 0x24); // End of struct
+        debug_assert!(f.pos()? == 0x24); // End of struct
 
         let mut tracks_map = TracksMap::new();
         let mut furthest_read_pos = 0;
@@ -226,7 +224,7 @@ impl Bgm {
                             i += 1;
                         }
 
-                        debug!("segment end {:#X}", f.stream_position()?);
+                        debug!("segment end {:#X}", f.pos()?);
 
                         Ok(Some(segment))
                     }
@@ -263,7 +261,7 @@ impl Bgm {
 
 impl Subsegment {
     fn decode<R: Read + Seek>(f: &mut R, start: u64, tracks_map: &mut TracksMap, furthest_read_pos: &mut u64) -> Result<Self, Error> {
-        debug!("subsegment {:#X}", f.stream_position()?);
+        debug!("subsegment {:#X}", f.pos()?);
         let flags = f.read_u8()?;
 
         if flags & 0x70 == 0x10 {
@@ -285,7 +283,7 @@ impl Subsegment {
                                     f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
                                     let track = Track::decode(f, tracks_start);
 
-                                    let pos = f.stream_position()?;
+                                    let pos = f.pos()?;
                                     if pos > *furthest_read_pos {
                                         *furthest_read_pos = pos;
                                     }
@@ -334,7 +332,7 @@ impl Track {
 
 impl CommandSeq {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
-        let start = f.stream_position()? as usize;
+        let start = f.pos()? as usize;
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
         // CommandSeq by performing an in-order traversal.
@@ -343,7 +341,7 @@ impl CommandSeq {
         let mut seen_terminator = false;
 
         loop {
-            let cmd_offset = (f.stream_position()? as usize) - start;
+            let cmd_offset = (f.pos()? as usize) - start;
 
             if seen_terminator {
                 // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
@@ -461,8 +459,8 @@ impl CommandSeq {
             commands.insert(cmd_offset, command);
         }
 
-        let size = f.stream_position()? as usize - start;
-        //debug!("end commandseq {:#X}", f.stream_position()?);
+        let size = f.pos()? as usize - start;
+        //debug!("end commandseq {:#X}", f.pos()?);
 
         // Explode if there are no commands (must be markers) past the end of the file
         for (offset, command) in commands.0.split_off(&OffsetCommandMap::atob(size)).into_iter() {
@@ -524,13 +522,16 @@ impl OffsetCommandMap {
     }
 
     pub fn last_offset(&self) -> usize {
-        self.0.last_key_value().map_or(0, |(&k, _)| Self::btoa(k))
+        self.0.iter().rev().next() //self.0.last_key_value()
+            .map_or(0, |(&k, _)| Self::btoa(k))
     }
 }
 
 impl From<OffsetCommandMap> for CommandSeq {
     fn from(map: OffsetCommandMap) -> CommandSeq {
-        map.0.into_values().collect()
+        map.0.into_iter()
+            .map(|(_, cmd)| cmd)
+            .collect()
     }
 }
 
@@ -546,7 +547,7 @@ impl Deref for OffsetCommandMap {
 
 impl Drum {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
-        debug!("drum = {:#X}", f.stream_position()?);
+        debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
             bank: f.read_u8()?,
             patch: f.read_u8()?,
@@ -566,7 +567,7 @@ impl Drum {
 
 impl Voice {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
-        debug!("drum = {:#X}", f.stream_position()?);
+        debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
             bank: f.read_u8()?,
             patch: f.read_u8()?,
@@ -609,23 +610,35 @@ mod test {
 
         let start_labels: Vec<Weak<Marker>> = seq.at_time(0)
             .into_iter()
-            .map_while(|cmd| match cmd {
-                Command::Marker(label) => Some(Rc::downgrade(&**label)),
-                _ => None,
+            .take_while(|cmd| match cmd {
+                Command::Marker(_) => true,
+                _ => false,
+            })
+            .map(|cmd| match cmd {
+                Command::Marker(label) => Rc::downgrade(&**label),
+                _ => unreachable!(),
             })
             .collect();
         let end_labels: Vec<Weak<Marker>> = seq.at_time(11)
             .into_iter()
-            .map_while(|cmd| match cmd {
-                Command::Marker(label) => Some(Rc::downgrade(&**label)),
-                _ => None,
+            .take_while(|cmd| match cmd {
+                Command::Marker(_) => true,
+                _ => false,
+            })
+            .map(|cmd| match cmd {
+                Command::Marker(label) => Rc::downgrade(&**label),
+                _ => unreachable!(),
             })
             .collect();
         let subroutine_labels: Vec<(&Weak<Marker>, &Weak<Marker>)> = seq.at_time(10)
             .into_iter()
-            .map_while(|cmd| match cmd {
-                Command::Subroutine(CommandRange { start, end, .. }) => Some((start, end)),
-                _ => None,
+            .take_while(|cmd| match cmd {
+                Command::Subroutine(_) => true,
+                _ => false,
+            })
+            .map(|cmd| match cmd {
+                Command::Subroutine(CommandRange { start, end, .. }) => (start, end),
+                _ => unreachable!(),
             })
             .collect();
 

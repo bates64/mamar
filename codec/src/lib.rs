@@ -1,6 +1,4 @@
-#![feature(seek_convenience, map_into_keys_values, map_first_last, iter_map_while)] // Requires nightly Rust
-
-use std::{ops::Deref, rc::Rc};
+use std::{ops::Deref, rc::Rc, io::{self, prelude::*, SeekFrom}};
 use tinystr::{tinystr4, TinyStr4};
 
 /// Encoder ([Bgm] -> .bin)
@@ -110,6 +108,16 @@ impl<T> Deref for TaggedRc<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.rc
+    }
+}
+
+trait SeekExt: Seek {
+    fn pos(&mut self) -> io::Result<u64>;
+}
+
+impl<S: Seek> SeekExt for S {
+    fn pos(&mut self) -> io::Result<u64> {
+        self.seek(SeekFrom::Current(0))
     }
 }
 

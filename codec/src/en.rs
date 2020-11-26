@@ -72,7 +72,7 @@ impl<W: Write + Seek> WriteExt for W {
     }
 
     fn write_u16_be_at(&mut self, value: u16, pos: SeekFrom) -> io::Result<()> {
-        let old_pos = self.stream_position()?;
+        let old_pos = self.pos()?;
         self.seek(pos)?;
         self.write_u16_be(value)?;
         self.seek(SeekFrom::Start(old_pos))?;
@@ -80,7 +80,7 @@ impl<W: Write + Seek> WriteExt for W {
     }
 
     fn write_u32_be_at(&mut self, value: u32, pos: SeekFrom) -> io::Result<()> {
-        let old_pos = self.stream_position()?;
+        let old_pos = self.pos()?;
         self.seek(pos)?;
         self.write_u32_be(value)?;
         self.seek(SeekFrom::Start(old_pos))?;
@@ -88,7 +88,7 @@ impl<W: Write + Seek> WriteExt for W {
     }
 
     fn align(&mut self, alignment: u64) -> io::Result<()> {
-        let pos = self.stream_position()?;
+        let pos = self.pos()?;
 
         if pos % alignment == 0 {
             // Nothing to do
@@ -115,47 +115,47 @@ impl Bgm {
 
         f.write_all(MAGIC)?;
 
-        debug_assert_eq!(f.stream_position()?, 0x04);
+        debug_assert_eq!(f.pos()?, 0x04);
         let file_size_offset = {
-            let pos = SeekFrom::Start(f.stream_position()?);
+            let pos = SeekFrom::Start(f.pos()?);
             f.write_u32_be(0)?;
             pos
         };
 
-        debug_assert_eq!(f.stream_position()?, 0x08);
+        debug_assert_eq!(f.pos()?, 0x08);
         f.write_all(self.index.as_bytes())?;
         f.seek(SeekFrom::Start(0x0C))?; // `self.index` may have been shorter than 4 bytes
 
         f.write_all(&[0, 0, 0, 0, self.segments.len() as u8, 0, 0, 0])?;
 
-        debug_assert_eq!(f.stream_position()?, 0x14);
+        debug_assert_eq!(f.pos()?, 0x14);
         let segment_offsets = (0..self.segments.len())
             .into_iter()
             .map(|_| {
-                let pos = f.stream_position()?;
+                let pos = f.pos()?;
                 f.write_u16_be(0)?;
                 Ok(pos)
             })
             .collect::<Result<Vec<_>, Error>>()?;
         let drums_offset = {
-            let pos = SeekFrom::Start(f.stream_position()?);
+            let pos = SeekFrom::Start(f.pos()?);
             f.write_u16_be(0)?;
             pos
         };
         f.write_u16_be(self.drums.len() as u16)?;
         let voices_offset = {
-            let pos = SeekFrom::Start(f.stream_position()?);
+            let pos = SeekFrom::Start(f.pos()?);
             f.write_u16_be(0)?;
             pos
         };
         f.write_u16_be(self.voices.len() as u16)?;
 
-        debug_assert_eq!(f.stream_position()?, 0x24); // End of header struct
+        debug_assert_eq!(f.pos()?, 0x24); // End of header struct
 
         // Write drums
         if self.drums.len() > 0 {
             f.align(4)?;
-            let pos = (f.stream_position()? >> 2) as u16;
+            let pos = (f.pos()? >> 2) as u16;
             f.write_u16_be_at(pos, drums_offset)?;
             for drum in self.drums.iter() {
                 drum.encode(f)?;
@@ -165,7 +165,7 @@ impl Bgm {
         // Write voices
         if self.voices.len() > 0 {
             f.align(4)?;
-            let pos = (f.stream_position()? >> 2) as u16;
+            let pos = (f.pos()? >> 2) as u16;
             f.write_u16_be_at(pos, voices_offset)?;
             for voice in self.voices.iter() {
                 voice.encode(f)?;
@@ -187,16 +187,16 @@ impl Bgm {
         for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
             if let Some(subsegments) = segment {
                 f.align(4)?;
-                debug!("segment {:#X}", f.stream_position()?);
+                debug!("segment {:#X}", f.pos()?);
                 // Write offset in header
-                let pos = (f.stream_position()? >> 2) as u16;
+                let pos = (f.pos()? >> 2) as u16;
                 f.write_u16_be_at(pos, SeekFrom::Start(offset))?;
 
                 // Write segment header
-                let segment_start = f.stream_position()?;
+                let segment_start = f.pos()?;
 
                 for subsegment in subsegments {
-                    debug!("subsegment {:#X}", f.stream_position()?);
+                    debug!("subsegment {:#X}", f.pos()?);
                     if let Some(tracks) = subsegment.encode(f)? {
                         todo_tracks.push((segment_start, tracks)); // Need to write track data after the header
                     }
@@ -225,7 +225,7 @@ impl Bgm {
 
             f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
-            let track_data_start = f.stream_position()?;
+            let track_data_start = f.pos()?;
             debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
 
             // Write offset in header
@@ -236,10 +236,10 @@ impl Bgm {
             // Write flags
             let mut todo_commands = Vec::new();
             for Track { flags, commands } in tracks.iter() {
-                //debug!("write commands_offset {:#X}", f.stream_position()?);
+                //debug!("write commands_offset {:#X}", f.pos()?);
                 if commands.len() > 0 {
                     // Need to write command data after the track
-                    todo_commands.push((f.stream_position()?, commands));
+                    todo_commands.push((f.pos()?, commands));
                 }
                 f.write_u16_be(0)?; // Replaced later if commands.len() > 0
 
@@ -248,10 +248,10 @@ impl Bgm {
 
             // Write command sequences
             for (offset, seq) in todo_commands.into_iter() {
-                //debug!("commandseq = {:#X} (offset = {:#X})", f.stream_position()?, f.stream_position()? - track_data_start);
+                //debug!("commandseq = {:#X} (offset = {:#X})", f.pos()?, f.pos()? - track_data_start);
 
                 // Write pointer to here
-                let pos = f.stream_position()? - track_data_start; // Notice no shift
+                let pos = f.pos()? - track_data_start; // Notice no shift
                 f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
 
                 seq.encode(f)?;
@@ -259,13 +259,13 @@ impl Bgm {
         }
 
         // Write file size
-        let file_size = f.stream_position()? as u32;
+        let file_size = f.pos()? as u32;
         f.write_u32_be_at(file_size, file_size_offset)?;
 
         // Pad to 16 alignment (not actually required - ld does this anyway - but makes testing for matches easier)
-        debug!("end = {:#X}", f.stream_position()?);
+        debug!("end = {:#X}", f.pos()?);
         f.align(16)?;
-        debug!("end (aligned) = {:#X}", f.stream_position()?);
+        debug!("end (aligned) = {:#X}", f.pos()?);
 
         Ok(())
     }
@@ -315,7 +315,7 @@ impl Subsegment {
             Subsegment::Tracks { tracks, .. } => {
                 f.write_u8(0)?;
 
-                let tracks_pos = f.stream_position()?;
+                let tracks_pos = f.pos()?;
                 f.write_u16_be(0)?;
 
                 Ok(Some((tracks_pos, tracks)))
@@ -429,7 +429,7 @@ impl CommandSeq {
                 Command::Subroutine(range) => {
                     f.write_u8(0xFE)?;
 
-                    let offset= f.stream_position()?;
+                    let offset= f.pos()?;
                     todo_subroutines.push((offset, range));
 
                     // These will be overwritten later
@@ -440,7 +440,7 @@ impl CommandSeq {
 
                 // Markers aren't actually written to the data - we just need to record their file offset for later use.
                 Command::Marker(marker) => {
-                    let offset = f.stream_position()?;
+                    let offset = f.pos()?;
                     marker_to_offset.insert(marker, offset);
                 },
 
@@ -448,8 +448,8 @@ impl CommandSeq {
             }
         }
 
-        //debug!("end commandseq {:#X}", f.stream_position()?);
-        let end_pos = SeekFrom::Start(f.stream_position()?);
+        //debug!("end commandseq {:#X}", f.pos()?);
+        let end_pos = SeekFrom::Start(f.pos()?);
 
         // Update the start/length of any subroutine commands. We have to do this after everything else, because
         // subroutines are able to reference markers that come after the subroutine jump itself.
