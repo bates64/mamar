@@ -6,8 +6,8 @@ use yew::prelude::*;
 use std::io::Cursor;
 use codec::Bgm;
 
-mod file;
-use file::{File, FileTypes};
+mod fs;
+use fs::{File, FileTypes};
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]	static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
