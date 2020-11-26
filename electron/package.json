@@ -1,0 +1,14 @@
+{
+  "name": "mamar-electron",
+  "author": "Alex Bates <hi@imalex.xyz>",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^11.0.3",
+    "electron-reloader": "^1.0.1"
+  },
+  "dependencies": {}
+}

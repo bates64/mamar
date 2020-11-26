@@ -4,10 +4,14 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use std::io::Cursor;
+use log::info;
 use codec::Bgm;
 
 mod fs;
 use fs::{File, FileTypes};
+
+// TODO: #[cfg] for this
+mod electron;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]	static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -17,15 +21,24 @@ pub fn run_app() {
     #[cfg(debug_assertions)] {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Debug).unwrap();
-        log::info!("Running in debug mode");
+        log::debug!("running in debug mode");
     }
 
     App::<Model>::new().mount_to_body();
 }
 
+const FILE_TYPES: FileTypes = FileTypes {
+    // TODO: also support .bgm (custom) and .midi
+    extensions: ".bin",
+    mime_types: "application/octect-stream",
+};
+
+#[wasm_bindgen]
 pub struct Model {
     link: ComponentLink<Self>,
     file: FileState,
+
+    server: Option<electron::ServerCallback>,
 }
 
 // TODO: better name
@@ -36,6 +49,9 @@ enum FileState {
 }
 
 pub enum Msg {
+    ServerStart,
+    ServerRecieve(Vec<u8>),
+
     FileOperation(FileOperation),
     FileOperationDone,
     FileLoading,
@@ -115,6 +131,12 @@ mod cursed {
 }
 use cursed::MODEL_PTR;
 
+impl Model {
+    fn is_server_running(&self) -> bool {
+        self.server.is_some()
+    }
+}
+
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
@@ -123,11 +145,38 @@ impl Component for Model {
         Self {
             link,
             file: FileState::Closed,
+            server: None,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
+            Msg::ServerStart => {
+                let send_message = self.link.callback(|data| Msg::ServerRecieve(data));
+
+                let recieve_callback: electron::ServerCallback = Closure::wrap(Box::new(move |data| {
+                    let data = data.to_vec();
+
+                    info!("received BGM size={:#X}", data.len());
+
+                    send_message.emit(data);
+                }));
+
+                electron::start_server_if_electron(&recieve_callback);
+
+                self.server = Some(recieve_callback);
+                true
+            },
+
+            Msg::ServerRecieve(data) => {
+                info!("decoding BGM recieved from emulator");
+
+                let bgm = Bgm::decode(&mut Cursor::new(data));
+
+                self.file = FileState::Open(File::new("from emulator", FILE_TYPES), bgm);
+                true
+            },
+
             Msg::FileOperation(operation) => {
                 // Point MODEL_PTR to self.
                 {
@@ -152,11 +201,7 @@ impl Component for Model {
                             let cell = MODEL_PTR.try_lock().unwrap();
                             let model = cell.get();
 
-                            if let Some(file) = File::open(FileTypes {
-                                // TODO: also support .bgm (custom) and .midi
-                                extensions: ".bin",
-                                mime_types: "application/octect-stream",
-                            }).await {
+                            if let Some(file) = File::open(FILE_TYPES).await {
                                 let link = unsafe { &(*model).link };
 
                                 // Try to parse the file
@@ -239,6 +284,25 @@ impl Component for Model {
                         html! {}
                     }}
                 </button-group>
+
+                {if electron::is_electron() {
+                    if self.is_server_running() {
+                        html! {
+                            "Emulator server is running."
+                        }
+                    } else {
+                        html! {
+                            <button-group>
+                                <button onclick={self.link.callback(|_| Msg::ServerStart)}>
+                                    {"Start emulator server"}
+                                </button>
+                            </button-group>
+                        }
+                    }
+                } else {
+                    html! {}
+                }}
+
                 {match &self.file {
                     FileState::Open(file, bgm) => html! {
                         <div class="pad">

@@ -1,0 +1,46 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run editor electron app",
+            "isBackground": true,
+            "dependsOn": [
+                "Compile editor on file change",
+                "Open electron",
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true,
+            },
+        },
+        {
+            "label": "Compile editor on file change",
+            "type": "npm",
+            "script": "watch",
+            "path": "editor/",
+            "isBackground": true,
+            "problemMatcher": [
+                "$rustc-watch"
+            ]
+        },
+        {
+            "label": "Run editor in browser",
+            "type": "npm",
+            "script": "start",
+            "path": "editor/",
+            "isBackground": true,
+            "problemMatcher": [
+                "$rustc-watch"
+            ],
+        },
+        {
+            "label": "Open electron",
+            "type": "npm",
+            "script": "start",
+            "path": "electron/",
+            "isBackground": true,
+            "problemMatcher": [],
+        },
+    ]
+}
