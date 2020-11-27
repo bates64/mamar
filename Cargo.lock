@@ -141,6 +141,7 @@ dependencies = [
 name = "editor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "codec",
  "console_error_panic_hook",
  "console_log",

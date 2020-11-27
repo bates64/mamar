@@ -2,21 +2,33 @@ export function is_electron() {
     return !!(window.process && window.process.versions.electron)
 }
 
-let server
-
 export function server_listen(callback) {
     const net = window.require("net")
 
-    server = net.createServer(sock => {
-        sock.on("data", data => {
-            console.log(data)
-            callback(data)
-        })
+    const connections = []
+
+    const server = net.createServer(sock => {
+        connections.push(sock)
+
+        sock.setKeepAlive(true)
+
+        sock.on("data", callback)
 
         sock.on("error", console.error)
 
-        sock.on("close", () => console.log("server died"))
+        sock.on("close", () => console.error("lost connection to emulator"))
     })
 
     server.listen(65432)
+
+    return {
+        server,
+        connections,
+    }
+}
+
+export function server_send({ connections }, data) {
+    for (const sock of connections) {
+        sock.write(data)
+    }
 }

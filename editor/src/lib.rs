@@ -4,7 +4,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use std::io::Cursor;
-use log::info;
+use log::{info, error};
+use anyhow::anyhow;
 use codec::Bgm;
 
 mod fs;
@@ -12,6 +13,7 @@ use fs::{File, FileTypes};
 
 // TODO: #[cfg] for this
 mod electron;
+use electron::EmulatorServer;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]	static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -38,7 +40,7 @@ pub struct Model {
     link: ComponentLink<Self>,
     file: FileState,
 
-    server: Option<electron::ServerCallback>,
+    server: Option<EmulatorServer>,
 }
 
 // TODO: better name
@@ -48,9 +50,20 @@ enum FileState {
     Open(File, Result<Bgm, codec::DecodeError>),
 }
 
+impl FileState {
+    fn bgm(&self) -> Option<&Bgm> {
+        if let FileState::Open(_, Ok(bgm)) = self {
+            Some(bgm)
+        } else {
+            None
+        }
+    }
+}
+
 pub enum Msg {
     ServerStart,
     ServerRecieve(Vec<u8>),
+    ServerSend,
 
     FileOperation(FileOperation),
     FileOperationDone,
@@ -135,13 +148,33 @@ impl Model {
     fn is_server_running(&self) -> bool {
         self.server.is_some()
     }
+
+    fn send_bgm_to_emulator(&self) -> Result<(), anyhow::Error> {
+        if let Some(bgm) = self.file.bgm() {
+            let mut data = Cursor::new(Vec::new());
+            if let Err(error) = bgm.encode(&mut data) {
+                // We can't return `error` because of lifetime requirements
+                error!("{}", error);
+                return Err(anyhow!("Failed to encode open BGM"));
+            }
+            let data = data.into_inner();
+
+            self.server
+                .as_ref()
+                .expect("Emulator server is not running")
+                .send(&data[..]);
+
+            Ok(())
+        } else {
+            Err(anyhow!("No BGM open"))
+        }
+    }
 }
 
 impl Component for Model {
     type Message = Msg;
     type Properties = ();
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        assert_eq!(123, 123);
         Self {
             link,
             file: FileState::Closed,
@@ -154,17 +187,13 @@ impl Component for Model {
             Msg::ServerStart => {
                 let send_message = self.link.callback(|data| Msg::ServerRecieve(data));
 
-                let recieve_callback: electron::ServerCallback = Closure::wrap(Box::new(move |data| {
+                self.server = EmulatorServer::start(Closure::wrap(Box::new(move |data| {
                     let data = data.to_vec();
 
                     info!("received BGM size={:#X}", data.len());
 
                     send_message.emit(data);
-                }));
-
-                electron::start_server_if_electron(&recieve_callback);
-
-                self.server = Some(recieve_callback);
+                }))).ok();
                 true
             },
 
@@ -175,6 +204,13 @@ impl Component for Model {
 
                 self.file = FileState::Open(File::new("from emulator", FILE_TYPES), bgm);
                 true
+            },
+
+            Msg::ServerSend => {
+                if let Err(error) = self.send_bgm_to_emulator() {
+                    error!("{}", error);
+                }
+                false
             },
 
             Msg::FileOperation(operation) => {
@@ -288,7 +324,18 @@ impl Component for Model {
                 {if electron::is_electron() {
                     if self.is_server_running() {
                         html! {
-                            "Emulator server is running."
+                            <button-group>
+                                {"Emulator server is running."}
+                                {if self.file.bgm().is_some() {
+                                    html! {
+                                        <button onclick={self.link.callback(|_| Msg::ServerSend)}>
+                                            {"Send to emulator"}
+                                        </button>
+                                    }
+                                } else {
+                                    html! {}
+                                }}
+                            </button-group>
                         }
                     } else {
                         html! {

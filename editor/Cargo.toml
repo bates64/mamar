@@ -19,3 +19,4 @@ console_log = { version = "0.2.0", features = ["color"] }
 yew = "0.17.4"
 lazy_static = "1.4.0"
 codec = { path = "../codec" }
+anyhow = "1.0.34"
