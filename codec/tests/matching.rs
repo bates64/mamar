@@ -5,7 +5,7 @@
 ///!
 
 use std::{path::Path, fs::File, io::prelude::*, io::Cursor, rc::Rc};
-use codec::*;
+use codec::bgm::*;
 
 use simple_logger::SimpleLogger;
 

@@ -2,7 +2,8 @@ use std::{collections::HashMap, io::{self, prelude::*, SeekFrom}};
 use std::fmt;
 use by_address::ByAddress;
 use log::{debug, info};
-use crate::*;
+use super::*;
+use crate::rw_util::*;
 
 #[derive(Debug)]
 pub enum Error<'a> {
@@ -37,75 +38,6 @@ impl std::error::Error for Error<'_> {
             Error::Io(source) => Some(source),
             _ => None,
         }
-    }
-}
-
-trait WriteExt: Write + Seek {
-    fn write_u8(&mut self, value: u8) -> io::Result<()>;
-    fn write_i8(&mut self, value: i8) -> io::Result<()>;
-    fn write_u16_be(&mut self, value: u16) -> io::Result<()>;
-    fn write_u32_be(&mut self, value: u32) -> io::Result<()>;
-
-    /// Seeks to a position, writes the value, then seeks back.
-    fn write_u16_be_at(&mut self, value: u16, pos: SeekFrom) -> io::Result<()>;
-    fn write_u32_be_at(&mut self, value: u32, pos: SeekFrom) -> io::Result<()>;
-
-    /// Seeks forward until the position is aligned to the given alignment.
-    fn align(&mut self, alignment: u64) -> io::Result<()>;
-}
-
-impl<W: Write + Seek> WriteExt for W {
-    fn write_u8(&mut self, value: u8) -> io::Result<()> {
-        self.write_all(&mut [value])
-    }
-
-    fn write_i8(&mut self, value: i8) -> io::Result<()> {
-        self.write_all(&mut value.to_be_bytes())
-    }
-
-    fn write_u16_be(&mut self, value: u16) -> io::Result<()> {
-        self.write_all(&mut value.to_be_bytes())
-    }
-
-    fn write_u32_be(&mut self, value: u32) -> io::Result<()> {
-        self.write_all(&mut value.to_be_bytes())
-    }
-
-    fn write_u16_be_at(&mut self, value: u16, pos: SeekFrom) -> io::Result<()> {
-        let old_pos = self.pos()?;
-        self.seek(pos)?;
-        self.write_u16_be(value)?;
-        self.seek(SeekFrom::Start(old_pos))?;
-        Ok(())
-    }
-
-    fn write_u32_be_at(&mut self, value: u32, pos: SeekFrom) -> io::Result<()> {
-        let old_pos = self.pos()?;
-        self.seek(pos)?;
-        self.write_u32_be(value)?;
-        self.seek(SeekFrom::Start(old_pos))?;
-        Ok(())
-    }
-
-    fn align(&mut self, alignment: u64) -> io::Result<()> {
-        let pos = self.pos()?;
-
-        if pos % alignment == 0 {
-            // Nothing to do
-            return Ok(());
-        }
-
-        // Calculate next multiple of `alignment`
-        let rounded_pos = pos + alignment; // NEXT multiple, not closest
-        let new_pos = (rounded_pos / alignment) * alignment;
-
-        // Write zeroes
-        let delta = new_pos - pos;
-        for _ in 0..delta {
-            self.write_u8(0)?;
-        }
-
-        Ok(())
     }
 }
 

@@ -6,7 +6,7 @@ use yew::prelude::*;
 use std::io::Cursor;
 use log::{info, error};
 use anyhow::anyhow;
-use codec::Bgm;
+use codec::bgm::{self, Bgm};
 
 mod fs;
 use fs::{File, FileTypes};
@@ -47,7 +47,7 @@ pub struct Model {
 enum FileState {
     Closed,
     Loading,
-    Open(File, Result<Bgm, codec::DecodeError>),
+    Open(File, Result<Bgm, bgm::de::Error>),
 }
 
 impl FileState {

@@ -4,7 +4,8 @@ use std::collections::{HashMap, btree_map::{BTreeMap, Entry}};
 use std::rc::{Rc, Weak};
 use smallvec::smallvec;
 use log::{debug, warn};
-use crate::*;
+use super::*;
+use crate::rw_util::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -12,7 +13,6 @@ pub enum Error {
     InvalidName(tinystr::Error),
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumSegments(u8),
-    NonZeroPadding, // TODO: add { position: u64 }
     Io(io::Error),
 }
 
@@ -33,7 +33,6 @@ impl fmt::Display for Error {
             } => write!(f, "The file says it is {}B, but it is actually {}B", internal_size, true_size),
             Error::InvalidNumSegments(num_segments) =>
                 write!(f, "Exactly 4 segment slots are supported, but this file has {}", num_segments),
-            Error::NonZeroPadding => write!(f, "Expected padding but found non-zero byte(s)"),
             Error::Io(source) => if let io::ErrorKind::UnexpectedEof = source.kind() {
                 write!(f, "Unexpected end-of-file")
             } else {
@@ -51,48 +50,6 @@ impl std::error::Error for Error {
             Error::Io(source) => Some(source),
             _ => None,
         }
-    }
-}
-
-trait ReadExt: Read {
-    fn read_u8(&mut self) -> io::Result<u8>;
-    fn read_i8(&mut self) -> io::Result<i8>;
-    fn read_u16_be(&mut self) -> io::Result<u16>;
-    fn read_u32_be(&mut self) -> io::Result<u32>;
-    fn read_padding(&mut self, num_bytes: u32) -> Result<(), Error>;
-}
-
-impl<R: Read> ReadExt for R {
-    fn read_u8(&mut self) -> io::Result<u8> {
-        let mut buffer = [0; 1];
-        self.read_exact(&mut buffer)?;
-        Ok(buffer[0])
-    }
-
-    fn read_i8(&mut self) -> io::Result<i8> {
-        self.read_u8().map(|i| i as i8)
-    }
-
-    fn read_u16_be(&mut self) -> io::Result<u16> {
-        let mut buffer = [0; 2];
-        self.read_exact(&mut buffer)?;
-        Ok(u16::from_be_bytes(buffer))
-    }
-
-    fn read_u32_be(&mut self) -> io::Result<u32> {
-        let mut buffer = [0; 4];
-        self.read_exact(&mut buffer)?;
-        Ok(u32::from_be_bytes(buffer))
-    }
-
-    fn read_padding(&mut self, num_bytes: u32) -> Result<(), Error> {
-        for _ in 0..num_bytes {
-            if self.read_u8()? != 0 {
-                return Err(Error::NonZeroPadding);
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -156,14 +113,15 @@ impl Bgm {
             f.seek(SeekFrom::Start(internal_size as u64))?;
             f.read_padding(true_size - internal_size)?;
         } else {
-            return Err(Error::SizeMismatch { true_size, internal_size });
+            //return Err(Error::SizeMismatch { true_size, internal_size });
         }
 
         f.seek(SeekFrom::Start(0x08))?;
         let mut index = [0; 4];
         f.read_exact(&mut index)?;
         let index = tinystr::TinyStr4::from_bytes(&index)
-            .map_err(|source| Error::InvalidName(source))?;
+            //.map_err(|source| Error::InvalidName(source))?;
+            .unwrap_or(tinystr4!("bad ")); // midi2bgm outputs songs without names
 
         debug_assert!(f.pos()? == 0x0C);
         f.read_padding(4)?;

@@ -3,8 +3,8 @@ var SERVER_PORT = 65432
 var BGM = 0x42474D20 // "BGM "
 var BGM_START = 0x801DA070
 
-var BATTLE_BGM_START = 0xB0F007C0 // TODO: better to load to ram, writing to rom is slow
-var BATTLE_BGM_ID = 0x02
+var BATTLE_BGM_START = 0xB0FA3C60 // TODO: better to load to ram, writing to rom is slow
+var BATTLE_BGM_ID = 0x90
 
 var sock
 
