@@ -2,7 +2,7 @@
 
 ### Installation
 
-Copy [mamar.js] to `C:\Program Files (x86)\Project64 2.3\Scripts\`.
+Copy [mamar.js](mamar.js) to `C:\Program Files (x86)\Project64 2.3\Scripts\`.
 
 ### Running
 

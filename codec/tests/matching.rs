@@ -1,11 +1,5 @@
-///! These tests run on data extracted from a vanilla Paper Mario (U) ROM.
-///! Run the following script to extract them:
-///!
-///!     $ ./bin/extract.py path/to/papermario.z64
-///!
-
 use std::{path::Path, fs::File, io::prelude::*, io::Cursor, rc::Rc};
-use codec::bgm::*;
+use codec::{bgm::*, sbn::*};
 
 use simple_logger::SimpleLogger;
 
@@ -282,3 +276,18 @@ fn shared_subsegment_tracks_ptr() {
     assert!(Rc::ptr_eq(tracks_0_2, tracks_1_1));
 }
 
+#[test]
+fn sbn() {
+    let original = include_bytes!("bin/sbn.bin");
+    let sbn = Sbn::from_bytes(original).unwrap();
+
+    for file in &sbn.files {
+        println!("file {} {} size={:#X}", file.magic().unwrap(), file.name, file.data.len());
+    }
+
+    for song in &sbn.songs {
+        println!("song {} -> {}", song.bgm_file, sbn.files[song.bgm_file as usize].name);
+    }
+
+    assert!(sbn.as_bytes().unwrap() == original);
+}

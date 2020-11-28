@@ -25,7 +25,7 @@ impl From<io::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::InvalidMagic => write!(f, "Missing 'BGM' signature at start of file"),
+            Error::InvalidMagic => write!(f, "Missing 'BGM' signature at start"),
             // TODO(blocked): output source error too; see https://github.com/zbraniecki/tinystr/issues/29
             Error::InvalidName(_source) => write!(f, "Invalid name string, must be 4 ASCII bytes"),
             Error::SizeMismatch {
@@ -99,7 +99,7 @@ impl Bgm {
         f.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 4];
         f.read_exact(&mut magic)?;
-        if magic != *MAGIC {
+        if magic != MAGIC.as_bytes() {
             return Err(Error::InvalidMagic);
         }
 
@@ -113,7 +113,7 @@ impl Bgm {
             f.seek(SeekFrom::Start(internal_size as u64))?;
             f.read_padding(true_size - internal_size)?;
         } else {
-            //return Err(Error::SizeMismatch { true_size, internal_size });
+            warn!("size mismatch! BGM says it is {:#X} B but the input is {:#X} B", internal_size, true_size);
         }
 
         f.seek(SeekFrom::Start(0x08))?;
@@ -121,7 +121,7 @@ impl Bgm {
         f.read_exact(&mut index)?;
         let index = tinystr::TinyStr4::from_bytes(&index)
             //.map_err(|source| Error::InvalidName(source))?;
-            .unwrap_or(tinystr4!("bad ")); // midi2bgm outputs songs without names
+            .unwrap_or(tinystr4!("bad ")); // midi2bgm outputs songs without names (TODO: warn/make optional)
 
         debug_assert!(f.pos()? == 0x0C);
         f.read_padding(4)?;

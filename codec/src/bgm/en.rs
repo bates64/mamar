@@ -42,10 +42,16 @@ impl std::error::Error for Error<'_> {
 }
 
 impl Bgm {
+    pub fn as_bytes<'a>(&'a self) -> Result<Vec<u8>, Error<'a>> {
+        let mut encoded = io::Cursor::new(Vec::new());
+        self.encode(&mut encoded)?;
+        Ok(encoded.into_inner())
+    }
+
     pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
         f.seek(SeekFrom::Start(0))?;
 
-        f.write_all(MAGIC)?;
+        f.write_all(MAGIC.as_bytes())?;
 
         debug_assert_eq!(f.pos()?, 0x04);
         let file_size_offset = {

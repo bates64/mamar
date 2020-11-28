@@ -11,7 +11,7 @@ mod cmd;
 pub use cmd::*;
 
 /// Constant signature string which appears at the start of every binary BGM file.
-pub const MAGIC: &[u8; 4] = b"BGM ";
+pub const MAGIC: &'static str = "BGM ";
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Bgm {

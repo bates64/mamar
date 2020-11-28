@@ -158,6 +158,7 @@ if __name__ == "__main__":
         exit(1)
 
     with open(argv[1], "rb") as rom:
+        # BGM
         for i, row in enumerate(songs):
             start, filename = row
 
@@ -174,3 +175,9 @@ if __name__ == "__main__":
                 file.write(rom.read(length))
 
             print(filename)
+
+        # SBN
+        with open(path.join(dirname, "sbn.bin"), "wb") as file:
+            rom.seek(0xF00000)
+            file.write(rom.read(0x1942C40))
+            print("sbn.bin")
