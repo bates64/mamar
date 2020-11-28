@@ -1,7 +1,6 @@
 appId: xyz.imalex.mamar
 productName: Mamar
 copyright: Copyright © 2020 Alex Bates
-publish: github
 files:
   - "**/*"
   - build/**/*
@@ -12,6 +11,7 @@ win:
 mac:
   category: public.app-category.music
 linux:
+  target: AppImage
   executableName: mamar
   synopsis: Paper Mario music editor
   category: Audio
