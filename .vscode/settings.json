@@ -4,7 +4,6 @@
         "**/package-lock.json": true,
         "target": true,
         "Cargo.lock": true,
-        "editor/dist": true,
         "editor/pkg": true,
     },
     "files.associations": {

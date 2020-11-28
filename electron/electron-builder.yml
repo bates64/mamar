@@ -1,0 +1,17 @@
+appId: xyz.imalex.mamar
+productName: Mamar
+copyright: Copyright © 2020 Alex Bates
+publish: github
+files:
+  - "**/*"
+  - build/**/*
+win:
+  target:
+    target: nsis
+    arch: x64 # could also do ia32 but nobody uses 32-bit Windows anymore
+mac:
+  category: public.app-category.music
+linux:
+  executableName: mamar
+  synopsis: Paper Mario music editor
+  category: Audio

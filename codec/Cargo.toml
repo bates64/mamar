@@ -3,6 +3,8 @@ name = "codec"
 version = "0.1.0"
 authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
+repository = "https://github.com/nanaian/mamar"
+license = "0BSD"
 
 [dependencies]
 smallvec = { version = "1.5.0", features = ["write"] }
