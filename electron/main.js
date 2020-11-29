@@ -1,5 +1,10 @@
 const { app, BrowserWindow } = require("electron")
 const path = require("path")
+const { autoUpdater } = require("electron-updater")
+
+if (process.platform !== "darwin") { // Code-signing is required on macOS
+    autoUpdater.checkForUpdatesAndNotify()
+}
 
 if (!app.isPackaged) {
     require("electron-reloader")(module, {
