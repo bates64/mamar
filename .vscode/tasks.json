@@ -5,7 +5,7 @@
             "label": "Run editor electron app",
             "isBackground": true,
             "dependsOn": [
-                "Compile editor on file change",
+                "Compile editor for electron on file change",
                 "Open electron",
             ],
             "problemMatcher": [],
@@ -15,9 +15,9 @@
             },
         },
         {
-            "label": "Compile editor on file change",
+            "label": "Compile editor for electron on file change",
             "type": "npm",
-            "script": "watch",
+            "script": "watch-electron",
             "path": "editor/",
             "isBackground": true,
             "problemMatcher": [

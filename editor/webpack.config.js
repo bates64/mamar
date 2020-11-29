@@ -7,11 +7,12 @@ const FaviconsWebpackPlugin = require("favicons-webpack-plugin")
 const dist = path.resolve(__dirname, "dist")
 
 module.exports = env => {
-    const is_electron = env === "electron"
-    const mode = is_electron ? "production" : env
+    const is_electron = env.startsWith("electron")
+    const mode = env.endsWith("development") ? "development" : "production"
 
     return {
         mode,
+        target: is_electron ? "electron-renderer" : "web",
         entry: {
             entry: "./src/entry.js",
         },
@@ -64,6 +65,7 @@ module.exports = env => {
             new WasmPackPlugin({
                 crateDirectory: __dirname,
                 forceMode: mode,
+                extraArgs: is_electron ? `-- --features electron` : "",
             }),
         ],
         module: {
@@ -74,5 +76,5 @@ module.exports = env => {
                 },
             ],
         },
-        }
+    }
 }

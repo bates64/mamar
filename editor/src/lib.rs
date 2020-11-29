@@ -11,9 +11,8 @@ use codec::bgm::{self, Bgm};
 mod fs;
 use fs::{File, FileTypes};
 
-// TODO: #[cfg] for this
+#[cfg(feature="electron")]
 mod electron;
-use electron::EmulatorServer;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]	static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -40,7 +39,8 @@ pub struct Model {
     link: ComponentLink<Self>,
     file: FileState,
 
-    server: Option<EmulatorServer>,
+    #[cfg(feature="electron")]
+    server: Option<electron::hot_server::HotReloadServer>,
 }
 
 // TODO: better name
@@ -61,9 +61,10 @@ impl FileState {
 }
 
 pub enum Msg {
-    ServerStart,
-    ServerRecieve(Vec<u8>),
-    ServerSend,
+    #[cfg(feature="electron")] HotServerStart,
+    #[cfg(feature="electron")] HotClientConnect,
+    #[cfg(feature="electron")] HotClientDisconnect,
+    #[cfg(feature="electron")] HotPlayBgm,
 
     FileOperation(FileOperation),
     FileOperationDone,
@@ -145,11 +146,13 @@ mod cursed {
 use cursed::MODEL_PTR;
 
 impl Model {
+    #[cfg(feature="electron")]
     fn is_server_running(&self) -> bool {
         self.server.is_some()
     }
 
-    fn send_bgm_to_emulator(&self) -> Result<(), anyhow::Error> {
+    #[cfg(feature="electron")]
+    fn play_bgm(&self) -> Result<(), anyhow::Error> {
         if let Some(bgm) = self.file.bgm() {
             let mut data = Cursor::new(Vec::new());
             if let Err(error) = bgm.encode(&mut data) {
@@ -161,8 +164,8 @@ impl Model {
 
             self.server
                 .as_ref()
-                .expect("Emulator server is not running")
-                .send(&data[..]);
+                .expect("hot-reload server is not running")
+                .play_bgm(&data[..]);
 
             Ok(())
         } else {
@@ -178,40 +181,43 @@ impl Component for Model {
         Self {
             link,
             file: FileState::Closed,
+            #[cfg(feature="electron")]
             server: None,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::ServerStart => {
-                let send_message = self.link.callback(|data| Msg::ServerRecieve(data));
+            #[cfg(feature="electron")]
+            Msg::HotServerStart => {
+                use electron::hot_server::*;
 
-                self.server = EmulatorServer::start(Closure::wrap(Box::new(move |data| {
-                    let data = data.to_vec();
+                let hot_client_connect = self.link.callback(|_| Msg::HotClientConnect);
+                let hot_client_disconnect = self.link.callback(|_| Msg::HotClientDisconnect);
 
-                    info!("received BGM size={:#X}", data.len());
-
-                    send_message.emit(data);
-                }))).ok();
+                self.server = Some(HotReloadServer::start(
+                    callback!(move || {
+                        info!("hot-reload client connected");
+                        hot_client_connect.emit(());
+                    }),
+                    callback!(move || {
+                        info!("hot-reload client disconnected");
+                        hot_client_disconnect.emit(());
+                    }),
+                ));
                 true
             },
 
-            Msg::ServerRecieve(data) => {
-                info!("decoding BGM recieved from emulator");
-
-                let bgm = Bgm::decode(&mut Cursor::new(data));
-
-                self.file = FileState::Open(File::new("from emulator", FILE_TYPES), bgm);
-                true
-            },
-
-            Msg::ServerSend => {
-                if let Err(error) = self.send_bgm_to_emulator() {
+            #[cfg(feature="electron")]
+            Msg::HotPlayBgm => {
+                if let Err(error) = self.play_bgm() {
                     error!("{}", error);
                 }
                 false
             },
+
+            #[cfg(feature="electron")]
+            Msg::HotClientConnect | Msg::HotClientDisconnect => true,
 
             Msg::FileOperation(operation) => {
                 // Point MODEL_PTR to self.
@@ -321,15 +327,24 @@ impl Component for Model {
                     }}
                 </button-group>
 
-                {if electron::is_electron() {
-                    if self.is_server_running() {
+                {{
+                    #[cfg(feature="electron")]
+                    if let Some(server) = &self.server {
+                        let num_connections = server.num_connections();
+
                         html! {
                             <button-group>
-                                {"Emulator server is running."}
-                                {if self.file.bgm().is_some() {
+                                {if self.file.bgm().is_some() && num_connections > 0 {
                                     html! {
-                                        <button onclick={self.link.callback(|_| Msg::ServerSend)}>
-                                            {"Send to emulator"}
+                                        <button onclick={self.link.callback(|_| Msg::HotPlayBgm)}>
+                                            {format!(
+                                                "Play in {}",
+                                                if num_connections == 1 {
+                                                    "emulator"
+                                                } else {
+                                                    "emulators"
+                                                }
+                                            )}
                                         </button>
                                     }
                                 } else {
@@ -340,13 +355,14 @@ impl Component for Model {
                     } else {
                         html! {
                             <button-group>
-                                <button onclick={self.link.callback(|_| Msg::ServerStart)}>
-                                    {"Start emulator server"}
+                                <button onclick={self.link.callback(|_| Msg::HotServerStart)}>
+                                    {"Start hot-reload server"}
                                 </button>
                             </button-group>
                         }
                     }
-                } else {
+
+                    #[cfg(not(feature="electron"))]
                     html! {}
                 }}
 

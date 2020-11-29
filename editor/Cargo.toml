@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
 
+[features]
+electron = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

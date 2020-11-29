@@ -5,12 +5,14 @@
   "private": true,
   "scripts": {
     "build": "webpack --env=production",
-    "build-electron": "webpack --env=electron --output-path ../electron/build",
+    "build-electron": "webpack --env=electron-production --output-path ../electron/build",
     "watch": "webpack-dev-server -d --env=development --hot",
+    "watch-electron": "webpack-dev-server -d --env=electron-development --hot",
     "start": "npm run watch -- --open",
     "test": "cargo test"
   },
   "dependencies": {
+    "@pmret/hot-reload": "^1.0.0",
     "browser-nativefs": "^0.11.1"
   },
   "devDependencies": {

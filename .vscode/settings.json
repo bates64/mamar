@@ -14,4 +14,6 @@
 
     // This diagnostic doesn't work correctly with wasm_bindgen externs
     "rust-analyzer.diagnostics.disabled": ["missing-unsafe"],
+
+    "rust-analyzer.cargo.features": ["electron"],
 }
