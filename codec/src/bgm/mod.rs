@@ -1,5 +1,4 @@
 use std::{ops::Deref, rc::Rc};
-use tinystr::{tinystr4, TinyStr4};
 
 /// Encoder ([Bgm] -> .bin)
 pub mod en;
@@ -13,26 +12,15 @@ pub use cmd::*;
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &'static str = "BGM ";
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Bgm {
     /// ASCII song index.
-    pub index: TinyStr4,
+    pub index: String,
 
     pub segments: [Option<Segment>; 4],
 
     pub drums: Vec<Drum>,
     pub voices: Vec<Voice>,
-}
-
-impl Default for Bgm {
-    fn default() -> Self {
-        Self {
-            index: tinystr4!("xxx "), // TODO: check engine accepts this
-            segments: [None, None, None, None],
-            drums: Vec::new(),
-            voices: Vec::new(),
-        }
-    }
 }
 
 type Segment = Vec<Subsegment>;

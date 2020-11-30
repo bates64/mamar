@@ -102,7 +102,6 @@ dependencies = [
  "log",
  "simple_logger",
  "smallvec",
- "tinystr",
 ]
 
 [[package]]
@@ -148,6 +147,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "log",
+ "midly",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -395,6 +395,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
+name = "midly"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cba5d86cecbe6d32ce048b29dd9cf5c83b941a0ede95b531687410c26b517577"
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -578,31 +584,6 @@ dependencies = [
  "wasi",
  "winapi",
 ]
-
-[[package]]
-name = "tinystr"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "939125669d4043772e1eb2e91e25d1f933679155d961149aa181519de131439f"
-dependencies = [
- "tinystr-macros",
- "tinystr-raw",
-]
-
-[[package]]
-name = "tinystr-macros"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f65be51117c325c2b58eec529be7a0857d11527a9029973b58810a4c63e77a6"
-dependencies = [
- "tinystr-raw",
-]
-
-[[package]]
-name = "tinystr-raw"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17bd7d3b696677c7844bf4ce7db7492c140b0922a553b6d285fe642e6d9934b5"
 
 [[package]]
 name = "unicode-xid"

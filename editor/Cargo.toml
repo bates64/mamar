@@ -23,3 +23,4 @@ yew = "0.17.4"
 lazy_static = "1.4.0"
 codec = { path = "../codec" }
 anyhow = "1.0.34"
+midly = { version = "0.5.1", default_features = false, features = ["std", "alloc"] }

@@ -9,7 +9,12 @@ use anyhow::anyhow;
 use codec::bgm::{self, Bgm};
 
 mod fs;
-use fs::{File, FileTypes};
+use fs::File;
+
+mod midi;
+
+mod read_agnostic;
+use read_agnostic::read_agnostic;
 
 #[cfg(feature="electron")]
 mod electron;
@@ -28,12 +33,6 @@ pub fn run_app() {
     App::<Model>::new().mount_to_body();
 }
 
-const FILE_TYPES: FileTypes = FileTypes {
-    // TODO: also support .bgm (custom) and .midi
-    extensions: ".bin",
-    mime_types: "application/octect-stream",
-};
-
 #[wasm_bindgen]
 pub struct Model {
     link: ComponentLink<Self>,
@@ -47,7 +46,7 @@ pub struct Model {
 enum FileState {
     Closed,
     Loading,
-    Open(File, Result<Bgm, bgm::de::Error>),
+    Open(File, Result<Bgm, read_agnostic::Error>),
 }
 
 impl FileState {
@@ -147,11 +146,6 @@ use cursed::MODEL_PTR;
 
 impl Model {
     #[cfg(feature="electron")]
-    fn is_server_running(&self) -> bool {
-        self.server.is_some()
-    }
-
-    #[cfg(feature="electron")]
     fn play_bgm(&self) -> Result<(), anyhow::Error> {
         if let Some(bgm) = self.file.bgm() {
             let mut data = Cursor::new(Vec::new());
@@ -243,12 +237,12 @@ impl Component for Model {
                             let cell = MODEL_PTR.try_lock().unwrap();
                             let model = cell.get();
 
-                            if let Some(file) = File::open(FILE_TYPES).await {
+                            if let Some(file) = File::open(read_agnostic::FILE_TYPES).await {
                                 let link = unsafe { &(*model).link };
 
                                 // Try to parse the file
                                 link.send_message(Msg::FileLoading);
-                                let bgm = Bgm::decode(&mut Cursor::new(file.read().await));
+                                let bgm = read_agnostic(&file.read().await);
 
                                 // Remotely update model state
                                 unsafe { (*model).file = FileState::Open(file, bgm) };

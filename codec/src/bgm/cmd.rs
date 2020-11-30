@@ -346,6 +346,16 @@ impl CommandSeq {
     /// Returns the number of commands ("length") in the sequence.
     pub fn len(&self) -> usize { self.vec.len() }
 
+    pub fn has_content(&self) -> bool {
+        if self.len() == 0 {
+            false
+        } else if self.len() == 1 && self.vec[0] == Command::End {
+            false
+        } else {
+            true
+        }
+    }
+
     // TODO
     /*
     /// Combines two sequences with the same relative-time space.
@@ -600,6 +610,8 @@ pub enum Command {
 
 use Command::Delay;
 
+pub const DELAY_MAX: u8 = 0x78;
+
 impl Default for Command {
     /// Returns a no-op command. Cannot be encoded.
     fn default() -> Self {
@@ -609,7 +621,7 @@ impl Default for Command {
 
 impl Command {
     /// Returns a Command iterator producing a series of [Delay] commands in order to reach the specified delta time.
-    /// This is required for any delta time greater than [`0xFF`](u8::MAX) ticks (which a [Delay] is unable to hold).
+    /// This is required for any delta time greater than [DELAY_MAX] ticks.
     ///
     /// ```
     /// # use codec::*;
@@ -634,13 +646,13 @@ impl Command {
     /// assert_eq!(sequence.len(), 5);
     /// ```
     pub fn delays(delta_time: usize) -> Box<dyn Iterator<Item = Command>> {
-        let full_delays = iter::repeat(Command::Delay(u8::MAX))
-            .take(delta_time / (u8::MAX as usize)); // Produce this many full delays
+        let full_delays = iter::repeat(Command::Delay(DELAY_MAX))
+            .take(delta_time / (DELAY_MAX as usize)); // Produce this many full delays
 
         // Add any remaining time.
         // Note: Box is needed for dynamic dispatch because full_delays and .chain() have different types
-        match delta_time % (u8::MAX as usize) {
-            0 => Box::new(full_delays), // No remaining time to add; delta_time divides cleanly into u8::MAX
+        match delta_time % (DELAY_MAX as usize) {
+            0 => Box::new(full_delays), // No remaining time to add; delta_time divides cleanly into DELAY_MAX
             remainder => Box::new(
                 // Append a single Delay to the iterator
                 full_delays.chain(iter::once(Command::Delay(remainder as u8)))

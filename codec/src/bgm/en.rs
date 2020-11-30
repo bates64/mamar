@@ -11,6 +11,7 @@ pub enum Error<'a> {
     MissingEndMarker(&'a CommandRange),
     UnorderedMarkers(&'a CommandRange),
     EndMarkerTooFarAway(&'a CommandRange),
+    TooBig,
     Io(io::Error),
 }
 
@@ -27,6 +28,7 @@ impl fmt::Display for Error<'_> {
             Error::MissingEndMarker(range) => write!(f, "Missing end marker for range '{}'", range.name),
             Error::UnorderedMarkers(range) => write!(f, "Start marker comes after end marker in range '{}'", range.name),
             Error::EndMarkerTooFarAway(range) => write!(f, "End marker is too far away from start marker in range '{}'", range.name),
+            Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
         }
     }
@@ -61,8 +63,8 @@ impl Bgm {
         };
 
         debug_assert_eq!(f.pos()?, 0x08);
-        f.write_all(self.index.as_bytes())?;
-        f.seek(SeekFrom::Start(0x0C))?; // `self.index` may have been shorter than 4 bytes
+        f.write_all(&self.index.as_bytes())?;
+        f.seek(SeekFrom::Start(0x0C))?;
 
         f.write_all(&[0, 0, 0, 0, self.segments.len() as u8, 0, 0, 0])?;
 
@@ -175,7 +177,7 @@ impl Bgm {
             let mut todo_commands = Vec::new();
             for Track { flags, commands } in tracks.iter() {
                 //debug!("write commands_offset {:#X}", f.pos()?);
-                if commands.len() > 0 {
+                if commands.has_content() {
                     // Need to write command data after the track
                     todo_commands.push((f.pos()?, commands));
                 }
@@ -205,7 +207,11 @@ impl Bgm {
         f.align(16)?;
         debug!("end (aligned) = {:#X}", f.pos()?);
 
-        Ok(())
+        if f.pos()? <= 0x8A8F {
+            Ok(())
+        } else {
+            Err(Error::TooBig)
+        }
     }
 }
 
@@ -275,12 +281,18 @@ impl CommandSeq {
             match command {
                 Command::Delay(time) => f.write_u8(*time)?,
                 Command::Note { flag, pitch, velocity, length } => {
+                    let length = if *length > 0xD3FF {
+                        0xD3FF
+                    } else {
+                        *length
+                    };
+
                     f.write_u8(pitch | if *flag { 1 } else { 0 })?;
                     f.write_u8(*velocity)?;
-                    if *length < 0xC0 {
-                        f.write_u8(*length as u8)?;
+                    if length < 0xC0 {
+                        f.write_u8(length as u8)?;
                     } else {
-                        let length = *length - 0xC0;
+                        let length = length - 0xC0;
                         // TODO: test me
                         let first_byte = (length >> 8) as u8;
                         let second_byte = length as u8;
