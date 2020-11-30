@@ -310,7 +310,7 @@ impl CommandSeq {
                 },
 
                 // Delay
-                0x01..=0x77 => Command::Delay(cmd_byte),
+                0x01..=0x77 => Command::Delay(cmd_byte as usize),
 
                 // TODO: this doesn't seem like a long delay; needs testing. Leaving as Unknown for now
                 // Long delay

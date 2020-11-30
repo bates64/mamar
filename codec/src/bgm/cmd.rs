@@ -15,7 +15,7 @@ use by_address::ByAddress;
 ///
 /// Relative-time changes only when you insert a [Delay]:
 /// ```
-/// use codec::{CommandSeq, Command};
+/// use codec::bgm::{CommandSeq, Command};
 ///
 /// let mut sequence = CommandSeq::new();
 ///
@@ -69,7 +69,7 @@ impl CommandSeq {
     /// [`shrink`](CommandSeq::shrink).
     ///
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::from(vec![
     ///     Command::Delay(10),
     ///     Command::Delay(10),
@@ -90,7 +90,7 @@ impl CommandSeq {
     ///
     /// A delay will also be inserted after the subsequence where required:
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::from(vec![
     ///     Command::Delay(40),
     ///     Command::MasterTempo(140),
@@ -105,9 +105,9 @@ impl CommandSeq {
     ///     Command::MasterTempo(140),
     /// ]));
     /// ```
-    /// Even in extreme cases using very long sets of Delays:
+    /// With delays after the insertion point combined into one:
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::from(vec![
     ///     Command::Delay(0xFF),
     ///     Command::Delay(0xFF),
@@ -120,8 +120,7 @@ impl CommandSeq {
     ///     Command::Delay(0xFF),
     ///     Command::Delay(0x1),
     ///     Command::MasterTempo(120),
-    ///     Command::Delay(0xFF),
-    ///     Command::Delay(0xFE),
+    ///     Command::Delay(0xFF + 0xFE), // Combined into a single delay
     /// ]));
     /// ```
     ///
@@ -130,7 +129,7 @@ impl CommandSeq {
     /// of playback issues in specific circumstances:
     ///
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::new();
     ///
     /// sequence.insert(10, Command::MasterTempo(60));  // (1)
@@ -155,7 +154,7 @@ impl CommandSeq {
     ///
     /// The order of the inserted subsequence is maintained:
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::new();
     ///
     /// sequence.insert_many(10, vec![
@@ -206,13 +205,21 @@ impl CommandSeq {
                     (before_time, after_time)
                 };
 
+                fn delay(time: usize) -> Box<dyn Iterator<Item = Command>> {
+                    if time > 0 {
+                        Box::new(iter::once(Command::Delay(time)))
+                    } else {
+                        Box::new(iter::empty())
+                    }
+                };
+
                 // Vec::splice and using an iterator is more efficient than a naive while loop that inserts delays.
                 // See https://stackoverflow.com/questions/28678615.
                 self.vec.splice(
                     old_delay_range, // Replace old delays
-                    Command::delays(insert_time.0)
+                    delay(insert_time.0)
                         .chain(subsequence)
-                        .chain(Command::delays(insert_time.1)),
+                        .chain(delay(insert_time.1)),
                 );
             },
         }
@@ -220,7 +227,7 @@ impl CommandSeq {
 
     /// Returns the commands occurring at the given time, including the terminating Delay command if there is one.
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     ///
     /// let mut sequence = CommandSeq::from(vec![
     ///     Command::MasterTempo(60),
@@ -272,7 +279,7 @@ impl CommandSeq {
     /// this value).
     ///
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::new();
     /// assert_eq!(sequence.len_time(), 0);
     ///
@@ -304,15 +311,15 @@ impl CommandSeq {
     ///
     /// Equivalent to [CommandSeq::len_time] for a sequence with no [Command::Note]s:
     /// ```
-    /// # use codec::*;
-    /// let seq: CommandSeq = Command::delays(1000).collect();
+    /// # use codec::bgm::*;
+    /// let seq = CommandSeq::from(vec![Command::Delay(1000)]);
     /// assert_eq!(seq.playback_time(), 1000);
     /// assert_eq!(seq.len_time(), 1000);
     /// ```
     ///
     /// An empty sequence has a playback time of zero:
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// assert_eq!(CommandSeq::new().playback_time(), 0);
     /// ```
     pub fn playback_time(&self) -> usize {
@@ -367,7 +374,7 @@ impl CommandSeq {
     /*
     /// Searches this sequence for the given command **by reference**.
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// use std::rc::Rc;
     ///
     /// let command = Rc::new(Command::TrackVoice(0));
@@ -393,7 +400,7 @@ impl CommandSeq {
 
     /// Determines if two sequences have referential equality.
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let commands = vec![
     ///     Command::TrackVoice(0), Command::Delay(10)
     /// ];
@@ -486,7 +493,7 @@ impl CommandSeq {
 
 impl From<Vec<Command>> for CommandSeq {
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// assert_eq!({
     ///     CommandSeq::from(vec![Command::Delay(10)])
     /// }, {
@@ -525,11 +532,7 @@ enum DelayLookup {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
-    ///
-    /// `Delay(0)` is considered a no-op, but cannot be encoded.
-    ///
-    /// See [`Command::delays(delta_time)`](Command::delays) to create delays longer than [u8::MAX] ticks.
-    Delay(u8), // TODO: use bounded-integer and add None for no-op instead of invalid Delay(0)
+    Delay(usize),
 
     /// Plays a note or drum sound. Non-blocking(?), i.e. does **not** act like a [`Delay(length)`](Command::Delay) and
     /// only continue execution once the note has finished playing.
@@ -619,26 +622,27 @@ impl Default for Command {
     }
 }
 
+/*
 impl Command {
     /// Returns a Command iterator producing a series of [Delay] commands in order to reach the specified delta time.
     /// This is required for any delta time greater than [DELAY_MAX] ticks.
     ///
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// assert_eq!(Command::delays(20).collect::<Vec<_>>(), vec![Command::Delay(20)]);
     /// assert_eq!(Command::delays(0x100).collect::<Vec<_>>(), vec![Command::Delay(0xFF), Command::Delay(1)]);
     /// ```
     ///
     /// A `delta_time` of zero produces an empty iterator (although any number of `Delay(0)`s would be equivalent).
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// assert_eq!(Command::delays(0).count(), 0);
     /// ```
     ///
     /// You can easily insert the series of [Delay] commands into a [CommandSeq] using
     /// [`CommandSeq::insert_many(time, Command::delays(delta_time))`](CommandSeq::insert_many):
     /// ```
-    /// # use codec::*;
+    /// # use codec::bgm::*;
     /// let mut sequence = CommandSeq::new();
     ///
     /// sequence.insert_many(0, Command::delays(0xFF * 5));
@@ -660,6 +664,7 @@ impl Command {
         }
     }
 }
+*/
 
 #[derive(Clone)]
 pub struct TimeIter<'a> {

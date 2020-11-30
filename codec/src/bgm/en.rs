@@ -279,7 +279,29 @@ impl CommandSeq {
 
         for command in self.iter() {
             match command {
-                Command::Delay(time) => f.write_u8(*time)?,
+                Command::Delay(mut delay) => {
+                    // https://github.com/KernelEquinox/midi2bgm/blob/master/midi2bgm.cpp#L202
+                    while delay > 0 {
+                        if delay < 0x78 {
+                            f.write_u8(delay as u8)?;
+                            delay = 0;
+                        } else {
+                            delay -= 0x78;
+
+                            let mask_low_extra = (delay >> 8).min(7);
+                            f.write_u8(0x78 | mask_low_extra as u8)?;
+                            delay -= mask_low_extra << 8;
+
+                            let extra_byte = match delay {
+                                d if d > 0x78 => 0x78,
+                                d if d > 0x00 => d,
+                                _ => 0,
+                            };
+                            f.write_u8(extra_byte as u8)?;
+                            delay -= extra_byte;
+                        }
+                    }
+                },
                 Command::Note { flag, pitch, velocity, length } => {
                     let length = if *length > 0xD3FF {
                         0xD3FF
