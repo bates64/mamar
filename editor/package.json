@@ -29,6 +29,7 @@
     "postcss-import": "^13.0.0",
     "postcss-import-ext-glob": "^1.1.0",
     "postcss-loader": "^4.1.0",
+    "postcss-pow": "^1.0.1",
     "postcss-preset-env": "^6.7.0",
     "postcss-short": "^5.0.0",
     "webpack": "^4.42.0",

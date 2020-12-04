@@ -1,23 +1,26 @@
-@import url('https://rsms.me/inter/inter.css');
-
+@import-glob "./ui/**/*.css";
 @import-glob "./elements/*.css";
 
 :root {
+    --ratio: 1.5rem; /* https://every-layout.dev/rudiments/modular-scale/ */
+    --measure: 60ch; /* https://every-layout.dev/rudiments/axioms/ */
+
     /* Shade in % */
     --shade-20: #00000031;
     --shade-50: #00000080;
 
-    /* Logo colours */
-    --yellow: #ffbb36;
-    --brown: #392118;
-    --light-brown: #c55020;
-    --pink: #ea7aa1;
-    --dark-pink: #92495d;
-    --rose: #92495d;
-
     /* Mono */
     --fg: #ffffffcc;
     --bg: #1d1b23;
+}
+
+* {
+    box-sizing: border-box;
+
+    max-width: 100%;
+    max-height: 100%;
+
+    overflow: hidden;
 }
 
 html { font-family: 'Inter', system-ui, sans-serif; }
@@ -26,8 +29,6 @@ html { font-family: 'Inter', system-ui, sans-serif; }
 }
 
 body {
-    box-sizing: border-box;
-
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -37,10 +38,12 @@ body {
 
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    line-height: 1.2;
+    line-height: var(--ratio);
 
     margin: 0;
     padding: 0;
+
+    font-size: 13px;
 
     user-select: none;
 }
@@ -55,7 +58,7 @@ body {
 
 ::-webkit-scrollbar-thumb { background-color: #ffffff15 }
 ::-webkit-scrollbar { background-color: #00000015 }
-::-webkit-scrollbar-corner { background-color: #ffffff15 }
+::-webkit-scrollbar-corner { background-color: #00000015 }
 
 ::selection {
     background: #333470f8;
@@ -63,11 +66,6 @@ body {
 
 .light { color: #C1C1F1 }
 
-/* Atoms (utility classes) */
-.pad  { padding: 1em }
-.padx { padding-left: 1em; padding-right: 1em }
-.padl { padding-left: 1em }
-.padr { padding-right: 1em }
-.pady { padding-top: 1em; padding-bottom: 1em }
-.padt { padding-top: 1em }
-.padb { padding-bottom: 1em }
+p {
+    width: 60ch;
+}

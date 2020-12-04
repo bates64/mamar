@@ -1,0 +1,41 @@
+/* https://every-layout.dev/layouts/stack/ */
+
+.Stack {
+    display: flex;
+
+    padding: var(--padding);
+    background: var(--bg);
+
+    overflow: hidden;
+}
+
+.Stack:only-child {
+    width: 100%;
+    height: 100%;
+}
+
+.HStack {
+    flex-direction: row;
+}
+
+.HStack > * {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.HStack > * + * {
+    margin-left: var(--spacing);
+}
+
+.VStack {
+    flex-direction: column;
+}
+
+.VStack > * {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.VStack > * + * {
+    margin-top: var(--spacing);
+}

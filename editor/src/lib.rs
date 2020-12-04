@@ -18,6 +18,8 @@ mod midi;
 mod elements;
 use elements::Titlebar;
 
+mod ui;
+
 mod read_agnostic;
 use read_agnostic::read_agnostic;
 
@@ -325,6 +327,13 @@ impl Component for Model {
 
     fn view(&self) -> Html {
         html! {
+            <ui::app::App/>
+        }
+    }
+
+    /*
+    fn view(&self) -> Html {
+        html! {
             <>
                 <Titlebar filename={match &self.file {
                     FileState::Open(file, _) => Some(file.name().clone()),
@@ -425,4 +434,5 @@ impl Component for Model {
             </>
         }
     }
+    */
 }

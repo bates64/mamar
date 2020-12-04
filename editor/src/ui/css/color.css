@@ -1,0 +1,20 @@
+:root {
+    --yellow: #ffbb36;
+    --brown: #c55020;
+    --pink: #ea7aa1;
+    --rose: #92495d;
+    --red: #df544d;
+
+    --black: #1d1b23;
+}
+
+/* https://learnui.design/tools/accessible-color-generator.html - AAA where possible */
+:root {
+    --on-yellow: #572c00;
+    --on-brown: #ffffce;
+    --on-pink: #2c0000;
+    --on-rose: #ffcee2;
+    --on-red: #400000;
+
+    --on-black: #a9a6b1;
+}

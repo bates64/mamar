@@ -9,6 +9,7 @@ module.exports = {
 
         // Extra expressions
         require('postcss-color-function'),
+        require('postcss-pow'),
 
         // Postprocessing
         // TODO: consider https://github.com/postcss/postcss-dark-theme-class

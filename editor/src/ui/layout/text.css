@@ -1,0 +1,26 @@
+@import url('https://rsms.me/inter/inter.css');
+
+.Text {
+    font-family: 'Inter', system-ui, sans-serif;
+
+    display: block;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+
+    font-weight: 500;
+}
+
+@supports (font-variation-settings: normal) {
+    .Text {
+        font-family: 'Inter var', system-ui, sans-serif;
+    }
+}
+
+.Text_multiline {
+    white-space: pre-line;
+}
+
+.Text_selectable {
+    user-select: text;
+}
