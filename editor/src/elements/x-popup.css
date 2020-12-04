@@ -1,0 +1,23 @@
+x-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    width: 600px;
+    min-height: 350px;
+
+    padding: 2em;
+
+    background-color: #ffffff22;
+}
+
+x-popup-shade {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+
+    background: #00000044;
+}

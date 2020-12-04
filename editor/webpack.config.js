@@ -3,6 +3,7 @@ const HtmlPlugin = require("html-webpack-plugin")
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const FaviconsWebpackPlugin = require("favicons-webpack-plugin")
+const CopyPlugin = require("copy-webpack-plugin")
 
 const dist = path.resolve(__dirname, "dist")
 
@@ -67,12 +68,24 @@ module.exports = env => {
                 forceMode: mode,
                 extraArgs: is_electron ? `-- --features electron` : "",
             }),
+
+            /*
+            new CopyPlugin({
+                patterns: [
+                    { from: "static", to: dist },
+                ],
+            }),
+            */
         ],
         module: {
             rules: [
                 {
                     test: /\.css$/,
                     use: [MiniCssExtractPlugin.loader, "css-loader", "postcss-loader"],
+                },
+                {
+                    test: /\.(png|svg|jpg|jpeg|gif)$/i,
+                    use: ['file-loader'],
                 },
             ],
         },

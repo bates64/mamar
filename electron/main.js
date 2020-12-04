@@ -16,14 +16,31 @@ function createWindow() {
     const win = new BrowserWindow({
         title: "Mamar",
         width: 1200,
-        height: 800,
-        backgroundColor: "#14161a",
+        height: 1000,
+        minWidth: 800,
+        minHeight: 600,
+        backgroundColor: "#1d1b23",
         darkTheme: true,
+        frame: process.platform === "darwin" ? true : false,
+        titleBarStyle: "hidden",
         icon: path.join(__dirname, "icon.png"),
         webPreferences: {
             nodeIntegration: true,
+            enableRemoteModule: true,
         },
+        show: false,
     })
+
+    // Add .blur class to body when window is unfocused
+    win.on("blur",  () => win.webContents.executeJavaScript(`document.body.classList.add("blur")`))
+    win.on("focus", () => win.webContents.executeJavaScript(`document.body.classList.remove("blur")`))
+
+    // Add .maximized class to body when window is maximized
+    win.on("maximize",   () => win.webContents.executeJavaScript(`document.body.classList.add("maximized")`))
+    win.on("unmaximize", () => win.webContents.executeJavaScript(`document.body.classList.remove("maximized")`))
+
+    // Show window when index.html loads
+    win.on("ready-to-show", () => win.show())
 
     if (app.isPackaged) {
         win.loadFile("build/index.html")

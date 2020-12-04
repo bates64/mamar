@@ -6,23 +6,23 @@ use super::*;
 use crate::rw_util::*;
 
 #[derive(Debug)]
-pub enum Error<'a> {
-    MissingStartMarker(&'a CommandRange),
-    MissingEndMarker(&'a CommandRange),
-    UnorderedMarkers(&'a CommandRange),
-    EndMarkerTooFarAway(&'a CommandRange),
+pub enum Error {
+    MissingStartMarker(CommandRange),
+    MissingEndMarker(CommandRange),
+    UnorderedMarkers(CommandRange),
+    EndMarkerTooFarAway(CommandRange),
     TooBig,
     Io(io::Error),
 }
 
-impl From<io::Error> for Error<'_> {
+impl From<io::Error> for Error {
     fn from(io: io::Error) -> Self {
         Self::Io(io)
     }
 }
 
-impl fmt::Display for Error<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::MissingStartMarker(range) => write!(f, "Missing start marker for range '{}'", range.name),
             Error::MissingEndMarker(range) => write!(f, "Missing end marker for range '{}'", range.name),
@@ -34,7 +34,7 @@ impl fmt::Display for Error<'_> {
     }
 }
 
-impl std::error::Error for Error<'_> {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Io(source) => Some(source),
@@ -44,13 +44,13 @@ impl std::error::Error for Error<'_> {
 }
 
 impl Bgm {
-    pub fn as_bytes<'a>(&'a self) -> Result<Vec<u8>, Error<'a>> {
+    pub fn as_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut encoded = io::Cursor::new(Vec::new());
         self.encode(&mut encoded)?;
         Ok(encoded.into_inner())
     }
 
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
         f.seek(SeekFrom::Start(0))?;
 
         f.write_all(MAGIC.as_bytes())?;
@@ -216,7 +216,7 @@ impl Bgm {
 }
 
 impl Drum {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
         f.write_all(&[
             self.bank,
             self.patch,
@@ -236,7 +236,7 @@ impl Drum {
 }
 
 impl Voice {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
         f.write_all(&[
             self.bank,
             self.patch,
@@ -252,7 +252,7 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {
@@ -273,7 +273,7 @@ impl Subsegment {
 }
 
 impl CommandSeq {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error<'a>> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
         let mut marker_to_offset = HashMap::new();
         let mut todo_subroutines = Vec::new();
 
@@ -430,21 +430,21 @@ impl CommandSeq {
             // the loop above, raise an error.
             let start_offset = *range.start.upgrade().and_then(|marker| {
                 marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingStartMarker(range))? as u16;
+            }).ok_or(Error::MissingStartMarker(range.clone()))? as u16;
 
             // Ditto for `range.end`.
             let end_offset = *range.end.upgrade().and_then(|marker| {
                 marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingEndMarker(range))? as u16;
+            }).ok_or(Error::MissingEndMarker(range.clone()))? as u16;
 
             // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
             // [rather than panicking on debug / wrapping on release], because that would mean end_offset > start_offset.
             let length = end_offset.checked_sub(start_offset)
-                .ok_or(Error::UnorderedMarkers(range))?;
+                .ok_or(Error::UnorderedMarkers(range.clone()))?;
 
             // Convert the length to a u8 if possible.
             if length > u8::MAX as u16 {
-                return Err(Error::EndMarkerTooFarAway(range));
+                return Err(Error::EndMarkerTooFarAway(range.clone()));
             }
             let length = length as u8;
 

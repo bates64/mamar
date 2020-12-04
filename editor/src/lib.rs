@@ -7,11 +7,16 @@ use std::io::Cursor;
 use log::{info, error};
 use anyhow::anyhow;
 use codec::bgm::{self, Bgm};
+use yew_octicons::Icon; // TEMP (don't use octicons)
+use yew_octicons::IconKind;
 
 mod fs;
 use fs::File;
 
 mod midi;
+
+mod elements;
+use elements::Titlebar;
 
 mod read_agnostic;
 use read_agnostic::read_agnostic;
@@ -38,21 +43,29 @@ pub struct Model {
     link: ComponentLink<Self>,
     file: FileState,
 
+    error_popup: Option<Box<dyn std::error::Error>>,
+
     #[cfg(feature="electron")]
     server: Option<electron::hot_server::HotReloadServer>,
 }
 
-// TODO: better name
 enum FileState {
     Closed,
-    Loading,
-    Open(File, Result<Bgm, read_agnostic::Error>),
+    Open(File, Bgm),
 }
 
 impl FileState {
     fn bgm(&self) -> Option<&Bgm> {
-        if let FileState::Open(_, Ok(bgm)) = self {
+        if let FileState::Open(_, bgm) = self {
             Some(bgm)
+        } else {
+            None
+        }
+    }
+
+    fn handle(&mut self) -> Option<&mut File> {
+        if let FileState::Open(file, _) = self {
+            Some(file)
         } else {
             None
         }
@@ -67,7 +80,9 @@ pub enum Msg {
 
     FileOperation(FileOperation),
     FileOperationDone,
-    FileLoading,
+
+    ShowError(Box<dyn std::error::Error>),
+    CloseError,
 }
 
 /// A file operation potentially deferring control to the user. If the user is still handling a previous FileOperation
@@ -150,7 +165,7 @@ impl Model {
         if let Some(bgm) = self.file.bgm() {
             let mut data = Cursor::new(Vec::new());
             if let Err(error) = bgm.encode(&mut data) {
-                // We can't return `error` because of lifetime requirements
+                // We can't return `error` (TODO)
                 error!("{}", error);
                 return Err(anyhow!("Failed to encode open BGM"));
             }
@@ -175,6 +190,7 @@ impl Component for Model {
         Self {
             link,
             file: FileState::Closed,
+            error_popup: None,
             #[cfg(feature="electron")]
             server: None,
         }
@@ -234,63 +250,72 @@ impl Component for Model {
                 match operation {
                     FileOperation::Open => {
                         spawn_local(async {
-                            let cell = MODEL_PTR.try_lock().unwrap();
-                            let model = cell.get();
-
                             if let Some(file) = File::open(read_agnostic::FILE_TYPES).await {
+                                let cell = MODEL_PTR.try_lock().unwrap();
+                                let model = cell.get();
                                 let link = unsafe { &(*model).link };
 
                                 // Try to parse the file
-                                link.send_message(Msg::FileLoading);
-                                let bgm = read_agnostic(&file.read().await);
-
-                                // Remotely update model state
-                                unsafe { (*model).file = FileState::Open(file, bgm) };
-                                link.send_message(Msg::FileOperationDone);
+                                match read_agnostic(&file.read().await) {
+                                    Ok(bgm) => {
+                                        // Remotely update model state
+                                        unsafe { (*model).file = FileState::Open(file, bgm) };
+                                        link.send_message(Msg::FileOperationDone);
+                                    },
+                                    Err(error) => link.send_message(Msg::ShowError(Box::new(error))),
+                                }
                             }
                         });
 
                         return true;
                     },
-                    /*
+                    // TODO? fix on electron
                     FileOperation::Save => spawn_local(async {
                         let cell = MODEL_PTR.try_lock().unwrap();
                         let model = cell.get();
 
                         let file = unsafe { &mut (*model).file };
-                        if let FileState::Open(file, _bgm) = file {
-                            // TODO: file.write(_bgm.encode());
-                            file.save().await.unwrap();
+                        match file.bgm().unwrap().as_bytes() {
+                            Ok(bytes) => file.handle().unwrap().save(&bytes).await.unwrap(),
+                            Err(error) => {
+                                let link = unsafe { &(*model).link };
+                                link.send_message(Msg::ShowError(Box::new(error)));
+                            },
                         }
-
-                        // No need to schedule re-render
                     }),
                     FileOperation::SaveAs => spawn_local(async {
                         let cell = MODEL_PTR.try_lock().unwrap();
                         let model = cell.get();
 
                         let file = unsafe { &mut (*model).file };
-                        if let FileState::Open(file, _bgm) = file {
-                            // TODO: file.write(_bgm.encode());
-
-                            // Show Save As popup. This returns Err if the user aborts, so we just ignore errors.
-                            if let Ok(_) = file.save_as().await {
-                                // State changed, so schedule a re-render.
+                        match file.bgm().unwrap().as_bytes() {
+                            Ok(bytes) => {
+                                // Show Save As popup. This returns Err if the user aborts, so we just ignore errors.
+                                if let Ok(_) = file.handle().unwrap().save_as(&bytes).await {
+                                    // State changed, so schedule a re-render.
+                                    let link = unsafe { &(*model).link };
+                                    link.send_message(Msg::FileOperationDone);
+                                }
+                            },
+                            Err(error) => {
                                 let link = unsafe { &(*model).link };
-                                link.send_message(Msg::FileOperationDone);
-                            }
+                                link.send_message(Msg::ShowError(Box::new(error)));
+                            },
                         }
                     }),
-                    */
-                    _ => web_sys::window().unwrap().alert_with_message("Not yet implemented :(").unwrap(),
                 };
                 false
             },
-            Msg::FileLoading => {
-                self.file = FileState::Loading;
+            Msg::FileOperationDone => true,
+
+            Msg::ShowError(error) => {
+                self.error_popup = Some(error);
                 true
             },
-            Msg::FileOperationDone => true,
+            Msg::CloseError => {
+                self.error_popup = None;
+                true
+            },
         }
     }
 
@@ -300,37 +325,42 @@ impl Component for Model {
 
     fn view(&self) -> Html {
         html! {
-            <div class="pad">
-                <button-group class="pad">
-                    <button class="primary" onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::Open))}>
-                        {"Open File..."}
-                    </button>
-                    {if let FileState::Open(..) = self.file {
-                        html! {
-                            <>
-                                <button onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::Save))}>
-                                    {"Save"}
-                                </button>
-                                <button onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::SaveAs))}>
-                                    {"Save As..."}
-                                </button>
-                            </>
-                        }
-                    } else {
-                        html! {}
-                    }}
-                </button-group>
+            <>
+                <Titlebar filename={match &self.file {
+                    FileState::Open(file, _) => Some(file.name().clone()),
+                    _ => None,
+                }}/>
 
-                {{
-                    #[cfg(feature="electron")]
-                    if let Some(server) = &self.server {
-                        let num_connections = server.num_connections();
+                <div id="body">
+                    <button-group class="pad">
+                        <button class="pink" onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::Open))}>
+                            {Icon::new(IconKind::Upload)}
+                            {"Open File..."}
+                        </button>
+                        {if let FileState::Open(..) = self.file {
+                            html! {
+                                <>
+                                    <button onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::Save))}>
+                                        {"Save"}
+                                    </button>
+                                    <button onclick={self.link.callback(|_| Msg::FileOperation(FileOperation::SaveAs))}>
+                                        {"Save As..."}
+                                    </button>
+                                </>
+                            }
+                        } else {
+                            html! {}
+                        }}
 
-                        html! {
-                            <button-group>
-                                {if self.file.bgm().is_some() && num_connections > 0 {
+                        {{
+                            #[cfg(feature="electron")]
+                            if let Some(server) = &self.server {
+                                let num_connections = server.num_connections();
+
+                                if self.file.bgm().is_some() && num_connections > 0 {
                                     html! {
                                         <button onclick={self.link.callback(|_| Msg::HotPlayBgm)}>
+                                            { Icon::new(IconKind::Play) }
                                             {format!(
                                                 "Play in {}",
                                                 if num_connections == 1 {
@@ -343,45 +373,56 @@ impl Component for Model {
                                     }
                                 } else {
                                     html! {}
-                                }}
-                            </button-group>
+                                }
+                            } else {
+                                html! {
+                                    <button onclick={self.link.callback(|_| Msg::HotServerStart)}>
+                                        {Icon::new(IconKind::Rss)}
+                                        {"Start hot-reload server"}
+                                    </button>
+                                }
+                            }
+
+                            #[cfg(not(feature="electron"))]
+                            html! {}
+                        }}
+
+                        {match &self.file {
+                            FileState::Open(file, bgm) => html! {
+                                <div class="pad">
+                                    {format!("Filename: {}", file.name())}
+                                    <pre>
+                                        {format!("{:#?}", bgm)}
+                                    </pre>
+                                </div>
+                            },
+                            FileState::Closed => html! {},
+                        }}
+                    </button-group>
+
+                    {if let Some(error) = &self.error_popup {
+                        html! {
+                            <>
+                                <x-popup-shade/>
+                                <x-popup>
+                                    <span class="padr">{Icon::new(IconKind::IssueOpened)}</span>
+                                    {format!("Error: {}", error)}
+
+                                    <br/>
+
+                                    <button-group class="padt"> // TODO: footer of popup
+                                        <button class="pink" onclick={self.link.callback(|_| Msg::CloseError)}>
+                                            {"Dismiss"}
+                                        </button>
+                                    </button-group>
+                                </x-popup>
+                            </>
                         }
                     } else {
-                        html! {
-                            <button-group>
-                                <button onclick={self.link.callback(|_| Msg::HotServerStart)}>
-                                    {"Start hot-reload server"}
-                                </button>
-                            </button-group>
-                        }
-                    }
-
-                    #[cfg(not(feature="electron"))]
-                    html! {}
-                }}
-
-                {match &self.file {
-                    FileState::Open(file, bgm) => html! {
-                        <div class="pad">
-                            {format!("Filename: {}", file.name())}
-                            <pre>
-                                {format!("{:#?}", bgm)}
-                            </pre>
-                        </div>
-                    },
-                    FileState::Loading => html! {
-                        <div class="pad">
-                            {"Loading file..."}
-                        </div>
-                    },
-                    FileState::Closed => html! {},
-                }}
-            </div>
+                        html! {}
+                    }}
+                </div>
+            </>
         }
     }
-}
-
-#[test]
-fn test() {
-    assert!(true);
 }
