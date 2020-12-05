@@ -21,11 +21,8 @@ impl Component for StatusBar {
     fn view(&self) -> Html {
         html! {
             <HStack min_size=Some(1.0) pad=Pad::H(-2.0) spacing=Some(0.0) color=Color::Rose>
-                <Text>{"Status bar 1"}</Text>
-                <Text>{"Status bar 2"}</Text>
-                <Text>{"Status bar 3"}</Text>
                 <Grow/>
-                <Text>{"Status bar right"}</Text>
+                <Text>{concat!("Mamar ", env!("CARGO_PKG_VERSION"))}</Text>
             </HStack>
         }
     }
