@@ -26,3 +26,4 @@ anyhow = "1.0.34"
 midly = { version = "0.5.1", default_features = false, features = ["std", "alloc"] }
 yew-octicons = "0.1.1"
 yewtil = "0.3.2"
+gloo-events = "0.1.1"

@@ -1,0 +1,13 @@
+.MenuItem {
+    width: 100%;
+
+    font-size: 12px;
+    font-weight: 400;
+
+    line-height: 1.5rem;
+}
+
+.MenuItem:hover {
+    --fg: var(--on-brown);
+    background: var(--brown);
+}

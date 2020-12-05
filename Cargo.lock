@@ -203,6 +203,7 @@ dependencies = [
  "codec",
  "console_error_panic_hook",
  "console_log",
+ "gloo-events",
  "js-sys",
  "lazy_static",
  "log",

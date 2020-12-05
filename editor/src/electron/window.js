@@ -17,3 +17,7 @@ export function toggle_maximize() {
 export function close() {
     getCurrentWindow().close()
 }
+
+export function on(event, callback) {
+    getCurrentWindow().on(event, callback)
+}

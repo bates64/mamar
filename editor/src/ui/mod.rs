@@ -10,6 +10,9 @@ pub use status_bar::StatusBar;
 pub mod title_bar;
 pub use title_bar::TitleBar;
 
+pub mod menu;
+pub mod action;
+
 mod prelude {
     pub use yew::prelude::*;
     pub use yewtil::NeqAssign;

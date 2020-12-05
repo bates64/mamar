@@ -28,7 +28,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::SmfParse(source) => Some(source),
-            _ => None,
+            //_ => None,
         }
     }
 }
@@ -76,7 +76,7 @@ pub fn smf_to_bgm(raw: &[u8]) -> Result<Bgm, Error> {
             time += event.delta.as_int() as usize;
 
             match event.kind {
-                TrackEventKind::Midi { channel, message} => {
+                TrackEventKind::Midi { channel: _, message} => {
                     // TODO: handle channel? e.g. set instrument
                     match message {
                         MidiMessage::NoteOn { key, vel } => {

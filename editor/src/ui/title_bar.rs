@@ -1,4 +1,6 @@
 use super::prelude::*;
+use super::menu::{Menu, MenuDesc};
+use std::rc::Rc;
 
 #[cfg(feature="electron")]
 use crate::electron;
@@ -7,9 +9,13 @@ use crate::electron;
 pub struct Props {
     #[prop_or_default]
     pub title: Option<String>, // XXX: cloning string from parent when we probably don't need to
+
+    pub menu: Rc<Vec<MenuDesc>>,
+    pub onaction: Callback<super::action::Action>,
 }
 
 pub struct TitleBar {
+    #[used]
     link: ComponentLink<Self>,
     props: Props,
 }
@@ -79,17 +85,35 @@ impl Component for TitleBar {
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        self.props.neq_assign(props)
+        let mut render = false;
+
+        if self.props.title != props.title {
+            self.props.title = props.title;
+            render = true;
+        }
+
+        if !Rc::ptr_eq(&self.props.menu, &props.menu) {
+            self.props.menu = props.menu;
+            render = true;
+        }
+
+        if self.props.onaction != props.onaction {
+            self.props.onaction = props.onaction;
+            render = true;
+        }
+
+        render
     }
 
     fn view(&self) -> Html {
         let title = self.apply_title();
 
-        // On macOS, we don't use { frame: false } and thus the native titlebar and traffic lights are used.
+        // On macOS electron, we don't use { frame: false } and thus the native titlebar and traffic lights are used.
         // TODO: provide option to use this behaviour on Linux
         #[cfg(feature="electron")]
-        if electron::process::is_macos() {
-            return html! {};
+        /*if crate::os::Os::detect().is_mac()*/ {
+            super::menu::set_application_menu(&self.props.menu);
+            //return html! {};
         }
 
         html! {
@@ -102,8 +126,7 @@ impl Component for TitleBar {
                     html! {}
                 }}
 
-                // TODO: toolbar support (File, Edit, ...)! At the moment, on non-electron, this element just takes 30px
-                // of vertical space for no reason. When on macOS use the native electron API to talk to the OS.
+                <Menu descriptions=self.props.menu.clone() onaction=self.props.onaction.clone()/>
 
                 <div class="TitleBarTitle">
                     {title}

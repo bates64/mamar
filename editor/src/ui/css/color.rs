@@ -9,6 +9,7 @@ pub enum Color {
 
     // Greyscale
     Black,
+    Grey,
 
     None,
 }
@@ -22,6 +23,7 @@ impl Color {
             Color::Rose => "var(--rose)",
             Color::Red => "var(--red)",
             Color::Black => "var(--black)",
+            Color::Grey => "var(--grey)",
             Color::None => "transparent",
         }
     }
@@ -30,7 +32,7 @@ impl Color {
         format!("--bg: {};", self.css_value())
     }
 
-    pub fn on_css_value(&self) -> &'static str {
+    fn on_css_value(&self) -> &'static str {
         match self {
             Color::Pink => "var(--on-pink)",
             Color::Yellow => "var(--on-yellow)",
@@ -38,7 +40,8 @@ impl Color {
             Color::Rose => "var(--on-rose)",
             Color::Red => "var(--on-red)",
             Color::Black => "var(--on-black)",
-            _ => "",
+            Color::Grey => "var(--on-grey)",
+            Color::None => panic!(),
         }
     }
 

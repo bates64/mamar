@@ -8,17 +8,13 @@ use log::{info, error};
 use anyhow::anyhow;
 use codec::bgm::{self, Bgm};
 use yew_octicons::Icon; // TEMP (don't use octicons)
-use yew_octicons::IconKind;
 
 mod fs;
 use fs::File;
 
 mod midi;
-
-mod elements;
-use elements::Titlebar;
-
 mod ui;
+mod os;
 
 mod read_agnostic;
 use read_agnostic::read_agnostic;
@@ -34,7 +30,7 @@ pub fn run_app() {
     #[cfg(debug_assertions)] {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Debug).unwrap();
-        log::debug!("running in debug mode");
+        log::info!("os: {}", os::Os::detect());
     }
 
     App::<Model>::new().mount_to_body();

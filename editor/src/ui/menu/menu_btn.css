@@ -1,0 +1,19 @@
+.MenuButton {
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.MenuButton:hover,
+.MenuButton_active {
+    background: #ffffff22;
+}
+
+body.blur .MenuButton,
+body.blur .MenuButton:not(:hover) {
+    opacity: 0.5;
+}
+
+.MenuButtonItems {
+    position: absolute;
+    top: 30px;
+}
