@@ -1,4 +1,4 @@
-x-titlebar {
+.TitleBar {
     width: 100%;
     height: 30px;
     line-height: 30px;
@@ -13,7 +13,7 @@ x-titlebar {
     z-index: 1;
 }
 
-x-titlebar-icon {
+.TitleBarIcon {
     display: block;
     width: 30px;
     height: 30px;
@@ -26,7 +26,7 @@ x-titlebar-icon {
     -webkit-app-region: drag;
 }
 
-x-titlebar-title {
+.TitleBarTitle {
     position: fixed;
     width: 100%;
     height: 30px;
@@ -39,13 +39,13 @@ x-titlebar-title {
     z-index: -1; /* behind buttons */
 }
 
-x-titlebar-drag-region {
+.TitleBarDragRegion {
     flex: 1;
     height: calc(100% - 1px);
     -webkit-app-region: drag;
 }
 
-x-titlebar-button {
+.TitleBarControl {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -68,15 +68,15 @@ x-titlebar-button {
         background-color: #ffffff22;
     }
 
-    &.--minimize {
+    &.TitleBarControl_minimize {
         background-image: url(icon/chrome-minimize.svg);
     }
 
-    &.--maximize {
+    &.TitleBarControl_maximize {
         background-image: url(icon/chrome-maximize.svg);
     }
 
-    &.--close {
+    &.TitleBarControl_close {
         background-image: url(icon/chrome-close.svg);
 
         &:hover {
@@ -85,11 +85,11 @@ x-titlebar-button {
     }
 }
 
-body.blur x-titlebar-title,
-body.blur x-titlebar-button:not(:hover) {
+body.blur .TitleBarTitle,
+body.blur .TitleBarControl:not(:hover) {
     opacity: 0.5;
 }
 
-body.maximized x-titlebar-button.--maximize {
-    background-image:  url(icon/chrome-restore.svg);
+body.maximized .TitleBarControl_maximize {
+    background-image: url(icon/chrome-restore.svg);
 }

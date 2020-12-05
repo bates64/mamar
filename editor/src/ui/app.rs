@@ -1,5 +1,5 @@
 use super::prelude::*;
-use super::StatusBar;
+use super::{StatusBar, TitleBar};
 
 pub struct App {}
 
@@ -22,9 +22,9 @@ impl Component for App {
     fn view(&self) -> Html {
         html! {
             <VStack color=Color::Black align=Align::SpaceBetween>
-                <Text>{"Titlebar"}</Text>
+                <TitleBar/>
                 <Grow>
-                    <Text>{"Grow"}</Text>
+                    // TODO: move lib.rs file management
                 </Grow>
                 <StatusBar/>
             </VStack>

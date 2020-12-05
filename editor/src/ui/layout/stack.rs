@@ -58,6 +58,7 @@ impl Component for HStack {
         self.props.neq_assign(props)
     }
 
+    // BUG: having a Stack as an immediate child of another Stack conflates their --spacing properties
     fn view(&self) -> Html {
         html! {
             <div
