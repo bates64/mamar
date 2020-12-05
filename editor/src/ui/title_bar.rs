@@ -1,5 +1,6 @@
 use super::prelude::*;
-use super::menu::{Menu, MenuDesc};
+use super::menu::{self, Menu, MenuDesc};
+use crate::os::Os;
 use std::rc::Rc;
 
 #[cfg(feature="electron")]
@@ -56,6 +57,8 @@ impl Component for TitleBar {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        super::menu::set_application_menu(&props.menu, props.onaction.clone());
+
         Self {
             link,
             props,
@@ -78,7 +81,9 @@ impl Component for TitleBar {
 
             #[cfg(feature="electron")]
             Msg::Close => {
-                electron::window::close();
+                // We could call `electron::window::close()` here and close immediately, but it's better to ask the
+                // App to quit so it can ask the user if they're sure if they have unsaved changes etc.
+                self.props.onaction.emit(super::action::Action::Quit);
                 false
             },
         }
@@ -95,6 +100,10 @@ impl Component for TitleBar {
         if !Rc::ptr_eq(&self.props.menu, &props.menu) {
             self.props.menu = props.menu;
             render = true;
+
+            // Hopefully this never happens...
+            log::warn!("menu changed; MEMORY LEAK!!");
+            menu::set_application_menu(&self.props.menu, self.props.onaction.clone());
         }
 
         if self.props.onaction != props.onaction {
@@ -108,12 +117,9 @@ impl Component for TitleBar {
     fn view(&self) -> Html {
         let title = self.apply_title();
 
-        // On macOS electron, we don't use { frame: false } and thus the native titlebar and traffic lights are used.
-        // TODO: provide option to use this behaviour on Linux
-        #[cfg(feature="electron")]
-        /*if crate::os::Os::detect().is_mac()*/ {
-            super::menu::set_application_menu(&self.props.menu);
-            //return html! {};
+        // `{ frame: false }` in `/electron/main.js`
+        if cfg!(feature="electron") && Os::detect().is_mac() {
+            return html! {};
         }
 
         html! {
@@ -159,5 +165,10 @@ impl Component for TitleBar {
                 }}
             </div>
         }
+    }
+
+    fn destroy(&mut self) {
+        // (oh no)
+        super::menu::set_application_menu(&[], self.props.onaction.clone());
     }
 }

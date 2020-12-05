@@ -139,7 +139,9 @@ impl Component for Menu {
     }
 }
 
-#[cfg(feature="electron")]
-pub fn set_application_menu(desc: &[MenuDesc]) {
-    // TODO
-}
+
+#[cfg(feature="electron")] mod electron;
+#[cfg(feature="electron")] pub use electron::*;
+
+#[cfg(not(feature="electron"))] mod web;
+#[cfg(not(feature="electron"))] pub use web::*;

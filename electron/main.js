@@ -21,7 +21,7 @@ function createWindow() {
         minHeight: 600,
         backgroundColor: "#1d1b23",
         darkTheme: true,
-        frame: process.platform === "darwin" ? true : false,
+        frame: process.platform === "darwin" ? true : false, // TODO: make this an option on Linux/Windows
         titleBarStyle: "hidden",
         icon: path.join(__dirname, "icon.png"),
         webPreferences: {

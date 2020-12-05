@@ -26,29 +26,29 @@ impl Component for App {
                     items: vec![
                         MenuItemDesc::Accelerator(Accelerator {
                             action: Action::NewFile,
-                            keys: vec![Key::Ctrl, Key::N],
+                            key: Key::new("CmdOrCtrl+N"),
                         }),
                         MenuItemDesc::Accelerator(Accelerator {
                             action: Action::OpenFile,
-                            keys: vec![Key::Ctrl, Key::O],
+                            key: Key::new("CmdOrCtrl+O"),
                         }),
 
                         MenuItemDesc::Separator,
 
                         MenuItemDesc::Accelerator(Accelerator {
                             action: Action::Save,
-                            keys: vec![Key::Ctrl, Key::S],
+                            key: Key::new("CmdOrCtrl+S"),
                         }),
                         MenuItemDesc::Accelerator(Accelerator {
                             action: Action::SaveAs,
-                            keys: vec![Key::Ctrl, Key::Shift, Key::S],
+                            key: Key::new("CmdOrCtrl+Shift+S"),
                         }),
 
                         MenuItemDesc::Separator,
 
                         MenuItemDesc::Accelerator(Accelerator {
                             action: Action::Quit,
-                            keys: vec![],
+                            key: Key::new(""),
                         }),
                     ]
                 },

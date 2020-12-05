@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@pmret/hot-reload": "^1.0.0",
-    "browser-nativefs": "^0.11.1"
+    "browser-nativefs": "^0.11.1",
+    "keyboardevent-from-electron-accelerator": "^2.0.0"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "nanaian/wasm-pack-plugin#fail-errors",

@@ -53,7 +53,7 @@ impl Component for MenuItem {
                             {format!("{}", accelerator.action)}
                         </span>
                         <span style="opacity: 0.5">
-                            {accelerator.keys.iter().map(|k| format!("{}", k)).collect::<String>()}
+                            {format!("{}", accelerator.key)}
                         </span>
                     </HStack>
                 </div>

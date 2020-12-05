@@ -1,9 +1,11 @@
 use std::fmt;
+use wasm_bindgen::prelude::*;
 
 pub mod accelerator;
 pub use accelerator::{Accelerator, Key};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     NewFile,
     OpenFile,
