@@ -170,6 +170,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cursed_global_ref"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "log",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,6 +211,7 @@ dependencies = [
  "codec",
  "console_error_panic_hook",
  "console_log",
+ "cursed_global_ref",
  "gloo-events",
  "js-sys",
  "lazy_static",

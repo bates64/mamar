@@ -1,7 +1,5 @@
-use std::io::{self, prelude::*, SeekFrom};
-use log::warn;
+use std::io::{self, prelude::*};
 use super::*;
-use crate::rw_util::*;
 
 type Error = io::Error;
 
@@ -14,7 +12,7 @@ impl Sbn {
         Ok(encoded.into_inner())
     }
 
-    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<()> {
+    pub fn encode<W: Write + Seek>(&self, _: &mut W) -> Result<()> {
         todo!("SBN encoding") // TODO
     }
 }

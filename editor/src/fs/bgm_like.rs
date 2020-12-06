@@ -1,12 +1,12 @@
 use std::io::{self, prelude::*, Cursor};
 use std::fmt;
 use codec::bgm::{self, Bgm};
-use crate::fs::FileTypes;
+use super::file::FileTypes;
 use crate::midi;
 
 pub const FILE_TYPES: FileTypes = FileTypes {
-    extensions: ".bin .bgm .mid .midi",
-    mime_types: "application/octect-stream application/x-bgm audio/midi audio/midi",
+    extensions: ".bgm .bin .mid .midi",
+    mime_types: "application/x-bgm application/octect-stream audio/midi audio/midi",
 };
 
 #[derive(Debug)]
@@ -57,16 +57,16 @@ impl std::error::Error for Error {
     }
 }
 
-pub fn read_agnostic(raw: &[u8]) -> Result<Bgm, Error> {
+/// Returns `Ok((Bgm, had to convert?))`.
+pub fn from_bytes(raw: &[u8]) -> Result<(Bgm, bool), Error> {
     let mut cursor = Cursor::new(raw);
 
     let mut buffer = [0; 4];
     cursor.read_exact(&mut buffer)?;
 
     match &buffer {
-        // TODO: nice errors
-        b"BGM " => Ok(Bgm::from_bytes(raw)?),
-        b"MThd" => Ok(midi::smf_to_bgm(raw)?),
+        b"BGM " => Ok((Bgm::from_bytes(raw)?, false)),
+        b"MThd" => Ok((midi::smf_to_bgm(raw)?, true)),
         _       => Err(Error::UnsupportedFileType),
     }
 }

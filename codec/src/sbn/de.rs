@@ -3,7 +3,6 @@ use std::fmt;
 use std::convert::TryInto;
 use log::warn;
 use super::*;
-use crate::rw_util::*;
 
 #[derive(Debug)]
 pub enum Error {

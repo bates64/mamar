@@ -27,3 +27,4 @@ midly = { version = "0.5.1", default_features = false, features = ["std", "alloc
 yew-octicons = "0.1.1"
 yewtil = "0.3.2"
 gloo-events = "0.1.1"
+cursed_global_ref = { path = "../cursed_global_ref" }

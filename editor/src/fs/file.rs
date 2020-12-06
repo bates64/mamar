@@ -6,7 +6,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::Blob;
 use js_sys::{ArrayBuffer, Uint8Array};
 
-#[wasm_bindgen(module = "/src/fs.js")]
+#[wasm_bindgen(module = "/src/fs/file.js")]
 extern "C" {
     /// Returns Ok(Blob) if the user didn't cancel the operation and opened the file.
     /// Returns Err if not executed from within a user event handler (such as an onclick handler).

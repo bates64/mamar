@@ -11,6 +11,7 @@ pub enum Action {
     OpenFile,
     Save,
     SaveAs,
+    CloseFile,
     Quit,
 }
 
@@ -21,6 +22,7 @@ impl fmt::Display for Action {
             Action::OpenFile => write!(f, "Open File..."),
             Action::Save => write!(f, "Save"),
             Action::SaveAs => write!(f, "Save As..."),
+            Action::CloseFile => write!(f, "Close File"),
             Action::Quit => write!(f, "Quit"),
         }
     }

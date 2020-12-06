@@ -1,23 +1,12 @@
 #![recursion_limit="1024"] // for html! macro
 
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-use std::io::Cursor;
-use log::{info, error};
-use anyhow::anyhow;
-use codec::bgm::{self, Bgm};
-use yew_octicons::Icon; // TEMP (don't use octicons)
 
 mod fs;
-use fs::File;
-
 mod midi;
 mod ui;
 mod os;
-
-mod read_agnostic;
-use read_agnostic::read_agnostic;
 
 #[cfg(feature="electron")]
 mod electron;
@@ -33,9 +22,11 @@ pub fn run_app() {
         log::info!("os: {}", os::Os::detect());
     }
 
-    App::<Model>::new().mount_to_body();
+    let link = App::<ui::app::App>::new().mount_to_body();
+    link.send_message(ui::app::Msg::Init);
 }
 
+/*
 #[wasm_bindgen]
 pub struct Model {
     link: ComponentLink<Self>,
@@ -97,65 +88,6 @@ pub enum FileOperation {
     /// Defers by opening a save file dialog.
     SaveAs,
 }
-
-/// Ew, a mutable global variable! What the heck is this doing here!? I didn't know Rust even had these!
-///
-/// Sadly, I think we need one. [spawn_local] requires the 'static lifetime for the Future it will run, which means we
-/// can't access the surrounding stack context. That means, in order to pass data to/from async blocks, we need a
-/// 'static, mutable variable... i.e. a global variable (to this module).
-///
-/// Note: This is incredibly unrusty and bad and I sincerely hope I never ever ever _ever_ have to do it again.
-mod cursed {
-    use std::cell::Cell;
-    use std::sync::Mutex;
-    use std::marker::{Send, Sync};
-    use std::ops::Deref;
-    use lazy_static::lazy_static;
-    use super::Model;
-
-    lazy_static! {
-        /// Cursed global mutable pointer.
-        pub static ref MODEL_PTR: ModelPtr = ModelPtr(Mutex::new(Cell::new(std::ptr::null_mut())));
-    }
-
-    /// ModelPtr is a Send+Sync wrapper over...
-    ///
-    /// ## Mutex<_>
-    ///
-    /// Mutex is used so we don't accidentally cause data races (e.g. update(Msg::FileOperation) whilst an older
-    /// FileOperation's popup is still open). Without this, I doubt anything would necessarily explode [our "threads" on
-    /// wasm32-unknown-unknown are JavaScript Promises, which use the syncronous event loop rather than real
-    /// threading], but its safer to use a Mutex and it makes the compiler happy.
-    ///
-    /// ## Mutex<Cell<_>>
-    ///
-    /// The Cell wrapper provides "interior mutability," which basically allows us to move values in and out of
-    /// the MODEL_PTR cell without actually having a mutable global variable (as Rust doesn't have them).
-    /// That is, MODEL_PTR is technically a constant ;)
-    ///
-    /// ### Why not RefCell<Model> instead of Cell<*mut Model>?
-    ///
-    /// The owner of the Model is the component instance (on the heap); it's not 'static and there could theoretically
-    /// be multiple components in existence at once.
-    ///
-    /// ## Mutex<Cell<*mut Model>>>
-    ///
-    /// *mut Model is a raw pointer to [Model], so we can read and write to it in 'static contexts (i.e. within
-    /// spawn_local threads). Note that dereferencing raw pointers requires an `unsafe` block.
-    pub struct ModelPtr(Mutex<Cell<*mut Model>>);
-
-    // We don't have real threads, so we can tell the compiler that ModelPtr is thread-safe (a requirement for statics).
-    unsafe impl Send for ModelPtr {}
-    unsafe impl Sync for ModelPtr {}
-
-    impl Deref for ModelPtr {
-        type Target = Mutex<Cell<*mut Model>>;
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-}
-use cursed::MODEL_PTR;
 
 impl Model {
     #[cfg(feature="electron")]
@@ -327,7 +259,6 @@ impl Component for Model {
         }
     }
 
-    /*
     fn view(&self) -> Html {
         html! {
             <>
@@ -430,5 +361,5 @@ impl Component for Model {
             </>
         }
     }
-    */
 }
+*/

@@ -2,6 +2,7 @@
 members = [
     "editor",
     "codec",
+    "cursed_global_ref",
 ]
 
 [profile.release]
