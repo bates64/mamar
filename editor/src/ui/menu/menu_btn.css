@@ -1,11 +1,15 @@
 .MenuButton {
     font-size: 12px;
     font-weight: 400;
+
+    background-color: transparent;
+    transition: background-color 350ms ease;
 }
 
 .MenuButton:hover,
 .MenuButton_active {
-    background: #ffffff22;
+    background-color: #3f3d44;
+    transition-duration: 100ms;
 }
 
 body.blur .MenuButton,

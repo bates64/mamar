@@ -323,7 +323,12 @@ impl Component for App {
                     onaction={self.link.callback(move |action: Action| Msg::Action(action))}
                 />
                 <Grow>
-                    // TODO: move lib.rs file management
+                    {match &self.open {
+                        Open::Bgm { bgm, .. } => html! {
+                            "It's bgm!"
+                        },
+                        _ => html! {},
+                    }}
                 </Grow>
                 <StatusBar/>
             </VStack>
