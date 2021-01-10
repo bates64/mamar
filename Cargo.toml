@@ -3,6 +3,7 @@ members = [
     "editor",
     "pmbgm",
     "cursed_global_ref",
+    "mamar",
 ]
 
 [profile.release]

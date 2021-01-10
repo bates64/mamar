@@ -1,0 +1,9 @@
+[package]
+name = "mamar"
+version = "0.1.0"
+authors = ["Alex Bates <hi@imalex.xyz>"]
+edition = "2018"
+
+[dependencies]
+pmbgm = { path = "../pmbgm" }
+structopt = "0.3"
