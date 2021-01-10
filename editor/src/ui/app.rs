@@ -6,7 +6,7 @@ use super::{TitleBar, StatusBar};
 use super::menu::{MenuDesc, MenuItemDesc};
 use super::action::*;
 use crate::fs::{self, File};
-use codec::bgm::Bgm;
+use pmbgm::Bgm;
 
 pub enum Msg {
     Init,

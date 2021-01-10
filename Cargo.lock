@@ -101,16 +101,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codec"
-version = "0.1.0"
-dependencies = [
- "by_address",
- "log",
- "simple_logger",
- "smallvec",
-]
-
-[[package]]
 name = "colored"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -208,7 +198,6 @@ name = "editor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "codec",
  "console_error_panic_hook",
  "console_log",
  "cursed_global_ref",
@@ -217,6 +206,7 @@ dependencies = [
  "lazy_static",
  "log",
  "midly",
+ "pmbgm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -684,6 +674,16 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pmbgm"
+version = "0.1.0"
+dependencies = [
+ "by_address",
+ "log",
+ "simple_logger",
+ "smallvec",
+]
 
 [[package]]
 name = "ppv-lite86"

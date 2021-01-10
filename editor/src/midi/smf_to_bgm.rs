@@ -1,7 +1,7 @@
 use std::fmt;
 use std::collections::HashMap;
 use std::rc::Rc;
-use codec::bgm::*;
+use pmbgm::*;
 use midly::{num::*, TrackEventKind, MidiMessage, MetaMessage};
 use log::*;
 

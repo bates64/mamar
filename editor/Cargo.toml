@@ -21,7 +21,7 @@ log = "0.4.11"
 console_log = { version = "0.2.0", features = ["color"] }
 yew = "0.17.4"
 lazy_static = "1.4.0"
-codec = { path = "../codec" }
+pmbgm = { path = "../pmbgm" }
 anyhow = "1.0.34"
 midly = { version = "0.5.1", default_features = false, features = ["std", "alloc"] }
 yew-octicons = "0.1.1"

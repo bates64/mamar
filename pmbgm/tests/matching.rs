@@ -1,5 +1,5 @@
 use std::{path::Path, fs::File, io::prelude::*, io::Cursor, rc::Rc};
-use codec::{bgm::*, sbn::*};
+use pmbgm::{*, sbn::*};
 
 use simple_logger::SimpleLogger;
 

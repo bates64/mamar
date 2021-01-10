@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "editor",
-    "codec",
+    "pmbgm",
     "cursed_global_ref",
 ]
 

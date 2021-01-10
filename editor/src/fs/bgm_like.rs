@@ -1,6 +1,6 @@
 use std::io::{self, prelude::*, Cursor};
 use std::fmt;
-use codec::bgm::{self, Bgm};
+use pmbgm::{self as bgm, Bgm};
 use super::file::FileTypes;
 use crate::midi;
 
