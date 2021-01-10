@@ -1,7 +1,7 @@
 use std::io::{self, prelude::*, SeekFrom};
 use std::fmt;
 use std::collections::{HashMap, btree_map::{BTreeMap, Entry}};
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use smallvec::smallvec;
 use log::{debug, warn};
 use super::*;
@@ -396,8 +396,8 @@ impl CommandSeq {
 
                     Command::Subroutine(CommandRange {
                         name: format!("Subroutine {:#X}", cmd_offset),
-                        start: commands.upsert_marker(start_offset, Marker),
-                        end: commands.upsert_marker(end_offset, Marker),
+                        start: commands.upsert_marker(start_offset),
+                        end: commands.upsert_marker(end_offset),
                     })
                 },
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
@@ -444,25 +444,21 @@ impl OffsetCommandMap {
         self.0.insert(Self::atob(offset), command);
     }
 
-    /// Finds the given marker at `offset`, or inserts it if it cannot be found.
-    pub fn upsert_marker(&mut self, offset: usize, marker: Marker) -> Weak<Marker> {
+    /// Finds a marker at `offset`, or inserts it if it cannot be found.
+    pub fn upsert_marker(&mut self, offset: usize) -> MarkerId {
         let shifted_offset = Self::atob(offset) - 1;
 
         match self.0.entry(shifted_offset) {
             Entry::Vacant(entry) => {
                 // Insert the new marker here.
-                let marker = Rc::new(marker);
-                let marker_weak = Rc::downgrade(&marker);
-                entry.insert(Command::Marker(marker.into()));
-                marker_weak
+                let id: MarkerId = format!("Offset {:#X}", offset);
+                entry.insert(Command::Marker(id.clone()));
+                id
             },
             Entry::Occupied(entry) => match entry.get() {
-                Command::Marker(l) => {
-                    // Re-use matching label `l`, discarding `label`.
-                    Rc::downgrade(&**l)
-                },
+                Command::Marker(id) => id.clone(),
                 other_command => panic!(
-                    "non-label command {:?} found in label range (shifted_offset = {:#X})",
+                    "non-marker command {:?} found in label range (shifted_offset = {:#X})",
                     other_command,
                     shifted_offset,
                 ),
@@ -557,29 +553,29 @@ mod test {
         let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
         dbg!(&seq);
 
-        let start_labels: Vec<Weak<Marker>> = seq.at_time(0)
+        let start_labels: Vec<&MarkerId> = seq.at_time(0)
             .into_iter()
             .take_while(|cmd| match cmd {
                 Command::Marker(_) => true,
                 _ => false,
             })
             .map(|cmd| match cmd {
-                Command::Marker(label) => Rc::downgrade(&**label),
+                Command::Marker(id) => id,
                 _ => unreachable!(),
             })
             .collect();
-        let end_labels: Vec<Weak<Marker>> = seq.at_time(11)
+        let end_labels: Vec<&MarkerId> = seq.at_time(11)
             .into_iter()
             .take_while(|cmd| match cmd {
                 Command::Marker(_) => true,
                 _ => false,
             })
             .map(|cmd| match cmd {
-                Command::Marker(label) => Rc::downgrade(&**label),
+                Command::Marker(id) => id,
                 _ => unreachable!(),
             })
             .collect();
-        let subroutine_labels: Vec<(&Weak<Marker>, &Weak<Marker>)> = seq.at_time(10)
+        let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq.at_time(10)
             .into_iter()
             .take_while(|cmd| match cmd {
                 Command::Subroutine(_) => true,
@@ -595,14 +591,14 @@ mod test {
         assert_eq!(end_labels.len(), 1);
         assert_eq!(subroutine_labels.len(), 3);
 
-        // Check start labels
-        assert!(Weak::ptr_eq(subroutine_labels[0].0, &start_labels[0]));
-        assert!(Weak::ptr_eq(subroutine_labels[1].0, &start_labels[0]));
-        assert!(Weak::ptr_eq(subroutine_labels[2].0, &start_labels[0]));
+        // Check start markers
+        assert_eq!(subroutine_labels[0].0, start_labels[0]);
+        assert_eq!(subroutine_labels[1].0, start_labels[0]);
+        assert_eq!(subroutine_labels[2].0, start_labels[0]);
 
-        // Check end labels
-        assert!(Weak::ptr_eq(subroutine_labels[0].1, &end_labels[0]));
-        assert!(Weak::ptr_eq(subroutine_labels[1].1, &end_labels[0]));
-        assert!(Weak::ptr_eq(subroutine_labels[2].1, &end_labels[0]));
+        // Check end markers
+        assert_eq!(subroutine_labels[0].1, end_labels[0]);
+        assert_eq!(subroutine_labels[1].1, end_labels[0]);
+        assert_eq!(subroutine_labels[2].1, end_labels[0]);
     }
 }

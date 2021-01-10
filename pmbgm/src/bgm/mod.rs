@@ -173,9 +173,9 @@ impl Bgm {
                                                 writeln!(f, "            tremolo {} {} {}", amount, speed, unknown)?,
                                             Command::TrackTremoloStop => writeln!(f, "            end_tremolo")?,
                                             Command::TrackVoice(v) => writeln!(f, "            set_voice {}", v)?,
-                                            Command::Marker(_) => writeln!(f, "            marker")?, // TODO
+                                            Command::Marker(id) => writeln!(f, "            marker {:?}", id)?,
                                             Command::Subroutine(range) => {
-                                                writeln!(f, "            subroutine")?; // TODO
+                                                writeln!(f, "            subroutine {:?} start={:?} end={:?}", range.name, range.start, range.end)?;
                                             },
                                             Command::Unknown(data) => {
                                                 write!(f, "            raw")?;

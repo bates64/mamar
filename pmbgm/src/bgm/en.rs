@@ -1,6 +1,5 @@
 use std::{collections::HashMap, io::{self, prelude::*, SeekFrom}};
 use std::fmt;
-use by_address::ByAddress;
 use log::{debug, info};
 use super::*;
 use crate::rw_util::*;
@@ -428,14 +427,12 @@ impl CommandSeq {
         for (abs_subroutine_pos, range) in todo_subroutines.into_iter() {
             // Try to get the file offset of `range.start`. If it is a dropped Weak<_> or we didn't see the Marker in
             // the loop above, raise an error.
-            let start_offset = *range.start.upgrade().and_then(|marker| {
-                marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingStartMarker(range.clone()))? as u16;
+            let start_offset = *marker_to_offset.get(&range.start)
+                .ok_or(Error::MissingStartMarker(range.clone()))? as u16;
 
             // Ditto for `range.end`.
-            let end_offset = *range.end.upgrade().and_then(|marker| {
-                marker_to_offset.get(&ByAddress::from(marker))
-            }).ok_or(Error::MissingEndMarker(range.clone()))? as u16;
+            let end_offset = *marker_to_offset.get(&range.end)
+                .ok_or(Error::MissingEndMarker(range.clone()))? as u16;
 
             // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
             // [rather than panicking on debug / wrapping on release], because that would mean end_offset > start_offset.

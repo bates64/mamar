@@ -1,8 +1,6 @@
 use std::iter;
-use std::rc::{Rc, Weak};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use smallvec::SmallVec;
-use by_address::ByAddress;
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -597,8 +595,9 @@ pub enum Command {
     /// Sets the track's voice. Field is an index into [Bgm::voices].
     TrackVoice(u8),
 
-    /// Marks a specific place in a [CommandSeq].
-    Marker(ByAddress<Rc<Marker>>),
+    /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this abstraction
+    /// rather than [CommandSeq] indices because they stay stable during mutation.
+    Marker(MarkerId),
 
     /// Jumps to the start label and executes until the end label is found.
     Subroutine(CommandRange),
@@ -729,34 +728,12 @@ impl<'a> Iterator for TimeGroupIter<'a> {
     }
 }
 
-/// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this abstraction
-/// rather than [CommandSeq] indices because they stay stable during mutation.
-#[derive(Debug)]
-pub struct Marker;
+pub type MarkerId = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandRange {
     pub name: String,
 
-    // These are Weak<_> so they become None if the relevant Command::Marker is dropped.
-    pub(crate) start: Weak<Marker>,
-    pub(crate) end: Weak<Marker>, // Must come after `start`
-}
-
-impl PartialEq for CommandRange {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && Weak::ptr_eq(&self.start, &other.start)
-            && Weak::ptr_eq(&self.end, &other.end)
-    }
-}
-
-impl Eq for CommandRange {}
-
-impl Hash for CommandRange {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.start.as_ptr().hash(state);
-        self.end.as_ptr().hash(state);
-    }
+    pub(crate) start: MarkerId,
+    pub(crate) end: MarkerId, // Must come after `start`
 }
