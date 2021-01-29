@@ -187,14 +187,9 @@ impl CommandSeq {
 
                 let mut old_delay_range = index..index;
                 let mut delta_time: usize = 0;
-                loop {
-                    match self.vec.get(old_delay_range.end) {
-                        Some(Delay(t)) => {
-                            old_delay_range.end += 1;
-                            delta_time += *t as usize;
-                        },
-                        _ => break,
-                    }
+                while let Some(Delay(t)) = self.vec.get(old_delay_range.end) {
+                    old_delay_range.end += 1;
+                    delta_time += *t as usize;
                 }
 
                 let insert_time = {
@@ -244,7 +239,7 @@ impl CommandSeq {
     /// assert_eq!(sequence.at_time(0),  vec![&Command::MasterTempo(60), &Command::Delay(15)]);
     /// assert_eq!(sequence.at_time(15), vec![&Command::MasterTempo(50), &Command::Delay(15)]);
     /// ```
-    pub fn at_time<'a>(&'a self, wanted_time: usize) -> Vec<&Command> {
+    pub fn at_time(&self, wanted_time: usize) -> Vec<&Command> {
         self.iter_time_groups()
             .find(|&(time, _)| time == wanted_time)
             .map_or(Vec::new(), |(_, subseq)| subseq)
@@ -253,12 +248,12 @@ impl CommandSeq {
     // TODO: remove
 
     /// Iterates over the commands in this sequence in time-order.
-    pub fn iter<'a>(&'a self) -> std::slice::Iter<'a, Command> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Command> {
         self.vec.iter()
     }
 
     /// Iterates over each command in this sequence annotated with its time relative to the start of the sequence.
-    pub fn iter_time<'a>(&'a self) -> TimeIter<'a> {
+    pub fn iter_time(&self) -> TimeIter<'_> {
         TimeIter {
             seq: self.vec.iter(),
             current_time: 0,
@@ -266,7 +261,7 @@ impl CommandSeq {
     }
 
     /// Iterates over subsequences of commands that execute at the same time.
-    pub fn iter_time_groups<'a>(&'a self) -> TimeGroupIter<'a> {
+    pub fn iter_time_groups(&self) -> TimeGroupIter<'_> {
         TimeGroupIter {
             seq: self.iter_time().peekable(),
         }
@@ -351,14 +346,9 @@ impl CommandSeq {
     /// Returns the number of commands ("length") in the sequence.
     pub fn len(&self) -> usize { self.vec.len() }
 
-    pub fn has_content(&self) -> bool {
-        if self.len() == 0 {
-            false
-        } else if self.len() == 1 && self.vec[0] == Command::End {
-            false
-        } else {
-            true
-        }
+    pub fn is_empty(&self) -> bool {
+        self.vec.len() == 0
+            || (self.vec.len() == 1 && self.vec[0] == Command::End)
     }
 
     // TODO
@@ -561,10 +551,10 @@ pub enum Command {
     /// Fades the volume to `volume` across `time` ticks.
     MasterVolumeFade { time: u16, volume: u8 },
 
-    /// Sets the volume for this track only. Resets at the end of the [Subsegment].
+    /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
     SubTrackVolume(u8),
 
-    /// Sets the volume for this track only. Resets at the end of the [Segment].
+    /// Sets the volume for this track only. Resets at the end of the [super::Segment].
     SegTrackVolume(u8),
 
     // TODO: figure out whether Seg or Sub
@@ -576,7 +566,7 @@ pub enum Command {
     /// Applies the given effect to the entire composition.
     MasterEffect(u8), // TODO: enum for field
 
-    /// Sets the bank/patch of this track, overriding its [Voice].
+    /// Sets the bank/patch of this track, overriding its [super::Voice].
     TrackOverridePatch { bank: u8, patch: u8 },
 
     SubTrackPan(u8), // TODO: better type for field
@@ -592,7 +582,7 @@ pub enum Command {
     TrackTremoloStop,
 
     // TODO: figure out whether Seg or Sub
-    /// Sets the track's voice. Field is an index into [Bgm::voices].
+    /// Sets the track's voice. Field is an index into [super::Bgm::voices].
     TrackVoice(u8),
 
     /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this abstraction

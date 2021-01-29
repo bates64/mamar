@@ -49,7 +49,7 @@ impl Bgm {
         Ok(encoded.into_inner())
     }
 
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         f.seek(SeekFrom::Start(0))?;
 
         f.write_all(MAGIC.as_bytes())?;
@@ -92,7 +92,7 @@ impl Bgm {
         debug_assert_eq!(f.pos()?, 0x24); // End of header struct
 
         // Write drums
-        if self.drums.len() > 0 {
+        if !self.drums.is_empty() {
             f.align(4)?;
             let pos = (f.pos()? >> 2) as u16;
             f.write_u16_be_at(pos, drums_offset)?;
@@ -102,7 +102,7 @@ impl Bgm {
         }
 
         // Write voices
-        if self.voices.len() > 0 {
+        if !self.voices.is_empty() {
             f.align(4)?;
             let pos = (f.pos()? >> 2) as u16;
             f.write_u16_be_at(pos, voices_offset)?;
@@ -176,7 +176,7 @@ impl Bgm {
             let mut todo_commands = Vec::new();
             for Track { flags, commands } in tracks.iter() {
                 //debug!("write commands_offset {:#X}", f.pos()?);
-                if commands.has_content() {
+                if !commands.is_empty() {
                     // Need to write command data after the track
                     todo_commands.push((f.pos()?, commands));
                 }
@@ -215,7 +215,7 @@ impl Bgm {
 }
 
 impl Drum {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         f.write_all(&[
             self.bank,
             self.patch,
@@ -235,7 +235,7 @@ impl Drum {
 }
 
 impl Voice {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         f.write_all(&[
             self.bank,
             self.patch,
@@ -272,7 +272,7 @@ impl Subsegment {
 }
 
 impl CommandSeq {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<(), Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         let mut marker_to_offset = HashMap::new();
         let mut todo_subroutines = Vec::new();
 
@@ -428,16 +428,16 @@ impl CommandSeq {
             // Try to get the file offset of `range.start`. If it is a dropped Weak<_> or we didn't see the Marker in
             // the loop above, raise an error.
             let start_offset = *marker_to_offset.get(&range.start)
-                .ok_or(Error::MissingStartMarker(range.clone()))? as u16;
+                .ok_or_else(|| Error::MissingStartMarker(range.clone()))? as u16;
 
             // Ditto for `range.end`.
             let end_offset = *marker_to_offset.get(&range.end)
-                .ok_or(Error::MissingEndMarker(range.clone()))? as u16;
+                .ok_or_else(|| Error::MissingEndMarker(range.clone()))? as u16;
 
             // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
             // [rather than panicking on debug / wrapping on release], because that would mean end_offset > start_offset.
             let length = end_offset.checked_sub(start_offset)
-                .ok_or(Error::UnorderedMarkers(range.clone()))?;
+                .ok_or_else(|| Error::UnorderedMarkers(range.clone()))?;
 
             // Convert the length to a u8 if possible.
             if length > u8::MAX as u16 {

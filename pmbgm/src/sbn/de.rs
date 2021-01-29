@@ -89,9 +89,7 @@ impl Sbn {
                 data: {
                     f.seek(SeekFrom::Start(file_start as u64))?;
 
-                    let mut bytes = Vec::with_capacity(file_size as usize);
-                    bytes.resize(file_size as usize, 0);
-
+                    let mut bytes = vec![0; file_size as usize];
                     f.read_exact(&mut bytes)?;
 
                     bytes

@@ -10,7 +10,7 @@ mod cmd;
 pub use cmd::*;
 
 /// Constant signature string which appears at the start of every binary BGM file.
-pub const MAGIC: &'static str = "BGM ";
+pub const MAGIC: &str = "BGM ";
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Bgm {
@@ -125,7 +125,7 @@ impl Bgm {
                             }
                             writeln!(f, "    tracks flags={:#X} {{", flags)?;
                             for track in tracks.rc.iter() {
-                                if track.commands.has_content() {
+                                if !track.commands.is_empty() {
                                     writeln!(f, "        track flags={:#X} {{", track.flags)?;
                                     for command in track.commands.iter() {
                                         match command {

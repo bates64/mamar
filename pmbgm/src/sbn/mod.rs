@@ -5,7 +5,7 @@ use crate::rw_util::*;
 pub mod de;
 pub mod en;
 
-pub const MAGIC: &'static str = "SBN ";
+pub const MAGIC: &str = "SBN ";
 pub const SBN_START: u64 = 0xF00000;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

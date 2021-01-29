@@ -97,19 +97,19 @@ pub trait WriteExt: Write + Seek {
 
 impl<W: Write + Seek> WriteExt for W {
     fn write_u8(&mut self, value: u8) -> Result<()> {
-        self.write_all(&mut [value])
+        self.write_all(&[value])
     }
 
     fn write_i8(&mut self, value: i8) -> Result<()> {
-        self.write_all(&mut value.to_be_bytes())
+        self.write_all(&value.to_be_bytes())
     }
 
     fn write_u16_be(&mut self, value: u16) -> Result<()> {
-        self.write_all(&mut value.to_be_bytes())
+        self.write_all(&value.to_be_bytes())
     }
 
     fn write_u32_be(&mut self, value: u32) -> Result<()> {
-        self.write_all(&mut value.to_be_bytes())
+        self.write_all(&value.to_be_bytes())
     }
 
     fn write_cstring_lossy(&mut self, string: &str, max_len: usize) -> Result<()> {

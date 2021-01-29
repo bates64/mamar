@@ -5,5 +5,30 @@ authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
 
 [dependencies]
+
+# rendering
+glium = "0.29"
+lyon = "0.17"
+
+# datastructures
+euclid = "0.22"
+lru = "0.6"
+lazy_static = "1"
+async-std = "1.9" # probs dont need
 pmbgm = { path = "../pmbgm" }
-structopt = "0.3"
+
+# file formats
+image = "0.23"
+ttf-parser = "0.9"
+
+# os
+tinyfiledialogs = "3.0"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["shellscalingapi"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+FileDescription = "Mamar" # windows uses this as the taskbar name for some reason

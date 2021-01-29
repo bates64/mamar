@@ -555,10 +555,7 @@ mod test {
 
         let start_labels: Vec<&MarkerId> = seq.at_time(0)
             .into_iter()
-            .take_while(|cmd| match cmd {
-                Command::Marker(_) => true,
-                _ => false,
-            })
+            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {
                 Command::Marker(id) => id,
                 _ => unreachable!(),
@@ -566,10 +563,7 @@ mod test {
             .collect();
         let end_labels: Vec<&MarkerId> = seq.at_time(11)
             .into_iter()
-            .take_while(|cmd| match cmd {
-                Command::Marker(_) => true,
-                _ => false,
-            })
+            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {
                 Command::Marker(id) => id,
                 _ => unreachable!(),
@@ -577,10 +571,7 @@ mod test {
             .collect();
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq.at_time(10)
             .into_iter()
-            .take_while(|cmd| match cmd {
-                Command::Subroutine(_) => true,
-                _ => false,
-            })
+            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {
                 Command::Subroutine(CommandRange { start, end, .. }) => (start, end),
                 _ => unreachable!(),

@@ -14,3 +14,6 @@ panic = "abort"
 
 [profile.dev]
 incremental = true
+
+[profile.dev.package.'*']
+opt-level = 3
