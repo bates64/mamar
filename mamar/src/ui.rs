@@ -31,16 +31,24 @@ impl Ui {
 impl Application for Ui {
     fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
         if btn::primary(ctx, delta, rect(0.0, 0.0, 96.0, 32.0), "Open File...", &mut self.open_file_btn) {
+            // We use ctx.spawn here to defer opening of the file dialog until after drawing is complete.
             ctx.spawn(|| {
-                // TODO: test on macOS, apparently it only likes file dialogs being opened on the main thread (how?)
-                // XXX: this is really slow for some reason
-                let f = tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
+                // Note: we cannot open_file_dialog in this thread; it must be done on the main thread (macOS)
+                // This is why we do everything in the below callback.
 
                 move |ui: &mut Self| {
+                    let f = tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
+
                     if let Some(f) = f {
-                        // XXX: this decoding should probably be done in the thread, not in this callback
-                        // TODO: display error
-                        ui.open_song = Some(Song::open(PathBuf::from(f)).unwrap());
+                        println!("loading song: {}", f);
+
+                        match Song::open(PathBuf::from(f)) {
+                            Ok(song) => ui.open_song = Some(song),
+                            Err(error) => {
+                                let msg = format!("{}", error);
+                                tinyfiledialogs::message_box_ok("Error opening file", &msg, tinyfiledialogs::MessageBoxIcon::Error);
+                            },
+                        }
                     }
                 }
             });
