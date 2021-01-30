@@ -3,9 +3,10 @@ use std::error::Error;
 use pmbgm::Bgm;
 use super::*;
 
+#[derive(Debug)]
 pub struct Song {
     pub path: PathBuf,
-    bgm: Bgm,
+    pub bgm: Bgm,
 
     voice_btns: [btn::ButtonState; 16],
 }

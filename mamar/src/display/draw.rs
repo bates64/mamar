@@ -8,9 +8,6 @@ pub use color::Color;
 pub use entity::Entity;
 use geometry::{Geometry, Vertex};
 
-use async_std::prelude::*;
-use async_std::task;
-
 use glium::{Surface, Display, Frame, Program};
 use glium::glutin::dpi::LogicalSize;
 type EventLoopProxy<A> = glium::glutin::event_loop::EventLoopProxy<Box<dyn FnOnce(&mut A) + Send>>;
@@ -155,10 +152,11 @@ impl<A: Application + 'static> Ctx<A> {
         self.redraw_requested = true;
     }
 
-    /// Spawns a future, then redraws when it completes.
+    /// Spawns a function in a thread, then redraws when it completes. The function must return a callback function
+    /// which will be executed on the host thread with a mutable Application reference, in order to update state.
     pub fn spawn<F, C>(&mut self, future: F)
     where
-        F: Future<Output = C> + Send + 'static,
+        F: FnOnce() -> C + Send + 'static,
         C: FnOnce(&mut A) + Send + 'static,
     {
         struct SyncEventLoopProxy<A: Application + 'static>(EventLoopProxy<A>);
@@ -172,9 +170,9 @@ impl<A: Application + 'static> Ctx<A> {
         unsafe impl<A: Application + 'static> Send for SyncEventLoopProxy<A> {}
 
         let sync_proxy = SyncEventLoopProxy(self.event_loop_proxy.clone());
-        task::spawn(async move {
+        std::thread::spawn(move || {
             // Run the future to completion
-            let callback: Box<dyn FnOnce(&mut A) + Send> = Box::new(future.await);
+            let callback: Box<dyn FnOnce(&mut A) + Send> = Box::new(future());
 
             // Send an empty event::UserEvent to the event loop managing this Ctx (display.rs).
             // This implicitly triggers a redraw from the OS.

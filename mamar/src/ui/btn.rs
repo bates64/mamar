@@ -1,7 +1,7 @@
 use crate::display::draw::*;
 use super::{shape, text, Ui};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ButtonState {
     inflation: f32,
     time_mouse_overed: f32,

@@ -14,7 +14,6 @@ lyon = "0.17"
 euclid = "0.22"
 lru = "0.6"
 lazy_static = "1"
-async-std = "1.9" # probs dont need
 pmbgm = { path = "../pmbgm" }
 
 # file formats
