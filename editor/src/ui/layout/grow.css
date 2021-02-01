@@ -1,8 +1,0 @@
-.Grow {
-    flex: 1;
-}
-
-.Grow:only-child {
-    width: 100%;
-    height: 100%;
-}
