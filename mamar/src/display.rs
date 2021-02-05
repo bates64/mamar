@@ -6,7 +6,7 @@ use glium::glutin;
 use glutin::dpi::LogicalSize;
 use draw::Ctx;
 
-const MSAA: u16 = 16;
+const MSAA: u16 = 4;
 const FPS: f32 = 60.0;
 
 pub trait Application {
