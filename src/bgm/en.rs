@@ -134,7 +134,7 @@ impl Bgm {
         // Write segments
         let mut todo_tracks = Vec::new();
         for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
-            if let Some(subsegments) = segment {
+            if let Some(segment) = segment {
                 f.align(4)?;
                 debug!("segment {:#X}", f.pos()?);
                 // Write offset in header
@@ -144,7 +144,7 @@ impl Bgm {
                 // Write segment header
                 let segment_start = f.pos()?;
 
-                for subsegment in subsegments {
+                for subsegment in &segment.subsegments {
                     debug!("subsegment {:#X}", f.pos()?);
                     if let Some(tracks) = subsegment.encode(f)? {
                         todo_tracks.push((segment_start, tracks)); // Need to write track data after the header

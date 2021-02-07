@@ -25,7 +25,44 @@ pub struct Bgm {
     pub voices: Vec<Voice>,
 }
 
-type Segment = Vec<Subsegment>;
+#[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
+pub struct NoSpace;
+
+impl Bgm {
+    pub fn new() -> Bgm {
+        Bgm {
+            index: "152 ".to_string(),
+            segments: [None, None, None, None],
+            drums: Vec::new(),
+            voices: Vec::new(),
+        }
+    }
+
+    pub fn can_add_segment(&self) -> bool {
+        self.segments
+            .iter()
+            .any(|s| s.is_none())
+    }
+
+    pub fn add_segment(&mut self) -> Result<&mut Segment, NoSpace> {
+        let empty_seg: Option<&mut Option<Segment>> = self.segments
+            .iter_mut()
+            .find(|s| s.is_none());
+
+        match empty_seg {
+            None => Err(NoSpace),
+            Some(slot) => {
+                *slot = Some(Segment::default());
+                Ok(slot.as_mut().unwrap())
+            },
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Segment {
+    pub subsegments: Vec<Subsegment>,
+}
 
 // TODO: better representation for `flags`
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -125,9 +162,9 @@ impl Bgm {
         writeln!(f, "}}")?;
         writeln!(f)?;
         for segment in &self.segments {
-            if let Some(subsegments) = segment {
+            if let Some(subsegment) = segment {
                 writeln!(f, "segment {{")?;
-                for subsegment in subsegments {
+                for subsegment in &subsegment.subsegments {
                     match subsegment {
                         Subsegment::Tracks { flags, tracks } => {
                             if let Some(offset) = tracks.decoded_pos {

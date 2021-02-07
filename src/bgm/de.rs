@@ -175,7 +175,7 @@ impl Bgm {
 
                         debug!("segment {:#X}", pos);
 
-                        let mut segment = vec![];
+                        let mut subsegments = vec![];
                         let mut i = 0;
                         while {
                             f.seek(SeekFrom::Start(pos + i * 4))?;
@@ -185,14 +185,14 @@ impl Bgm {
                             f.seek(SeekFrom::Current(-4))?;
                             byte != 0
                         } {
-                            segment.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos)?);
+                            subsegments.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos)?);
 
                             i += 1;
                         }
 
                         debug!("segment end {:#X}", f.pos()?);
 
-                        Ok(Some(segment))
+                        Ok(Some(Segment { subsegments }))
                     }
                 })
                 .collect_array_pedantic()?,

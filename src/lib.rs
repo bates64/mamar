@@ -2,6 +2,7 @@ pub mod bgm;
 pub mod display;
 pub mod hot;
 pub mod logger;
+pub mod midi;
 pub mod sbn;
 pub mod ui;
 pub mod util;
@@ -17,7 +18,7 @@ pub fn init() {
 
     let _ = log::set_logger(&logger::LOGGER);
 
-    if cfg!(debug_assetions) {
+    if cfg!(debug_assertions) {
         log::set_max_level(log::LevelFilter::Debug);
     } else {
         log::set_max_level(log::LevelFilter::Info);

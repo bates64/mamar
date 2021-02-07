@@ -1,8 +1,13 @@
 use std::error::Error;
 use std::path::PathBuf;
+use std::io::prelude::*;
+use std::io::SeekFrom;
+use std::fs::File;
 
 use super::*;
 use crate::bgm::Bgm;
+use crate::util::rw::*;
+use crate::midi;
 
 #[derive(Debug)]
 pub struct Song {
@@ -12,12 +17,35 @@ pub struct Song {
     voice_btns: [btn::ButtonState; 16],
 }
 
+pub fn is_midi(file: &mut File) -> Result<bool, std::io::Error> {
+    file.seek(SeekFrom::Start(0))?;
+    Ok(file.read_cstring(4)? == "MThd")
+}
+
 impl Song {
     pub fn open(path: PathBuf) -> Result<Self, Box<dyn Error>> {
-        use std::fs::File;
+        let file = &mut File::open(&path)?;
+
+        let bgm = {
+            if is_midi(file).unwrap_or(false) {
+                let mut buf = Vec::new();
+                file.seek(SeekFrom::Start(0))?;
+                file.read_to_end(&mut buf)?;
+
+                midi::to_bgm(&buf)?
+            } else {
+                Bgm::decode(file)?
+            }
+        };
+
+        log::debug!("{}", {
+            let mut s = String::new();
+            bgm.write_kdl(&mut s).unwrap();
+            s
+        });
 
         Ok(Self {
-            bgm: Bgm::decode(&mut File::open(&path)?)?,
+            bgm,
             path,
 
             voice_btns: Default::default(),

@@ -1,6 +1,7 @@
 ## 0.3.0
 
 - Added _Save As..._ button
+- _Open File..._ now supports MIDI files (experimental)
 
 ## 0.2.0
 

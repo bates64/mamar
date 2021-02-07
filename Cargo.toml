@@ -15,6 +15,7 @@ image = "0.23"
 ttf-parser = "0.9"
 tinyfiledialogs = "3.0"
 log = "0.4.14"
+midly = "0.5.1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["shellscalingapi"] }
