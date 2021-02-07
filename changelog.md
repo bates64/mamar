@@ -1,3 +1,7 @@
+## 0.3.0
+
+- Added _Save As..._ button
+
 ## 0.2.0
 
 - Entirely new app architecture

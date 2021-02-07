@@ -16,6 +16,7 @@ pub struct Ui {
 
     open_song: Option<Song>,
     open_file_btn: btn::ButtonState,
+    save_file_btn: btn::ButtonState,
     play_btn: btn::ButtonState,
 }
 
@@ -25,6 +26,7 @@ impl Ui {
             hot_reload_tx,
             open_song: None,
             open_file_btn: Default::default(),
+            save_file_btn: Default::default(),
             play_btn: Default::default(),
         }
     }
@@ -47,7 +49,7 @@ impl Application for Ui {
                 move |ui: &mut Self| {
                     log::debug!("showing file open dialog");
                     let f =
-                        tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
+                        tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM files")));
 
                     if let Some(f) = f {
                         log::info!("loading song: {}", f);
@@ -77,6 +79,26 @@ impl Application for Ui {
             if btn::primary(ctx, delta, rect(100.0, 0.0, 64.0, 32.0), "Play", &mut self.play_btn) {
                 let data = song.bgm.as_bytes().unwrap(); // TODO handle error
                 self.hot_reload_tx.send(data).unwrap();
+            }
+
+            if btn::primary(ctx, delta, rect(168.0, 0.0, 96.0, 32.0), "Save As...", &mut self.save_file_btn) {
+                ctx.spawn(|| {
+                    move |ui: &mut Self| {
+                        use std::fs::File;
+
+                        log::debug!("showing file save dialog");
+                        let f =
+                            tinyfiledialogs::save_file_dialog_with_filter("Save As", "", &["*.bgm", "*.bin"], "");
+
+                        if let Some(f) = f {
+                            log::info!("saving bgm to {}", f);
+                            let mut f = File::create(f).unwrap();
+                            ui.open_song.as_ref().unwrap().bgm.encode(&mut f).unwrap();
+                        } else {
+                            log::debug!("user cancelled file save operation");
+                        }
+                    }
+                });
             }
         }
     }
