@@ -3,13 +3,9 @@
 use mamar::*;
 
 fn main() {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        use winapi::um::*;
+    init();
 
-        shellscalingapi::SetProcessDpiAwareness(2);
-        wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS);
-    }
+    log::info!("hello");
 
     let (tx, rx) = std::sync::mpsc::channel();
 

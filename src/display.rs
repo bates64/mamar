@@ -38,7 +38,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
-                    println!("bye");
+                    log::debug!("bye");
                     *control_flow = ControlFlow::Exit;
                 },
                 WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => ctx.update_projection(),

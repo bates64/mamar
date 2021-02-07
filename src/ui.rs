@@ -37,18 +37,22 @@ impl Application for Ui {
                 // This is why we do everything in the below callback.
 
                 move |ui: &mut Self| {
+                    log::debug!("showing file open dialog");
                     let f = tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
 
                     if let Some(f) = f {
-                        println!("loading song: {}", f);
+                        log::info!("loading song: {}", f);
 
                         match Song::open(PathBuf::from(f)) {
                             Ok(song) => ui.open_song = Some(song),
                             Err(error) => {
                                 let msg = format!("{}", error);
+                                log::error!("{}", msg);
                                 tinyfiledialogs::message_box_ok("Error opening file", &msg, tinyfiledialogs::MessageBoxIcon::Error);
                             },
                         }
+                    } else {
+                        log::debug!("user cancelled file open operation");
                     }
                 }
             });
