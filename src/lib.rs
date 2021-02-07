@@ -1,10 +1,10 @@
 pub mod bgm;
 pub mod display;
 pub mod hot;
+pub mod logger;
 pub mod sbn;
 pub mod ui;
 pub mod util;
-pub mod logger;
 
 pub fn init() {
     #[cfg(target_os = "windows")]

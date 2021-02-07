@@ -1,7 +1,10 @@
-use std::io::{self, prelude::*, SeekFrom};
-use std::fmt;
 use std::convert::TryInto;
+use std::fmt;
+use std::io::prelude::*;
+use std::io::{self, SeekFrom};
+
 use log::warn;
+
 use super::*;
 
 #[derive(Debug)]
@@ -56,7 +59,10 @@ impl Sbn {
             f.seek(SeekFrom::Start(internal_size as u64))?;
             f.read_padding(true_size - internal_size)?;
         } else {
-            warn!("size mismatch! SBN says it is {:#X} B but the input is {:#X} B", internal_size, true_size);
+            warn!(
+                "size mismatch! SBN says it is {:#X} B but the input is {:#X} B",
+                internal_size, true_size
+            );
         }
 
         f.seek(SeekFrom::Start(0x08))?;

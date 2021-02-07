@@ -1,9 +1,13 @@
-use std::io::{self, prelude::*, SeekFrom};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::HashMap;
 use std::fmt;
-use std::collections::{HashMap, btree_map::{BTreeMap, Entry}};
+use std::io::prelude::*;
+use std::io::{self, SeekFrom};
 use std::rc::Rc;
-use smallvec::smallvec;
+
 use log::{debug, warn};
+use smallvec::smallvec;
+
 use super::*;
 use crate::util::rw::*;
 
@@ -26,14 +30,24 @@ impl fmt::Display for Error {
         match self {
             Error::InvalidMagic => write!(f, "Missing 'BGM' signature at start"),
             Error::SizeMismatch {
-                true_size, internal_size,
-            } => write!(f, "The file says it is {}B, but it is actually {}B", internal_size, true_size),
-            Error::InvalidNumSegments(num_segments) =>
-                write!(f, "Exactly 4 segment slots are supported, but this file has {}", num_segments),
-            Error::Io(source) => if let io::ErrorKind::UnexpectedEof = source.kind() {
-                write!(f, "Unexpected end-of-file")
-            } else {
-                write!(f, "{}", source)
+                true_size,
+                internal_size,
+            } => write!(
+                f,
+                "The file says it is {}B, but it is actually {}B",
+                internal_size, true_size
+            ),
+            Error::InvalidNumSegments(num_segments) => write!(
+                f,
+                "Exactly 4 segment slots are supported, but this file has {}",
+                num_segments
+            ),
+            Error::Io(source) => {
+                if let io::ErrorKind::UnexpectedEof = source.kind() {
+                    write!(f, "Unexpected end-of-file")
+                } else {
+                    write!(f, "{}", source)
+                }
             }
         }
     }
@@ -108,7 +122,10 @@ impl Bgm {
             f.seek(SeekFrom::Start(internal_size as u64))?;
             f.read_padding(true_size - internal_size)?;
         } else {
-            warn!("size mismatch! BGM says it is {:#X} B but the input is {:#X} B", internal_size, true_size);
+            warn!(
+                "size mismatch! BGM says it is {:#X} B but the input is {:#X} B",
+                internal_size, true_size
+            );
         }
 
         f.seek(SeekFrom::Start(0x08))?;
@@ -209,7 +226,12 @@ impl Bgm {
 }
 
 impl Subsegment {
-    fn decode<R: Read + Seek>(f: &mut R, start: u64, tracks_map: &mut TracksMap, furthest_read_pos: &mut u64) -> Result<Self, Error> {
+    fn decode<R: Read + Seek>(
+        f: &mut R,
+        start: u64,
+        tracks_map: &mut TracksMap,
+        furthest_read_pos: &mut u64,
+    ) -> Result<Self, Error> {
         debug!("subsegment {:#X}", f.pos()?);
         let flags = f.read_u8()?;
 
@@ -222,24 +244,28 @@ impl Subsegment {
 
             Ok(Subsegment::Tracks {
                 flags,
-                tracks: tracks_map.entry(tracks_start)
-                    .or_insert({ // TODO(speed): use or_insert_with; need to figure out how to return Result
+                tracks: tracks_map
+                    .entry(tracks_start)
+                    .or_insert({
+                        // TODO(speed): use or_insert_with; need to figure out how to return Result
                         TaggedRc {
                             decoded_pos: Some(tracks_start),
-                            rc: Rc::new((0..16)
-                                .into_iter()
-                                .map(|track_no| {
-                                    f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
-                                    let track = Track::decode(f, tracks_start);
+                            rc: Rc::new(
+                                (0..16)
+                                    .into_iter()
+                                    .map(|track_no| {
+                                        f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
+                                        let track = Track::decode(f, tracks_start);
 
-                                    let pos = f.pos()?;
-                                    if pos > *furthest_read_pos {
-                                        *furthest_read_pos = pos;
-                                    }
+                                        let pos = f.pos()?;
+                                        if pos > *furthest_read_pos {
+                                            *furthest_read_pos = pos;
+                                        }
 
-                                    track
-                                })
-                                .collect_array_pedantic()?),
+                                        track
+                                    })
+                                    .collect_array_pedantic()?,
+                            ),
                         }
                     })
                     .clone(), // New reference
@@ -248,10 +274,7 @@ impl Subsegment {
             let mut data = [0; 3];
             f.read_exact(&mut data)?;
 
-            Ok(Subsegment::Unknown {
-                flags,
-                data,
-            })
+            Ok(Subsegment::Unknown { flags, data })
         }
     }
 }
@@ -307,7 +330,7 @@ impl CommandSeq {
                 0x00 => {
                     seen_terminator = true;
                     Command::End
-                },
+                }
 
                 // Delay
                 0x01..=0x77 => Command::Delay(cmd_byte as usize),
@@ -320,7 +343,7 @@ impl CommandSeq {
                     Command::Delay(0x78 + cmd_byte + (f.read_u8()? & 0x7) << 8));
                     */
                     Command::Unknown(smallvec![cmd_byte, f.read_u8()?])
-                },
+                }
 
                 // Note
                 0x80..=0xD3 => {
@@ -345,25 +368,42 @@ impl CommandSeq {
                     };
                     //assert!(length < 0x4000, "{:#X}", length);
 
-                    Command::Note { pitch, flag, velocity, length }
-                },
+                    Command::Note {
+                        pitch,
+                        flag,
+                        velocity,
+                        length,
+                    }
+                }
 
                 0xE0 => Command::MasterTempo(f.read_u16_be()?),
                 0xE1 => Command::MasterVolume(f.read_u8()?),
                 0xE2 => Command::MasterTranspose(f.read_i8()?),
                 0xE3 => Command::Unknown(smallvec![0xE3, f.read_u8()?]),
-                0xE4 => Command::MasterTempoFade { time: f.read_u16_be()?, bpm: f.read_u16_be()? },
-                0xE5 => Command::MasterVolumeFade { time: f.read_u16_be()?, volume: f.read_u8()? },
+                0xE4 => Command::MasterTempoFade {
+                    time: f.read_u16_be()?,
+                    bpm: f.read_u16_be()?,
+                },
+                0xE5 => Command::MasterVolumeFade {
+                    time: f.read_u16_be()?,
+                    volume: f.read_u8()?,
+                },
                 0xE6 => Command::MasterEffect(f.read_u8()?),
                 0xE7 => Command::Unknown(smallvec![0xE7]),
-                0xE8 => Command::TrackOverridePatch { bank: f.read_u8()?, patch: f.read_u8()? },
+                0xE8 => Command::TrackOverridePatch {
+                    bank: f.read_u8()?,
+                    patch: f.read_u8()?,
+                },
                 0xE9 => Command::SubTrackVolume(f.read_u8()?),
                 0xEA => Command::SubTrackPan(f.read_u8()?),
                 0xEB => Command::SubTrackReverb(f.read_u8()?),
                 0xEC => Command::SegTrackVolume(f.read_u8()?),
                 0xED => Command::SubTrackCoarseTune(f.read_u8()?),
                 0xEE => Command::SubTrackFineTune(f.read_u8()?),
-                0xEF => Command::SegTrackTune { coarse: f.read_u8()?, fine: f.read_u8()? },
+                0xEF => Command::SegTrackTune {
+                    coarse: f.read_u8()?,
+                    fine: f.read_u8()?,
+                },
                 0xF0 => Command::TrackTremolo {
                     amount: f.read_u8()?,
                     speed: f.read_u8()?,
@@ -374,7 +414,10 @@ impl CommandSeq {
                 0xF3 => Command::TrackTremoloStop,
                 0xF4 => Command::Unknown(smallvec![0xF4, f.read_u8()?, f.read_u8()?]),
                 0xF5 => Command::TrackVoice(f.read_u8()?),
-                0xF6 => Command::TrackVolumeFade { time: f.read_u16_be()?, volume: f.read_u8()? },
+                0xF6 => Command::TrackVolumeFade {
+                    time: f.read_u16_be()?,
+                    volume: f.read_u8()?,
+                },
                 0xF7 => Command::SubTrackReverbType(f.read_u8()?),
                 0xF8 => Command::Unknown(smallvec![0xF8]),
                 0xF9 => Command::Unknown(smallvec![0xF9]),
@@ -386,7 +429,7 @@ impl CommandSeq {
 
                     // TODO Jump random
                     todo!("Jump random");
-                },
+                }
                 0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
@@ -399,7 +442,7 @@ impl CommandSeq {
                         start: commands.upsert_marker(start_offset),
                         end: commands.upsert_marker(end_offset),
                     })
-                },
+                }
                 0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
                 _ => Command::Unknown(smallvec![cmd_byte]),
@@ -454,29 +497,29 @@ impl OffsetCommandMap {
                 let id: MarkerId = format!("Offset {:#X}", offset);
                 entry.insert(Command::Marker(id.clone()));
                 id
-            },
+            }
             Entry::Occupied(entry) => match entry.get() {
                 Command::Marker(id) => id.clone(),
                 other_command => panic!(
                     "non-marker command {:?} found in label range (shifted_offset = {:#X})",
-                    other_command,
-                    shifted_offset,
+                    other_command, shifted_offset,
                 ),
             },
         }
     }
 
     pub fn last_offset(&self) -> usize {
-        self.0.iter().rev().next() //self.0.last_key_value()
+        self.0
+            .iter()
+            .rev()
+            .next() //self.0.last_key_value()
             .map_or(0, |(&k, _)| Self::btoa(k))
     }
 }
 
 impl From<OffsetCommandMap> for CommandSeq {
     fn from(map: OffsetCommandMap) -> CommandSeq {
-        map.0.into_iter()
-            .map(|(_, cmd)| cmd)
-            .collect()
+        map.0.into_iter().map(|(_, cmd)| cmd).collect()
     }
 }
 
@@ -488,7 +531,6 @@ impl Deref for OffsetCommandMap {
     }
 }
 */
-
 
 impl Drum {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
@@ -528,8 +570,9 @@ impl Voice {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     /// Make sure that parsing garbage data returns an error.
     #[test]
@@ -545,7 +588,7 @@ mod test {
             0x09, // Delay(9)
             0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
             0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
-            0xFE, 0x00, 0x00, 15, // Subroutine { start = 0, length = 15 }
+            0xFE, 0x00, 0x00, 15,   // Subroutine { start = 0, length = 15 }
             0x01, // Delay(1)
             0x00, // End - at offset 15
         ];
@@ -553,7 +596,8 @@ mod test {
         let seq = CommandSeq::decode(&mut Cursor::new(bytecode)).unwrap();
         dbg!(&seq);
 
-        let start_labels: Vec<&MarkerId> = seq.at_time(0)
+        let start_labels: Vec<&MarkerId> = seq
+            .at_time(0)
             .into_iter()
             .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {
@@ -561,7 +605,8 @@ mod test {
                 _ => unreachable!(),
             })
             .collect();
-        let end_labels: Vec<&MarkerId> = seq.at_time(11)
+        let end_labels: Vec<&MarkerId> = seq
+            .at_time(11)
             .into_iter()
             .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {
@@ -569,7 +614,8 @@ mod test {
                 _ => unreachable!(),
             })
             .collect();
-        let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq.at_time(10)
+        let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
+            .at_time(10)
             .into_iter()
             .take_while(|cmd| matches!(cmd, Command::Marker(_)))
             .map(|cmd| match cmd {

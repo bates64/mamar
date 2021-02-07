@@ -1,7 +1,8 @@
 use lazy_static::lazy_static;
 use ttf_parser::{Face, OutlineBuilder};
-use crate::display::draw::*;
+
 use super::Ctx;
+use crate::display::draw::*;
 
 // Adjustment values in font em units
 const FONT_HEIGHT_ADJUST: f32 = -0.3;
@@ -135,11 +136,13 @@ impl<'a> OutlineBuilder for FontPathBuilder<'a> {
     }
 
     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        self.path.quadratic_bezier_to(self.point(x1, y1), self.point(x, y), self.attr);
+        self.path
+            .quadratic_bezier_to(self.point(x1, y1), self.point(x, y), self.attr);
     }
 
     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.path.cubic_bezier_to(self.point(x1, y1), self.point(x2, y2), self.point(x, y), self.attr);
+        self.path
+            .cubic_bezier_to(self.point(x1, y1), self.point(x2, y2), self.point(x, y), self.attr);
     }
 
     fn close(&mut self) {

@@ -1,4 +1,6 @@
-use std::io::{self, prelude::*};
+use std::io;
+use std::io::prelude::*;
+
 use super::*;
 
 type Error = io::Error;

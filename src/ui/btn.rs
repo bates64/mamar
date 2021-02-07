@@ -1,5 +1,5 @@
-use crate::display::draw::*;
 use super::{shape, text, Ui};
+use crate::display::draw::*;
 
 #[derive(Default, Debug)]
 pub struct ButtonState {

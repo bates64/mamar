@@ -1,6 +1,7 @@
+use glium::{implement_vertex, uniform, IndexBuffer, Surface, VertexBuffer};
+use lyon::tessellation::{FillVertex, VertexBuffers};
+
 use super::*;
-use glium::{implement_vertex, uniform, Surface, VertexBuffer, IndexBuffer};
-use lyon::tessellation::{VertexBuffers, FillVertex};
 
 pub const VERTEX_SHADER: &str = include_str!("multicolor.vert");
 pub const FRAGMENT_SHADER: &str = include_str!("multicolor.frag");
@@ -42,23 +43,28 @@ impl super::Geometry for Geometry {
     fn from_lyon<A: Application>(ctx: &Ctx<A>, bufs: &VertexBuffers<Vertex, u16>, aabb: Box2D<GeomSpace>) -> Self {
         Geometry {
             vertex_buf: VertexBuffer::new(&ctx.display, &bufs.vertices).unwrap(),
-            index_buf: IndexBuffer::new(&ctx.display, glium::index::PrimitiveType::TrianglesList, &bufs.indices).unwrap(),
+            index_buf: IndexBuffer::new(&ctx.display, glium::index::PrimitiveType::TrianglesList, &bufs.indices)
+                .unwrap(),
             aabb,
         }
     }
 
     fn draw<A: Application>(&self, ctx: &mut Ctx<A>, transform: [[f32; 4]; 4], params: &glium::DrawParameters) {
         ctx.ensure_frame();
-        ctx.frame.as_mut().unwrap().draw(
-            &self.vertex_buf,
-            &self.index_buf,
-            &ctx.multicolor_shader,
-            &uniform! {
-                matrix: ctx.projection.to_arrays(),
-                transform: transform,
-            },
-            params,
-        ).unwrap();
+        ctx.frame
+            .as_mut()
+            .unwrap()
+            .draw(
+                &self.vertex_buf,
+                &self.index_buf,
+                &ctx.multicolor_shader,
+                &uniform! {
+                    matrix: ctx.projection.to_arrays(),
+                    transform: transform,
+                },
+                params,
+            )
+            .unwrap();
     }
 
     fn bounding_box(&self) -> &Box2D<GeomSpace> {

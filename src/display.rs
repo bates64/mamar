@@ -1,21 +1,24 @@
-mod icon;
 pub mod draw;
+mod icon;
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
+
+use draw::Ctx;
 use glium::glutin;
 use glutin::dpi::LogicalSize;
-use draw::Ctx;
 
 const MSAA: u16 = 4;
 const FPS: f32 = 60.0;
 
 pub trait Application {
-    fn draw(&mut self, ctx: &mut Ctx<Self>, delta: f32) where Self: Sized;
+    fn draw(&mut self, ctx: &mut Ctx<Self>, delta: f32)
+    where
+        Self: Sized;
 }
 
 pub fn main<A: Application + 'static>(mut application: A) -> ! {
-    use glutin::event_loop::ControlFlow;
     use glutin::event::{Event, WindowEvent};
+    use glutin::event_loop::ControlFlow;
 
     let event_loop = glutin::event_loop::EventLoop::with_user_event();
     let wb = glutin::window::WindowBuilder::new()
@@ -23,9 +26,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
         .with_inner_size(LogicalSize::new(800.0, 600.0))
         //.with_min_inner_size(LogicalSize::new(800.0, 600.0))
         .with_window_icon(icon::get_icon());
-    let cb = glutin::ContextBuilder::new()
-        .with_multisampling(MSAA)
-        .with_srgb(true);
+    let cb = glutin::ContextBuilder::new().with_multisampling(MSAA).with_srgb(true);
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
     let mut ctx = Ctx::new(display, event_loop.create_proxy());
 
@@ -40,12 +41,12 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
                 WindowEvent::CloseRequested => {
                     log::debug!("bye");
                     *control_flow = ControlFlow::Exit;
-                },
+                }
                 WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => ctx.update_projection(),
                 WindowEvent::CursorMoved { position, .. } => {
                     let position = position.to_logical(ctx.dpi_scale() as f64); // Apply DPI
                     ctx.mouse_pos = Some(draw::point(position.x, position.y));
-                },
+                }
                 WindowEvent::CursorLeft { .. } => ctx.mouse_pos = None,
                 WindowEvent::MouseInput { state, button, .. } => {
                     // TODO: handle multiple buttons at once (use a vec? bitflags?)
@@ -53,7 +54,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
                         glutin::event::ElementState::Pressed => Some(button),
                         glutin::event::ElementState::Released => None,
                     };
-                },
+                }
                 _ => (),
             },
             //Event::RedrawRequested(_) => (),
@@ -77,7 +78,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
                     // Limit frames to FPS so we don't hog the CPU
                     *control_flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_secs_f32(1.0 / FPS));
                 }
-            },
+            }
             Event::UserEvent(callback) => {
                 callback(&mut application);
                 // Redraw is implicitly requested by OS

@@ -1,9 +1,8 @@
-use crate::display::draw::*;
 use super::Ctx;
+use crate::display::draw::*;
 
 pub fn rect(ctx: &mut Ctx, rect: Rect<ViewSpace>, color: Color) -> Entity<geometry::multicolor::Geometry> {
-    rect_origin(ctx, rect.width(), rect.height(), color)
-        .translate(rect.origin.to_vector())
+    rect_origin(ctx, rect.width(), rect.height(), color).translate(rect.origin.to_vector())
 }
 
 pub fn rect_origin(ctx: &mut Ctx, width: f32, height: f32, color: Color) -> Entity<geometry::multicolor::Geometry> {
@@ -24,6 +23,5 @@ pub fn rect_origin(ctx: &mut Ctx, width: f32, height: f32, color: Color) -> Enti
         })
     });
 
-    square
-        .scale_2d(width, height)
+    square.scale_2d(width, height)
 }

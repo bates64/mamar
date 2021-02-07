@@ -1,17 +1,7 @@
 {
     "files.exclude": {
-        "**/node_modules": true,
-        "**/package-lock.json": true,
         "target": true,
         "Cargo.lock": true,
-        "editor/pkg": true,
-    },
-    "files.associations": {
-        "**/snapshots/*": "yaml",
-        //"*.css": "postcss"
     },
     "editor.rulers": [120],
-
-    // This diagnostic doesn't work correctly with wasm_bindgen externs
-    "rust-analyzer.diagnostics.disabled": ["missing-unsafe"],
 }

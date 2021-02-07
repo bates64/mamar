@@ -1,5 +1,9 @@
 use std::rc::Rc;
-use super::{Ctx, math::*, geometry::Geometry, MouseButton, super::Application};
+
+use super::super::Application;
+use super::geometry::Geometry;
+use super::math::*;
+use super::{Ctx, MouseButton};
 
 /// A `Geometry` supporting transformations in view-space.
 /// Cloning is cheap (using reference-counting).
@@ -84,24 +88,30 @@ impl<G: Geometry> Entity<G> {
         would also be nice to have .is_mouse_over_ignore_z() that bypasses this whole system and just queries the current mouse position
         */
 
-        self.is_mouse_over(ctx)
-            && ctx.mouse_button == Some(button)
-            && ctx.mouse_button_previous.is_none()
+        self.is_mouse_over(ctx) && ctx.mouse_button == Some(button) && ctx.mouse_button_previous.is_none()
     }
 
     /// Commit the entity to the screen, drawing over previously-drawn entities
     pub fn draw<A: Application>(&self, ctx: &mut Ctx<A>) {
-        self.geometry.draw(ctx, self.transform.to_arrays(), &glium::DrawParameters {
-            blend: glium::draw_parameters::Blend::alpha_blending(),
-            ..Default::default()
-        });
+        self.geometry.draw(
+            ctx,
+            self.transform.to_arrays(),
+            &glium::DrawParameters {
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                ..Default::default()
+            },
+        );
     }
 
     pub fn draw_debug_outlined<A: Application>(&self, ctx: &mut Ctx<A>) {
-        self.geometry.draw(ctx, self.transform.to_arrays(), &glium::DrawParameters {
-            blend: glium::draw_parameters::Blend::alpha_blending(),
-            polygon_mode: glium::draw_parameters::PolygonMode::Line,
-            ..Default::default()
-        });
+        self.geometry.draw(
+            ctx,
+            self.transform.to_arrays(),
+            &glium::DrawParameters {
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                polygon_mode: glium::draw_parameters::PolygonMode::Line,
+                ..Default::default()
+            },
+        );
     }
 }

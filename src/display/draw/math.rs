@@ -1,6 +1,5 @@
 ///! This module mainly rexports types from `euclid` as `f32`s with units.
 ///! Note that `lyon::math` does this too (for GeomSpace).
-
 use euclid::Trig;
 
 // Coordinate systems.
@@ -38,5 +37,12 @@ pub type Angle = euclid::Angle<f32>;
 // Convenience functions
 pub use euclid::{point2 as point, point3, rect, size2, size3, vec2, vec3};
 
-pub fn rad(radians: f32) -> Angle { Angle { radians } }
-pub fn deg(degrees: f32) -> Angle { Angle { radians: Trig::degrees_to_radians(degrees) } }
+pub fn rad(radians: f32) -> Angle {
+    Angle { radians }
+}
+
+pub fn deg(degrees: f32) -> Angle {
+    Angle {
+        radians: Trig::degrees_to_radians(degrees),
+    }
+}

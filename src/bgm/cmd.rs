@@ -1,5 +1,6 @@
-use std::iter;
 use std::hash::Hash;
+use std::iter;
+
 use smallvec::SmallVec;
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
@@ -27,9 +28,10 @@ use smallvec::SmallVec;
 /// | Method         | Worst-case | Naïve [`Vec<Command>`] | Explanation                                               |
 /// | -------------- | ---------- | ---------------------- | --------------------------------------------------------- |
 /// | get/lookup     | O(n)       | N/A                    | Must iterate to find insertion point                      |
-/// | insert         | O(2n)      | N/A                    | Must iterate to find insertion point and commands to the right must be shifted |
-/// | push           | O(1)       | O(1)                   | Same implementation as [Vec]                              |
-/// | remove         | O(1)       | O(n)                   | [Vec] shifts elements, whereas [CommandSeq] replaces with [Command::default] |
+/// | insert         | O(2n)      | N/A                    | Must iterate to find insertion point and commands to the
+/// right must be shifted | | push           | O(1)       | O(1)                   | Same implementation as [Vec]
+/// | | remove         | O(1)       | O(n)                   | [Vec] shifts elements, whereas [CommandSeq] replaces with
+/// [Command::default] |
 ///
 /// [CommandSeq] is backed by a [`Vec<Command>`] with some domain-specific optimisations and methods. Note, however,
 /// that this collection is not equivalent to [Vec] - in many ways it acts more like a
@@ -43,8 +45,7 @@ pub struct CommandSeq {
     /// However, a number of [Vec] operations _are_ safe to provide; these are wrapped in the `impl CommandSeq`, such
     /// as [CommandSeq::len].
     vec: Vec<Command>,
-
-    // TODO: consider implementing this optimisation because get/insert are hot
+    /* TODO: consider implementing this optimisation because get/insert are hot */
     /*
     /// Lookup table (time -> vec index of first command with that time) for avoiding linear searches.
     /// A binary tree is used so it is trivial to find the last time value (i.e. the time of the last Command).
@@ -180,7 +181,7 @@ impl CommandSeq {
                     index..index, // Remove no elements
                     subsequence,
                 );
-            },
+            }
 
             DelayLookup::Missing { index, time_at_index } => {
                 debug_assert!(time >= time_at_index);
@@ -210,11 +211,9 @@ impl CommandSeq {
                 // See https://stackoverflow.com/questions/28678615.
                 self.vec.splice(
                     old_delay_range, // Replace old delays
-                    delay(insert_time.0)
-                        .chain(subsequence)
-                        .chain(delay(insert_time.1)),
+                    delay(insert_time.0).chain(subsequence).chain(delay(insert_time.1)),
                 );
-            },
+            }
         }
     }
 
@@ -316,13 +315,11 @@ impl CommandSeq {
     /// assert_eq!(CommandSeq::new().playback_time(), 0);
     /// ```
     pub fn playback_time(&self) -> usize {
-        self.iter_time()
-            .last()
-            .map_or(0, |(time, command)| match *command {
-                Command::Delay(delta) => time + delta as usize,
-                Command::Note { length, .. } => time + length as usize,
-                _ => time,
-            })
+        self.iter_time().last().map_or(0, |(time, command)| match *command {
+            Command::Delay(delta) => time + delta as usize,
+            Command::Note { length, .. } => time + length as usize,
+            _ => time,
+        })
     }
 
     /// See [Vec::with_capacity].
@@ -341,14 +338,17 @@ impl CommandSeq {
     }
 
     /// Appends the given [Command] to the end of the sequence.
-    pub fn push<C: Into<Command>>(&mut self, command: C) { self.vec.push(command.into()) }
+    pub fn push<C: Into<Command>>(&mut self, command: C) {
+        self.vec.push(command.into())
+    }
 
     /// Returns the number of commands ("length") in the sequence.
-    pub fn len(&self) -> usize { self.vec.len() }
+    pub fn len(&self) -> usize {
+        self.vec.len()
+    }
 
     pub fn is_empty(&self) -> bool {
-        self.vec.len() == 0
-            || (self.vec.len() == 1 && self.vec[0] == Command::End)
+        self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0] == Command::End)
     }
 
     // TODO
@@ -422,7 +422,10 @@ impl CommandSeq {
     /// Performs a search for the [Delay] introducing the given time. `Delay(0)`s are ignored.
     fn lookup_delay(&self, time: usize) -> DelayLookup {
         if time == 0 {
-            return DelayLookup::Missing { index: 0, time_at_index: 0 };
+            return DelayLookup::Missing {
+                index: 0,
+                time_at_index: 0,
+            };
         }
 
         let mut current_time = 0;
@@ -498,7 +501,9 @@ impl From<Vec<Command>> for CommandSeq {
 
 impl iter::FromIterator<Command> for CommandSeq {
     fn from_iter<T: IntoIterator<Item = Command>>(iter: T) -> Self {
-        Self { vec: iter.into_iter().collect() }
+        Self {
+            vec: iter.into_iter().collect(),
+        }
     }
 }
 
@@ -513,8 +518,8 @@ enum DelayLookup {
 }
 
 /// A Command (or in MIDI terms, an event) describes operations performed at a particular time and on a particular track
-/// during playback, like playing a note or changing the track instrument. CommandSeq are independent of (and therefore do
-/// not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
+/// during playback, like playing a note or changing the track instrument. CommandSeq are independent of (and therefore
+/// do not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
 /// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
 /// relative time positioning.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -543,13 +548,19 @@ pub enum Command {
     MasterTempo(u16),
 
     /// Fades the tempo to `bpm` across `time` ticks.
-    MasterTempoFade { time: u16, bpm: u16 },
+    MasterTempoFade {
+        time: u16,
+        bpm: u16,
+    },
 
     /// Sets the composition volume.
     MasterVolume(u8),
 
     /// Fades the volume to `volume` across `time` ticks.
-    MasterVolumeFade { time: u16, volume: u8 },
+    MasterVolumeFade {
+        time: u16,
+        volume: u8,
+    },
 
     /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
     SubTrackVolume(u8),
@@ -558,7 +569,10 @@ pub enum Command {
     SegTrackVolume(u8),
 
     // TODO: figure out whether Seg or Sub
-    TrackVolumeFade { time: u16, volume: u8 },
+    TrackVolumeFade {
+        time: u16,
+        volume: u8,
+    },
 
     /// Sets the composition transpose value. It is currently unknown exactly how this adjusts pitch.
     MasterTranspose(i8),
@@ -567,7 +581,10 @@ pub enum Command {
     MasterEffect(u8), // TODO: enum for field
 
     /// Sets the bank/patch of this track, overriding its [super::Voice].
-    TrackOverridePatch { bank: u8, patch: u8 },
+    TrackOverridePatch {
+        bank: u8,
+        patch: u8,
+    },
 
     SubTrackPan(u8), // TODO: better type for field
     SubTrackReverb(u8),
@@ -575,18 +592,25 @@ pub enum Command {
 
     SubTrackCoarseTune(u8),
     SubTrackFineTune(u8),
-    SegTrackTune { coarse: u8, fine: u8 },
+    SegTrackTune {
+        coarse: u8,
+        fine: u8,
+    },
 
     // TODO: figure out whether Seg or Sub
-    TrackTremolo { amount: u8, speed: u8, unknown: u8 },
+    TrackTremolo {
+        amount: u8,
+        speed: u8,
+        unknown: u8,
+    },
     TrackTremoloStop,
 
     // TODO: figure out whether Seg or Sub
     /// Sets the track's voice. Field is an index into [super::Bgm::voices].
     TrackVoice(u8),
 
-    /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this abstraction
-    /// rather than [CommandSeq] indices because they stay stable during mutation.
+    /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this
+    /// abstraction rather than [CommandSeq] indices because they stay stable during mutation.
     Marker(MarkerId),
 
     /// Jumps to the start label and executes until the end label is found.
@@ -674,7 +698,7 @@ impl<'a> Iterator for TimeIter<'a> {
                 }
 
                 Some(ret)
-            },
+            }
             None => None,
         }
     }
@@ -697,9 +721,9 @@ impl<'a> Iterator for TimeGroupIter<'a> {
                             self.seq
                                 .clone()
                                 .take_while(move |(t, _)| *t == time)
-                                .map(|(_, command)| command)
+                                .map(|(_, command)| command),
                         )
-                        .collect()
+                        .collect(),
                 ));
 
                 // Because we returned a cloned iterator above (in order to use take_while), we need to advance
@@ -712,7 +736,7 @@ impl<'a> Iterator for TimeGroupIter<'a> {
                 }
 
                 ret
-            },
+            }
             None => None,
         }
     }

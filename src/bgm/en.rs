@@ -1,6 +1,10 @@
-use std::{collections::HashMap, io::{self, prelude::*, SeekFrom}};
+use std::collections::HashMap;
 use std::fmt;
+use std::io::prelude::*;
+use std::io::{self, SeekFrom};
+
 use log::{debug, info};
+
 use super::*;
 use crate::util::rw::*;
 
@@ -25,8 +29,14 @@ impl fmt::Display for Error {
         match self {
             Error::MissingStartMarker(range) => write!(f, "Missing start marker for range '{}'", range.name),
             Error::MissingEndMarker(range) => write!(f, "Missing end marker for range '{}'", range.name),
-            Error::UnorderedMarkers(range) => write!(f, "Start marker comes after end marker in range '{}'", range.name),
-            Error::EndMarkerTooFarAway(range) => write!(f, "End marker is too far away from start marker in range '{}'", range.name),
+            Error::UnorderedMarkers(range) => {
+                write!(f, "Start marker comes after end marker in range '{}'", range.name)
+            }
+            Error::EndMarkerTooFarAway(range) => write!(
+                f,
+                "End marker is too far away from start marker in range '{}'",
+                range.name
+            ),
             Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
         }
@@ -165,7 +175,11 @@ impl Bgm {
             f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
             let track_data_start = f.pos()?;
-            debug!("tracks start = {:#X} (offset = {:#X})", track_data_start, track_data_start - segment_start);
+            debug!(
+                "tracks start = {:#X} (offset = {:#X})",
+                track_data_start,
+                track_data_start - segment_start
+            );
 
             // Write offset in header
             let pos = ((track_data_start - segment_start) >> 2) as u16;
@@ -251,7 +265,10 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error> {
+    pub fn encode<'a, W: Write + Seek>(
+        &'a self,
+        f: &'_ mut W,
+    ) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {
@@ -262,11 +279,11 @@ impl Subsegment {
                 f.write_u16_be(0)?;
 
                 Ok(Some((tracks_pos, tracks)))
-            },
+            }
             Subsegment::Unknown { flags: _, data } => {
                 f.write_all(data)?;
                 Ok(None)
-            },
+            }
         }
     }
 }
@@ -300,13 +317,14 @@ impl CommandSeq {
                             delay -= extra_byte;
                         }
                     }
-                },
-                Command::Note { flag, pitch, velocity, length } => {
-                    let length = if *length > 0xD3FF {
-                        0xD3FF
-                    } else {
-                        *length
-                    };
+                }
+                Command::Note {
+                    flag,
+                    pitch,
+                    velocity,
+                    length,
+                } => {
+                    let length = if *length > 0xD3FF { 0xD3FF } else { *length };
 
                     f.write_u8(pitch | if *flag { 1 } else { 0 })?;
                     f.write_u8(*velocity)?;
@@ -319,101 +337,101 @@ impl CommandSeq {
                         let second_byte = length as u8;
                         f.write_all(&[first_byte | 0xC0, second_byte])?;
                     }
-                },
+                }
                 Command::MasterTempo(bpm) => {
                     f.write_u8(0xE0)?;
                     f.write_u16_be(*bpm)?;
-                },
+                }
                 Command::MasterVolume(volume) => {
                     f.write_u8(0xE1)?;
                     f.write_u8(*volume)?;
-                },
+                }
                 Command::MasterTranspose(shift) => {
                     f.write_u8(0xE2)?;
                     f.write_i8(*shift)?;
-                },
+                }
                 Command::MasterTempoFade { time, bpm } => {
                     f.write_u8(0xE4)?;
                     f.write_u16_be(*time)?;
                     f.write_u16_be(*bpm)?;
-                },
+                }
                 Command::MasterVolumeFade { time, volume } => {
                     f.write_u8(0xE5)?;
                     f.write_u16_be(*time)?;
                     f.write_u8(*volume)?;
-                },
+                }
                 Command::MasterEffect(effect) => {
                     f.write_u8(0xE6)?;
                     f.write_u8(*effect)?;
-                },
+                }
                 Command::TrackOverridePatch { bank, patch } => {
                     f.write_u8(0xE8)?;
                     f.write_u8(*bank)?;
                     f.write_u8(*patch)?;
-                },
+                }
                 Command::SubTrackVolume(a) => {
                     f.write_u8(0xE9)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SubTrackPan(a) => {
                     f.write_u8(0xEA)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SubTrackReverb(a) => {
                     f.write_u8(0xEB)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SegTrackVolume(a) => {
                     f.write_u8(0xEC)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SubTrackCoarseTune(a) => {
                     f.write_u8(0xED)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SubTrackFineTune(a) => {
                     f.write_u8(0xEE)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::SegTrackTune { coarse, fine } => {
                     f.write_u8(0xEF)?;
                     f.write_u8(*coarse)?;
                     f.write_u8(*fine)?;
-                },
+                }
                 Command::TrackTremolo { amount, speed, unknown } => {
                     f.write_all(&[0xF0, *amount, *speed, *unknown])?;
-                },
+                }
                 Command::TrackTremoloStop => f.write_u8(0xF3)?,
                 Command::TrackVoice(a) => {
                     f.write_u8(0xF5)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::TrackVolumeFade { time, volume } => {
                     f.write_u8(0xF6)?;
                     f.write_u16_be(*time)?;
                     f.write_u8(*volume)?;
-                },
+                }
                 Command::SubTrackReverbType(a) => {
                     f.write_u8(0xF7)?;
                     f.write_u8(*a)?;
-                },
+                }
                 Command::Subroutine(range) => {
                     f.write_u8(0xFE)?;
 
-                    let offset= f.pos()?;
+                    let offset = f.pos()?;
                     todo_subroutines.push((offset, range));
 
                     // These will be overwritten later
                     f.write_u16_be(0)?;
                     f.write_u8(0)?;
-                },
+                }
                 Command::Unknown(bytes) => f.write_all(bytes)?,
 
                 // Markers aren't actually written to the data - we just need to record their file offset for later use.
                 Command::Marker(marker) => {
                     let offset = f.pos()?;
                     marker_to_offset.insert(marker, offset);
-                },
+                }
 
                 Command::End => f.write_u8(0)?,
             }
@@ -427,16 +445,20 @@ impl CommandSeq {
         for (abs_subroutine_pos, range) in todo_subroutines.into_iter() {
             // Try to get the file offset of `range.start`. If it is a dropped Weak<_> or we didn't see the Marker in
             // the loop above, raise an error.
-            let start_offset = *marker_to_offset.get(&range.start)
+            let start_offset = *marker_to_offset
+                .get(&range.start)
                 .ok_or_else(|| Error::MissingStartMarker(range.clone()))? as u16;
 
             // Ditto for `range.end`.
-            let end_offset = *marker_to_offset.get(&range.end)
+            let end_offset = *marker_to_offset
+                .get(&range.end)
                 .ok_or_else(|| Error::MissingEndMarker(range.clone()))? as u16;
 
             // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
-            // [rather than panicking on debug / wrapping on release], because that would mean end_offset > start_offset.
-            let length = end_offset.checked_sub(start_offset)
+            // [rather than panicking on debug / wrapping on release], because that would mean end_offset >
+            // start_offset.
+            let length = end_offset
+                .checked_sub(start_offset)
                 .ok_or_else(|| Error::UnorderedMarkers(range.clone()))?;
 
             // Convert the length to a u8 if possible.

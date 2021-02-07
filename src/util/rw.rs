@@ -1,4 +1,5 @@
-use std::io::{prelude::*, Result, SeekFrom, Error, ErrorKind};
+use std::io::prelude::*;
+use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 pub trait SeekExt: Seek {
     fn pos(&mut self) -> Result<u64>;
@@ -64,7 +65,7 @@ impl<R: Read> ReadExt for R {
         let mut buffer = buffer?;
 
         // Resize `buffer` up to - but not including - its null terminator (if any)
-        let mut i =0;
+        let mut i = 0;
         while i < buffer.len() {
             if buffer[i] == 0 {
                 buffer.truncate(i);
@@ -74,8 +75,7 @@ impl<R: Read> ReadExt for R {
             i += 1;
         }
 
-        String::from_utf8(buffer)
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        String::from_utf8(buffer).map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 }
 
@@ -180,7 +180,6 @@ pub fn align(value: u32, n: u32) -> u32 {
 #[cfg(test)]
 mod test {
     use super::*;
-
 
     #[test]
     fn test_align() {

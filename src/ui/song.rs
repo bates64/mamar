@@ -1,7 +1,8 @@
-use std::path::PathBuf;
 use std::error::Error;
-use crate::bgm::Bgm;
+use std::path::PathBuf;
+
 use super::*;
+use crate::bgm::Bgm;
 
 #[derive(Debug)]
 pub struct Song {
@@ -27,7 +28,13 @@ impl Song {
         let mut y = 100.0;
 
         for (voice, btn_state) in self.bgm.voices.iter_mut().zip(self.voice_btns.iter_mut()) {
-            if btn::primary(ctx, delta, rect(0.0, y, 96.0, 32.0), &format!("Vol {}", voice.volume), btn_state) {
+            if btn::primary(
+                ctx,
+                delta,
+                rect(0.0, y, 96.0, 32.0),
+                &format!("Vol {}", voice.volume),
+                btn_state,
+            ) {
                 voice.volume = match voice.volume {
                     0 => 100,
                     _ => 0,

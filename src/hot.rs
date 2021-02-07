@@ -1,14 +1,9 @@
-use {
-    std::{
-        io::{
-            Cursor,
-            prelude::*
-        },
-        net::{TcpListener, TcpStream},
-        sync::mpsc::Receiver,
-    },
-    crate::util::rw::*,
-};
+use std::io::prelude::*;
+use std::io::Cursor;
+use std::net::{TcpListener, TcpStream};
+use std::sync::mpsc::Receiver;
+
+use crate::util::rw::*;
 
 // Server implementation of https://github.com/pmret/hot-reload/blob/main/protocol.md
 // TODO: implement rest of protocol (i.e. ERROR)
@@ -47,7 +42,8 @@ pub fn run(rx: Receiver<Vec<u8>>) -> ! {
     Packet {
         message: "PING",
         data: &[],
-    }.send(&mut stream);
+    }
+    .send(&mut stream);
 
     // Respond to handshake PING sent by client
     loop {
@@ -55,7 +51,8 @@ pub fn run(rx: Receiver<Vec<u8>>) -> ! {
             Packet {
                 message: "PONG",
                 data: &[1, 0, 0],
-            }.send(&mut stream);
+            }
+            .send(&mut stream);
             break;
         }
     }
@@ -70,6 +67,7 @@ pub fn run(rx: Receiver<Vec<u8>>) -> ! {
         Packet {
             message: "HOT_BGM",
             data: &bgm_data,
-        }.send(&mut stream);
+        }
+        .send(&mut stream);
     }
 }

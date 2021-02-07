@@ -1,12 +1,14 @@
-pub mod text;
-pub mod shape;
 pub mod btn;
+pub mod shape;
 pub mod song;
+pub mod text;
 
-use crate::display::{Application, draw::*};
+use crate::display::draw::*;
+use crate::display::Application;
 pub type Ctx = crate::display::draw::Ctx<Ui>;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+
 use song::Song;
 
 pub struct Ui {
@@ -30,7 +32,13 @@ impl Ui {
 
 impl Application for Ui {
     fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
-        if btn::primary(ctx, delta, rect(0.0, 0.0, 96.0, 32.0), "Open File...", &mut self.open_file_btn) {
+        if btn::primary(
+            ctx,
+            delta,
+            rect(0.0, 0.0, 96.0, 32.0),
+            "Open File...",
+            &mut self.open_file_btn,
+        ) {
             // We use ctx.spawn here to defer opening of the file dialog until after drawing is complete.
             ctx.spawn(|| {
                 // Note: we cannot open_file_dialog in this thread; it must be done on the main thread (macOS)
@@ -38,7 +46,8 @@ impl Application for Ui {
 
                 move |ui: &mut Self| {
                     log::debug!("showing file open dialog");
-                    let f = tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
+                    let f =
+                        tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin"], "BGM files")));
 
                     if let Some(f) = f {
                         log::info!("loading song: {}", f);
@@ -48,8 +57,12 @@ impl Application for Ui {
                             Err(error) => {
                                 let msg = format!("{}", error);
                                 log::error!("{}", msg);
-                                tinyfiledialogs::message_box_ok("Error opening file", &msg, tinyfiledialogs::MessageBoxIcon::Error);
-                            },
+                                tinyfiledialogs::message_box_ok(
+                                    "Error opening file",
+                                    &msg,
+                                    tinyfiledialogs::MessageBoxIcon::Error,
+                                );
+                            }
                         }
                     } else {
                         log::debug!("user cancelled file open operation");

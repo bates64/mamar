@@ -1,26 +1,24 @@
 pub mod color;
-pub mod geometry;
 pub mod entity;
+pub mod geometry;
 mod math;
 
-pub use math::*;
 pub use color::Color;
 pub use entity::Entity;
 use geometry::{Geometry, Vertex};
-
-use glium::{Surface, Display, Frame, Program};
 use glium::glutin::dpi::LogicalSize;
+use glium::{Display, Frame, Program, Surface};
+pub use math::*;
 type EventLoopProxy<A> = glium::glutin::event_loop::EventLoopProxy<Box<dyn FnOnce(&mut A) + Send>>;
-pub use glium::glutin::event::MouseButton;
+use std::hash::Hash;
+use std::panic::Location;
+use std::rc::Rc;
 
+pub use glium::glutin::event::MouseButton;
+use lru::LruCache;
+pub use lyon::path::path::BuilderWithAttributes as PathBuilder;
 use lyon::path::Path;
 use lyon::tessellation::*;
-pub use lyon::path::path::BuilderWithAttributes as PathBuilder;
-
-use std::rc::Rc;
-use std::panic::Location;
-use std::hash::Hash;
-use lru::LruCache;
 
 use super::Application;
 
@@ -65,9 +63,8 @@ pub struct Ctx<A: Application + 'static> {
     multicolor_geom_cache: LruCache<u64, Rc<geometry::multicolor::Geometry>>,
 
     //texture_shader: Program,
-
     pub mouse_pos: Option<Point2D<ScreenSpace>>, // Mouse pos; None if not onscreen
-    pub mouse_button: Option<MouseButton>, // Current frame
+    pub mouse_button: Option<MouseButton>,       // Current frame
     pub mouse_button_previous: Option<MouseButton>, // Previous frame
 }
 
@@ -79,10 +76,10 @@ impl<A: Application + 'static> Ctx<A> {
                 geometry::multicolor::VERTEX_SHADER,
                 geometry::multicolor::FRAGMENT_SHADER,
                 None,
-            ).unwrap(),
+            )
+            .unwrap(),
             multicolor_geom_cache: LruCache::new(GEOMETRY_CACHE_LIMIT),
             //texture_shader: compile_shader!(&display, "texture"),
-
             projection: screen_to_clip(&display),
 
             redraw_requested: false,
@@ -193,13 +190,14 @@ impl<A: Application + 'static> Ctx<A> {
     #[track_caller] // required for Location::caller()
     pub fn fill_path<F, M, G>(&mut self, memo: M, build: F) -> Entity<G>
     where
-        F: FnOnce(&mut PathBuilder, M) -> Option<Box2D<GeomSpace>> + 'static, // requires that anything entering via the stack comes through M
+        F: FnOnce(&mut PathBuilder, M) -> Option<Box2D<GeomSpace>> + 'static, /* requires that anything entering via
+                                                                               * the stack comes through M */
         M: Hash,
         G: Geometry + 'static,
     {
         let hash: u64 = {
-            use std::hash::Hasher;
             use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hasher;
 
             let mut hasher = DefaultHasher::new();
             Location::caller().hash(&mut hasher); // unique compile-time id for this caller
@@ -223,17 +221,22 @@ impl<A: Application + 'static> Ctx<A> {
         let mut geometry: VertexBuffers<G::Vertex, u16> = VertexBuffers::new();
         let mut tessellator = FillTessellator::new();
 
-        tessellator.tessellate_path(
-            &path,
-            &FillOptions::default().with_tolerance(PATH_TOLERANCE / self.dpi_scale()),
-            &mut BuffersBuilder::new(&mut geometry, G::Vertex::from_fill),
-        ).unwrap();
+        tessellator
+            .tessellate_path(
+                &path,
+                &FillOptions::default().with_tolerance(PATH_TOLERANCE / self.dpi_scale()),
+                &mut BuffersBuilder::new(&mut geometry, G::Vertex::from_fill),
+            )
+            .unwrap();
 
         let geometry = Rc::new(G::from_lyon(
             self,
             &geometry,
-            bounding_box
-                .unwrap_or_else(|| lyon::algorithms::aabb::fast_bounding_rect(path.iter()).to_box2d().cast_unit())
+            bounding_box.unwrap_or_else(|| {
+                lyon::algorithms::aabb::fast_bounding_rect(path.iter())
+                    .to_box2d()
+                    .cast_unit()
+            }),
         ));
 
         // Store to cache
