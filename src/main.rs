@@ -1,11 +1,14 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![windows_subsystem = "windows"]
 
 use mamar::*;
 
 fn main() {
     #[cfg(target_os = "windows")]
     unsafe {
-        winapi::um::shellscalingapi::SetProcessDpiAwareness(2);
+        use winapi::um::*;
+
+        shellscalingapi::SetProcessDpiAwareness(2);
+        wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS);
     }
 
     let (tx, rx) = std::sync::mpsc::channel();
