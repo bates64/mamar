@@ -27,7 +27,7 @@ FileDescription = "Mamar" # windows uses this as the taskbar name for some reaso
 
 [profile.release]
 lto = true
-codegen-units = 1 # slow compile, but makes more optimisations possible
+#codegen-units = 1 # slow compile, but makes more optimisations possible
 opt-level = 3 # could also use "s" to optimise for code size
 panic = "abort"
 
