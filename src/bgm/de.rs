@@ -5,7 +5,7 @@ use std::rc::Rc;
 use smallvec::smallvec;
 use log::{debug, warn};
 use super::*;
-use crate::rw_util::*;
+use crate::util::rw::*;
 
 #[derive(Debug)]
 pub enum Error {

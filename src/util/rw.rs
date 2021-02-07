@@ -1,6 +1,5 @@
 use std::io::{prelude::*, Result, SeekFrom, Error, ErrorKind};
 
-
 pub trait SeekExt: Seek {
     fn pos(&mut self) -> Result<u64>;
 }

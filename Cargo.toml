@@ -1,9 +1,30 @@
-[workspace]
-members = [
-    "pmbgm",
-    "cursed_global_ref",
-    "mamar",
-]
+[package]
+name = "mamar"
+version = "0.1.0"
+authors = ["Alex Bates <hi@imalex.xyz>"]
+edition = "2018"
+
+[dependencies]
+glium = "0.29"
+lyon = "0.17"
+euclid = "0.22"
+lru = "0.6"
+lazy_static = "1"
+smallvec = { version = "1.5.0", features = ["write"] } # TODO: remove
+image = "0.23"
+ttf-parser = "0.9"
+tinyfiledialogs = "3.0"
+log = "0.4.14"
+pretty_env_logger = "0.4.0"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["shellscalingapi"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+FileDescription = "Mamar" # windows uses this as the taskbar name for some reason
 
 [profile.release]
 lto = true

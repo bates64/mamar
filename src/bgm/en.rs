@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::{self, prelude::*, SeekFrom}};
 use std::fmt;
 use log::{debug, info};
 use super::*;
-use crate::rw_util::*;
+use crate::util::rw::*;
 
 #[derive(Debug)]
 pub enum Error {

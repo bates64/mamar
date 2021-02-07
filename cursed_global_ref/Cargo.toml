@@ -1,9 +1,0 @@
-[package]
-name = "cursed_global_ref"
-version = "0.1.0"
-authors = ["Alex Bates <hi@imalex.xyz>"]
-edition = "2018"
-
-[dependencies]
-lazy_static = "1.4.0"
-log = "0.4.11"

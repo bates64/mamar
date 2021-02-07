@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-pub mod display;
-pub mod ui;
+use mamar::*;
 
 fn main() {
     #[cfg(target_os = "windows")]
@@ -11,7 +10,7 @@ fn main() {
 
     let (tx, rx) = std::sync::mpsc::channel();
 
-    std::thread::spawn(move || pmbgm::hot_reload_server::run(rx));
+    std::thread::spawn(move || hot::run(rx));
 
     display::main(ui::Ui::new(tx))
 }

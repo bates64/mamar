@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::error::Error;
-use pmbgm::Bgm;
+use crate::bgm::Bgm;
 use super::*;
 
 #[derive(Debug)]

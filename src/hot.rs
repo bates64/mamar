@@ -7,7 +7,7 @@ use {
         net::{TcpListener, TcpStream},
         sync::mpsc::Receiver,
     },
-    super::rw_util::*,
+    crate::util::rw::*,
 };
 
 // Server implementation of https://github.com/pmret/hot-reload/blob/main/protocol.md
