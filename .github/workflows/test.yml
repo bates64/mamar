@@ -1,4 +1,4 @@
-name: Rust
+name: Test
 
 on:
   push:
@@ -25,17 +25,10 @@ jobs:
         BASEROM_URL: ${{ secrets.BASEROM_URL }}
 
     - name: Extract assets from baserom
-      run: python3 pmbgm/tests/bin/extract.py baserom.z64
-
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        #toolchain: nightly
+      run: python3 tests/bin/extract.py baserom.z64
 
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --verbose
-        #toolchain: nightly
+        args: --verbose --no-fail-fast
