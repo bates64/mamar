@@ -30,10 +30,24 @@ impl Ui {
             play_btn: Default::default(),
         }
     }
+
+    pub fn window_title(&self) -> String {
+        match &self.open_song {
+            None => "Mamar".to_string(),
+            Some(song) => format!("{} - Mamar", song.file_name()),
+        }
+    }
 }
 
 impl Application for Ui {
     fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
+        shape::rect(ctx, {
+            let size = ctx.display_size();
+            rect(0.0, 0.0, size.width, size.height)
+        }, color::BACKGROUND).draw(ctx);
+
+        ctx.set_window_title(&self.window_title());
+
         if btn::primary(
             ctx,
             delta,
@@ -82,18 +96,23 @@ impl Application for Ui {
             }
 
             if btn::primary(ctx, delta, rect(168.0, 0.0, 96.0, 32.0), "Save As...", &mut self.save_file_btn) {
+                let current_path = song.path.to_string_lossy().to_string();
                 ctx.spawn(|| {
                     move |ui: &mut Self| {
                         use std::fs::File;
 
                         log::debug!("showing file save dialog");
-                        let f =
-                            tinyfiledialogs::save_file_dialog_with_filter("Save As", "", &["*.bgm", "*.bin"], "");
+                        let path =
+                            tinyfiledialogs::save_file_dialog_with_filter("Save As", &current_path, &["*.bgm", "*.bin"], "");
 
-                        if let Some(f) = f {
-                            log::info!("saving bgm to {}", f);
-                            let mut f = File::create(f).unwrap();
-                            ui.open_song.as_ref().unwrap().bgm.encode(&mut f).unwrap();
+                        if let Some(path) = path {
+                            log::info!("saving bgm to {}", path);
+                            let mut f = File::create(&path).unwrap();
+
+                            let song = ui.open_song.as_mut().unwrap();
+
+                            song.path = PathBuf::from(path);
+                            song.bgm.encode(&mut f).unwrap();
                         } else {
                             log::debug!("user cancelled file save operation");
                         }

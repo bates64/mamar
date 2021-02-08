@@ -23,6 +23,13 @@ pub fn is_midi(file: &mut File) -> Result<bool, std::io::Error> {
 }
 
 impl Song {
+    pub fn file_name(&self) -> String {
+        match self.path.file_name() {
+            Some(name) => name.to_string_lossy().to_string(),
+            None => "song.bgm".to_string(),
+        }
+    }
+
     pub fn open(path: PathBuf) -> Result<Self, Box<dyn Error>> {
         let file = &mut File::open(&path)?;
 

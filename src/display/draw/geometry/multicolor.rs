@@ -1,10 +1,8 @@
-use glium::{implement_vertex, uniform, IndexBuffer, Surface, VertexBuffer};
+use glium::{implement_vertex, uniform, Display, IndexBuffer, Surface, VertexBuffer};
+use glium::program::{Program, ProgramCreationInput};
 use lyon::tessellation::{FillVertex, VertexBuffers};
 
 use super::*;
-
-pub const VERTEX_SHADER: &str = include_str!("multicolor.vert");
-pub const FRAGMENT_SHADER: &str = include_str!("multicolor.frag");
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
@@ -24,6 +22,19 @@ impl super::Vertex for Vertex {
             color: [rgba[0], rgba[1], rgba[2], rgba[3]],
         }
     }
+}
+
+pub fn compile_shader(display: &Display) -> Program {
+    Program::new(display, ProgramCreationInput::SourceCode {
+        vertex_shader: include_str!("multicolor.vert"),
+        fragment_shader: include_str!("multicolor.frag"),
+        geometry_shader: None,
+        tessellation_control_shader: None,
+        tessellation_evaluation_shader: None,
+        transform_feedback_varyings: None,
+        outputs_srgb: true,
+        uses_point_size: false,
+    }).unwrap()
 }
 
 /// Geometry where each vertex has its own colour.

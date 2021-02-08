@@ -36,9 +36,9 @@ pub fn primary(ctx: &mut Ctx<Ui>, delta: f32, rect: Rect<ViewSpace>, label: &str
         }
     }
 
-    let container = shape::rect(ctx, rect.inflate(state.inflation, state.inflation), color::WHITE);
+    let container = shape::rect(ctx, rect.inflate(state.inflation, state.inflation), color::PURPLE);
 
-    let text = text::label(ctx, text::Font::Sans, color::BLACK, 14.0, label)
+    let text = text::label(ctx, text::Font::Sans, color::WHITE, 14.0, label)
         .anchor(0.5, 0.5)
         .scale(1.0 + state.inflation / 100.0)
         .translate(rect.center().cast_unit().to_vector());

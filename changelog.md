@@ -3,6 +3,8 @@
 - Added _Save As..._ button
 - _Open File..._ now supports MIDI files (experimental)
 - Switched to Inter Medium font for better legibility (was Inter Regular)
+- Updated UI
+- Current song is shown in window title
 
 ## 0.2.0
 

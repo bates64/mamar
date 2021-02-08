@@ -71,13 +71,7 @@ pub struct Ctx<A: Application + 'static> {
 impl<A: Application + 'static> Ctx<A> {
     pub(super) fn new(display: Display, event_loop_proxy: EventLoopProxy<A>) -> Self {
         Ctx {
-            multicolor_shader: Program::from_source(
-                &display,
-                geometry::multicolor::VERTEX_SHADER,
-                geometry::multicolor::FRAGMENT_SHADER,
-                None,
-            )
-            .unwrap(),
+            multicolor_shader: geometry::multicolor::compile_shader(&display),
             multicolor_geom_cache: LruCache::new(GEOMETRY_CACHE_LIMIT),
             //texture_shader: compile_shader!(&display, "texture"),
             projection: screen_to_clip(&display),
@@ -113,9 +107,15 @@ impl<A: Application + 'static> Ctx<A> {
     fn ensure_frame(&mut self) {
         if self.frame.is_none() {
             let mut frame = self.display.draw();
-            frame.clear_all((0.0, 0.0, 0.0, 1.0), 0.0, 0);
+            frame.clear_all((0.0, 0.0, 0.0, 0.0), 0.0, 0);
             self.frame = Some(frame);
         }
+    }
+
+    pub fn set_window_title(&self, title: &str) {
+        let gl_window = self.display.gl_window();
+        let window = gl_window.window();
+        window.set_title(title);
     }
 
     /// Grabs the logical (DPI-aware) size of the display, i.e. the bounds for our drawing coordinate space.
