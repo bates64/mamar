@@ -6,6 +6,7 @@ pub mod midi;
 pub mod sbn;
 pub mod ui;
 pub mod util;
+pub mod history;
 
 pub fn init() {
     #[cfg(target_os = "windows")]
