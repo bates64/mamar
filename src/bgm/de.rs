@@ -617,7 +617,7 @@ mod test {
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
+            .take_while(|cmd| matches!(cmd, Command::Subroutine(_)))
             .map(|cmd| match cmd {
                 Command::Subroutine(CommandRange { start, end, .. }) => (start, end),
                 _ => unreachable!(),
