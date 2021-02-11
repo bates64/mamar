@@ -42,7 +42,7 @@ macro_rules! test_matching {
                 println!("original tracks allocation:");
                 for (seg_no, seg) in bgm.segments.iter().enumerate() {
                     if let Some(seg) = seg {
-                        for (subseg_no, subseg) in seg.iter().enumerate() {
+                        for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
                             match subseg {
                                 Subsegment::Tracks { flags, tracks } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
@@ -63,7 +63,7 @@ macro_rules! test_matching {
                 println!("non-matching tracks allocation:");
                 for (seg_no, seg) in bgm.segments.iter().enumerate() {
                     if let Some(seg) = seg {
-                        for (subseg_no, subseg) in seg.iter().enumerate() {
+                        for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
                             match subseg {
                                 Subsegment::Tracks { flags, tracks } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
@@ -284,13 +284,13 @@ fn shared_subsegment_tracks_ptr() {
     let original = include_bytes!("bin/Fuzzy_s_Took_My_Shell_12.bin");
     let bgm = Bgm::decode(&mut Cursor::new(original)).expect("decode error");
 
-    let tracks_0_2 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[0].as_ref().unwrap()[2] {
+    let tracks_0_2 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[0].as_ref().unwrap().subsegments[2] {
         tracks
     } else {
         panic!();
     };
 
-    let tracks_1_1 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[1].as_ref().unwrap()[1] {
+    let tracks_1_1 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[1].as_ref().unwrap().subsegments[1] {
         tracks
     } else {
         panic!();
