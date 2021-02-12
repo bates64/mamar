@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::path::Path;
-use std::rc::Rc;
 
 use mamar::bgm::*;
 use mamar::init;
@@ -44,12 +43,12 @@ macro_rules! test_matching {
                     if let Some(seg) = seg {
                         for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, tracks } => println!(
+                                Subsegment::Tracks { flags, track_list } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
                                     seg_no,
                                     subseg_no,
                                     flags,
-                                    tracks.decoded_pos.unwrap()
+                                    bgm.track_lists[*track_list].pos.unwrap()
                                 ),
                                 Subsegment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)
@@ -65,12 +64,12 @@ macro_rules! test_matching {
                     if let Some(seg) = seg {
                         for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, tracks } => println!(
+                                Subsegment::Tracks { flags, track_list } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
                                     seg_no,
                                     subseg_no,
                                     flags,
-                                    tracks.decoded_pos.unwrap()
+                                    bgm.track_lists[*track_list].pos.unwrap()
                                 ),
                                 Subsegment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)
@@ -286,20 +285,20 @@ fn shared_subsegment_tracks_ptr() {
     let original = include_bytes!("bin/Fuzzy_s_Took_My_Shell_12.bin");
     let bgm = Bgm::decode(&mut Cursor::new(original)).expect("decode error");
 
-    let tracks_0_2 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[0].as_ref().unwrap().subsegments[2] {
-        tracks
+    let tracks_0_2 = if let Subsegment::Tracks { ref track_list, .. } = bgm.segments[0].as_ref().unwrap().subsegments[2] {
+        track_list
     } else {
         panic!();
     };
 
-    let tracks_1_1 = if let Subsegment::Tracks { ref tracks, .. } = bgm.segments[1].as_ref().unwrap().subsegments[1] {
-        tracks
+    let tracks_1_1 = if let Subsegment::Tracks { ref track_list, .. } = bgm.segments[1].as_ref().unwrap().subsegments[1] {
+        track_list
     } else {
         panic!();
     };
 
-    // The two tracks share a pointer to their CommandSeq, so they should be decoded to share a reference
-    assert!(Rc::ptr_eq(tracks_0_2, tracks_1_1));
+    // The two tracks share a pointer to their CommandSeq, so they should be decoded to share an ID
+    assert_eq!(tracks_0_2, tracks_1_1);
 }
 
 #[test]

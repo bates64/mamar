@@ -1,9 +1,8 @@
 use std::collections::btree_map::{BTreeMap, Entry};
-use std::collections::HashMap;
 use std::fmt;
 use std::io::prelude::*;
 use std::io::{self, SeekFrom};
-use std::rc::Rc;
+use std::mem::MaybeUninit;
 
 use log::{debug, warn};
 use smallvec::smallvec;
@@ -97,8 +96,6 @@ trait CollectArray<T, E, U: Default + AsMut<[T]>>: Sized + Iterator<Item = Resul
 
 impl<T, E, U: Iterator<Item = Result<T, E>>, V: Default + AsMut<[T]>> CollectArray<T, E, V> for U {}
 
-type TracksMap = HashMap<u64, TaggedRc<[Track; 16]>>;
-
 impl Bgm {
     pub fn from_bytes(f: &[u8]) -> Result<Self, Error> {
         Self::decode(&mut std::io::Cursor::new(f))
@@ -128,8 +125,10 @@ impl Bgm {
             );
         }
 
+        let mut bgm = Bgm::new();
+
         f.seek(SeekFrom::Start(0x08))?;
-        let index = f.read_cstring(4)?;
+        bgm.index = f.read_cstring(4)?;
 
         debug_assert!(f.pos()? == 0x0C);
         f.read_padding(4)?;
@@ -157,75 +156,72 @@ impl Bgm {
 
         debug_assert!(f.pos()? == 0x24); // End of struct
 
-        let mut tracks_map = TracksMap::new();
-        let mut furthest_read_pos = 0;
+        let mut furthest_read_pos = 0; // TODO: have `f` track this (i.e. a wrapper over f)
 
-        let bgm = Self {
-            // Special cases to get problematic BGMs to match
-            unknowns: match index.as_str() {
-                "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], // Bowser's Castle Caves (entire segment? TODO look into this)
-                "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
-                "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], // Bowser's Castle Explodes (very short segment at eof?)
-                _ => vec![],
-            },
-
-            segments: segment_offsets
-                .iter()
-                .map(|&pos| -> Result<Option<Segment>, Error> {
-                    if pos == 0 {
-                        // Null (no segments)
-                        Ok(None)
-                    } else {
-                        // Seek to the offset and decode the segment(s) there
-                        let pos = pos as u64;
-                        f.seek(SeekFrom::Start(pos))?;
-
-                        debug!("segment {:#X}", pos);
-
-                        let mut subsegments = vec![];
-                        let mut i = 0;
-                        while {
-                            f.seek(SeekFrom::Start(pos + i * 4))?;
-
-                            // Peek for null terminator
-                            let word = f.read_u32_be()?;
-                            f.seek(SeekFrom::Current(-4))?;
-                            word != 0
-                        } {
-                            subsegments.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos, index.as_str())?);
-
-                            i += 1;
-                        }
-
-                        debug!("segment end {:#X}", f.pos()?);
-
-                        Ok(Some(Segment { subsegments }))
-                    }
-                })
-                .collect_array_pedantic()?,
-            drums: if drums_offset != 0 {
-                f.seek(SeekFrom::Start(drums_offset))?;
-                (0..drums_count)
-                    .into_iter()
-                    .map(|_| Drum::decode(f))
-                    .collect::<Result<_, _>>()?
-            } else {
-                Vec::new()
-            },
-            voices: if voices_offset != 0 {
-                f.seek(SeekFrom::Start(voices_offset))?;
-                (0..voices_count)
-                    .into_iter()
-                    .map(|_| Voice::decode(f))
-                    .collect::<Result<_, _>>()?
-            } else {
-                Vec::new()
-            },
-            index,
+        // Special cases to get problematic BGMs to match
+        bgm.unknowns = match bgm.index.as_str() {
+            "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], // Bowser's Castle Caves (entire segment? TODO look into this)
+            "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
+            "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], // Bowser's Castle Explodes (very short segment at eof?)
+            _ => vec![],
         };
+
+        bgm.segments = segment_offsets
+            .iter()
+            .map(|&pos| -> Result<Option<Segment>, Error> {
+                if pos == 0 {
+                    // Null (no segments)
+                    Ok(None)
+                } else {
+                    // Seek to the offset and decode the segment(s) there
+                    let pos = pos as u64;
+                    f.seek(SeekFrom::Start(pos))?;
+
+                    debug!("segment {:#X}", pos);
+
+                    let mut subsegments = vec![];
+                    let mut i = 0;
+                    while {
+                        f.seek(SeekFrom::Start(pos + i * 4))?;
+
+                        // Peek for null terminator
+                        let word = f.read_u32_be()?;
+                        f.seek(SeekFrom::Current(-4))?;
+                        word != 0
+                    } {
+                        subsegments.push(Subsegment::decode(f, &mut bgm, pos, &mut furthest_read_pos)?);
+
+                        i += 1;
+                    }
+
+                    debug!("segment end {:#X}", f.pos()?);
+
+                    Ok(Some(Segment { subsegments }))
+                }
+            })
+            .collect_array_pedantic()?;
+
+        if drums_offset != 0 {
+            f.seek(SeekFrom::Start(drums_offset))?;
+            bgm.drums = (0..drums_count)
+                .into_iter()
+                .map(|_| Drum::decode(f))
+                .collect::<Result<_, _>>()?;
+        }
+
+        if voices_offset != 0 {
+            f.seek(SeekFrom::Start(voices_offset))?;
+            bgm.voices = (0..voices_count)
+                .into_iter()
+                .map(|_| Voice::decode(f))
+                .collect::<Result<_, _>>()?;
+        };
+
+        // TODO: check that all the data between furthest_read_pos and align(furthest_read_pos) is padding (zero)
 
         let eof_pos = f.seek(SeekFrom::End(0))?;
         if align(furthest_read_pos as u32, 16) < eof_pos as u32 {
+            // TODO: make this an error
             warn!("unused data at {:#X}", furthest_read_pos);
         }
 
@@ -236,10 +232,9 @@ impl Bgm {
 impl Subsegment {
     fn decode<R: Read + Seek>(
         f: &mut R,
+        bgm: &mut Bgm,
         start: u64,
-        tracks_map: &mut TracksMap,
         furthest_read_pos: &mut u64,
-        _index: &str,
     ) -> Result<Self, Error> {
         debug!("subsegment {:#X}", f.pos()?);
         let flags = f.read_u8()?;
@@ -248,36 +243,47 @@ impl Subsegment {
             f.read_padding(1)?;
 
             let offset = (f.read_u16_be()? as u64) << 2;
-            let tracks_start = start + offset;
-            debug!("tracks start = {:#X} (offset = {:#X})", tracks_start, offset);
+            let track_list_pos = start + offset;
+            debug!("tracks start = {:#X} (offset = {:#X})", track_list_pos, offset);
+
+            // If we've decoded the track list at `track_list_pos` already, reference that.
+            // Otherwise, decode the track there and add it to `bgm.track_lists`.
+            let track_list = match bgm.find_track_list_with_pos(track_list_pos) {
+                Some(id) => id,
+                None => {
+                    let mut tracks: [MaybeUninit<Track>; 16] = unsafe {
+                        // SAFETY: this is an array of uninitialised elements, so the array overall does not require
+                        // initialisation.
+                        MaybeUninit::uninit().assume_init()
+                    };
+
+                    for (track_no, track) in tracks.iter_mut().enumerate() {
+                        let track_no = track_no as u64;
+
+                        f.seek(SeekFrom::Start(track_list_pos + track_no * 4))?;
+                        *track = MaybeUninit::new(Track::decode(f, track_list_pos)?);
+
+                        let pos = f.pos()?;
+                        if pos > *furthest_read_pos {
+                            *furthest_read_pos = pos;
+                        }
+                    }
+
+                    bgm.track_lists.alloc(TrackList {
+                        pos: Some(track_list_pos),
+                        tracks: unsafe {
+                            // SAFETY: the for loop above has initialised the array. This is also how the std
+                            // documentation suggests initialising an array element-by-element:
+                            // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
+                            std::mem::transmute(tracks)
+                        },
+                    })
+                }
+            };
 
             Ok(Subsegment::Tracks {
                 flags,
-                tracks: tracks_map
-                    .entry(tracks_start)
-                    .or_insert({
-                        // TODO(speed): use or_insert_with; need to figure out how to return Result
-                        TaggedRc {
-                            decoded_pos: Some(tracks_start),
-                            rc: Rc::new(
-                                (0..16)
-                                    .into_iter()
-                                    .map(|track_no| {
-                                        f.seek(SeekFrom::Start(tracks_start + track_no * 4))?;
-                                        let track = Track::decode(f, tracks_start);
-
-                                        let pos = f.pos()?;
-                                        if pos > *furthest_read_pos {
-                                            *furthest_read_pos = pos;
-                                        }
-
-                                        track
-                                    })
-                                    .collect_array_pedantic()?,
-                            ),
-                        }
-                    })
-                    .clone(), // New reference
+                track_list,
             })
         } else {
             let mut data = [0; 3];

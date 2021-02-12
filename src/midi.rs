@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::rc::Rc;
 
 use midly::Smf;
 
@@ -8,7 +7,6 @@ use crate::bgm::*;
 pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     let smf = Smf::parse(raw)?;
     let mut bgm = Bgm::new();
-    let mut segment = bgm.add_segment().unwrap();
 
     let total_song_length = {
         let mut max = 0;
@@ -30,6 +28,54 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
 
     log::debug!("song length: {} ticks", total_song_length);
 
+    let track_list = bgm.track_lists.alloc(TrackList {
+        pos: None,
+        tracks: [
+            Track {
+                flags: 0xA000,
+                commands: {
+                    let mut seq = CommandSeq::from(vec![
+                        Command::MasterTempo(128), // smf.header.timing
+                        Command::MasterVolume(100),
+                        Command::MasterEffect(0),
+                    ]);
+                    seq.insert(total_song_length, Command::End);
+                    seq
+                },
+            },
+            midi_track_to_bgm_track(smf.tracks.get(1), total_song_length),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            Track::default(),
+            /*midi_track_to_bgm_track(smf.tracks.get(2), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(3), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(4), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(5), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(6), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(7), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(8), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(9), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(10), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(11), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(12), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(13), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(14), total_song_length),
+            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length),*/
+        ],
+    });
+
+    let mut segment = bgm.add_segment().unwrap();
     segment.subsegments = vec![
         Subsegment::Unknown {
             flags: 0x30,
@@ -37,52 +83,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
         },
         Subsegment::Tracks {
             flags: 0x10,
-            tracks: TaggedRc {
-                rc: Rc::new([
-                    Track {
-                        flags: 0xA000,
-                        commands: {
-                            let mut seq = CommandSeq::from(vec![
-                                Command::MasterTempo(128), // smf.header.timing
-                                Command::MasterVolume(100),
-                                Command::MasterEffect(0),
-                            ]);
-                            seq.insert(total_song_length, Command::End);
-                            seq
-                        },
-                    },
-                    midi_track_to_bgm_track(smf.tracks.get(1), total_song_length),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    Track::default(),
-                    /*midi_track_to_bgm_track(smf.tracks.get(2), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(3), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(4), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(5), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(6), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(7), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(8), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(9), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(10), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(11), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(12), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(13), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(14), total_song_length),
-                    midi_track_to_bgm_track(smf.tracks.get(15), total_song_length),*/
-                ]),
-                decoded_pos: None,
-            },
+            track_list,
         },
         Subsegment::Unknown {
             flags: 0x50,

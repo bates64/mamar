@@ -132,8 +132,8 @@ impl Bgm {
         */
 
         enum ToWrite {
-            Tracks {
-                tracks: TaggedRc<[Track; 16]>,
+            TrackList {
+                track_list_id: Id<TrackList>,
                 tracks_pos: u64,
                 segment_start: u64,
             },
@@ -158,10 +158,10 @@ impl Bgm {
 
                 for subsegment in &segment.subsegments {
                     debug!("subsegment {:#X}", f.pos()?);
-                    if let Some((tracks_pos, tracks)) = subsegment.encode(f)? {
+                    if let Some((tracks_pos, track_list_id)) = subsegment.encode(f)? {
                         // Need to write track data after the header
-                        to_write.push(ToWrite::Tracks {
-                            tracks: tracks.clone(),
+                        to_write.push(ToWrite::TrackList {
+                            track_list_id,
                             tracks_pos,
                             segment_start,
                         });
@@ -173,19 +173,22 @@ impl Bgm {
             }
         }
 
-        // Write segment data
-        let mut encoded_tracks = HashMap::new();
+        // Write track lists
 
         to_write.sort_by_key(|w| match w {
-            ToWrite::Tracks { tracks, .. } => tracks.decoded_pos.unwrap_or_default(),
+            ToWrite::TrackList { track_list_id, .. } => self.track_lists[*track_list_id].pos.unwrap_or_default(),
             ToWrite::Unknown(unk) => unk.range.start,
         });
 
+        let mut encoded_tracks: HashMap<Id<TrackList>, u64> = HashMap::new();
+
         for w in to_write.into_iter() {
             match w {
-                ToWrite::Tracks { segment_start, tracks, tracks_pos } => {
-                    // If we've seen these tracks already, just point to the already-encoded tracks.
-                    if let Some(track_data_start) = encoded_tracks.get(&Rc::as_ptr(&tracks)) {
+                ToWrite::TrackList { segment_start, track_list_id, tracks_pos } => {
+                    let track_list = &self.track_lists[track_list_id];
+
+                    // If we've encoded this track list already, just point to that instead.
+                    if let Some(track_data_start) = encoded_tracks.get(&track_list_id) {
                         info!("sharing tracks at {:#X}", track_data_start);
 
                         // Write offset in header
@@ -198,11 +201,14 @@ impl Bgm {
                     f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
                     // For matching
-                    if let Some(pos) = tracks.decoded_pos {
+                    let track_data_start = if let Some(pos) = track_list.pos {
+                        // TODO: turn track_list.pos into a range and make sure this will fit there
                         f.seek(SeekFrom::Start(pos))?;
-                    }
+                        pos
+                    } else {
+                        f.pos()?
+                    };
 
-                    let track_data_start = f.pos()?;
                     debug!(
                         "tracks start = {:#X} (offset = {:#X})",
                         track_data_start,
@@ -212,11 +218,11 @@ impl Bgm {
                     // Write offset in header
                     let pos = ((track_data_start - segment_start) >> 2) as u16;
                     f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
-                    encoded_tracks.insert(Rc::as_ptr(&tracks), track_data_start);
+                    encoded_tracks.insert(track_list_id, track_data_start);
 
                     // Write flags
                     let mut todo_commands = Vec::new();
-                    for Track { flags, commands } in tracks.iter() {
+                    for Track { flags, commands } in track_list.tracks.iter() {
                         //debug!("write commands_offset {:#X}", f.pos()?);
                         if !commands.is_empty() {
                             // Need to write command data after the track
@@ -314,17 +320,17 @@ impl Subsegment {
     pub fn encode<'a, W: Write + Seek>(
         &'a self,
         f: &'_ mut W,
-    ) -> Result<Option<(u64, &'a TaggedRc<[Track; 16]>)>, Error> {
+    ) -> Result<Option<(u64, Id<TrackList>)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {
-            Subsegment::Tracks { tracks, .. } => {
+            Subsegment::Tracks { track_list, .. } => {
                 f.write_u8(0)?;
 
                 let tracks_pos = f.pos()?;
                 f.write_u16_be(0)?;
 
-                Ok(Some((tracks_pos, tracks)))
+                Ok(Some((tracks_pos, *track_list)))
             }
             Subsegment::Unknown { flags: _, data } => {
                 f.write_all(data)?;

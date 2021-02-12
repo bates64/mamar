@@ -2,6 +2,8 @@ use std::fmt;
 use std::ops::{Range, Deref};
 use std::rc::Rc;
 
+use id_arena::{Arena, Id};
+
 /// Encoder ([Bgm] -> .bin)
 pub mod en;
 
@@ -14,10 +16,15 @@ pub use cmd::*;
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &str = "BGM ";
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+/// An offset relative to the beginning of the decoded/encoded BGM.
+pub type FilePos = u64;
+
+#[derive(Clone, Default, Debug)]
 pub struct Bgm {
     /// ASCII song index.
     pub index: String,
+
+    pub track_lists: Arena<TrackList>,
 
     pub segments: [Option<Segment>; 4],
 
@@ -32,13 +39,7 @@ pub struct NoSpace;
 
 impl Bgm {
     pub fn new() -> Bgm {
-        Bgm {
-            index: "152 ".to_string(),
-            segments: [None, None, None, None],
-            drums: Vec::new(),
-            voices: Vec::new(),
-            unknowns: Vec::new(),
-        }
+        Default::default()
     }
 
     pub fn can_add_segment(&self) -> bool {
@@ -60,6 +61,16 @@ impl Bgm {
             },
         }
     }
+
+    pub fn find_track_list_with_pos(&self, pos: FilePos) -> Option<Id<TrackList>> {
+        for (id, track_list) in self.track_lists.iter() {
+            if track_list.pos == Some(pos) {
+                return Some(id);
+            }
+        }
+
+        None
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -72,12 +83,18 @@ pub struct Segment {
 pub enum Subsegment {
     Tracks {
         flags: u8,
-        tracks: TaggedRc<[Track; 16]>,
+        track_list: Id<TrackList>,
     },
     Unknown {
         flags: u8,
         data: [u8; 3], // Is this always padding?
     },
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct TrackList {
+    pub pos: Option<FilePos>,
+    pub tracks: [Track; 16],
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
@@ -175,12 +192,14 @@ impl Bgm {
                 writeln!(f, "segment {{")?;
                 for subsegment in &subsegment.subsegments {
                     match subsegment {
-                        Subsegment::Tracks { flags, tracks } => {
-                            if let Some(offset) = tracks.decoded_pos {
+                        Subsegment::Tracks { flags, track_list } => {
+                            let track_list = &self.track_lists[*track_list];
+
+                            if let Some(offset) = track_list.pos {
                                 writeln!(f, "    // offset {:#X}", offset)?;
                             }
                             writeln!(f, "    tracks flags={:#X} {{", flags)?;
-                            for track in tracks.rc.iter() {
+                            for track in track_list.tracks.iter() {
                                 if !track.commands.is_empty() {
                                     writeln!(f, "        track flags={:#X} {{", track.flags)?;
                                     for command in track.commands.iter() {

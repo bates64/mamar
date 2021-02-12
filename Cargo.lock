@@ -598,6 +598,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "id-arena"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -792,6 +798,7 @@ version = "0.2.0"
 dependencies = [
  "euclid",
  "glium",
+ "id-arena",
  "image",
  "lazy_static",
  "log",
