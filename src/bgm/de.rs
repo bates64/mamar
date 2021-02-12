@@ -144,10 +144,10 @@ impl Bgm {
         f.read_padding(3)?;
 
         debug_assert!(f.pos()? == 0x14);
-        let segment_offsets: [u16; 4] = (0..4)
+        let segment_offsets: Vec<u16> = (0..4)
             .into_iter()
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
-            .collect_array()?; // We need to obtain all offsets before seeking to any
+            .collect::<Result<_, _>>()?; // We need to obtain all offsets before seeking to any
 
         debug_assert!(f.pos()? == 0x1C);
         let drums_offset = (f.read_u16_be()? as u64) << 2;
@@ -161,7 +161,14 @@ impl Bgm {
         let mut furthest_read_pos = 0;
 
         let bgm = Self {
-            index,
+            // Special cases to get problematic BGMs to match
+            unknowns: match index.as_str() {
+                "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], // Bowser's Castle Caves (entire segment? TODO look into this)
+                "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
+                "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], // Bowser's Castle Explodes (very short segment at eof?)
+                _ => vec![],
+            },
+
             segments: segment_offsets
                 .iter()
                 .map(|&pos| -> Result<Option<Segment>, Error> {
@@ -181,11 +188,11 @@ impl Bgm {
                             f.seek(SeekFrom::Start(pos + i * 4))?;
 
                             // Peek for null terminator
-                            let byte = f.read_u32_be()?;
+                            let word = f.read_u32_be()?;
                             f.seek(SeekFrom::Current(-4))?;
-                            byte != 0
+                            word != 0
                         } {
-                            subsegments.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos)?);
+                            subsegments.push(Subsegment::decode(f, pos, &mut tracks_map, &mut furthest_read_pos, index.as_str())?);
 
                             i += 1;
                         }
@@ -214,6 +221,7 @@ impl Bgm {
             } else {
                 Vec::new()
             },
+            index,
         };
 
         let eof_pos = f.seek(SeekFrom::End(0))?;
@@ -231,6 +239,7 @@ impl Subsegment {
         start: u64,
         tracks_map: &mut TracksMap,
         furthest_read_pos: &mut u64,
+        _index: &str,
     ) -> Result<Self, Error> {
         debug!("subsegment {:#X}", f.pos()?);
         let flags = f.read_u8()?;
@@ -316,6 +325,13 @@ impl CommandSeq {
             let cmd_offset = (f.pos()? as usize) - start;
 
             if seen_terminator {
+                // TEMP: for matching. This should really look at the BGM index and not run for all files...
+                // There's probably some command that I don't yet know about that points to this data.
+                match f.pos()? {
+                    0x38EB => { commands.upsert_marker(0x39EB - start); }, // 0x64 Bowser's Castle
+                    _ => {},
+                };
+
                 // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
                 // keep reading until every marker has been passed.
                 if cmd_offset >= commands.last_offset() {
@@ -564,6 +580,24 @@ impl Voice {
             coarse_tune: f.read_u8()?,
             fine_tune: f.read_u8()?,
             unk_07: f.read_u8()?,
+        })
+    }
+}
+
+impl Unknown {
+    fn decode<R: Read + Seek>(f: &mut R, range: Range<u64>) -> Result<Self, Error> {
+        let range_len = range.end - range.start;
+
+        log::warn!("forcibly reading {:X} bytes from {:X}..", range_len, range.start);
+
+        Ok(Self {
+            data: {
+                let mut buf = vec![0; range_len as usize];
+                f.seek(SeekFrom::Start(range.start))?;
+                f.read_exact(&mut buf)?;
+                buf
+            },
+            range,
         })
     }
 }

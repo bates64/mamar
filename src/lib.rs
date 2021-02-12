@@ -19,7 +19,7 @@ pub fn init() {
 
     let _ = log::set_logger(&logger::LOGGER);
 
-    if cfg!(debug_assertions) {
+    if cfg!(debug_assertions) || cfg!(test) {
         log::set_max_level(log::LevelFilter::Debug);
     } else {
         log::set_max_level(log::LevelFilter::Info);

@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::Deref;
+use std::ops::{Range, Deref};
 use std::rc::Rc;
 
 /// Encoder ([Bgm] -> .bin)
@@ -23,6 +23,8 @@ pub struct Bgm {
 
     pub drums: Vec<Drum>,
     pub voices: Vec<Voice>,
+
+    pub unknowns: Vec<Unknown>
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
@@ -35,6 +37,7 @@ impl Bgm {
             segments: [None, None, None, None],
             drums: Vec::new(),
             voices: Vec::new(),
+            unknowns: Vec::new(),
         }
     }
 
@@ -120,6 +123,12 @@ pub struct Voice {
     pub coarse_tune: u8,
     pub fine_tune: u8,
     pub unk_07: u8,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Unknown {
+    pub range: Range<u64>,
+    pub data: Vec<u8>,
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
