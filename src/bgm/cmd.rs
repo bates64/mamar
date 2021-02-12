@@ -170,7 +170,7 @@ impl CommandSeq {
     ///
     /// Has the side-effect of combining delays to the immediate right of the inserted subsequence.
     pub fn insert_many<C: Into<Command>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
-        // Turn subsequence members into Rc<Command> if they are not already
+        // Turn subsequence members into Commands if they are not already (C: Into<Command>)
         let subsequence = subsequence.into_iter().map(|cmd| cmd.into());
 
         match self.lookup_delay(time) {
