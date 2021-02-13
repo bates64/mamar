@@ -13,8 +13,6 @@ use crate::midi;
 pub struct Song {
     pub path: PathBuf,
     pub bgm: Bgm,
-
-    voice_btns: [btn::ButtonState; 16],
 }
 
 pub fn is_midi(file: &mut File) -> Result<bool, std::io::Error> {
@@ -54,21 +52,17 @@ impl Song {
         Ok(Self {
             bgm,
             path,
-
-            voice_btns: Default::default(),
         })
     }
 
-    pub fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
+    pub fn draw(&mut self, ctx: &mut Ctx, _delta: f32) {
         let mut y = 100.0;
 
-        for (voice, btn_state) in self.bgm.voices.iter_mut().zip(self.voice_btns.iter_mut()) {
+        for voice in self.bgm.voices.iter_mut() {
             let btn = btn::primary(
                 ctx,
-                delta,
                 rect(0.0, y, 96.0, 32.0),
                 &format!("Vol {}", voice.volume),
-                btn_state,
             );
             btn.draw(ctx);
             if btn.is_click(ctx, MouseButton::Left) {

@@ -14,9 +14,6 @@ pub struct Ui {
     hot_reload_tx: Sender<Vec<u8>>,
 
     open_song: Option<Song>,
-    open_file_btn: btn::ButtonState,
-    save_file_btn: btn::ButtonState,
-    play_btn: btn::ButtonState,
 }
 
 impl Ui {
@@ -24,9 +21,6 @@ impl Ui {
         Ui {
             hot_reload_tx,
             open_song: None,
-            open_file_btn: Default::default(),
-            save_file_btn: Default::default(),
-            play_btn: Default::default(),
         }
     }
 
@@ -47,10 +41,8 @@ impl Ui {
 
         let btn = btn::primary(
             ctx,
-            delta,
             rect(0.0, 0.0, 96.0, 32.0),
             "Open File...",
-            &mut self.open_file_btn,
         );
         btn.draw(ctx);
         if btn.is_click(ctx, MouseButton::Left) {
@@ -89,14 +81,14 @@ impl Ui {
         if let Some(song) = &mut self.open_song {
             song.draw(ctx, delta);
 
-            let btn = btn::primary(ctx, delta, rect(100.0, 0.0, 64.0, 32.0), "Play", &mut self.play_btn);
+            let btn = btn::primary(ctx, rect(100.0, 0.0, 64.0, 32.0), "Play");
             btn.draw(ctx);
             if btn.is_click(ctx, MouseButton::Left) {
                 let data = song.bgm.as_bytes().unwrap(); // TODO handle error
                 self.hot_reload_tx.send(data).unwrap();
             }
 
-            let btn = btn::primary(ctx, delta, rect(168.0, 0.0, 96.0, 32.0), "Save As...", &mut self.save_file_btn);
+            let btn = btn::primary(ctx, rect(168.0, 0.0, 96.0, 32.0), "Save As...");
             btn.draw(ctx);
             if btn.is_click(ctx, MouseButton::Left) {
                 let current_path = song.path.to_string_lossy().to_string();

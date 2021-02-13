@@ -1,13 +1,16 @@
 use super::{shape, text};
 use crate::display::draw::*;
 
+/*
 #[derive(Default, Debug)]
 pub struct ButtonState {
     inflation: f32,
     time_mouse_overed: f32,
 }
+*/
 
-pub fn primary(ctx: &mut Ctx, delta: f32, rect: Rect, label: &str, state: &mut ButtonState) -> EntityGroup {
+pub fn primary(ctx: &mut Ctx, rect: Rect, label: &str) -> EntityGroup {
+    /*
     let rect_shape = shape::rect(ctx, rect, color::WHITE);
     let is_click = rect_shape.is_click(ctx, MouseButton::Left);
 
@@ -35,12 +38,13 @@ pub fn primary(ctx: &mut Ctx, delta: f32, rect: Rect, label: &str, state: &mut B
             ctx.request_redraw();
         }
     }
+    */
 
-    let container = shape::rect(ctx, rect.inflate(state.inflation, state.inflation), color::PURPLE);
+    let container = shape::rect(ctx, rect/*.inflate(state.inflation, state.inflation)*/, color::PURPLE);
 
     let mut text = text::label(ctx, text::Font::Sans, color::WHITE, 14.0, label);
     text.anchor(point3(0.5, 0.5, 0.5));
-    text.scale_uniform(1.0 + state.inflation / 100.0);
+    //text.scale_uniform(1.0 + state.inflation / 100.0);
     text.translate(rect.center().to_vector().to_3d());
 
     let mut group = EntityGroup::new();
