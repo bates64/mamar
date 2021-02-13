@@ -5,6 +5,7 @@ pub mod rw;
 pub use color::Color;
 pub use math::*;
 pub use rw::*;
+pub use rayon::prelude::*;
 
 pub fn lerp(current: f32, target: f32, factor: f32) -> f32 {
     let t = match factor {

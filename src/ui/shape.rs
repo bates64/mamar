@@ -19,11 +19,6 @@ pub fn rect_origin(width: f32, height: f32, color: Color) -> Multicolor {
         path.line_to(point(1.0, 1.0), &color); // bottom-right
         path.line_to(point(0.0, 1.0), &color); // bottom-left
         path.end(true);
-
-        Some(Box2D {
-            min: point(0.0, 0.0),
-            max: point(1.0, 1.0),
-        })
     });
 
     square.scale_2d(width, height);

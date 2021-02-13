@@ -1,11 +1,12 @@
+use std::cmp::Ordering;
+
 use crate::display::draw::Ctx;
-use crate::util::math::*;
+use crate::util::*;
 
 /// An Entity is some mesh that can be transformed and drawn.
-/// Don't forget to `draw()` this!
 pub trait Entity: Send + Sync {
     /// Commit the entity to the screen, drawing over previously-drawn entities.
-    fn draw(&self, ctx: &mut Ctx);
+    fn draw(&mut self, ctx: &mut Ctx);
 
     /// Applies some transformation to this entity.
     fn transform(&mut self, transform: &Transform3D);
@@ -99,6 +100,30 @@ pub trait Entity: Send + Sync {
     */
 }
 
+impl PartialEq for dyn Entity {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for dyn Entity {}
+
+impl PartialOrd for dyn Entity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Defines the drawing/raycasting order for entities, based on their maximal z position.
+impl Ord for dyn Entity {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_z = self.bounding_box().max.z as isize;
+        let other_z = other.bounding_box().max.z as isize;
+
+        other_z.cmp(&self_z)
+    }
+}
+
 /// A bunch of entities grouped together, so they can be transformed and drawn as one.
 #[derive(Default)]
 pub struct EntityGroup {
@@ -110,14 +135,19 @@ impl EntityGroup {
         Default::default()
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { children: Vec::with_capacity(capacity) }
+    }
+
     pub fn add<E: Entity + 'static>(&mut self, child: E) {
         self.children.push(Box::new(child));
     }
 }
 
 impl Entity for EntityGroup {
-    fn draw(&self, ctx: &mut Ctx) {
-        for child in &self.children {
+    fn draw(&mut self, ctx: &mut Ctx) {
+        self.children.par_sort_unstable();
+        for child in &mut self.children {
             child.draw(ctx);
         }
     }
@@ -136,5 +166,11 @@ impl Entity for EntityGroup {
         }
 
         aabb
+    }
+}
+
+impl From<Vec<Box<dyn Entity>>> for EntityGroup {
+    fn from(children: Vec<Box<dyn Entity>>) -> Self {
+        Self { children }
     }
 }

@@ -805,6 +805,7 @@ dependencies = [
  "lru",
  "lyon",
  "midly",
+ "rayon",
  "smallvec",
  "tinyfiledialogs",
  "ttf-parser 0.9.0",

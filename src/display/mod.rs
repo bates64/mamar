@@ -6,6 +6,7 @@ mod icon;
 use std::sync::mpsc::Sender;
 
 pub use entity::{Entity, EntityGroup};
+use draw::Ctx;
 use glium::glutin::dpi::LogicalSize;
 use glium::glutin::event::{Event, WindowEvent};
 use glium::glutin::event_loop::{ControlFlow, EventLoop, EventLoopProxy};
@@ -13,7 +14,7 @@ use glium::glutin::window::WindowBuilder;
 use glium::glutin::ContextBuilder;
 use glium::Display;
 
-pub type DisplayList = Vec<Box<dyn Entity>>;
+use crate::util::math::screen_to_clip;
 
 pub mod init {
     use super::*;
@@ -28,7 +29,7 @@ pub mod init {
 
     /// A request for the main thread to do something, from the ui thread.
     pub enum MainThreadRequest {
-        Draw(DisplayList), // Here is your display list
+        Draw(EntityGroup), // Here is your display list
     }
 
     pub fn create_event_loop() -> (EventLoop<MainThreadRequest>, EventLoopProxy<MainThreadRequest>) {
@@ -45,7 +46,7 @@ pub mod init {
             .with_window_icon(icon::get_icon());
         let cb = ContextBuilder::new().with_multisampling(MSAA).with_srgb(true);
         let display = Display::new(wb, cb, &event_loop).unwrap();
-        let mut ctx = draw::Ctx::new(display);
+        let mut ctx = Ctx::new(display);
 
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
@@ -86,13 +87,9 @@ pub mod init {
                 //}
                 Event::UserEvent(callback) => {
                     match callback {
-                        MainThreadRequest::Draw(dl) => {
-                            for entity in &dl {
-                                entity.draw(&mut ctx);
-                            }
-
-                            //log::debug!("drew {} entities", dl.len());
-
+                        MainThreadRequest::Draw(mut root) => {
+                            root.transform(&screen_to_clip(&ctx.display));
+                            root.draw(&mut ctx);
                             ctx.finish();
                         }
                     }

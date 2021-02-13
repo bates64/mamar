@@ -32,6 +32,7 @@ impl Vertex {
 }
 
 /// Geometry where each vertex has its own colour.
+#[derive(Clone)]
 pub struct Multicolor {
     geometry: VertexBuffers<Vertex, u16>,
     aabb: Box3D,
@@ -41,7 +42,7 @@ pub struct Multicolor {
 impl Multicolor {
     pub fn build_svg<F>(build: F) -> Self
     where
-        F: FnOnce(&mut PathBuilder) -> Option<Box2D>,
+        F: FnOnce(&mut PathBuilder),
     {
         let mut path = Path::builder_with_attributes(4);
         let aabb = build(&mut path);
@@ -58,11 +59,10 @@ impl Multicolor {
             )
             .unwrap();
 
-        let aabb = aabb.unwrap_or_else(|| {
+        let aabb = //aabb.unwrap_or_else(|| {
             lyon::algorithms::aabb::fast_bounding_rect(path.iter())
-                .to_box2d()
-                .cast_unit()
-        });
+                .to_box2d();
+        //});
 
         Self {
             geometry,
@@ -73,7 +73,7 @@ impl Multicolor {
 }
 
 impl Entity for Multicolor {
-    fn draw(&self, ctx: &mut Ctx) {
+    fn draw(&mut self, ctx: &mut Ctx) {
         let transform = self.transform.to_arrays();
 
         ctx.draw(

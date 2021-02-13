@@ -3,6 +3,8 @@ use glium::program::{Program, ProgramCreationInput};
 use glium::uniforms::Uniforms;
 use glium::{Display, DrawParameters, Frame, IndexBuffer, Surface, Vertex, VertexBuffer};
 
+use crate::util::color;
+
 pub struct Ctx {
     pub display: Display,
     frame: Frame,
@@ -31,7 +33,7 @@ impl Ctx {
         Self {
             frame: {
                 let mut frame = display.draw();
-                frame.clear_all((0.0, 1.0, 0.0, 1.0), 0.0, 0);
+                frame.clear_all(color::BACKGROUND.as_rgba_f32_tuple(), 0.0, 0);
                 frame
             },
             display,
@@ -42,7 +44,7 @@ impl Ctx {
         self.frame.set_finish().unwrap();
 
         self.frame = self.display.draw();
-        self.frame.clear_all((1.0, 0.0, 0.0, 1.0), 0.0, 0);
+        self.frame.clear_all(color::BACKGROUND.as_rgba_f32_tuple(), 0.0, 0);
     }
 
     pub fn draw<U, V>(

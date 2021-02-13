@@ -1,8 +1,9 @@
 use lazy_static::lazy_static;
+use lyon::path::path::BuilderWithAttributes as PathBuilder;
 use ttf_parser::{Face, OutlineBuilder};
 
-use super::Ctx;
-use crate::display::draw::*;
+use crate::display::*;
+use crate::util::*;
 
 // Adjustment values in font em units
 const FONT_HEIGHT_ADJUST: f32 = -0.3;
@@ -27,14 +28,12 @@ impl Font {
     }
 }
 
-// TODO: monocolor
-#[track_caller]
-pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> GeometryEntity<geometry::multicolor::Geometry> {
+pub fn label(text: &str, color: Color, size: f32) -> geo::Multicolor {
     // TODO: cache individual glyph paths and batch them into a longer path
 
-    let mut mesh = ctx.fill_path((font, color, text), |path, (font, color, text)| {
-        let font = font.face();
+    let font = Font::Sans.face();
 
+    let mut mesh = geo::Multicolor::build_svg(|path| {
         let units_per_em = font.units_per_em().unwrap() as f32;
         let font_height = font.height() as f32 + FONT_HEIGHT_ADJUST * units_per_em;
 
@@ -65,12 +64,10 @@ pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> 
             // TODO: kerning
             x_offset += rect.x_max as f32;
         }
-
-        None // TODO: bounding box like measure()
     });
 
     // Convert to view space
-    let units_per_em = font.face().units_per_em().unwrap() as f32;
+    let units_per_em = font.units_per_em().unwrap() as f32;
     mesh.scale_uniform(size / units_per_em);
     mesh
 }

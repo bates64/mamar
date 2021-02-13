@@ -1,7 +1,6 @@
-/* pub mod btn; */
 pub mod shape;
-pub mod song;
-//pub mod text;
+mod song;
+pub mod text;
 
 use std::sync::mpsc::Sender;
 use std::time::Duration;
@@ -11,6 +10,52 @@ use song::Song;
 
 use crate::display::*;
 use crate::util::*;
+
+fn button(text: &str) -> EntityGroup {
+    let mut text = text::label(text, color::WHITE, 14.0);
+
+    let container_box = text.bounding_box().inflate(16.0, 16.0, 0.0);
+    //container_box.translate(vec3(16.0, 16.0, 0.0));
+
+    text.translate(container_box.center().to_vector());
+    text.anchor(point3(0.5, 0.6, 0.5)); // y is off to account for baseline
+    text.rotate_2d(deg(0.5));
+
+    let mut container = geo::Multicolor::build_svg(|path| {
+        let color = color::PURPLE.as_rgba_f32();
+
+        path.begin(point(container_box.min.x - 1.0 , container_box.min.y + 1.0), &color); // top-left
+        path.line_to(point(container_box.max.x + 1.0, container_box.min.y), &color); // top-right
+        path.line_to(point(container_box.max.x, container_box.max.y + 2.0), &color); // bottom-right
+        path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
+        path.end(true);
+    });
+    container.translate(vec3(0.0, 0.0, -1.0)); // Behind the text
+
+    /*
+    if container.is_click {
+        container.translate(vec3(3.0, 3.0, 0.0));
+    }
+    */
+
+    // FIXME: alpha channel
+    let mut shadow = geo::Multicolor::build_svg(|path| {
+        let color = [0.0, 0.0, 0.0, 0.1];
+
+        path.begin(point(container_box.min.x - 1.0 , container_box.min.y + 2.0), &color); // top-left
+        path.line_to(point(container_box.max.x + 1.0, container_box.min.y), &color); // top-right
+        path.line_to(point(container_box.max.x, container_box.max.y + 2.0), &color); // bottom-right
+        path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
+        path.end(true);
+    });
+    shadow.translate(vec3(4.0, 4.0, -1.0));
+
+    let mut root = EntityGroup::with_capacity(2);
+    root.add(container);
+    root.add(shadow);
+    root.add(text);
+    root
+}
 
 pub struct Ui {
     hot_reload_tx: Sender<Vec<u8>>,
@@ -33,13 +78,21 @@ impl Ui {
         }
     }
 
-    pub fn draw(&mut self, _delta: Duration) -> DisplayList {
+    pub fn draw(&mut self, _delta: Duration) -> EntityGroup {
         log::debug!("draw");
 
-        vec![
-            Box::new(shape::rect(rect(0.1, 0.1, 0.2, 0.2), color::PURPLE)),
-            Box::new(shape::rect(rect(0.0, 0.0, 1.0, 1.0), color::PURPLE)),
-        ]
+        let mut root = EntityGroup::new();
+
+        let mut button = button("I am a button");
+        /*button.on_click(|| {
+            println!("i was clicked!");
+        });*/
+
+        //button.anchor(point3(0.5, 0.5, 0.5));
+        //button.scale_uniform(2.0);
+        button.translate(vec3(100.0, 100.0, 0.0));
+
+        root.add(button);
 
         /*
         shape::rect(ctx, {
@@ -126,5 +179,7 @@ impl Ui {
             }
         }
         */
+
+        root
     }
 }
