@@ -94,10 +94,10 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     Ok(bgm)
 }
 
-fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>,total_song_length: usize) -> Track {
+fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_length: usize) -> Track {
     use std::collections::HashMap;
 
-    use midly::{TrackEventKind, MidiMessage};
+    use midly::{MidiMessage, TrackEventKind};
 
     /// NoteOn data
     struct Note {
@@ -132,16 +132,19 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>,total_song_le
                             if let Some(start) = started_notes.remove(&key) {
                                 let length = time - start.time;
 
-                                track.commands.insert(start.time, Command::Note {
-                                    pitch: key,
-                                    velocity: start.vel,
-                                    length: length as u16,
-                                    flag: false,
-                                });
+                                track.commands.insert(
+                                    start.time,
+                                    Command::Note {
+                                        pitch: key,
+                                        velocity: start.vel,
+                                        length: length as u16,
+                                        flag: false,
+                                    },
+                                );
                             } else {
                                 log::warn!("found NoteOff {} but saw no NoteOn", key);
                             }
-                        },
+                        }
                         MidiMessage::NoteOn { key, vel } => {
                             let key = key.as_int();
                             let vel = vel.as_int();
@@ -150,20 +153,23 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>,total_song_le
                                 if let Some(start) = started_notes.remove(&key) {
                                     let length = time - start.time;
 
-                                    track.commands.insert(start.time, Command::Note {
-                                        pitch: key,
-                                        velocity: start.vel,
-                                        length: length as u16,
-                                        flag: false,
-                                    });
+                                    track.commands.insert(
+                                        start.time,
+                                        Command::Note {
+                                            pitch: key,
+                                            velocity: start.vel,
+                                            length: length as u16,
+                                            flag: false,
+                                        },
+                                    );
                                 } else {
                                     log::warn!("found NoteOn(vel=0) {} but saw no NoteOn(vel>0)", key);
                                 }
                             } else {
                                 started_notes.insert(key, Note { time, vel });
                             }
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -175,7 +181,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>,total_song_le
             track.commands.insert(total_song_length, Command::End);
 
             track
-        },
+        }
     }
 }
 

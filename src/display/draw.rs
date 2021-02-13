@@ -1,57 +1,14 @@
-pub mod color;
-pub mod entity;
-pub mod geometry;
-mod math;
-
-pub use color::Color;
-pub use entity::{Entity, GeometryEntity, EntityGroup};
-use geometry::{Geometry, Vertex};
-use glium::glutin::dpi::LogicalSize;
-use glium::{Display, Frame, Program, Surface};
-pub use math::*;
-type EventLoopProxy<A> = glium::glutin::event_loop::EventLoopProxy<Box<dyn FnOnce(&mut A) + Send>>;
-use std::hash::Hash;
-use std::panic::Location;
-use std::rc::Rc;
-
-pub use glium::glutin::event::MouseButton;
-use lru::LruCache;
-pub use lyon::path::path::BuilderWithAttributes as PathBuilder;
-use lyon::path::Path;
-use lyon::tessellation::*;
-
-use super::Ui;
-
-/// Higher values = less triangles.
-/// Automatically divided by the DPI.
-const PATH_TOLERANCE: f32 = 0.1;
-
-/// The number of geometries of a particular type that can be cached before least-recently-used entries are removed.
-const GEOMETRY_CACHE_LIMIT: usize = 128;
-
-/*
-#[derive(Copy, Clone)]
-struct TextureVertex {
-    position: [f32; 2],
-    uv: [f32; 2],
-}
-
-implement_vertex!(TextureVertex, position, uv);
-*/
-
-pub fn lerp(current: f32, target: f32, factor: f32) -> f32 {
-    let t = match factor {
-        t if t < 0.0 => 0.0,
-        t if t > 1.0 => 1.0,
-        t => t,
-    };
-
-    current * (1.0 - t) + target * t
-}
+use glium::index::PrimitiveType;
+use glium::program::{Program, ProgramCreationInput};
+use glium::uniforms::Uniforms;
+use glium::{Display, DrawParameters, Frame, IndexBuffer, Surface, Vertex, VertexBuffer};
 
 pub struct Ctx {
-    pub(super) display: Display,
-    frame: Option<Frame>,
+    pub display: Display,
+    frame: Frame,
+    /* refcell caches */
+
+    /*
     event_loop_proxy: EventLoopProxy<Ui>,
 
     projection: Transform3D,
@@ -66,8 +23,59 @@ pub struct Ctx {
     pub mouse_pos: Option<Point2D>, // Mouse pos; None if not onscreen
     pub mouse_button: Option<MouseButton>,       // Current frame
     pub mouse_button_previous: Option<MouseButton>, // Previous frame
+    */
 }
 
+impl Ctx {
+    pub fn new(display: Display) -> Self {
+        Self {
+            frame: {
+                let mut frame = display.draw();
+                frame.clear_all((0.0, 1.0, 0.0, 1.0), 0.0, 0);
+                frame
+            },
+            display,
+        }
+    }
+
+    pub fn finish(&mut self) {
+        self.frame.set_finish().unwrap();
+
+        self.frame = self.display.draw();
+        self.frame.clear_all((1.0, 0.0, 0.0, 1.0), 0.0, 0);
+    }
+
+    pub fn draw<U, V>(
+        &mut self,
+        vertices: &[V],
+        indices: &[u16],
+        program: ProgramCreationInput,
+        uniforms: &U,
+        params: &DrawParameters,
+    ) where
+        U: Uniforms,
+        V: Vertex,
+    {
+        // TODO: cache geometry and program
+
+        let vertex_buf = VertexBuffer::new(&self.display, vertices).unwrap();
+        let index_buf = IndexBuffer::new(&self.display, PrimitiveType::TrianglesList, indices).unwrap();
+
+        let program = Program::new(&self.display, program).unwrap();
+
+        self.frame
+            .draw(&vertex_buf, &index_buf, &program, uniforms, params)
+            .unwrap();
+    }
+}
+
+impl Drop for Ctx {
+    fn drop(&mut self) {
+        let _ = self.frame.set_finish();
+    }
+}
+
+/*
 impl Ctx {
     pub(super) fn new(display: Display, event_loop_proxy: EventLoopProxy<Ui>) -> Self {
         Ctx {
@@ -346,4 +354,5 @@ impl<'a> TextureGeometry<'a> {
         ).unwrap();
     }
 }
+*/
 */

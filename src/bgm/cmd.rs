@@ -205,7 +205,7 @@ impl CommandSeq {
                     } else {
                         Box::new(iter::empty())
                     }
-                };
+                }
 
                 // Vec::splice and using an iterator is more efficient than a naive while loop that inserts delays.
                 // See https://stackoverflow.com/questions/28678615.

@@ -1,18 +1,17 @@
-use super::Ctx;
-use crate::display::draw::*;
+use crate::display::geo::Multicolor;
+use crate::display::Entity;
+use crate::util::*;
 
-#[track_caller]
-pub fn rect(ctx: &mut Ctx, rect: Rect, color: Color) -> GeometryEntity<geometry::multicolor::Geometry> {
-    let mut entity = rect_origin(ctx, rect.width(), rect.height(), color);
+pub fn rect(rect: Rect, color: Color) -> Multicolor {
+    let mut entity = rect_origin(rect.width(), rect.height(), color);
     entity.translate(rect.origin.to_vector().to_3d());
     entity
 }
 
-#[track_caller]
-pub fn rect_origin(ctx: &mut Ctx, width: f32, height: f32, color: Color) -> GeometryEntity<geometry::multicolor::Geometry> {
+pub fn rect_origin(width: f32, height: f32, color: Color) -> Multicolor {
     // Draw a square here and just scale it up later; this allows for indefinite caching
     // TODO: draw in a single color and use a shader to change it
-    let mut square = ctx.fill_path(color, |path, color| {
+    let mut square = Multicolor::build_svg(|path| {
         let color = color.as_rgba_f32();
 
         path.begin(point(0.0, 0.0), &color); // top-left

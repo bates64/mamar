@@ -139,10 +139,7 @@ impl Bgm {
             },
             Unknown(Unknown),
         }
-        let mut to_write: Vec<ToWrite> = self.unknowns
-            .iter()
-            .map(|unk| ToWrite::Unknown(unk.clone()))
-            .collect();
+        let mut to_write: Vec<ToWrite> = self.unknowns.iter().map(|unk| ToWrite::Unknown(unk.clone())).collect();
 
         // Write segments
         for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
@@ -184,7 +181,11 @@ impl Bgm {
 
         for w in to_write.into_iter() {
             match w {
-                ToWrite::TrackList { segment_start, track_list_id, tracks_pos } => {
+                ToWrite::TrackList {
+                    segment_start,
+                    track_list_id,
+                    tracks_pos,
+                } => {
                     let track_list = &self.track_lists[track_list_id];
 
                     // If we've encoded this track list already, just point to that instead.
@@ -243,13 +244,18 @@ impl Bgm {
 
                         seq.encode(f)?;
                     }
-                },
+                }
                 ToWrite::Unknown(unk) => {
                     f.seek(SeekFrom::Start(unk.range.start))?;
-                    debug!("write unknown {:X}..{:X} @ {:X}", unk.range.start, unk.range.end, f.pos()?);
+                    debug!(
+                        "write unknown {:X}..{:X} @ {:X}",
+                        unk.range.start,
+                        unk.range.end,
+                        f.pos()?
+                    );
                     f.write_all(&unk.data)?;
                     f.seek(SeekFrom::Start(unk.range.end))?;
-                },
+                }
             }
         }
 
@@ -317,10 +323,7 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(
-        &'a self,
-        f: &'_ mut W,
-    ) -> Result<Option<(u64, Id<TrackList>)>, Error> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, Id<TrackList>)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {

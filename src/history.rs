@@ -1,15 +1,15 @@
-use std::ops::{Deref, DerefMut};
 use std::mem;
+use std::ops::{Deref, DerefMut};
 
 const NUM_STATES: usize = 32;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct History<State: Clone + Eq> {
-    mut_current_state: State, // Copy of current state
+    mut_current_state: State,    // Copy of current state
     states: [State; NUM_STATES], // Ring buffer
-    newest_state_index: usize, // Future (for redo)
-    current_state_index: usize, // Immutable current state
-    oldest_state_index: usize, // Past (for undo)
+    newest_state_index: usize,   // Future (for redo)
+    current_state_index: usize,  // Immutable current state
+    oldest_state_index: usize,   // Past (for undo)
 }
 
 impl<State: Clone + Eq> History<State> {
@@ -80,9 +80,9 @@ impl<State: Clone + Eq> History<State> {
 
     fn prev(index: usize) -> usize {
         if index == 0 {
-            return NUM_STATES - 1;
+            NUM_STATES - 1
         } else {
-            return index - 1;
+            index - 1
         }
     }
 

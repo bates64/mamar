@@ -1,15 +1,47 @@
 #![windows_subsystem = "windows"]
 
-use mamar::*;
+use std::sync::mpsc::channel;
+use std::thread;
+use std::time::Instant;
+
+use mamar::display::init::{MainThreadRequest, UiThreadRequest};
+use mamar::ui::Ui;
 
 fn main() {
-    init();
+    mamar::init();
 
     log::info!("hello");
 
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (hot_reload_tx, hot_reload_rx) = channel();
+    thread::spawn(move || mamar::hot::run(hot_reload_rx));
 
-    std::thread::spawn(move || hot::run(rx));
+    let (event_loop, event_loop_proxy) = mamar::display::init::create_event_loop();
+    let (ui_tx, ui_rx) = channel();
 
-    display::main(ui::Ui::new(tx))
+    // UI thread - sends DisplayLists to the main thread for drawing
+    thread::spawn(move || {
+        let mut prev_draw = Instant::now();
+        let mut ui = Ui::new(hot_reload_tx);
+
+        while let Ok(req) = ui_rx.recv() {
+            match req {
+                UiThreadRequest::Draw => {
+                    // Calculate the duration since the last time we drew
+                    let delta = {
+                        let now = Instant::now();
+                        let delta = now.duration_since(prev_draw);
+                        prev_draw = now;
+                        delta
+                    };
+
+                    let display_list = ui.draw(delta);
+
+                    let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(display_list));
+                } // ...
+            }
+        }
+    });
+
+    // Main thread - does actual rendering (must be on the main thread)
+    mamar::display::init::main(event_loop, ui_tx)
 }

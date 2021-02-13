@@ -1,14 +1,16 @@
-pub mod btn;
+/* pub mod btn; */
 pub mod shape;
 pub mod song;
-pub mod text;
+//pub mod text;
 
-use crate::display::draw::*;
-pub type Ctx = crate::display::draw::Ctx;
-use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
+//pub type Ctx = crate::display::draw::Ctx;
 use song::Song;
+
+use crate::display::*;
+use crate::util::*;
 
 pub struct Ui {
     hot_reload_tx: Sender<Vec<u8>>,
@@ -31,7 +33,15 @@ impl Ui {
         }
     }
 
-    pub fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
+    pub fn draw(&mut self, _delta: Duration) -> DisplayList {
+        log::debug!("draw");
+
+        vec![
+            Box::new(shape::rect(rect(0.1, 0.1, 0.2, 0.2), color::PURPLE)),
+            Box::new(shape::rect(rect(0.0, 0.0, 1.0, 1.0), color::PURPLE)),
+        ]
+
+        /*
         shape::rect(ctx, {
             let size = ctx.display_size();
             rect(0.0, 0.0, size.width, size.height)
@@ -115,5 +125,6 @@ impl Ui {
                 });
             }
         }
+        */
     }
 }

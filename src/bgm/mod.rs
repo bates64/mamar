@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Range, Deref};
+use std::ops::{Deref, Range};
 use std::rc::Rc;
 
 use id_arena::{Arena, Id};
@@ -31,7 +31,7 @@ pub struct Bgm {
     pub drums: Vec<Drum>,
     pub voices: Vec<Voice>,
 
-    pub unknowns: Vec<Unknown>
+    pub unknowns: Vec<Unknown>,
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
@@ -43,22 +43,18 @@ impl Bgm {
     }
 
     pub fn can_add_segment(&self) -> bool {
-        self.segments
-            .iter()
-            .any(|s| s.is_none())
+        self.segments.iter().any(|s| s.is_none())
     }
 
     pub fn add_segment(&mut self) -> Result<&mut Segment, NoSpace> {
-        let empty_seg: Option<&mut Option<Segment>> = self.segments
-            .iter_mut()
-            .find(|s| s.is_none());
+        let empty_seg: Option<&mut Option<Segment>> = self.segments.iter_mut().find(|s| s.is_none());
 
         match empty_seg {
             None => Err(NoSpace),
             Some(slot) => {
                 *slot = Some(Segment::default());
                 Ok(slot.as_mut().unwrap())
-            },
+            }
         }
     }
 

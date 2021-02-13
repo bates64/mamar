@@ -1,13 +1,12 @@
 use std::error::Error;
-use std::path::PathBuf;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
-use std::fs::File;
+use std::path::PathBuf;
 
-use super::*;
 use crate::bgm::Bgm;
-use crate::util::rw::*;
 use crate::midi;
+use crate::util::rw::*;
 
 #[derive(Debug)]
 pub struct Song {
@@ -49,12 +48,10 @@ impl Song {
             s
         });
 
-        Ok(Self {
-            bgm,
-            path,
-        })
+        Ok(Self { bgm, path })
     }
 
+    /*
     pub fn draw(&mut self, ctx: &mut Ctx, _delta: f32) {
         let mut y = 100.0;
 
@@ -75,4 +72,5 @@ impl Song {
             y += 40.0;
         }
     }
+    */
 }

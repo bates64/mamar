@@ -1,6 +1,5 @@
 ///! This module mainly rexports types from `euclid` as `f32`s with units.
 ///! Note that `lyon::math` does this too.
-
 use euclid::{Trig, UnknownUnit};
 
 /*

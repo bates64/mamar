@@ -1,12 +1,9 @@
-use std::rc::Rc;
-
-use super::geometry::Geometry;
-use super::math::*;
-use super::{Ctx, MouseButton};
+use crate::display::draw::Ctx;
+use crate::util::math::*;
 
 /// An Entity is some mesh that can be transformed and drawn.
 /// Don't forget to `draw()` this!
-pub trait Entity {
+pub trait Entity: Send + Sync {
     /// Commit the entity to the screen, drawing over previously-drawn entities.
     fn draw(&self, ctx: &mut Ctx);
 
@@ -29,7 +26,7 @@ pub trait Entity {
 
     /// Scales this entity up (positive) or down (negative) by a factor.
     fn scale(&mut self, x: f32, y: f32, z: f32) {
-       self.transform(&Transform3D::scale(x, y, z));
+        self.transform(&Transform3D::scale(x, y, z));
     }
 
     /// Performs a scale in the x and y axes.
@@ -48,9 +45,14 @@ pub trait Entity {
     /// By default, entities pivot around their top-left. Note that anchoring twice won't reset the previous anchoring!
     fn anchor(&mut self, point: Point3D) {
         let bounds = self.bounding_box();
-        self.translate(vec3(bounds.width() * -point.x, bounds.height() * -point.y, bounds.depth() * -point.z));
+        self.translate(vec3(
+            bounds.width() * -point.x,
+            bounds.height() * -point.y,
+            bounds.depth() * -point.z,
+        ));
     }
 
+    /*
     /// Returns `true` if the mouse is hovering over this entity in its current position.
     ///
     /// Note: this uses `self.bounding_box`, which is axis-aligned, so rotation may produce unexpectedly
@@ -94,60 +96,10 @@ pub trait Entity {
 
         self.is_mouse_over(ctx) && ctx.mouse_button == Some(button) && ctx.mouse_button_previous.is_none()
     }
-}
-
-/// A `Geometry` supporting transformations in view-space.
-/// Cloning is cheap (using reference-counting).
-#[derive(Clone, PartialEq)]
-pub struct GeometryEntity<G: Geometry> {
-    geometry: Rc<G>,
-    transform: Transform3D,
-}
-
-impl<G: Geometry> GeometryEntity<G> {
-    pub fn new(geometry: Rc<G>) -> Self {
-        Self {
-            geometry,
-            transform: Default::default(), // No transformation
-        }
-    }
-
-    pub fn draw_debug_outlined(&self, ctx: &mut Ctx) {
-        self.geometry.draw(
-            ctx,
-            self.transform.to_arrays(),
-            &glium::DrawParameters {
-                blend: glium::draw_parameters::Blend::alpha_blending(),
-                polygon_mode: glium::draw_parameters::PolygonMode::Line,
-                ..Default::default()
-            },
-        );
-    }
-}
-
-impl<G: Geometry> Entity for GeometryEntity<G> {
-    fn draw(&self, ctx: &mut Ctx) {
-        self.geometry.draw(
-            ctx,
-            self.transform.to_arrays(),
-            &glium::DrawParameters {
-                blend: glium::draw_parameters::Blend::alpha_blending(),
-                ..Default::default()
-            },
-        );
-    }
-
-    fn transform(&mut self, transform: &Transform3D) {
-        self.transform = self.transform.then(transform);
-    }
-
-    fn bounding_box(&self) -> Box3D {
-        self.transform.outer_transformed_box3d(self.geometry.bounding_box()).unwrap()
-    }
+    */
 }
 
 /// A bunch of entities grouped together, so they can be transformed and drawn as one.
-#[must_use = "possibly forgot to call `.draw(ctx)` method"]
 #[derive(Default)]
 pub struct EntityGroup {
     children: Vec<Box<dyn Entity>>,

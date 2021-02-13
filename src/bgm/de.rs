@@ -160,9 +160,11 @@ impl Bgm {
 
         // Special cases to get problematic BGMs to match
         bgm.unknowns = match bgm.index.as_str() {
-            "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], // Bowser's Castle Caves (entire segment? TODO look into this)
+            "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], /* Bowser's Castle Caves (entire segment? TODO look */
+            // into this)
             "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
-            "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], // Bowser's Castle Explodes (very short segment at eof?)
+            "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], /* Bowser's Castle Explodes (very short segment at */
+            // eof?)
             _ => vec![],
         };
 
@@ -281,10 +283,7 @@ impl Subsegment {
                 }
             };
 
-            Ok(Subsegment::Tracks {
-                flags,
-                track_list,
-            })
+            Ok(Subsegment::Tracks { flags, track_list })
         } else {
             let mut data = [0; 3];
             f.read_exact(&mut data)?;
@@ -334,8 +333,10 @@ impl CommandSeq {
                 // TEMP: for matching. This should really look at the BGM index and not run for all files...
                 // There's probably some command that I don't yet know about that points to this data.
                 match f.pos()? {
-                    0x38EB => { commands.upsert_marker(0x39EB - start); }, // 0x64 Bowser's Castle
-                    _ => {},
+                    0x38EB => {
+                        commands.upsert_marker(0x39EB - start);
+                    } // 0x64 Bowser's Castle
+                    _ => {}
                 };
 
                 // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
