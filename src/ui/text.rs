@@ -28,6 +28,7 @@ impl Font {
 }
 
 // TODO: monocolor
+#[track_caller]
 pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> GeometryEntity<geometry::multicolor::Geometry> {
     // TODO: cache individual glyph paths and batch them into a longer path
 

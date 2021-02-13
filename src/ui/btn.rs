@@ -9,6 +9,7 @@ pub struct ButtonState {
 }
 */
 
+#[track_caller]
 pub fn primary(ctx: &mut Ctx, rect: Rect, label: &str) -> EntityGroup {
     /*
     let rect_shape = shape::rect(ctx, rect, color::WHITE);
