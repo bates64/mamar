@@ -41,26 +41,29 @@ pub fn compile_shader(display: &Display) -> Program {
 pub struct Geometry {
     vertex_buf: VertexBuffer<Vertex>,
     index_buf: IndexBuffer<u16>,
-    aabb: Box2D<GeomSpace>,
+    aabb: Box3D,
 }
 
 impl super::Geometry for Geometry {
     type Vertex = Vertex;
 
-    fn cache<A: Application>(ctx: &mut Ctx<A>) -> &mut LruCache<u64, Rc<Self>> {
+    fn cache(ctx: &mut Ctx) -> &mut LruCache<u64, Rc<Self>> {
         &mut ctx.multicolor_geom_cache
     }
 
-    fn from_lyon<A: Application>(ctx: &Ctx<A>, bufs: &VertexBuffers<Vertex, u16>, aabb: Box2D<GeomSpace>) -> Self {
+    fn from_lyon(ctx: &Ctx, bufs: &VertexBuffers<Vertex, u16>, aabb: Box2D) -> Self {
         Geometry {
             vertex_buf: VertexBuffer::new(&ctx.display, &bufs.vertices).unwrap(),
             index_buf: IndexBuffer::new(&ctx.display, glium::index::PrimitiveType::TrianglesList, &bufs.indices)
                 .unwrap(),
-            aabb,
+            aabb: Box3D::new(
+                point3(aabb.min.x, aabb.min.y, 0.0),
+                point3(aabb.max.x, aabb.max.y, 0.0),
+            ),
         }
     }
 
-    fn draw<A: Application>(&self, ctx: &mut Ctx<A>, transform: [[f32; 4]; 4], params: &glium::DrawParameters) {
+    fn draw(&self, ctx: &mut Ctx, transform: [[f32; 4]; 4], params: &glium::DrawParameters) {
         ctx.ensure_frame();
         ctx.frame
             .as_mut()
@@ -78,7 +81,7 @@ impl super::Geometry for Geometry {
             .unwrap();
     }
 
-    fn bounding_box(&self) -> &Box2D<GeomSpace> {
+    fn bounding_box(&self) -> &Box3D {
         &self.aabb
     }
 }

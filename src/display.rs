@@ -7,20 +7,18 @@ use draw::Ctx;
 use glium::glutin;
 use glutin::dpi::LogicalSize;
 
+use super::ui::Ui;
+
 const MSAA: u16 = 4;
 const FPS: f32 = 60.0;
 
-pub trait Application {
-    fn draw(&mut self, ctx: &mut Ctx<Self>, delta: f32)
-    where
-        Self: Sized;
-}
-
-pub fn main<A: Application + 'static>(mut application: A) -> ! {
+pub fn main(mut ui: Ui) -> ! {
     use glutin::event::{Event, WindowEvent};
     use glutin::event_loop::ControlFlow;
 
     let event_loop = glutin::event_loop::EventLoop::with_user_event();
+    let event_loop_proxy = event_loop.create_proxy();
+
     let wb = glutin::window::WindowBuilder::new()
         .with_title("Mamar")
         .with_inner_size(LogicalSize::new(800.0, 600.0))
@@ -28,7 +26,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
         .with_window_icon(icon::get_icon());
     let cb = glutin::ContextBuilder::new().with_multisampling(MSAA).with_srgb(true);
     let display = glium::Display::new(wb, cb, &event_loop).unwrap();
-    let mut ctx = Ctx::new(display, event_loop.create_proxy());
+    let mut ctx = Ctx::new(display, event_loop_proxy);
 
     let mut prev_frame = Instant::now();
 
@@ -67,7 +65,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
                     delta.as_secs_f32()
                 };
 
-                application.draw(&mut ctx, delta);
+                ui.draw(&mut ctx, delta);
                 let redraw_requested = ctx.flush();
 
                 if redraw_requested {
@@ -80,7 +78,7 @@ pub fn main<A: Application + 'static>(mut application: A) -> ! {
                 }
             }
             Event::UserEvent(callback) => {
-                callback(&mut application);
+                callback(&mut ui);
                 // Redraw is implicitly requested by OS
             }
             _ => (),

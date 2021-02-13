@@ -4,7 +4,7 @@ pub mod geometry;
 mod math;
 
 pub use color::Color;
-pub use entity::Entity;
+pub use entity::{Entity, GeometryEntity, EntityGroup};
 use geometry::{Geometry, Vertex};
 use glium::glutin::dpi::LogicalSize;
 use glium::{Display, Frame, Program, Surface};
@@ -20,7 +20,7 @@ pub use lyon::path::path::BuilderWithAttributes as PathBuilder;
 use lyon::path::Path;
 use lyon::tessellation::*;
 
-use super::Application;
+use super::Ui;
 
 /// Higher values = less triangles.
 /// Automatically divided by the DPI.
@@ -49,12 +49,12 @@ pub fn lerp(current: f32, target: f32, factor: f32) -> f32 {
     current * (1.0 - t) + target * t
 }
 
-pub struct Ctx<A: Application + 'static> {
+pub struct Ctx {
     pub(super) display: Display,
     frame: Option<Frame>,
-    event_loop_proxy: EventLoopProxy<A>,
+    event_loop_proxy: EventLoopProxy<Ui>,
 
-    projection: Transform3D<ScreenSpace, ClipSpace>,
+    projection: Transform3D,
 
     redraw_requested: bool,
 
@@ -63,13 +63,13 @@ pub struct Ctx<A: Application + 'static> {
     multicolor_geom_cache: LruCache<u64, Rc<geometry::multicolor::Geometry>>,
 
     //texture_shader: Program,
-    pub mouse_pos: Option<Point2D<ScreenSpace>>, // Mouse pos; None if not onscreen
+    pub mouse_pos: Option<Point2D>, // Mouse pos; None if not onscreen
     pub mouse_button: Option<MouseButton>,       // Current frame
     pub mouse_button_previous: Option<MouseButton>, // Previous frame
 }
 
-impl<A: Application + 'static> Ctx<A> {
-    pub(super) fn new(display: Display, event_loop_proxy: EventLoopProxy<A>) -> Self {
+impl Ctx {
+    pub(super) fn new(display: Display, event_loop_proxy: EventLoopProxy<Ui>) -> Self {
         Ctx {
             multicolor_shader: geometry::multicolor::compile_shader(&display),
             multicolor_geom_cache: LruCache::new(GEOMETRY_CACHE_LIMIT),
@@ -120,7 +120,7 @@ impl<A: Application + 'static> Ctx<A> {
 
     /// Grabs the logical (DPI-aware) size of the display, i.e. the bounds for our drawing coordinate space.
     // TODO: compare with frame.get_dimensions() - is it DPI-aware?
-    pub fn display_size(&self) -> Size2D<ScreenSpace> {
+    pub fn display_size(&self) -> Size2D {
         let gl_window = self.display.gl_window();
         let window = gl_window.window();
         let size: LogicalSize<f32> = window.inner_size().to_logical(window.scale_factor());
@@ -150,13 +150,15 @@ impl<A: Application + 'static> Ctx<A> {
     }
 
     /// Spawns a function in a thread, then redraws when it completes. The function must return a callback function
-    /// which will be executed on the host thread with a mutable Application reference, in order to update state.
+    /// which will be executed on the host thread with a mutable Ui reference, in order to update its state.
+    // TODO: much better to use a futures executor and channels or something. or like an actions list that is iterated
+    // through between frames
     pub fn spawn<F, C>(&mut self, future: F)
     where
         F: FnOnce() -> C + Send + 'static,
-        C: FnOnce(&mut A) + Send + 'static,
+        C: FnOnce(&mut Ui) + Send + 'static,
     {
-        struct SyncEventLoopProxy<A: Application + 'static>(EventLoopProxy<A>);
+        struct SyncEventLoopProxy(EventLoopProxy<Ui>);
 
         // XXX: swap this out for something safer in the future
         // Here we're telling Rust that glutin's EventLoopProxy is Send so we can pass it over threads.
@@ -164,12 +166,12 @@ impl<A: Application + 'static> Ctx<A> {
         // This is definitely a Really Bad idea and could probably be done better with channels or something,
         // but it /does/ work (on Windows, at least). [TODO: test this doesn't explode on macOS and Linux!]
         // (We need an event loop proxy so we can ask for a redraw at an arbitrary future time.)
-        unsafe impl<A: Application + 'static> Send for SyncEventLoopProxy<A> {}
+        unsafe impl Send for SyncEventLoopProxy {}
 
         let sync_proxy = SyncEventLoopProxy(self.event_loop_proxy.clone());
         std::thread::spawn(move || {
             // Run the future to completion
-            let callback: Box<dyn FnOnce(&mut A) + Send> = Box::new(future());
+            let callback: Box<dyn FnOnce(&mut Ui) + Send> = Box::new(future());
 
             // Send an empty event::UserEvent to the event loop managing this Ctx (display.rs).
             // This implicitly triggers a redraw from the OS.
@@ -188,9 +190,9 @@ impl<A: Application + 'static> Ctx<A> {
     /// least-recently-used cache. The values of `memo`  are passed to the `build` callback and can be used to move
     /// values into the closure. This is similar to the API of the `useMemo` hook in React.
     #[track_caller] // required for Location::caller()
-    pub fn fill_path<F, M, G>(&mut self, memo: M, build: F) -> Entity<G>
+    pub fn fill_path<F, M, G>(&mut self, memo: M, build: F) -> GeometryEntity<G>
     where
-        F: FnOnce(&mut PathBuilder, M) -> Option<Box2D<GeomSpace>> + 'static, /* requires that anything entering via
+        F: FnOnce(&mut PathBuilder, M) -> Option<Box2D> + 'static, /* requires that anything entering via
                                                                                * the stack comes through M */
         M: Hash,
         G: Geometry + 'static,
@@ -207,7 +209,7 @@ impl<A: Application + 'static> Ctx<A> {
 
         // Load from cache
         if let Some(cached) = G::cache(self).get(&hash) {
-            return Entity::new(cached.clone());
+            return GeometryEntity::new(cached.clone());
         }
 
         // At this point, we could expel any previously-cached geometries that came from this caller.
@@ -242,7 +244,7 @@ impl<A: Application + 'static> Ctx<A> {
         // Store to cache
         G::cache(self).put(hash, geometry.clone());
 
-        Entity::new(geometry)
+        GeometryEntity::new(geometry)
     }
 
     /*

@@ -1,77 +1,81 @@
 use std::rc::Rc;
 
-use super::super::Application;
 use super::geometry::Geometry;
 use super::math::*;
 use super::{Ctx, MouseButton};
 
-/// A `Geometry` supporting transformations in view-space.
-/// Cloning is cheap (using reference-counting).
-#[must_use = "possibly forgot to call `.draw(ctx)` method"]
-#[derive(Clone, PartialEq)]
-pub struct Entity<G: Geometry> {
-    geometry: Rc<G>,
-    transform: Transform3D<GeomSpace, ViewSpace>,
-}
+/// An Entity is some mesh that can be transformed and drawn.
+/// Don't forget to `draw()` this!
+pub trait Entity {
+    /// Commit the entity to the screen, drawing over previously-drawn entities.
+    fn draw(&self, ctx: &mut Ctx);
 
-impl<G: Geometry> Entity<G> {
-    pub fn new(geometry: Rc<G>) -> Self {
-        Entity {
-            geometry,
-            transform: Default::default(), // No transformation
-        }
+    /// Applies some transformation to this entity.
+    fn transform(&mut self, transform: &Transform3D);
+
+    /// Calculates the bounding box of this entity **including transformations**.
+    fn bounding_box(&self) -> Box3D;
+
+    /// Moves the entity by a particular vector.
+    fn translate(&mut self, vec: Vector3D) {
+        self.transform(&vec.to_transform());
     }
 
-    /// 2D translation
-    pub fn translate(mut self, vec: Vector2D<ViewSpace>) -> Self {
-        self.transform = self.transform.then_translate(vec.to_3d());
-        self
+    /// Rotates this entity on the z-axis (yaw). Use `rad(t)` for radians, and `deg(t)` for degrees.
+    /// This is typically what you will always want in 2D, since the z axis faces the camera.
+    fn rotate_2d(&mut self, angle: Angle) {
+        self.transform(&Transform3D::rotation(0.0, 0.0, 1.0, angle));
     }
 
-    pub fn anchor(self, x_ndc: f32, y_ndc: f32) -> Self {
-        let bounds = self.bounding_box().expect("unable to calculate bounding box");
-        self.translate(vec2(bounds.width() * -x_ndc, bounds.height() * -y_ndc))
+    /// Scales this entity up (positive) or down (negative) by a factor.
+    fn scale(&mut self, x: f32, y: f32, z: f32) {
+       self.transform(&Transform3D::scale(x, y, z));
     }
 
-    /// 2D rotation
-    pub fn rotate(mut self, angle: Angle) -> Self {
-        self.transform = self.transform.then_rotate(0.0, 0.0, 1.0, angle);
-        self
+    /// Performs a scale in the x and y axes.
+    fn scale_2d(&mut self, x: f32, y: f32) {
+        self.scale(x, y, 1.0);
     }
 
-    /// Uniform scale in all axes
-    pub fn scale(mut self, factor: f32) -> Self {
-        self.transform = self.transform.then_scale(factor, factor, factor);
-        self
+    /// Performs a uniform scale in all axes.
+    fn scale_uniform(&mut self, factor: f32) {
+        self.scale(factor, factor, factor);
     }
 
-    pub fn scale_2d(mut self, x: f32, y: f32) -> Self {
-        self.transform = self.transform.then_scale(x, y, 1.0);
-        self
+    /// Sets the pivot of this entity to a particular point, such that `anchor(point3(0.5, 0.5, 0.5))` causes
+    /// further transformations to apply around the centre of the entity.
+    ///
+    /// By default, entities pivot around their top-left. Note that anchoring twice won't reset the previous anchoring!
+    fn anchor(&mut self, point: Point3D) {
+        let bounds = self.bounding_box();
+        self.translate(vec3(bounds.width() * -point.x, bounds.height() * -point.y, bounds.depth() * -point.z));
     }
 
-    /// Calculates the bounding box of this entity, taking into account any transformations.
-    pub fn bounding_box(&self) -> Option<Box2D<ViewSpace>> {
-        self.transform.outer_transformed_box2d(self.geometry.bounding_box())
-    }
-
+    /// Returns `true` if the mouse is hovering over this entity in its current position.
+    ///
     /// Note: this uses `self.bounding_box`, which is axis-aligned, so rotation may produce unexpectedly
     /// large input surfaces.
-    pub fn is_mouse_over<A: Application>(&self, ctx: &Ctx<A>) -> bool {
+    ///
+    /// XXX: doesn't take into account entities closer to the camera than this one.
+    fn is_mouse_over(&self, ctx: &Ctx) -> bool {
         if let Some(mouse_pos) = ctx.mouse_pos {
-            let aabb_view = self.bounding_box().unwrap();
+            let aabb = self.bounding_box();
 
-            // TODO: have ctx (or some kind of viewport arg) transform the box from ViewSpace to ScreenSpace
-            let aabb_screen = aabb_view.cast_unit();
+            // Convert our 3D bounding-box to a 2D one, discarding (!) the Z value.
+            let aabb = Box2D::new(
+                aabb.min.xy(),
+                aabb.max.xy(),
+            );
 
-            aabb_screen.contains(mouse_pos)
+            aabb.contains(mouse_pos)
         } else {
             // Mouse is offscreen
             false
         }
     }
 
-    pub fn is_click<A: Application>(&self, ctx: &Ctx<A>, button: MouseButton) -> bool {
+    /// Returns `true` if this entity is being clicked this frame.
+    fn is_click(&self, ctx: &Ctx, button: MouseButton) -> bool {
         // TODO, see below notes
         /*
         1. have some way for an entity to ask the ctx to consider it a mouse region (possibly limited to hover, click, mousedown etc to reduce redraws)
@@ -90,9 +94,39 @@ impl<G: Geometry> Entity<G> {
 
         self.is_mouse_over(ctx) && ctx.mouse_button == Some(button) && ctx.mouse_button_previous.is_none()
     }
+}
 
-    /// Commit the entity to the screen, drawing over previously-drawn entities
-    pub fn draw<A: Application>(&self, ctx: &mut Ctx<A>) {
+/// A `Geometry` supporting transformations in view-space.
+/// Cloning is cheap (using reference-counting).
+#[derive(Clone, PartialEq)]
+pub struct GeometryEntity<G: Geometry> {
+    geometry: Rc<G>,
+    transform: Transform3D,
+}
+
+impl<G: Geometry> GeometryEntity<G> {
+    pub fn new(geometry: Rc<G>) -> Self {
+        Self {
+            geometry,
+            transform: Default::default(), // No transformation
+        }
+    }
+
+    pub fn draw_debug_outlined(&self, ctx: &mut Ctx) {
+        self.geometry.draw(
+            ctx,
+            self.transform.to_arrays(),
+            &glium::DrawParameters {
+                blend: glium::draw_parameters::Blend::alpha_blending(),
+                polygon_mode: glium::draw_parameters::PolygonMode::Line,
+                ..Default::default()
+            },
+        );
+    }
+}
+
+impl<G: Geometry> Entity for GeometryEntity<G> {
+    fn draw(&self, ctx: &mut Ctx) {
         self.geometry.draw(
             ctx,
             self.transform.to_arrays(),
@@ -103,15 +137,52 @@ impl<G: Geometry> Entity<G> {
         );
     }
 
-    pub fn draw_debug_outlined<A: Application>(&self, ctx: &mut Ctx<A>) {
-        self.geometry.draw(
-            ctx,
-            self.transform.to_arrays(),
-            &glium::DrawParameters {
-                blend: glium::draw_parameters::Blend::alpha_blending(),
-                polygon_mode: glium::draw_parameters::PolygonMode::Line,
-                ..Default::default()
-            },
-        );
+    fn transform(&mut self, transform: &Transform3D) {
+        self.transform = self.transform.then(transform);
+    }
+
+    fn bounding_box(&self) -> Box3D {
+        self.transform.outer_transformed_box3d(self.geometry.bounding_box()).unwrap()
+    }
+}
+
+/// A bunch of entities grouped together, so they can be transformed and drawn as one.
+#[must_use = "possibly forgot to call `.draw(ctx)` method"]
+#[derive(Default)]
+pub struct EntityGroup {
+    children: Vec<Box<dyn Entity>>,
+}
+
+impl EntityGroup {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn add<E: Entity + 'static>(&mut self, child: E) {
+        self.children.push(Box::new(child));
+    }
+}
+
+impl Entity for EntityGroup {
+    fn draw(&self, ctx: &mut Ctx) {
+        for child in &self.children {
+            child.draw(ctx);
+        }
+    }
+
+    fn transform(&mut self, transform: &Transform3D) {
+        for child in &mut self.children {
+            child.transform(transform)
+        }
+    }
+
+    fn bounding_box(&self) -> Box3D {
+        let mut aabb = Box3D::zero();
+
+        for child in &self.children {
+            aabb = aabb.union(&child.bounding_box());
+        }
+
+        aabb
     }
 }

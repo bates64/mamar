@@ -4,8 +4,7 @@ pub mod song;
 pub mod text;
 
 use crate::display::draw::*;
-use crate::display::Application;
-pub type Ctx = crate::display::draw::Ctx<Ui>;
+pub type Ctx = crate::display::draw::Ctx;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
@@ -37,10 +36,8 @@ impl Ui {
             Some(song) => format!("{} - Mamar", song.file_name()),
         }
     }
-}
 
-impl Application for Ui {
-    fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
+    pub fn draw(&mut self, ctx: &mut Ctx, delta: f32) {
         shape::rect(ctx, {
             let size = ctx.display_size();
             rect(0.0, 0.0, size.width, size.height)
@@ -48,13 +45,15 @@ impl Application for Ui {
 
         ctx.set_window_title(&self.window_title());
 
-        if btn::primary(
+        let btn = btn::primary(
             ctx,
             delta,
             rect(0.0, 0.0, 96.0, 32.0),
             "Open File...",
             &mut self.open_file_btn,
-        ) {
+        );
+        btn.draw(ctx);
+        if btn.is_click(ctx, MouseButton::Left) {
             // We use ctx.spawn here to defer opening of the file dialog until after drawing is complete.
             ctx.spawn(|| {
                 // Note: we cannot open_file_dialog in this thread; it must be done on the main thread (macOS)
@@ -90,12 +89,16 @@ impl Application for Ui {
         if let Some(song) = &mut self.open_song {
             song.draw(ctx, delta);
 
-            if btn::primary(ctx, delta, rect(100.0, 0.0, 64.0, 32.0), "Play", &mut self.play_btn) {
+            let btn = btn::primary(ctx, delta, rect(100.0, 0.0, 64.0, 32.0), "Play", &mut self.play_btn);
+            btn.draw(ctx);
+            if btn.is_click(ctx, MouseButton::Left) {
                 let data = song.bgm.as_bytes().unwrap(); // TODO handle error
                 self.hot_reload_tx.send(data).unwrap();
             }
 
-            if btn::primary(ctx, delta, rect(168.0, 0.0, 96.0, 32.0), "Save As...", &mut self.save_file_btn) {
+            let btn = btn::primary(ctx, delta, rect(168.0, 0.0, 96.0, 32.0), "Save As...", &mut self.save_file_btn);
+            btn.draw(ctx);
+            if btn.is_click(ctx, MouseButton::Left) {
                 let current_path = song.path.to_string_lossy().to_string();
                 ctx.spawn(|| {
                     move |ui: &mut Self| {

@@ -28,10 +28,10 @@ impl Font {
 }
 
 // TODO: monocolor
-pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> Entity<geometry::multicolor::Geometry> {
+pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> GeometryEntity<geometry::multicolor::Geometry> {
     // TODO: cache individual glyph paths and batch them into a longer path
 
-    let mesh = ctx.fill_path((font, color, text), |path, (font, color, text)| {
+    let mut mesh = ctx.fill_path((font, color, text), |path, (font, color, text)| {
         let font = font.face();
 
         let units_per_em = font.units_per_em().unwrap() as f32;
@@ -70,7 +70,8 @@ pub fn label(ctx: &mut Ctx, font: Font, color: Color, size: f32, text: &str) -> 
 
     // Convert to view space
     let units_per_em = font.face().units_per_em().unwrap() as f32;
-    mesh.scale(size / units_per_em)
+    mesh.scale_uniform(size / units_per_em);
+    mesh
 }
 
 /*
@@ -121,7 +122,7 @@ struct FontPathBuilder<'a> {
 }
 
 impl<'a> FontPathBuilder<'a> {
-    fn point(&self, x: f32, y: f32) -> Point2D<GeomSpace> {
+    fn point(&self, x: f32, y: f32) -> Point2D {
         point(self.x_offset + x, self.y_offset + (self.flip_height - y))
     }
 }
