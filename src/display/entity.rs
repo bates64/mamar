@@ -53,6 +53,10 @@ pub trait Entity: Send + Sync {
         ));
     }
 
+    fn children(&self) -> Option<&Vec<Box<dyn Entity>>> {
+        None
+    }
+
     /*
     /// Returns `true` if the mouse is hovering over this entity in its current position.
     ///
@@ -166,6 +170,10 @@ impl Entity for EntityGroup {
         }
 
         aabb
+    }
+
+    fn children(&self) -> Option<&Vec<Box<dyn Entity>>> {
+        Some(&self.children)
     }
 }
 

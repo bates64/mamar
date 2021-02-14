@@ -46,7 +46,7 @@ impl Multicolor {
         F: FnOnce(&mut PathBuilder),
     {
         let mut path = Path::builder_with_attributes(4);
-        let aabb = build(&mut path);
+        build(&mut path);
         let path = path.build();
 
         let mut geometry = VertexBuffers::new();
@@ -60,10 +60,7 @@ impl Multicolor {
             )
             .unwrap();
 
-        let aabb = //aabb.unwrap_or_else(|| {
-            lyon::algorithms::aabb::fast_bounding_rect(path.iter())
-                .to_box2d();
-        //});
+        let aabb = lyon::algorithms::aabb::fast_bounding_rect(path.iter()).to_box2d();
 
         Self {
             geometry,
