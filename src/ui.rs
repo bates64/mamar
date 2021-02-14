@@ -30,7 +30,6 @@ fn button(text: &str) -> EntityGroup {
         path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
         path.end(true);
     });
-    container.translate(vec3(0.0, 0.0, -1.0)); // Behind the text
 
     /*
     if container.is_click {
@@ -48,7 +47,9 @@ fn button(text: &str) -> EntityGroup {
         path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
         path.end(true);
     });
-    shadow.translate(vec3(4.0, 4.0, -1.0));
+
+    shadow.translate(vec3(4.0, 4.0, -1.0)); // Behind container
+    text.translate(vec3(0.0, 0.0, 1.0)); // Above container
 
     let mut root = EntityGroup::with_capacity(2);
     root.add(container);

@@ -43,7 +43,7 @@ pub fn screen_to_clip(display: &glium::Display) -> Transform3D {
     let size = window.inner_size().to_logical(window.scale_factor());
 
     // This orthographic projection converts logical screen-space coords to normalized (-1.0..1.0) coords for GL.
-    Transform3D::ortho(0.0, size.width, size.height, 0.0, -1.0, 1.0)
+    Transform3D::ortho(0.0, size.width, size.height, 0.0, 1000.0, -1000.0)
 }
 
 pub type Angle = euclid::Angle<f32>;

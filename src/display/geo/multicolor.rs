@@ -1,3 +1,4 @@
+use glium::draw_parameters::*;
 use glium::program::ProgramCreationInput;
 use glium::{implement_vertex, uniform};
 use lyon::path::path::BuilderWithAttributes as PathBuilder;
@@ -92,8 +93,13 @@ impl Entity for Multicolor {
             &uniform! {
                 transform: transform,
             },
-            &glium::DrawParameters {
-                blend: glium::draw_parameters::Blend::alpha_blending(),
+            &DrawParameters {
+                blend: Blend::alpha_blending(),
+                depth: Depth {
+                    test: DepthTest::IfMore,
+                    write: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         );
