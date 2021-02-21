@@ -64,7 +64,7 @@ impl Multicolor {
 
         Self {
             geometry,
-            aabb: Box3D::new(point3(aabb.min.x, aabb.min.y, 0.0), point3(aabb.max.x, aabb.max.y, 0.0)),
+            aabb: Box3D::new(point3(aabb.min.x, aabb.min.y, 0.0), point3(aabb.max.x, aabb.max.y, 0.1)),
             transform: Default::default(),
         }
     }
@@ -72,7 +72,9 @@ impl Multicolor {
 
 impl Entity for Multicolor {
     fn draw(&mut self, ctx: &mut Ctx) {
-        let transform = self.transform.to_arrays();
+        let transform = self.transform
+            .then(&ctx.projection())
+            .to_arrays();
 
         ctx.draw(
             &self.geometry.vertices,

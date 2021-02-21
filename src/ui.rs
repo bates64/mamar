@@ -51,7 +51,7 @@ fn button(text: &str) -> EntityGroup {
     shadow.translate(vec3(4.0, 4.0, -1.0)); // Behind container
     text.translate(vec3(0.0, 0.0, 1.0)); // Above container
 
-    let mut root = EntityGroup::with_capacity(2);
+    let mut root = EntityGroup::with_capacity(3);
     root.add(container);
     root.add(shadow);
     root.add(text);
@@ -62,6 +62,10 @@ pub struct Ui {
     hot_reload_tx: Sender<Vec<u8>>,
 
     open_song: Option<Song>,
+}
+
+pub enum Msg {
+    Click,
 }
 
 impl Ui {
@@ -79,15 +83,23 @@ impl Ui {
         }
     }
 
+    pub fn update(&mut self, msg: Msg) {
+        match msg {
+            Msg::Click => println!("its click"),
+        }
+    }
+
     pub fn draw(&mut self, _delta: Duration) -> EntityGroup {
         log::debug!("draw");
 
         let mut root = EntityGroup::new();
 
         let mut button = button("I am a button");
-        /*button.on_click(|| {
-            println!("i was clicked!");
-        });*/
+        button.before_draw(|button, ctx| {
+            if ctx.is_left_click(button) {
+                println!("button was clicked");
+            }
+        });
 
         //button.anchor(point3(0.5, 0.5, 0.5));
         //button.scale_uniform(2.0);

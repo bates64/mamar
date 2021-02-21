@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use crate::display::draw::Ctx;
 use crate::util::*;
 
@@ -53,7 +51,7 @@ pub trait Entity: Send + Sync {
         ));
     }
 
-    fn children(&self) -> Option<&Vec<Box<dyn Entity>>> {
+    fn children(&mut self) -> Option<&mut Vec<Box<dyn Entity>>> {
         None
     }
 
@@ -104,6 +102,7 @@ pub trait Entity: Send + Sync {
     */
 }
 
+/*
 impl PartialEq for dyn Entity {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
@@ -127,11 +126,13 @@ impl Ord for dyn Entity {
         other_z.cmp(&self_z)
     }
 }
+*/
 
 /// A bunch of entities grouped together, so they can be transformed and drawn as one.
 #[derive(Default)]
 pub struct EntityGroup {
     children: Vec<Box<dyn Entity>>,
+    before_draw: Vec<Box<dyn Fn(&EntityGroup, &mut Ctx) + Send + Sync>>,
 }
 
 impl EntityGroup {
@@ -140,17 +141,30 @@ impl EntityGroup {
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { children: Vec::with_capacity(capacity) }
+        Self {
+            children: Vec::with_capacity(capacity),
+            before_draw: Vec::new(),
+        }
     }
 
     pub fn add<E: Entity + 'static>(&mut self, child: E) {
         self.children.push(Box::new(child));
     }
+
+    pub fn before_draw<F>(&mut self, f: F)
+    where
+        F: Fn(&EntityGroup, &mut Ctx) + Send + Sync + 'static,
+    {
+        self.before_draw.push(Box::new(f));
+    }
 }
 
 impl Entity for EntityGroup {
     fn draw(&mut self, ctx: &mut Ctx) {
-        self.children.par_sort_unstable();
+        for cb in &self.before_draw {
+            cb(self, ctx);
+        }
+
         for child in &mut self.children {
             child.draw(ctx);
         }
@@ -166,19 +180,23 @@ impl Entity for EntityGroup {
         let mut aabb = Box3D::zero();
 
         for child in &self.children {
-            aabb = aabb.union(&child.bounding_box());
+            if aabb.is_empty() {
+                aabb = child.bounding_box();
+            } else {
+                aabb = aabb.union(&child.bounding_box());
+            }
         }
 
         aabb
     }
 
-    fn children(&self) -> Option<&Vec<Box<dyn Entity>>> {
-        Some(&self.children)
+    fn children(&mut self) -> Option<&mut Vec<Box<dyn Entity>>> {
+        Some(&mut self.children)
     }
 }
 
 impl From<Vec<Box<dyn Entity>>> for EntityGroup {
     fn from(children: Vec<Box<dyn Entity>>) -> Self {
-        Self { children }
+        Self { children, before_draw: Vec::new() }
     }
 }

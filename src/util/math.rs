@@ -35,17 +35,6 @@ pub type Transform2D<FromSpace, ToSpace> = euclid::Transform2D<f32, FromSpace, T
 pub type Transform3D<FromSpace, ToSpace> = euclid::Transform3D<f32, FromSpace, ToSpace>;
 */
 
-/// Calculates a screen-space projection matrix for the given display.
-/// Needs to be recalculated if the display's size or DPI changes.
-pub fn screen_to_clip(display: &glium::Display) -> Transform3D {
-    let gl_window = display.gl_window();
-    let window = gl_window.window();
-    let size = window.inner_size().to_logical(window.scale_factor());
-
-    // This orthographic projection converts logical screen-space coords to normalized (-1.0..1.0) coords for GL.
-    Transform3D::ortho(0.0, size.width, size.height, 0.0, 1000.0, -1000.0)
-}
-
 pub type Angle = euclid::Angle<f32>;
 
 pub type Point2D = euclid::Point2D<f32, UnknownUnit>;

@@ -34,9 +34,9 @@ fn main() {
                         delta
                     };
 
-                    let display_list = ui.draw(delta);
+                    let root = Box::new(ui.draw(delta));
 
-                    let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(display_list));
+                    let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(root));
                 } // ...
             }
         }
