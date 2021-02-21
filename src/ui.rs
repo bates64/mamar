@@ -64,10 +64,6 @@ pub struct Ui {
     open_song: Option<Song>,
 }
 
-pub enum Msg {
-    Click,
-}
-
 impl Ui {
     pub fn new(hot_reload_tx: Sender<Vec<u8>>) -> Self {
         Ui {
@@ -80,12 +76,6 @@ impl Ui {
         match &self.open_song {
             None => "Mamar".to_string(),
             Some(song) => format!("{} - Mamar", song.file_name()),
-        }
-    }
-
-    pub fn update(&mut self, msg: Msg) {
-        match msg {
-            Msg::Click => println!("its click"),
         }
     }
 
