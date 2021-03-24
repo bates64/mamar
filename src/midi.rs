@@ -46,6 +46,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
                 },
             },
             midi_track_to_bgm_track(smf.tracks.get(1), total_song_length),
+            /*Track::default(),
             Track::default(),
             Track::default(),
             Track::default(),
@@ -58,9 +59,8 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
             Track::default(),
             Track::default(),
             Track::default(),
-            Track::default(),
-            Track::default(),
-            /*midi_track_to_bgm_track(smf.tracks.get(2), total_song_length),
+            Track::default(),*/
+            midi_track_to_bgm_track(smf.tracks.get(2), total_song_length),
             midi_track_to_bgm_track(smf.tracks.get(3), total_song_length),
             midi_track_to_bgm_track(smf.tracks.get(4), total_song_length),
             midi_track_to_bgm_track(smf.tracks.get(5), total_song_length),
@@ -73,7 +73,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
             midi_track_to_bgm_track(smf.tracks.get(12), total_song_length),
             midi_track_to_bgm_track(smf.tracks.get(13), total_song_length),
             midi_track_to_bgm_track(smf.tracks.get(14), total_song_length),
-            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length),*/
+            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length),
         ],
     });
 
@@ -112,12 +112,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
         Some(events) => {
             let mut track = Track {
                 flags: 0xA000,
-                commands: CommandSeq::from(vec![
-                    Command::SubTrackReverb(0),
-                    Command::TrackOverridePatch { bank: 48, patch: 0 },
-                    Command::SubTrackVolume(100),
-                    Command::SubTrackPan(64),
-                ]),
+                commands: CommandSeq::new(),
             };
 
             let mut time = 0;
@@ -181,6 +176,13 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
             }
 
             track.commands.insert(total_song_length, Command::End);
+
+            track.commands.insert_many(0, vec![
+                Command::SubTrackReverb(0),
+                Command::TrackOverridePatch { bank: 48, patch: 0 },
+                Command::SubTrackVolume(100),
+                Command::SubTrackPan(64),
+            ]);
 
             track
         }
