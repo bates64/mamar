@@ -374,14 +374,13 @@ impl CommandSeq {
                     }
                 }
                 Command::Note {
-                    flag,
                     pitch,
                     velocity,
                     length,
                 } => {
                     let length = if *length > 0xD3FF { 0xD3FF } else { *length };
 
-                    f.write_u8(pitch | if *flag { 1 } else { 0 })?;
+                    f.write_u8(*pitch)?;
                     f.write_u8(*velocity)?;
                     if length < 0xC0 {
                         f.write_u8(length as u8)?;

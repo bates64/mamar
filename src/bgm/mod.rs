@@ -205,13 +205,8 @@ impl Bgm {
                                                 pitch,
                                                 velocity,
                                                 length,
-                                                flag,
                                             } => {
-                                                write!(f, "            note {} {} {}", pitch, velocity, length)?;
-                                                if *flag {
-                                                    write!(f, " flag=true")?;
-                                                }
-                                                writeln!(f)?;
+                                                writeln!(f, "            note {} {} {}", pitch, velocity, length)?
                                             }
                                             Command::MasterTempo(bpm) => writeln!(f, "            set_tempo {}", bpm)?,
                                             Command::MasterTempoFade { time, bpm } => {

@@ -374,11 +374,8 @@ impl CommandSeq {
 
                 // Note
                 0x80..=0xD3 => {
-                    let flag = (cmd_byte & 1) != 0;
-                    let pitch = cmd_byte & !1;
-
+                    let pitch = cmd_byte;
                     let velocity = f.read_u8()?;
-
                     let length = {
                         let first_byte = f.read_u8()? as u16;
 
@@ -397,7 +394,6 @@ impl CommandSeq {
 
                     Command::Note {
                         pitch,
-                        flag,
                         velocity,
                         length,
                     }

@@ -132,10 +132,9 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                 track.commands.insert(
                                     start.time,
                                     Command::Note {
-                                        pitch: key,
+                                        pitch: key + 104,
                                         velocity: start.vel,
                                         length: length as u16,
-                                        flag: false,
                                     },
                                 );
                             } else {
@@ -153,10 +152,9 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                     track.commands.insert(
                                         start.time,
                                         Command::Note {
-                                            pitch: key,
+                                            pitch: key + 104,
                                             velocity: start.vel,
                                             length: length as u16,
-                                            flag: false,
                                         },
                                     );
                                 } else {
@@ -175,11 +173,15 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                 log::warn!("{} unended notes", started_notes.len());
             }
 
+            if track.commands.is_empty() {
+                return Track::default();
+            }
+
             track.commands.insert(total_song_length, Command::End);
 
             track.commands.insert_many(0, vec![
                 Command::SubTrackReverb(0),
-                Command::TrackOverridePatch { bank: 48, patch: 0 },
+                Command::TrackOverridePatch { bank: 48, patch: 73 },
                 Command::SubTrackVolume(100),
                 Command::SubTrackPan(64),
             ]);
@@ -191,5 +193,5 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
 
 // TODO
 fn convert_time(t: usize) -> usize {
-    t / 2
+    t / 10
 }

@@ -539,9 +539,6 @@ pub enum Command {
         // TODO: determine max value (it's not u16::MAX)
         // I think it's 0xD3FF? TODO use newtype
         length: u16,
-
-        /// Unknown flag.
-        flag: bool,
     },
 
     /// Sets the beats-per-minute of the composition.
