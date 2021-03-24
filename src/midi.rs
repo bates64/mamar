@@ -103,7 +103,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
             let mut started_notes: HashMap<u8, Note> = HashMap::new(); // Maps key to notes that have not finished yet
 
             for event in events {
-                time += convert_time(event.delta.as_int() as usize, time_divisor);
+                time += event.delta.as_int() as usize;
 
                 match event.kind {
                     TrackEventKind::Midi { channel: _, message } => {
@@ -115,11 +115,11 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                     let length = time - start.time;
 
                                     track.commands.insert(
-                                        start.time,
+                                        convert_time(start.time, time_divisor),
                                         Command::Note {
                                             pitch: key + 104,
                                             velocity: start.vel,
-                                            length: length as u16,
+                                            length: convert_time(length as usize, time_divisor) as u16,
                                         },
                                     );
                                 } else {
@@ -135,7 +135,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                         let length = time - start.time;
 
                                         track.commands.insert(
-                                            start.time,
+                                            convert_time(start.time, time_divisor),
                                             Command::Note {
                                                 pitch: key + 104,
                                                 velocity: start.vel,
@@ -152,7 +152,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                             MidiMessage::ProgramChange { program } => {
                                 log::debug!("program change: {}", program);
                                 track.commands.insert(
-                                    time,
+                                    convert_time(time, time_divisor),
                                     Command::TrackOverridePatch { bank: 48, patch: program.as_int() },
                                 );
                             }
@@ -163,7 +163,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                         let microseconds_per_beat = tempo.as_int() as f32;
                         let beats_per_minute = (60_000_000.0 / microseconds_per_beat).round() as u16;
                         track.commands.insert(
-                            time,
+                            convert_time(time, time_divisor),
                             Command::MasterTempo(beats_per_minute),
                         );
                         log::debug!("bpm: {}", beats_per_minute);
