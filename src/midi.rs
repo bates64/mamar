@@ -8,6 +8,8 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     let smf = Smf::parse(raw)?;
     let mut bgm = Bgm::new();
 
+    bgm.index = "152 ".to_string(); // TODO: is this required?
+
     let total_song_length = {
         let mut max = 0;
 
@@ -35,9 +37,9 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
                 flags: 0xA000,
                 commands: {
                     let mut seq = CommandSeq::from(vec![
-                        Command::MasterTempo(128), // smf.header.timing
+                        Command::MasterTempo(180), // smf.header.timing
                         Command::MasterVolume(100),
-                        Command::MasterEffect(0),
+                        Command::MasterEffect(0, 1),
                     ]);
                     seq.insert(total_song_length, Command::End);
                     seq

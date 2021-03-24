@@ -415,9 +415,10 @@ impl CommandSeq {
                     f.write_u16_be(*time)?;
                     f.write_u8(*volume)?;
                 }
-                Command::MasterEffect(effect) => {
+                Command::MasterEffect(a, b) => {
                     f.write_u8(0xE6)?;
-                    f.write_u8(*effect)?;
+                    f.write_u8(*a)?;
+                    f.write_u8(*b)?;
                 }
                 Command::TrackOverridePatch { bank, patch } => {
                     f.write_u8(0xE8)?;

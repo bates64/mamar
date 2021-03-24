@@ -578,7 +578,7 @@ pub enum Command {
     MasterTranspose(i8),
 
     /// Applies the given effect to the entire composition.
-    MasterEffect(u8), // TODO: enum for field
+    MasterEffect(u8, u8), // TODO: enum for field
 
     /// Sets the bank/patch of this track, overriding its [super::Voice].
     TrackOverridePatch {

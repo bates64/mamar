@@ -415,7 +415,7 @@ impl CommandSeq {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
-                0xE6 => Command::MasterEffect(f.read_u8()?), // TODO: clover says this takes (u8, u8) not (u8)
+                0xE6 => Command::MasterEffect(f.read_u8()?, f.read_u8()?),
                 0xE7 => Command::Unknown(smallvec![0xE7]),
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,

@@ -233,7 +233,7 @@ impl Bgm {
                                                 writeln!(f, "            fade_volume {} {}", volume, time)?
                                             }
                                             Command::MasterTranspose(t) => writeln!(f, "            transpose {}", t)?,
-                                            Command::MasterEffect(e) => writeln!(f, "            effect {}", e)?,
+                                            Command::MasterEffect(a, b) => writeln!(f, "            effect {} {}", a, b)?,
                                             Command::TrackOverridePatch { bank, patch } => {
                                                 writeln!(f, "            override_bank_patch {} {}", bank, patch)?
                                             }
