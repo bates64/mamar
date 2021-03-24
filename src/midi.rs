@@ -149,6 +149,13 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                     started_notes.insert(key, Note { time, vel });
                                 }
                             }
+                            MidiMessage::ProgramChange { program } => {
+                                log::debug!("program change: {}", program);
+                                track.commands.insert(
+                                    time,
+                                    Command::TrackOverridePatch { bank: 48, patch: program.as_int() },
+                                );
+                            }
                             _ => {}
                         }
                     }
@@ -186,9 +193,10 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
             track.commands.insert(total_song_length, Command::End);
 
             if !is_master {
+                // Required else the game crashes D:
                 track.commands.insert_many(0, vec![
                     Command::SubTrackReverb(0),
-                    Command::TrackOverridePatch { bank: 48, patch: 73 },
+                    Command::TrackOverridePatch { bank: 48, patch: 1 },
                     Command::SubTrackVolume(100),
                     Command::SubTrackPan(64),
                 ]);
