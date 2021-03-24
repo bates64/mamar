@@ -94,86 +94,43 @@ impl Ui {
     pub fn draw(&mut self, _delta: Duration, i: &Input) -> EntityGroup {
         let mut root = EntityGroup::new();
 
-        let mut button = button("Open File...", 128.0);
+        root.add({
+            let mut button = button("Open File...", 128.0);
 
-        log::debug!("song is open? {}", self.open_song.is_some());
-
-        if i.is_left_click(&button.bounding_box()) {
-            // We cannot open_file_dialog in the UI thread; it must be done on the main thread (specifically, on macOS).
-            // This is why we do everything in the below callback.
-            button.before_draw(|_, ctx| {
-                log::debug!("showing file open dialog");
-                let f =
-                    tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM files")));
-
-                if let Some(path) = f {
-                    // This will eventually route back to `self.open_song(path)`.
-                    let _ = ctx.ui_tx.send(UiThreadRequest::OpenSong(path));
-                } else {
-                    log::debug!("user cancelled file open operation");
-                }
-            });
-        }
-
-        root.add(button);
-
-        /*
-        shape::rect(ctx, {
-            let size = ctx.display_size();
-            rect(0.0, 0.0, size.width, size.height)
-        }, color::BACKGROUND).draw(ctx);
-
-        ctx.set_window_title(&self.window_title());
-
-        let btn = btn::primary(
-            ctx,
-            rect(0.0, 0.0, 96.0, 32.0),
-            "Open File...",
-        );
-        btn.draw(ctx);
-        if btn.is_click(ctx, MouseButton::Left) {
-            // We use ctx.spawn here to defer opening of the file dialog until after drawing is complete.
-            ctx.spawn(|| {
-                // Note: we cannot open_file_dialog in this thread; it must be done on the main thread (macOS)
+            if i.is_left_click(&button.bounding_box()) {
+                // We cannot open_file_dialog in the UI thread; it must be done on the main thread (specifically, on macOS).
                 // This is why we do everything in the below callback.
-
-                move |ui: &mut Self| {
+                button.before_draw(|_, ctx| {
                     log::debug!("showing file open dialog");
                     let f =
                         tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM files")));
 
-                    if let Some(f) = f {
-                        log::info!("loading song: {}", f);
-
-                        match Song::open(PathBuf::from(f)) {
-                            Ok(song) => ui.open_song = Some(song),
-                            Err(error) => {
-                                let msg = format!("{}", error);
-                                log::error!("{}", msg);
-                                tinyfiledialogs::message_box_ok(
-                                    "Error opening file",
-                                    &msg,
-                                    tinyfiledialogs::MessageBoxIcon::Error,
-                                );
-                            }
-                        }
+                    if let Some(path) = f {
+                        // This will eventually route back to `self.open_song(path)`.
+                        let _ = ctx.ui_tx.send(UiThreadRequest::OpenSong(path));
                     } else {
                         log::debug!("user cancelled file open operation");
                     }
+                });
+            }
+
+            button
+        });
+
+        if let Some(song) = &self.open_song {
+            root.add({
+                let mut button = button(&format!("Play {}", song.file_name()), 128.0);
+                button.translate(vec3(0.0, 36.0, 0.0));
+
+                if i.is_left_click(&button.bounding_box()) {
+                    let _ = self.hot_reload_tx.send(song.bgm.as_bytes().unwrap());
                 }
+
+                button
             });
         }
 
-        if let Some(song) = &mut self.open_song {
-            song.draw(ctx, delta);
-
-            let btn = btn::primary(ctx, rect(100.0, 0.0, 64.0, 32.0), "Play");
-            btn.draw(ctx);
-            if btn.is_click(ctx, MouseButton::Left) {
-                let data = song.bgm.as_bytes().unwrap(); // TODO handle error
-                self.hot_reload_tx.send(data).unwrap();
-            }
-
+        /*
             let btn = btn::primary(ctx, rect(168.0, 0.0, 96.0, 32.0), "Save As...");
             btn.draw(ctx);
             if btn.is_click(ctx, MouseButton::Left) {
@@ -200,7 +157,6 @@ impl Ui {
                     }
                 });
             }
-        }
         */
 
         root
