@@ -358,14 +358,18 @@ impl CommandSeq {
                 // Delay
                 0x01..=0x77 => Command::Delay(cmd_byte as usize),
 
-                // TODO: this doesn't seem like a long delay; needs testing. Leaving as Unknown for now
                 // Long delay
                 0x78..=0x7F => {
-                    /*
+                    // It's possible that this logic is entirely wrong, I just derived it from the inverse
+                    // of the midi2bgm routine encoding delays.
+
+                    let num_256s = (cmd_byte - 0x78) as usize;
+                    let extend = f.read_u8()? as usize;
+
+                    Command::Delay(0x78 + num_256s * 256 + extend)
+
                     // This logic taken from N64MidiTool
-                    Command::Delay(0x78 + cmd_byte + (f.read_u8()? & 0x7) << 8));
-                    */
-                    Command::Unknown(smallvec![cmd_byte, f.read_u8()?])
+                    //Command::Delay(0x78 + (cmd_byte as usize) + ((f.read_u8()? & 7) as usize) << 8)
                 }
 
                 // Note
@@ -411,7 +415,7 @@ impl CommandSeq {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
-                0xE6 => Command::MasterEffect(f.read_u8()?),
+                0xE6 => Command::MasterEffect(f.read_u8()?), // TODO: clover says this takes (u8, u8) not (u8)
                 0xE7 => Command::Unknown(smallvec![0xE7]),
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,
