@@ -42,11 +42,11 @@ impl Song {
             }
         };
 
-        log::debug!("{}", {
+        /*log::debug!("{}", {
             let mut s = String::new();
             bgm.write_kdl(&mut s).unwrap();
             s
-        });
+        });*/
 
         Ok(Self { bgm, path })
     }
