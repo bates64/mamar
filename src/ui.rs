@@ -4,39 +4,33 @@ pub mod text;
 
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use std::path::PathBuf;
 
-//pub type Ctx = crate::display::draw::Ctx;
 use song::Song;
 
 use crate::display::*;
 use crate::util::*;
 
-fn button(text: &str) -> EntityGroup {
+fn button(text: &str, width: f32) -> EntityGroup {
     let mut text = text::label(text, color::WHITE, 14.0);
 
-    let container_box = text.bounding_box().inflate(16.0, 16.0, 0.0);
+    let container_box = Box3D::new(point3(0.0, 0.0, 0.0), point3(width, 32.0, 0.0)); //text.bounding_box().inflate(16.0, 16.0, 0.0);
     //container_box.translate(vec3(16.0, 16.0, 0.0));
 
     text.translate(container_box.center().to_vector());
     text.anchor(point3(0.5, 0.6, 0.5)); // y is off to account for baseline
-    text.rotate_2d(deg(0.5));
 
-    let mut container = geo::Multicolor::build_svg(|path| {
+    let container = geo::Multicolor::build_svg(|path| {
         let color = color::PURPLE.as_rgba_f32();
 
-        path.begin(point(container_box.min.x - 1.0 , container_box.min.y + 1.0), &color); // top-left
-        path.line_to(point(container_box.max.x + 1.0, container_box.min.y), &color); // top-right
-        path.line_to(point(container_box.max.x, container_box.max.y + 2.0), &color); // bottom-right
-        path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
+        path.begin(point(container_box.min.x , container_box.min.y), &color); // top-left
+        path.line_to(point(container_box.max.x, container_box.min.y), &color); // top-right
+        path.line_to(point(container_box.max.x, container_box.max.y), &color); // bottom-right
+        path.line_to(point(container_box.min.x, container_box.max.y), &color); // bottom-left
         path.end(true);
     });
 
     /*
-    if container.is_click {
-        container.translate(vec3(3.0, 3.0, 0.0));
-    }
-    */
-
     // FIXME: alpha channel
     let mut shadow = geo::Multicolor::build_svg(|path| {
         let color = [0.0, 0.0, 0.0, 0.1];
@@ -47,13 +41,14 @@ fn button(text: &str) -> EntityGroup {
         path.line_to(point(container_box.min.x + 2.0, container_box.max.y - 2.0), &color); // bottom-left
         path.end(true);
     });
+    */
 
-    shadow.translate(vec3(4.0, 4.0, -1.0)); // Behind container
+    //shadow.translate(vec3(4.0, 4.0, -1.0)); // Behind container
     text.translate(vec3(0.0, 0.0, 1.0)); // Above container
 
-    let mut root = EntityGroup::with_capacity(3);
+    let mut root = EntityGroup::with_capacity(2);
     root.add(container);
-    root.add(shadow);
+    //root.add(shadow);
     root.add(text);
     root
 }
@@ -79,21 +74,46 @@ impl Ui {
         }
     }
 
-    pub fn draw(&mut self, _delta: Duration) -> EntityGroup {
-        log::debug!("draw");
+    pub fn open_song(&mut self, path: String) {
+        log::info!("loading song: {}", path);
 
+        match Song::open(PathBuf::from(path)) {
+            Ok(song) => self.open_song = Some(song),
+            Err(error) => {
+                let msg = format!("{}", error);
+                log::error!("{}", msg);
+                tinyfiledialogs::message_box_ok(
+                    "Error opening file",
+                    &msg,
+                    tinyfiledialogs::MessageBoxIcon::Error,
+                );
+            }
+        }
+    }
+
+    pub fn draw(&mut self, _delta: Duration, i: &Input) -> EntityGroup {
         let mut root = EntityGroup::new();
 
-        let mut button = button("I am a button");
-        button.before_draw(|button, ctx| {
-            if ctx.is_left_click(button) {
-                println!("button was clicked");
-            }
-        });
+        let mut button = button("Open File...", 128.0);
 
-        //button.anchor(point3(0.5, 0.5, 0.5));
-        //button.scale_uniform(2.0);
-        button.translate(vec3(100.0, 100.0, 0.0));
+        log::debug!("song is open? {}", self.open_song.is_some());
+
+        if i.is_left_click(&button.bounding_box()) {
+            // We cannot open_file_dialog in the UI thread; it must be done on the main thread (specifically, on macOS).
+            // This is why we do everything in the below callback.
+            button.before_draw(|_, ctx| {
+                log::debug!("showing file open dialog");
+                let f =
+                    tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM files")));
+
+                if let Some(path) = f {
+                    // This will eventually route back to `self.open_song(path)`.
+                    let _ = ctx.ui_tx.send(UiThreadRequest::OpenSong(path));
+                } else {
+                    log::debug!("user cancelled file open operation");
+                }
+            });
+        }
 
         root.add(button);
 

@@ -1,10 +1,11 @@
+use std::sync::mpsc::Sender;
+
 use glium::index::PrimitiveType;
 use glium::program::{Program, ProgramCreationInput};
 use glium::uniforms::Uniforms;
 use glium::{Display, DrawParameters, Frame, IndexBuffer, Surface, Vertex, VertexBuffer};
 
-use super::input::InputState;
-use super::Entity;
+use super::UiThreadRequest;
 use crate::util::*;
 
 /// Calculates a screen-space projection matrix for the given display.
@@ -20,28 +21,12 @@ fn screen_to_clip(display: &glium::Display) -> Transform3D {
 pub struct Ctx {
     pub display: Display,
     frame: Frame,
-    /* refcell caches */
 
-    /*
-    event_loop_proxy: EventLoopProxy<Ui>,
-
-    projection: Transform3D,
-
-    redraw_requested: bool,
-
-    // XXX: these would be better encapsulated in geometry::multicolor if possible
-    multicolor_shader: Program,
-    multicolor_geom_cache: LruCache<u64, Rc<geometry::multicolor::Geometry>>,
-
-    //texture_shader: Program,
-    */
-
-    pub input_state: InputState,
-    pub prev_input_state: InputState,
+    pub ui_tx: Sender<UiThreadRequest>,
 }
 
 impl Ctx {
-    pub fn new(display: Display) -> Self {
+    pub fn new(display: Display, ui_tx: Sender<UiThreadRequest>) -> Self {
         Self {
             frame: {
                 let mut frame = display.draw();
@@ -49,8 +34,7 @@ impl Ctx {
                 frame
             },
             display,
-            input_state: InputState::default(),
-            prev_input_state: InputState::default(),
+            ui_tx,
         }
     }
 
@@ -59,8 +43,6 @@ impl Ctx {
 
         self.frame = self.display.draw();
         self.frame.clear_all(color::BACKGROUND.as_rgba_f32_tuple(), -1000.0, 0);
-
-        self.prev_input_state = self.input_state.clone();
     }
 
     pub fn projection(&self) -> Transform3D {
@@ -88,21 +70,6 @@ impl Ctx {
         self.frame
             .draw(&vertex_buf, &index_buf, &program, uniforms, params)
             .unwrap();
-    }
-
-    pub fn is_mouse_over<E: Entity>(&self, entity: &E) -> bool {
-        if let Some(mouse_pos) = self.input_state.mouse_pos_raycasted {
-            // We need to inflate on the Z axis slightly because the mouse_pos may be on the exact border
-            entity.bounding_box().inflate(0.0, 0.0, 0.0001).contains(mouse_pos)
-        } else {
-            false
-        }
-    }
-
-    pub fn is_left_click<E: Entity>(&self, entity: &E) -> bool {
-        self.input_state.left_mouse
-            && !self.prev_input_state.left_mouse
-            && self.is_mouse_over(entity)
     }
 }
 

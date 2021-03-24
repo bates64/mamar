@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Instant;
 
-use mamar::display::init::{MainThreadRequest, UiThreadRequest};
+use mamar::display::{Input, MainThreadRequest, UiThreadRequest};
 use mamar::ui::Ui;
 
 fn main() {
@@ -22,22 +22,35 @@ fn main() {
     thread::spawn(move || {
         let mut prev_draw = Instant::now();
         let mut ui = Ui::new(hot_reload_tx);
+        let mut input = Input::default();
 
         while let Ok(req) = ui_rx.recv() {
+            let mut draw = false;
             match req {
-                UiThreadRequest::Draw => {
-                    // Calculate the duration since the last time we drew
-                    let delta = {
-                        let now = Instant::now();
-                        let delta = now.duration_since(prev_draw);
-                        prev_draw = now;
-                        delta
-                    };
+                UiThreadRequest::Draw(new_input) => {
+                    input = new_input;
+                    draw = true;
+                }
 
-                    let root = Box::new(ui.draw(delta));
+                UiThreadRequest::OpenSong(path) => {
+                    ui.open_song(path);
+                    draw = true;
+                    input = Input::default(); // Needed so 'Open File...' button doesn't think its been clicked twice
+                }
+            }
 
-                    let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(root));
-                } // ...
+            if draw {
+                // Calculate the duration since the last time we drew
+                let delta = {
+                    let now = Instant::now();
+                    let delta = now.duration_since(prev_draw);
+                    prev_draw = now;
+                    delta
+                };
+
+                // Draw, then send the entities to the main thread to actually be rendered
+                let root = Box::new(ui.draw(delta, &input));
+                let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(root));
             }
         }
     });
