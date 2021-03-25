@@ -22,6 +22,7 @@ use crate::util::math::*;
 pub enum UiThreadRequest {
     Draw(Input), // Please send me a display list so I can draw it
     OpenSong(String), // Open BGM at given path
+    SaveSongAs(String), // Save open BGM to given path
 }
 
 /// A request for the main thread to do something, from the ui thread.

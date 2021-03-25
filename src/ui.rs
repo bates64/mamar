@@ -2,6 +2,8 @@ pub mod shape;
 mod song;
 pub mod text;
 
+use std::error::Error;
+use std::fmt::{self, Display};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -59,6 +61,17 @@ pub struct Ui {
     open_song: Option<Song>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct NoSongOpen;
+
+impl Display for NoSongOpen {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "no song is open")
+    }
+}
+
+impl Error for NoSongOpen {}
+
 impl Ui {
     pub fn new(hot_reload_tx: Sender<Vec<u8>>) -> Self {
         Ui {
@@ -91,6 +104,23 @@ impl Ui {
         }
     }
 
+    pub fn save_song_as(&mut self, path: String) -> Result<(), Box<dyn Error>> {
+        use std::fs::File;
+
+        if let Some(song) = self.open_song.as_mut() {
+            log::info!("saving bgm to {}", path);
+            let mut f = File::create(&path)?;
+
+            song.path = PathBuf::from(path);
+            song.bgm.encode(&mut f)?;
+
+            Ok(())
+        } else {
+            // No song open???
+            Err(Box::new(NoSongOpen))
+        }
+    }
+
     pub fn draw(&mut self, _delta: Duration, i: &Input) -> EntityGroup {
         let mut root = EntityGroup::new();
 
@@ -103,7 +133,7 @@ impl Ui {
                 button.before_draw(|_, ctx| {
                     log::debug!("showing file open dialog");
                     let f =
-                        tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM files")));
+                        tinyfiledialogs::open_file_dialog("Open File", "", Some((&["*.bgm", "*.bin", "*.mid", "*.midi"], "BGM or MIDI files")));
 
                     if let Some(path) = f {
                         // This will eventually route back to `self.open_song(path)`.
@@ -128,36 +158,30 @@ impl Ui {
 
                 button
             });
-        }
 
-        /*
-            let btn = btn::primary(ctx, rect(168.0, 0.0, 96.0, 32.0), "Save As...");
-            btn.draw(ctx);
-            if btn.is_click(ctx, MouseButton::Left) {
-                let current_path = song.path.to_string_lossy().to_string();
-                ctx.spawn(|| {
-                    move |ui: &mut Self| {
-                        use std::fs::File;
+            root.add({
+                let mut button = button("Save As...", 128.0);
+                button.translate(vec3(0.0, 72.0, 0.0));
 
+                if i.is_left_click(&button.bounding_box()) {
+                    let proposed_path = song.path.with_extension("bgm").to_string_lossy().to_string();
+                    button.before_draw(move |_, ctx| {
                         log::debug!("showing file save dialog");
                         let path =
-                            tinyfiledialogs::save_file_dialog_with_filter("Save As", &current_path, &["*.bgm", "*.bin"], "");
+                            tinyfiledialogs::save_file_dialog_with_filter("Save As", &proposed_path, &["*.bgm", "*.bin"], "");
 
                         if let Some(path) = path {
-                            log::info!("saving bgm to {}", path);
-                            let mut f = File::create(&path).unwrap();
-
-                            let song = ui.open_song.as_mut().unwrap();
-
-                            song.path = PathBuf::from(path);
-                            song.bgm.encode(&mut f).unwrap();
+                            // Routes to `self.save_song_as(path)`.
+                            let _ = ctx.ui_tx.send(UiThreadRequest::SaveSongAs(path));
                         } else {
                             log::debug!("user cancelled file save operation");
                         }
-                    }
-                });
-            }
-        */
+                    });
+                }
+
+                button
+            });
+        }
 
         root
     }

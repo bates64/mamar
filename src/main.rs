@@ -37,6 +37,14 @@ fn main() {
                     draw = true;
                     input = Input::default(); // Needed so 'Open File...' button doesn't think its been clicked twice
                 }
+
+                UiThreadRequest::SaveSongAs(path) => {
+                    if let Err(error) = ui.save_song_as(path) {
+                        log::error!("error saving song: {}", error);
+                    }
+                    draw = true;
+                    input = Input::default();
+                }
             }
 
             if draw {
