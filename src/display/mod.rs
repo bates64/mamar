@@ -67,6 +67,7 @@ pub mod init {
 
                     WindowEvent::CursorMoved { position, .. } => {
                         // Convert position to screen-space
+                        // FIXME: dpi scale on my laptop is 1.75; why?
                         let dpi_scale = {
                             let gl_window = ctx.display.gl_window();
                             gl_window.window().scale_factor()
