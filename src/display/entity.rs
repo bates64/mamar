@@ -131,7 +131,7 @@ impl Ord for dyn Entity {
 /// A bunch of entities grouped together, so they can be transformed and drawn as one.
 #[derive(Default)]
 pub struct EntityGroup {
-    children: Vec<Box<dyn Entity>>,
+    pub children: Vec<Box<dyn Entity>>,
     before_draw: Vec<Box<dyn Fn(&EntityGroup, &mut Ctx) + Send + Sync>>,
 }
 

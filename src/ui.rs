@@ -1,6 +1,7 @@
 pub mod shape;
 mod song;
 pub mod text;
+mod layout;
 
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -53,6 +54,14 @@ fn button(text: &str, width: f32) -> EntityGroup {
     //root.add(shadow);
     root.add(text);
     root
+}
+
+fn ellipsis(s: &str, max_len: usize) -> String {
+    if s.len() > max_len {
+        format!("{}...", &s[..max_len - 3])
+    } else {
+        s.to_owned()
+    }
 }
 
 pub struct Ui {
@@ -122,10 +131,14 @@ impl Ui {
     }
 
     pub fn draw(&mut self, _delta: Duration, i: &Input) -> EntityGroup {
-        let mut root = EntityGroup::new();
+        let mut toolbar = EntityGroup::new();
+        let mut layout = layout::Row::new();
 
-        root.add({
+        toolbar.add({
             let mut button = button("Open File...", 128.0);
+
+            layout.apply(&mut button);
+            layout.pad(10.0);
 
             if i.is_left_click(&button.bounding_box()) {
                 // We cannot open_file_dialog in the UI thread; it must be done on the main thread (specifically, on macOS).
@@ -148,9 +161,11 @@ impl Ui {
         });
 
         if let Some(song) = &self.open_song {
-            root.add({
-                let mut button = button(&format!("Play {}", song.file_name()), 128.0);
-                button.translate(vec3(0.0, 36.0, 0.0));
+            toolbar.add({
+                let mut button = button(&format!("Play {}", ellipsis(&song.file_name(), 10)), 128.0);
+
+                layout.apply(&mut button);
+                layout.pad(10.0);
 
                 if i.is_left_click(&button.bounding_box()) {
                     let _ = self.hot_reload_tx.send(song.bgm.as_bytes().unwrap());
@@ -159,9 +174,11 @@ impl Ui {
                 button
             });
 
-            root.add({
+            toolbar.add({
                 let mut button = button("Save As...", 128.0);
-                button.translate(vec3(0.0, 72.0, 0.0));
+
+                layout.apply(&mut button);
+                layout.pad(10.0);
 
                 if i.is_left_click(&button.bounding_box()) {
                     let proposed_path = song.path.with_extension("bgm").to_string_lossy().to_string();
@@ -182,6 +199,9 @@ impl Ui {
                 button
             });
         }
+
+        let mut root = EntityGroup::new();
+        root.add(toolbar);
 
         root
     }
