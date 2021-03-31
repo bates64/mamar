@@ -2,6 +2,8 @@
 ///! Note that `lyon::math` does this too.
 use euclid::{Trig, UnknownUnit};
 
+pub use std::time::Duration;
+
 /*
 // Coordinate systems.
 // See https://learnopengl.com/Getting-started/Coordinate-Systems for more info.

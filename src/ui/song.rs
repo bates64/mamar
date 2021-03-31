@@ -6,12 +6,21 @@ use std::path::PathBuf;
 
 use crate::bgm::Bgm;
 use crate::midi;
-use crate::util::rw::*;
+use crate::ui::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Song {
     pub path: PathBuf,
     pub bgm: Bgm,
+
+    adjust: Option<AdjustState>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct AdjustState {
+    entity_id: usize,
+    start_y: f32,
+    start_value: isize,
 }
 
 pub fn is_midi(file: &mut File) -> Result<bool, std::io::Error> {
@@ -48,7 +57,11 @@ impl Song {
             s
         });*/
 
-        Ok(Self { bgm, path })
+        Ok(Self {
+            bgm,
+            path,
+            adjust: None,
+        })
     }
 
     /*
@@ -73,4 +86,53 @@ impl Song {
         }
     }
     */
+
+    pub fn draw(&mut self, _delta: Duration, i: &Input, pos: Vector3D) -> (EntityGroup, bool) {
+        let mut root = EntityGroup::new();
+        let mut layout = layout::Column::new();
+        let mut commit = false;
+
+        for (idx, voice) in self.bgm.voices.iter_mut().enumerate() {
+            root.add({
+                let mut button = button(&format!("voice {:X} {:X}", voice.bank, voice.patch), 128.0);
+
+                button.translate(pos);
+                layout.apply(&mut button);
+                layout.pad(4.0);
+
+                if let Some(mouse_pos) = i.now.mouse_pos {
+                    // Click and drag to adjust value
+                    let value = &mut voice.patch;
+                    if let Some(adjust) = self.adjust.as_mut() {
+                        // Something is currently being adjusted, is it us?
+                        if adjust.entity_id == idx {
+                            // Change the value using the change in mouse Y since the start of the drag
+                            let delta = adjust.start_y - mouse_pos.y;
+                            let new_value = adjust.start_value.saturating_add((delta / 10.0).round() as isize);
+                            *value = new_value as u8;
+
+                            // End drag?
+                            if !i.now.left_mouse  {
+                                self.adjust = None;
+                                commit = true;
+                            }
+                        }
+                    } else {
+                        // Begin drag?
+                        if i.is_mouse_over(&button.bounding_box()) && i.now.left_mouse && !i.prev.left_mouse {
+                            self.adjust = Some(AdjustState {
+                                entity_id: idx,
+                                start_value: *value as isize,
+                                start_y: mouse_pos.y,
+                            })
+                        }
+                    }
+                }
+
+                button
+            });
+        }
+
+        (root, commit)
+    }
 }

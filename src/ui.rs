@@ -6,15 +6,15 @@ mod layout;
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::sync::mpsc::Sender;
-use std::time::Duration;
 use std::path::PathBuf;
 
 use song::Song;
 
-use crate::display::*;
-use crate::util::*;
+pub use crate::display::*;
+pub use crate::util::*;
+use crate::history::History;
 
-fn button(text: &str, width: f32) -> EntityGroup {
+pub fn button(text: &str, width: f32) -> EntityGroup {
     let mut text = text::label(text, color::WHITE, 14.0);
 
     let container_box = Box3D::new(point3(0.0, 0.0, 0.0), point3(width, 32.0, 0.0)); //text.bounding_box().inflate(16.0, 16.0, 0.0);
@@ -66,8 +66,7 @@ fn ellipsis(s: &str, max_len: usize) -> String {
 
 pub struct Ui {
     hot_reload_tx: Sender<Vec<u8>>,
-
-    open_song: Option<Song>,
+    song: Option<History<Song>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -85,12 +84,13 @@ impl Ui {
     pub fn new(hot_reload_tx: Sender<Vec<u8>>) -> Self {
         Ui {
             hot_reload_tx,
-            open_song: None,
+            song: None,
         }
     }
 
+    // TODO impl
     pub fn window_title(&self) -> String {
-        match &self.open_song {
+        match &self.song {
             None => "Mamar".to_string(),
             Some(song) => format!("{} - Mamar", song.file_name()),
         }
@@ -100,7 +100,7 @@ impl Ui {
         log::info!("loading song: {}", path);
 
         match Song::open(PathBuf::from(path)) {
-            Ok(song) => self.open_song = Some(song),
+            Ok(song) => self.song = Some(History::new(song)),
             Err(error) => {
                 let msg = format!("{}", error);
                 log::error!("{}", msg);
@@ -116,7 +116,7 @@ impl Ui {
     pub fn save_song_as(&mut self, path: String) -> Result<(), Box<dyn Error>> {
         use std::fs::File;
 
-        if let Some(song) = self.open_song.as_mut() {
+        if let Some(song) = self.song.as_mut() {
             log::info!("saving bgm to {}", path);
             let mut f = File::create(&path)?;
 
@@ -130,7 +130,24 @@ impl Ui {
         }
     }
 
-    pub fn draw(&mut self, _delta: Duration, i: &Input) -> EntityGroup {
+    pub fn draw(&mut self, delta: Duration, i: &Input) -> EntityGroup {
+        let mut root = EntityGroup::new();
+
+        root.add(self.draw_toolbar(i));
+
+        if let Some(song) = self.song.as_mut() {
+            let (subtree, commit) = song.draw(delta, i, vec3(0.0, 36.0, 0.0));
+            root.add(subtree);
+
+            if commit {
+                song.commit();
+            }
+        }
+
+        root
+    }
+
+    pub fn draw_toolbar(&mut self, i: &Input) -> EntityGroup {
         let mut toolbar = EntityGroup::new();
         let mut layout = layout::Row::new();
 
@@ -138,7 +155,7 @@ impl Ui {
             let mut button = button("Open File...", 128.0);
 
             layout.apply(&mut button);
-            layout.pad(10.0);
+            layout.pad(4.0);
 
             if i.is_left_click(&button.bounding_box()) {
                 // We cannot open_file_dialog in the UI thread; it must be done on the main thread (specifically, on macOS).
@@ -160,12 +177,12 @@ impl Ui {
             button
         });
 
-        if let Some(song) = &self.open_song {
+        if let Some(song) = &self.song {
             toolbar.add({
                 let mut button = button(&format!("Play {}", ellipsis(&song.file_name(), 10)), 128.0);
 
                 layout.apply(&mut button);
-                layout.pad(10.0);
+                layout.pad(4.0);
 
                 if i.is_left_click(&button.bounding_box()) {
                     let _ = self.hot_reload_tx.send(song.bgm.as_bytes().unwrap());
@@ -178,7 +195,7 @@ impl Ui {
                 let mut button = button("Save As...", 128.0);
 
                 layout.apply(&mut button);
-                layout.pad(10.0);
+                layout.pad(4.0);
 
                 if i.is_left_click(&button.bounding_box()) {
                     let proposed_path = song.path.with_extension("bgm").to_string_lossy().to_string();
@@ -200,9 +217,6 @@ impl Ui {
             });
         }
 
-        let mut root = EntityGroup::new();
-        root.add(toolbar);
-
-        root
+        toolbar
     }
 }

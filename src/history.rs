@@ -3,8 +3,8 @@ use std::ops::{Deref, DerefMut};
 
 const NUM_STATES: usize = 32;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct History<State: Clone + Eq> {
+#[derive(Clone, PartialEq, Debug)]
+pub struct History<State: Clone + PartialEq> {
     mut_current_state: State,    // Copy of current state
     states: [State; NUM_STATES], // Ring buffer
     newest_state_index: usize,   // Future (for redo)
@@ -12,7 +12,7 @@ pub struct History<State: Clone + Eq> {
     oldest_state_index: usize,   // Past (for undo)
 }
 
-impl<State: Clone + Eq> History<State> {
+impl<State: Clone + PartialEq> History<State> {
     pub fn new(initial_state: State) -> Self {
         Self {
             mut_current_state: initial_state.clone(),
@@ -91,7 +91,7 @@ impl<State: Clone + Eq> History<State> {
     }
 }
 
-impl<State: Clone + Eq> Deref for History<State> {
+impl<State: Clone + PartialEq> Deref for History<State> {
     type Target = State;
 
     fn deref(&self) -> &Self::Target {
@@ -99,7 +99,7 @@ impl<State: Clone + Eq> Deref for History<State> {
     }
 }
 
-impl<State: Clone + Eq> DerefMut for History<State> {
+impl<State: Clone + PartialEq> DerefMut for History<State> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.mut_current_state
     }

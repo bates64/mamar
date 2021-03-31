@@ -19,7 +19,7 @@ pub const MAGIC: &str = "BGM ";
 /// An offset relative to the beginning of the decoded/encoded BGM.
 pub type FilePos = u64;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct Bgm {
     /// ASCII song index.
     pub index: String,
