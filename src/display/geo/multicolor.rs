@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glium::draw_parameters::*;
 use glium::program::ProgramCreationInput;
 use glium::{implement_vertex, uniform};
@@ -35,7 +37,7 @@ impl Vertex {
 /// Geometry where each vertex has its own colour.
 #[derive(Clone)]
 pub struct Multicolor {
-    geometry: VertexBuffers<Vertex, u16>,
+    geometry: Arc<VertexBuffers<Vertex, u16>>,
     aabb: Box3D,
     transform: Transform3D,
 }
@@ -63,7 +65,7 @@ impl Multicolor {
         let aabb = lyon::algorithms::aabb::fast_bounding_rect(path.iter()).to_box2d();
 
         Self {
-            geometry,
+            geometry: Arc::new(geometry),
             aabb: Box3D::new(point3(aabb.min.x, aabb.min.y, 0.0), point3(aabb.max.x, aabb.max.y, 0.1)),
             transform: Default::default(),
         }
