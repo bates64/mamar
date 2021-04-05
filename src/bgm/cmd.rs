@@ -1,5 +1,6 @@
 use std::hash::Hash;
 use std::iter;
+use std::ops::Range;
 
 use smallvec::SmallVec;
 
@@ -349,6 +350,26 @@ impl CommandSeq {
 
     pub fn is_empty(&self) -> bool {
         self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0] == Command::End)
+    }
+
+    pub fn pitch_range(&self) -> Range<u8> {
+        let mut range = 0..0;
+
+        for cmd in self.iter() {
+            if let Command::Note { pitch, .. } = cmd {
+                let pitch = *pitch;
+
+                if pitch < range.start {
+                    range.start = pitch;
+                }
+
+                if pitch >= range.end {
+                    range.end = pitch.saturating_add(1);
+                }
+            }
+        }
+
+        range
     }
 
     // TODO

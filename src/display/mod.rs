@@ -77,19 +77,17 @@ pub mod init {
                         let position = point(position.x, position.y);
 
                         // 2D position is trivial
-                        input_state.now.mouse_pos = Some(position);
+                        input_state.now.set_mouse_pos(position);
 
-                        // We will do 3D position later, upon recieving MainThreadRequest::Draw
-                        // Note: input_state.now.mouse_pos_raycasted is OUTDATED !
+                        // We will do raycasted 3D position later, upon recieving MainThreadRequest::Draw!
 
                         request_redraw = true;
                     }
 
                     WindowEvent::CursorLeft { .. } => {
-                        input_state.now.mouse_pos = None;
-                        input_state.now.mouse_pos_raycasted = None;
+                        input_state.now.unset_mouse_pos();
                         request_redraw = true;
-                    },
+                    }
 
                     WindowEvent::MouseInput { state, button, .. } => {
                         use glium::glutin::event::ElementState;
@@ -101,6 +99,27 @@ pub mod init {
 
                         request_redraw = true;
                     }
+
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        use glium::glutin::event::MouseScrollDelta;
+
+                        // Normalise scroll delta into a Vector2
+                        input_state.now.scroll_delta = match delta {
+                            MouseScrollDelta::LineDelta(lines, rows) => vec2(lines * 40.0, rows * 40.0),
+                            MouseScrollDelta::PixelDelta(pos) => {
+                                let dpi_scale = {
+                                    let gl_window = ctx.display.gl_window();
+                                    gl_window.window().scale_factor()
+                                };
+
+                                let pos = pos.to_logical(dpi_scale);
+                                vec2(pos.x, pos.y)
+                            }
+                        };
+
+                        request_redraw = true;
+                    }
+
                     _ => (),
                 },
 
@@ -115,11 +134,7 @@ pub mod init {
                 Event::UserEvent(callback) => {
                     match callback {
                         MainThreadRequest::Draw(mut root) => {
-                            // Mouse picking (given a 2D mouse pos, figure out the highest-Z entity that touches it)
-                            // TODO: probably move this and raycast_z into input module
-                            if let Some(mouse_pos) = &input_state.now.mouse_pos {
-                                input_state.now.mouse_pos_raycasted = raycast_z(mouse_pos.clone(), &mut root);
-                            }
+                            input_state.now.calc_mouse_pos_raycasted(&mut root);
 
                             // Actually render it
                             root.draw(&mut ctx);
@@ -136,36 +151,5 @@ pub mod init {
                 input_state.next_frame(); // The state was just sent
             }
         })
-    }
-
-    fn raycast_z(pos: Point2D, entity: &mut Box<dyn Entity>) -> Option<Point3D> {
-        // Convert entity bounding box to 2D
-        let bb_3d = entity.bounding_box();
-        let bb_2d = Box2D {
-            min: bb_3d.min.to_2d(),
-            max: bb_3d.max.to_2d(),
-        };
-
-        if bb_2d.contains(pos) {
-            // Register a hit at the *lowest* z-pos of this entity.
-            let mut hit = point3(pos.x, pos.y, bb_3d.min.z);
-
-            if let Some(group) = entity.children() {
-                // Recurse over the entity's children and check their bounding-boxes also
-                for child in group {
-                    if let Some(inner_hit) = raycast_z(pos.clone(), child) {
-                        // If we collided with the child, only update `hit` if it is above (in z-pos) the current `hit`.
-                        if inner_hit.z > hit.z {
-                            hit = inner_hit;
-                        }
-                    }
-                }
-            }
-
-            Some(hit)
-        } else {
-            // No collision
-            None
-        }
     }
 }

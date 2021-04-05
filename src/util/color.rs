@@ -1,6 +1,6 @@
 // Yeah thats right American spelling
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Color(u8, u8, u8, u8); // u8 as Colors often need to be hashed (cached)
+pub struct Color(pub u8, pub u8, pub u8, pub u8); // u8 as Colors often need to be hashed (cached)
 
 pub const WHITE: Color = Color(255, 255, 255, 255);
 pub const BLACK: Color = Color(0, 0, 0, 255);

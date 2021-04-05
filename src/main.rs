@@ -4,8 +4,11 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Instant;
 
-use mamar::display::{Input, MainThreadRequest, UiThreadRequest};
+use mamar::display::{Input, MainThreadRequest, UiThreadRequest, Entity};
 use mamar::ui::Ui;
+use mamar::util::*;
+
+const SHOW_TIMING_INFO: bool = cfg!(debug_assertions);
 
 fn main() {
     mamar::init();
@@ -22,10 +25,10 @@ fn main() {
     thread::spawn(move || {
         let mut prev_draw = Instant::now();
         let mut ui = Ui::new(hot_reload_tx);
-        let mut input = Input::default();
+        let mut input;
 
         while let Ok(req) = ui_rx.recv() {
-            let mut draw = false;
+            let draw;
             match req {
                 UiThreadRequest::Draw(new_input) => {
                     input = new_input;
@@ -49,16 +52,29 @@ fn main() {
 
             if draw {
                 // Calculate the duration since the last time we drew
+                let before_draw = Instant::now();
                 let delta = {
-                    let now = Instant::now();
-                    let delta = now.duration_since(prev_draw);
-                    prev_draw = now;
+                    let delta = before_draw.duration_since(prev_draw);
+                    prev_draw = before_draw;
                     delta
                 };
 
                 // Draw, then send the entities to the main thread to actually be rendered
-                let root = Box::new(ui.draw(delta, &input));
-                let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(root));
+                let mut root = ui.draw(delta, &input);
+
+                if SHOW_TIMING_INFO {
+                    let draw_duration = Instant::now().duration_since(before_draw);
+
+                    let mut rect = mamar::ui::shape::rect_origin(
+                        draw_duration.as_secs_f32() * 2000.0,
+                        20.0,
+                        Color(255, 0, 0, 100),
+                    );
+                    rect.translate(vec3(0.0, 0.0, 500.0));
+                    root.add(rect);
+                }
+
+                let _ = event_loop_proxy.send_event(MainThreadRequest::Draw(Box::new(root)));
             }
         }
     });
