@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "mamar",
+    "imui",
 ]
 
 [profile.release]

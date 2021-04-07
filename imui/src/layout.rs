@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use super::{Pool, Key};
+use super::*;
 
 #[derive(Debug, PartialEq)]
 pub struct Layout {
@@ -23,22 +23,14 @@ pub enum Dir {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Position {
-    Absolute(f32, f32),
-    Relative(f32, f32),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Rect {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
+    Absolute(Point),
+    Relative(Point),
 }
 
 impl Default for Layout {
     fn default() -> Self {
         Self {
-            position: Position::Relative(0.0, 0.0),
+            position: Position::Relative(Point::new(0.0, 0.0)),
             direction: Dir::Row, // TEMP
             width: 0.0..=f32::INFINITY,
             height: 0.0..=f32::INFINITY,
@@ -57,17 +49,10 @@ fn clamp(value: f32, range: &RangeInclusive<f32>) -> f32 {
 }
 
 impl Position {
-    pub fn resolve_x(&self, parent_x: f32) -> f32 {
+    pub fn resolve(&self, parent: &Point) -> Point {
         match &self {
-            Position::Absolute(x, _) => *x,
-            Position::Relative(x, _) => parent_x + *x,
-        }
-    }
-
-    pub fn resolve_y(&self, parent_y: f32) -> f32 {
-        match &self {
-            Position::Absolute(_, y) => *y,
-            Position::Relative(_, y) => parent_y + *y,
+            Position::Absolute(point) => point.clone(),
+            Position::Relative(Point { x, y, .. }) => Point::new(parent.x + *x, parent.y + *y),
         }
     }
 }
@@ -77,10 +62,11 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
 
     let rect = Rect {
         // TODO: option to centre
-        x: control.layout.position.resolve_x(rect.x),
-        y: control.layout.position.resolve_y(rect.y),
-        w: clamp(rect.w, &control.layout.width),
-        h: clamp(rect.h, &control.layout.height),
+        origin: control.layout.position.resolve(&rect.origin),
+        size: Size::new(
+            clamp(rect.size.width, &control.layout.width),
+            clamp(rect.size.height, &control.layout.height),
+        ),
     };
 
     control.calculated_rect = Some(rect.clone());
@@ -94,8 +80,7 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
         }
         _ => match control.layout.direction {
             Dir::Row => {
-                let mut x = 0.0;
-                let mut y = 0.0;
+                let mut pos = Vector::zero();
                 let mut row_height = 0.0;
 
                 for child in &children {
@@ -103,23 +88,22 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
                         pool,
                         child,
                         Rect {
-                            x: rect.x + x,
-                            y: rect.y + y,
-                            w: rect.w - x,
-                            h: rect.h - y,
+                            origin: Point::new(rect.min_x() + pos.x, rect.min_y() + pos.y),
+                            size: Size::new(rect.width() - pos.x, rect.height() - pos.y),
                         },
                     );
 
                     let calc = pool[child].calculated_rect.as_ref().unwrap();
-                    x += calc.w;
-                    if calc.h > row_height {
-                        row_height = calc.h;
+                    pos.x += calc.width();
+                    if calc.height() > row_height {
+                        row_height = calc.height();
                     }
 
                     // Wrap.
-                    if x >= rect.w {
-                        x = 0.0;
-                        y += row_height;
+                    // TODO: relayout prev child if it is too wide (gt, not eq)
+                    if pos.x >= rect.width() {
+                        pos.x = 0.0;
+                        pos.y += row_height;
                         row_height = 0.0;
                     }
                 }

@@ -56,7 +56,7 @@ impl EventHandler for App {
                     let mesh = graphics::Mesh::new_rectangle(
                         ctx,
                         graphics::DrawMode::fill(),
-                        ggez::graphics::Rect::new(rect.x, rect.y, rect.w, rect.h),
+                        ggez::graphics::Rect::new(rect.origin.x, rect.origin.y, rect.width(), rect.height()),
                         color,
                     ).unwrap();
 
@@ -65,27 +65,7 @@ impl EventHandler for App {
                     graphics::draw(ctx, &mesh, graphics::DrawParam::default()).unwrap();
                 }
 
-                Widget::Text(_text) => {
-                    todo!()
-                }
-
-                Widget::Button {} => {
-                    let mesh = graphics::Mesh::new_circle(
-                        ctx,
-                        graphics::DrawMode::fill(),
-                        ggez::mint::Point2 {
-                            x: rect.x + rect.w / 2.0,
-                            y: rect.y + rect.y / 2.0,
-                        },
-                        20.0,
-                        1.0,
-                        color,
-                    ).unwrap();
-
-                    color.r += 0.4;
-
-                    graphics::draw(ctx, &mesh, graphics::DrawParam::default()).unwrap();
-                }
+                _ => unimplemented!()
             }
         });
 

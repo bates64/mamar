@@ -2,7 +2,11 @@ mod layout;
 
 use layout::Dir;
 pub use layout::Layout;
-pub use layout::Rect;
+
+pub type Point = euclid::default::Point2D<f32>;
+pub type Rect = euclid::default::Rect<f32>;
+pub type Size = euclid::default::Size2D<f32>;
+pub type Vector = euclid::default::Vector2D<f32>;
 
 type Pool = std::collections::HashMap<Key, Control>;
 
@@ -81,7 +85,10 @@ impl Ui {
             frame_no: 0,
             parent: Key::root(),
             prev_sibling: None,
-            screen: Rect { x: 0.0, y: 0.0, w: 800.0, h: 600.0 },
+            screen: Rect {
+                origin: Point::new(0.0, 0.0),
+                size: Size::new(800.0, 600.0),
+            },
         };
 
         // Create omnipresent root node.
@@ -114,9 +121,8 @@ impl Ui {
         self.len() == 0
     }
 
-    pub fn resize(&mut self, width: f32, height: f32) {
-        self.screen.w = width;
-        self.screen.h = height;
+    pub fn resize(&mut self, screen: Rect) {
+        self.screen = screen;
 
         // Invalidate the current layout and recompuute it.
         for child in self.pool.values_mut() {
