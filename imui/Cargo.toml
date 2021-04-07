@@ -1,0 +1,10 @@
+[package]
+name = "ui"
+version = "0.1.0"
+authors = ["Alex Bates <hi@imalex.xyz>"]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+ggez = "0.5"
