@@ -19,7 +19,7 @@ impl Font {
     fn face(&self) -> &Face<'static> {
         lazy_static! {
             // XXX: this is a big file, consider stripping unneeded sections out and/or decompressing it at runtime
-            static ref SANS: Face<'static> = Face::from_slice(include_bytes!("../../assets/Inter-Medium.otf"), 0).unwrap();
+            static ref SANS: Face<'static> = Face::from_slice(include_bytes!("../../../assets/Inter-Medium.otf"), 0).unwrap();
         }
 
         match self {

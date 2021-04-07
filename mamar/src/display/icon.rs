@@ -3,7 +3,7 @@ use glium::glutin::window::Icon;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn get_icon() -> Option<Icon> {
     // Generated with https://github.com/y15un/png-to-32bpp-rgba
-    let data = include_bytes!("../../assets/icon.dat").to_vec();
+    let data = include_bytes!("../../../assets/icon.dat").to_vec();
 
     Icon::from_rgba(data, 128, 128).ok()
 }
