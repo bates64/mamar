@@ -1,8 +1,13 @@
 [package]
-name = "imui"
+name = "imui_glium"
 version = "0.1.0"
 authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
 
 [dependencies]
+imui = { path = "../imui" }
+glium = "0.29"
+image = "0.23"
 euclid = "0.22"
+
+[dev-dependencies]

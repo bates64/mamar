@@ -395,9 +395,11 @@ impl Key {
 }
 
 impl Control {
+    /*
     fn is_dirty(&self) -> bool {
         self.calculated_rect.is_none()
     }
+    */
 
     fn set_dirty(&mut self) {
         self.calculated_rect = None;

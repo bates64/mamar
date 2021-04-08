@@ -2,6 +2,7 @@
 members = [
     "mamar",
     "imui",
+    "imui_glium",
 ]
 
 [profile.release]
