@@ -84,15 +84,16 @@ impl Glue {
     }
 
     /// Handle glutin input and window resize events. Returns `true` if an `update()` call is recommended.
-    #[must_use]
+    #[must_use = "if true is returned, call update"]
     pub fn handle_window_event(&mut self, event: &WindowEvent, display: &Display) -> bool {
+        let dpi_scale = || {
+            let gl_window = display.gl_window();
+            gl_window.window().scale_factor()
+        };
+
         match event {
             WindowEvent::Resized(size) => {
-                let dpi_scale = {
-                    let gl_window = display.gl_window();
-                    gl_window.window().scale_factor()
-                };
-                let size = size.to_logical(dpi_scale);
+                let size = size.to_logical(dpi_scale());
 
                 self.projection = screen_to_clip(display);
                 self.ui.resize(Rect {
@@ -101,7 +102,12 @@ impl Glue {
                 });
 
                 self.buffers_need_writing = true;
-                false // Only the layout changed.
+                false // Only the layout changed, which imui handles internally.
+            }
+
+            WindowEvent::CursorMoved { position, .. } => {
+                let position = position.to_logical(dpi_scale());
+                self.ui.set_mouse_pos(Point::new(position.x, position.y))
             }
 
             _ => false
@@ -129,7 +135,11 @@ impl Glue {
             vertex_vec.clear();
             index_vec.clear();
 
-            let mut render_quad = |rect: &Rect, uv: &Rect, top_left_color, top_right_color, bottom_left_color, bottom_right_color| {
+            let mut render_quad = |region: &Region, uv: &Rect, top_left_color, top_right_color, bottom_left_color, bottom_right_color| {
+                let rect = &region.rect;
+
+                // TODO: handle layer
+
                 // Render a quad:
                 //
                 //    0 -- 1
@@ -166,7 +176,7 @@ impl Glue {
                 vtx_number += 4;
             };
 
-            self.ui.draw_tree(|_key, widget, rect| {
+            self.ui.iter_depth_first_visible(&Key::root(), &mut |_key, widget, region| {
                 match widget {
                     Widget::Button {} | Widget::Div => {
                         // TODO: get uv coordinates from atlas struct
@@ -183,7 +193,7 @@ impl Glue {
 
                         // TODO: nine-slice for button
 
-                        render_quad(rect, &uv, top_left_color, top_right_color, bottom_left_color, bottom_right_color);
+                        render_quad(&region, &uv, top_left_color, top_right_color, bottom_left_color, bottom_right_color);
                     }
                     _ => todo!()
                 }

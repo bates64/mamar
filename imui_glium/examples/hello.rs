@@ -60,7 +60,11 @@ fn update_interface(glue: &mut Glue) {
 
     glue.update(|ui| {
         ui.div(0, |ui| {
-            ui.set_size(100.0, 32.0);
+            if ui.is_mouse_over() {
+                ui.set_size(200.0, 128.0);
+            } else {
+                ui.set_size(100.0, 32.0);
+            }
         });
 
         ui.div(1, |ui| {

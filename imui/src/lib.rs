@@ -1,9 +1,10 @@
 mod layout;
 
+use std::time::{Duration, Instant};
+use std::collections::BTreeMap;
+
 use layout::Dir;
 pub use layout::Layout;
-
-use std::time::{Duration, Instant};
 
 pub type Point = euclid::default::Point2D<f32>;
 pub type Rect = euclid::default::Rect<f32>;
@@ -11,6 +12,10 @@ pub type Size = euclid::default::Size2D<f32>;
 pub type Vector = euclid::default::Vector2D<f32>;
 
 type Pool = std::collections::HashMap<Key, Control>;
+
+/// Lower values appear below higher values. Can be considered a Z position.
+pub type Layer = u8;
+pub const LAYER_DEFAULT: Layer = 255;
 
 /// A UI tree.
 pub struct Ui {
@@ -31,6 +36,9 @@ pub struct Ui {
 
     /// The time at which the previous update occurred.
     most_recent_update: Instant,
+
+    /// Controls that care about whether the mouse intersects them, indexed by layer.
+    cares_about_mouse_intersect: BTreeMap<Layer, Vec<Key>>,
 }
 
 /// Interface for adding controls to the UI tree.
@@ -52,6 +60,12 @@ pub struct Key {
     parent: Option<Box<Key>>,
 }
 
+/// Absolutely-positioned region on-screen, used for input and layout.
+pub struct Region {
+    pub rect: Rect,
+    pub layer: Layer,
+}
+
 struct Control {
     /// Unique identifier for this control; also allows access to parent.
     key: Key,
@@ -71,9 +85,12 @@ struct Control {
     /// Layout style of self and children.
     layout: Layout,
 
-    /// The rectangle of space this control takes up, calculated via layout parameters. Invalidated (set to None) if
-    /// children or layout parameters change. Positions are absolute.
-    calculated_rect: Option<Rect>,
+    /// The rectangle of space this control takes up, calculated via layout parameters.
+    calculated_region: Region,
+
+    /// Whether this control intersects the mouse on this layer. `false` could also mean 'unknown' if this is the first
+    /// frame where this control has asked to be added to `Ui::cares_about_mouse_intersect`.
+    is_mouse_intersecting: bool,
 }
 
 pub enum Widget {
@@ -89,6 +106,7 @@ impl Ui {
     pub fn new() -> Self {
         let mut ui = Self {
             pool: Pool::with_capacity(1),
+            cares_about_mouse_intersect: BTreeMap::new(),
             frame_no: 0,
             parent: Key::root(),
             prev_sibling: None,
@@ -107,13 +125,17 @@ impl Ui {
             updated_frame_no: ui.frame_no,
             children: Vec::new(),
             layout: Layout::default(),
-            calculated_rect: None,
+            calculated_region: Region {
+                rect: ui.screen.clone(),
+                layer: 0,
+            },
+            is_mouse_intersecting: false,
         });
 
         ui
     }
 
-    /// Refresh the tree.
+    /// Re-create the tree.
     pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
         self.begin_frame();
 
@@ -143,33 +165,53 @@ impl Ui {
 
     pub fn resize(&mut self, screen: Rect) {
         self.screen = screen;
-
-        // Invalidate the current layout and recompuute it.
-        for child in self.pool.values_mut() {
-            child.set_dirty();
-        }
-
         layout::compute(&mut self.pool, &Key::root(), self.screen.clone());
     }
 
-    pub fn draw_tree<D: FnMut(&Key, &Widget, &Rect)>(&self, mut draw: D) {
-        self.draw_control(&mut draw, &Key::root());
+    #[must_use = "if true is returned, call update"]
+    pub fn set_mouse_pos(&mut self, pos: Point) -> bool {
+        let mut hit = false;
+        let mut did_change = false;
+
+        // Iterate over the controls that care about mouse intersection, highest layer first.
+        for (layer, keys) in self.cares_about_mouse_intersect.iter().rev() {
+            for key in keys {
+                let control = self.pool.get_mut(key).unwrap();
+
+                if !hit && control.calculated_region.rect.contains(pos) {
+                    if !control.is_mouse_intersecting {
+                        // Notify the control that it
+                        control.is_mouse_intersecting = true;
+                        did_change = true;
+                    }
+
+                    hit = true; // This control 'owns' the mouse.
+                } else if control.is_mouse_intersecting {
+                    // Notify the control that it isn't intersecting the mouse anymore.
+                    control.is_mouse_intersecting = false;
+                    did_change = true;
+                }
+            }
+        }
+
+        // a) No controls that contain pos care, so there's no need to update.
+        // b) If any changes were made to control state, we need to update.
+        // c) If we hit control(s) but they already knew they were being hit, there is no need to update.
+        did_change
     }
 
-    /// Draw a control and its children.
-    /// Depth-first so parents do not overwrite their children.
-    fn draw_control<D: FnMut(&Key, &Widget, &Rect)>(&self, draw: &mut D, key: &Key) {
+    /// Iterate through a tree and its children, depth-first.
+    /// (Depth-first is good for drawing - it ensures parents do not overwrite their children when on the same layer.)
+    pub fn iter_depth_first_visible<D: FnMut(&Key, &Widget, &Region)>(&self, key: &Key, f: &mut D) {
         let control = self.pool.get(key).unwrap();
 
         if control.is_visible {
-            let rect = control.calculated_rect.as_ref().unwrap();
-
             for child in &control.children {
-                self.draw_control(draw, child);
+                self.iter_depth_first_visible(child, f);
             }
 
             if let Some(widget) = &control.widget {
-                draw(&control.key, widget, &rect);
+                f(&control.key, widget, &control.calculated_region);
             }
         }
     }
@@ -179,6 +221,8 @@ impl Ui {
 
         // Touch the root so it isn't removed by end_frame() later.
         self.pool.get_mut(&Key::root()).unwrap().updated_frame_no = self.frame_no;
+
+        self.cares_about_mouse_intersect.clear();
 
         self.parent = Key::root();
         self.prev_sibling = None;
@@ -244,13 +288,11 @@ impl Ui {
 
                 let parent = self.pool.get_mut(&self.parent).unwrap();
                 parent.children.swap(child_index, prev_index);
-                parent.set_dirty();
             }
         } else {
             // This control is new on this frame!
             let parent = self.pool.get_mut(&self.parent).unwrap();
             parent.children.insert(child_index, key.clone());
-            parent.set_dirty();
         }
 
         // Set up (potentially new) control.
@@ -266,7 +308,14 @@ impl Ui {
                 updated_frame_no: frame_no,
                 children: Vec::new(),
                 layout: Layout::default(),
-                calculated_rect: None,
+
+                // This will be calculated later.
+                calculated_region: Region {
+                    rect: Rect::zero(),
+                    layer: LAYER_DEFAULT,
+                },
+
+                is_mouse_intersecting: false,
             });
 
         // Enter into this control.
@@ -315,7 +364,18 @@ impl Ui {
 }
 
 impl UiFrame<'_> {
-    fn current_control(&mut self) -> &mut Control {
+    fn current(&self) -> &Control {
+        let key;
+        if let Some(prev_sibling) = self.ui.prev_sibling.as_ref() {
+            key = prev_sibling;
+        } else {
+            key = &self.ui.parent;
+        }
+
+        &self.ui.pool[key]
+    }
+
+    fn current_mut(&mut self) -> &mut Control {
         let key;
         if let Some(prev_sibling) = self.ui.prev_sibling.as_ref() {
             key = prev_sibling;
@@ -328,12 +388,12 @@ impl UiFrame<'_> {
 
     /// Sets the layout parameters of the current control.
     pub fn set_layout(&mut self, layout: Layout) {
-        self.current_control().layout = layout;
+        self.current_mut().layout = layout;
     }
 
     /// Force-sets the size of the current control.
     pub fn set_size(&mut self, width: f32, height: f32) {
-        let layout = &mut self.current_control().layout;
+        let layout = &mut self.current_mut().layout;
 
         layout.width = width..=width;
         layout.height = width..=height;
@@ -342,7 +402,18 @@ impl UiFrame<'_> {
     /// Sets whether the current control is visible or not.
     /// An invisible control does not get draw, and neither does its children.
     pub fn set_visible(&mut self, is_visible: bool) {
-        self.current_control().is_visible = is_visible;
+        self.current_mut().is_visible = is_visible;
+    }
+
+    /// Returns true if the mouse is over the current control, on this layer only.
+    /// Inputs are reported on a need-to-know basis, so avoid conditionally calling this method.
+    pub fn is_mouse_over(&mut self) -> bool {
+        let key = self.current().key.clone();
+        self.ui.cares_about_mouse_intersect.entry(LAYER_DEFAULT) // TODO: layer
+            .or_insert(Vec::new())
+            .push(key);
+
+        self.current_mut().is_mouse_intersecting
     }
 
     pub fn div<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
@@ -350,7 +421,7 @@ impl UiFrame<'_> {
 
         self.ui.begin_control(key);
 
-        let ctrl = self.current_control();
+        let ctrl = self.current_mut();
 
         if let Some(Widget::Div) = ctrl.widget.as_ref() {
             // Update.
@@ -368,7 +439,7 @@ impl UiFrame<'_> {
     pub fn text<K: Into<UserKey>, S: Into<String>>(&mut self, key: K, text: S) {
         self.ui.begin_control(self.ui.key(key.into()));
 
-        let ctrl = self.current_control();
+        let ctrl = self.current_mut();
 
         if let Some(Widget::Text(string)) = ctrl.widget.as_mut() {
             // Update.
@@ -387,7 +458,7 @@ impl UiFrame<'_> {
 
         self.ui.begin_control(key);
 
-        let ctrl = self.current_control();
+        let ctrl = self.current_mut();
 
         ctrl.layout.direction = Dir::Row;
         ctrl.layout.width = 100.0..=f32::INFINITY;
@@ -408,7 +479,7 @@ impl UiFrame<'_> {
 
 impl Key {
     /// Returns the key of the root control. The root is guaranteed to always exist in `Ui::pool`.
-    const fn root() -> Self {
+    pub const fn root() -> Self {
         Self {
             user: 0,
             parent: None,
@@ -417,16 +488,6 @@ impl Key {
 }
 
 impl Control {
-    /*
-    fn is_dirty(&self) -> bool {
-        self.calculated_rect.is_none()
-    }
-    */
-
-    fn set_dirty(&mut self) {
-        self.calculated_rect = None;
-    }
-
     fn is_old(&self, frame_no: u8) -> bool {
         frame_no != self.updated_frame_no
     }

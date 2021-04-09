@@ -69,7 +69,10 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
         ),
     };
 
-    control.calculated_rect = Some(rect.clone());
+    control.calculated_region = Region {
+        rect: rect.clone(),
+        layer: LAYER_DEFAULT,
+    };
 
     let children = control.children.clone();
     match children.len() {
@@ -93,7 +96,7 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
                         },
                     );
 
-                    let calc = pool[child].calculated_rect.as_ref().unwrap();
+                    let calc = &pool[child].calculated_region.rect;
                     pos.x += calc.width();
                     if calc.height() > row_height {
                         row_height = calc.height();
