@@ -16,6 +16,16 @@ fn main() {
 
     let mut glue = Glue::new(&display).unwrap();
 
+    glue.update(|ui| {
+        ui.div(0, |ui| {
+            ui.set_size(100.0, 32.0);
+        });
+
+        ui.div(1, |ui| {
+            ui.set_size(200.0, 64.0);
+        });
+    });
+
     {
         let mut surface = display.draw();
         surface.clear_color(0.0, 0.0, 0.0, 1.0);

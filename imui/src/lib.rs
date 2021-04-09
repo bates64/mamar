@@ -370,6 +370,8 @@ impl UiFrame<'_> {
         let ctrl = self.current_control();
 
         ctrl.layout.direction = Dir::Row;
+        ctrl.layout.width = 100.0..=f32::INFINITY;
+        ctrl.layout.height = 32.0..=f32::INFINITY;
 
         if let Some(Widget::Button {}) = ctrl.widget.as_ref() {
             // Update.

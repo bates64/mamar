@@ -10,11 +10,15 @@ pub use imui::*;
 
 pub struct Glue {
     ui: Ui,
-    needs_redraw: bool,
+    buffers_need_writing: bool,
 
     program: Program,
+
     vertex_buf: VertexBuffer<Vertex>,
+    vertex_vec: Vec<Vertex>,
+
     index_buf: IndexBuffer<u16>,
+    index_vec: Vec<u16>,
 
     texture: Texture2d,
     projection: Transform3D,
@@ -24,9 +28,10 @@ pub struct Glue {
 struct Vertex {
     position: [f32; 2],
     uv: [f32; 2],
+    color: [f32; 4],
 }
 
-implement_vertex!(Vertex, position, uv);
+implement_vertex!(Vertex, position, uv, color);
 
 /// Calculates a screen-space projection matrix for the given display.
 fn screen_to_clip(display: &Display) -> Transform3D {
@@ -42,7 +47,7 @@ impl Glue {
     pub fn new(facade: &Display) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             ui: Ui::new(),
-            needs_redraw: true,
+            buffers_need_writing: false, // Nothing in UI yet to be drawn.
 
             program: Program::new(facade, ProgramCreationInput::SourceCode {
                 vertex_shader: include_str!("shader.vert"),
@@ -55,17 +60,11 @@ impl Glue {
                 uses_point_size: false,
             })?,
 
-            vertex_buf: VertexBuffer::new(facade, &[
-                Vertex { position: [0.0,   0.0],   uv: [0.0, 0.0] }, // Top left.
-                Vertex { position: [0.0,   100.0], uv: [0.0, 1.0] }, // Bottom left.
-                Vertex { position: [100.0, 0.0],   uv: [1.0, 0.0] }, // Top right.
-                Vertex { position: [100.0, 100.0], uv: [1.0, 1.0] }, // Bottom right.
-            ])?,
+            vertex_buf: VertexBuffer::empty_dynamic(facade, 1024)?,
+            vertex_vec: Vec::with_capacity(1024),
 
-            index_buf: IndexBuffer::new(facade, glium::index::PrimitiveType::TrianglesList, &[
-                0, 1, 2,
-                2, 1, 3,
-            ])?,
+            index_buf: IndexBuffer::empty_dynamic(facade, glium::index::PrimitiveType::TrianglesList, 512)?,
+            index_vec: Vec::with_capacity(512),
 
             texture: {
                 use image::GenericImageView;
@@ -78,7 +77,7 @@ impl Glue {
                 Texture2d::new(facade, raw)?
             },
 
-            projection: Transform3D::identity() //screen_to_clip(facade),
+            projection: screen_to_clip(facade),
         })
     }
 
@@ -98,7 +97,7 @@ impl Glue {
                     size: Size::new(size.width, size.height),
                 });
 
-                self.needs_redraw = true;
+                self.buffers_need_writing = true;
             }
 
             _ => {}
@@ -108,23 +107,96 @@ impl Glue {
     /// Update the UI tree.
     pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
         self.ui.update(f);
-        self.needs_redraw = true;
+        self.buffers_need_writing = true;
     }
 
     pub fn needs_redraw(&self) -> bool {
-        self.needs_redraw
+        self.buffers_need_writing
     }
 
     pub fn draw<S: Surface>(&mut self, surface: &mut S)  -> Result<(), glium::DrawError> {
-        self.needs_redraw = false;
-
         let projection: [[f32; 4]; 4] = self.projection.to_arrays();
 
-        // TODO self.ui.draw_tree
+        if self.buffers_need_writing {
+            let vertex_vec = &mut self.vertex_vec;
+            let index_vec = &mut self.index_vec;
+            let mut vtx_number = 0;
+
+            vertex_vec.clear();
+            index_vec.clear();
+
+            let mut render_quad = |rect: &Rect, uv: &Rect, top_left_color, top_right_color, bottom_left_color, bottom_right_color| {
+                // Render a quad:
+                //
+                //    0 -- 1
+                //    |  / |
+                //    | /  |
+                //    2 -- 3
+                //
+                index_vec.extend_from_slice(&[
+                    vtx_number + 0, vtx_number + 1, vtx_number + 2,
+                    vtx_number + 2, vtx_number + 1, vtx_number + 3,
+                ]);
+                vertex_vec.extend_from_slice(&[
+                    Vertex {
+                        position: [rect.min_x(), rect.min_y()],
+                        uv: [uv.min_x(), uv.min_y()],
+                        color: top_left_color,
+                    },
+                    Vertex {
+                        position: [rect.max_x(), rect.min_y()],
+                        uv: [uv.max_x(), uv.min_y()],
+                        color: top_right_color,
+                    },
+                    Vertex {
+                        position: [rect.min_x(), rect.max_y()],
+                        uv: [uv.min_x(), uv.max_y()],
+                        color: bottom_left_color,
+                    },
+                    Vertex {
+                        position: [rect.max_x(), rect.max_y()],
+                        uv: [uv.max_y(), uv.max_y()],
+                        color: bottom_right_color,
+                    },
+                ]);
+                vtx_number += 4;
+            };
+
+            self.ui.draw_tree(|_key, widget, rect| {
+                match widget {
+                    Widget::Button {} | Widget::Div => {
+                        // TODO: get uv coordinates from atlas struct
+                        let uv = Rect {
+                            origin: Point::new(0.0, 0.0),
+                            size: Size::new(1.0, 1.0),
+                        };
+
+                        // TODO: let widget style reference define this
+                        let top_left_color = [1.0, 1.0, 1.0, 1.0];
+                        let top_right_color = [1.0, 1.0, 1.0, 1.0];
+                        let bottom_left_color = [1.0, 1.0, 1.0, 1.0];
+                        let bottom_right_color = [1.0, 1.0, 1.0, 1.0];
+
+                        // TODO: nine-slice for button
+
+                        render_quad(rect, &uv, top_left_color, top_right_color, bottom_left_color, bottom_right_color);
+                    }
+                    _ => todo!()
+                }
+            });
+
+            // Upload the new data to the GPU.
+            //self.vertex_buf.invalidate();
+            //self.index_buf.invalidate();
+            self.vertex_buf.as_mut_slice().write(vertex_vec);
+            self.index_buf.as_mut_slice().write(index_vec);
+            self.buffers_need_writing = false;
+            println!("uploaded {} triangles", index_vec.len() / 3);
+        }
 
         surface.draw(
             &self.vertex_buf,
-            &self.index_buf,
+            &self.index_buf,//&self.index_buf.slice(0..self.index_vec.len()).unwrap(),
             &self.program,
             &uniform! {
                 tex: &self.texture,
