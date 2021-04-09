@@ -1,12 +1,11 @@
 pub mod bgm;
-pub mod display;
 pub mod history;
 pub mod hot;
 pub mod logger;
 pub mod midi;
 pub mod sbn;
-pub mod ui;
 pub mod util;
+pub mod interface;
 
 pub fn init() {
     #[cfg(target_os = "windows")]

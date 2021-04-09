@@ -1,12 +1,14 @@
 use std::error::Error;
 
-use glium::glutin::event::WindowEvent;
-use glium::{uniform, implement_vertex, Display, Surface, VertexBuffer, IndexBuffer, Texture2d};
+pub use imui::*;
+pub use glium;
+pub use glium::Surface;
+pub use glium::glutin::event::{Event, WindowEvent};
+pub use glium::glutin::event_loop::{EventLoop, ControlFlow};
+use glium::{uniform, implement_vertex, Display, VertexBuffer, IndexBuffer, Texture2d};
 use glium::program::{Program, ProgramCreationInput};
 
 type Transform3D = euclid::default::Transform3D<f32>;
-
-pub use imui::*;
 
 pub struct Glue {
     ui: Ui,
@@ -81,8 +83,9 @@ impl Glue {
         })
     }
 
-    /// Handle glutin input and window resize events.
-    pub fn handle_window_event(&mut self, event: &WindowEvent, display: &Display) {
+    /// Handle glutin input and window resize events. Returns `true` if an `update()` call is recommended.
+    #[must_use]
+    pub fn handle_window_event(&mut self, event: &WindowEvent, display: &Display) -> bool {
         match event {
             WindowEvent::Resized(size) => {
                 let dpi_scale = {
@@ -98,9 +101,10 @@ impl Glue {
                 });
 
                 self.buffers_need_writing = true;
+                false // Only the layout changed.
             }
 
-            _ => {}
+            _ => false
         }
     }
 

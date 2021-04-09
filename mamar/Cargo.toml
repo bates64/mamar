@@ -5,6 +5,7 @@ authors = ["Alex Bates <hi@imalex.xyz>"]
 edition = "2018"
 
 [dependencies]
+imui_glium = { path = "../imui_glium" }
 glium = "0.29"
 lyon = "0.17"
 euclid = "0.22"

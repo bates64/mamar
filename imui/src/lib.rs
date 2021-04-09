@@ -3,6 +3,8 @@ mod layout;
 use layout::Dir;
 pub use layout::Layout;
 
+use std::time::{Duration, Instant};
+
 pub type Point = euclid::default::Point2D<f32>;
 pub type Rect = euclid::default::Rect<f32>;
 pub type Size = euclid::default::Size2D<f32>;
@@ -24,12 +26,17 @@ pub struct Ui {
     /// The previous sibling control.
     prev_sibling: Option<Key>, // TODO: consider next_child_index
 
+    /// The display dimensions.
     screen: Rect,
+
+    /// The time at which the previous update occurred.
+    most_recent_update: Instant,
 }
 
 /// Interface for adding controls to the UI tree.
 pub struct UiFrame<'ui> {
     ui: &'ui mut Ui,
+    pub delta_time: Duration,
 }
 
 type UserKey = u8;
@@ -89,6 +96,7 @@ impl Ui {
                 origin: Point::new(0.0, 0.0),
                 size: Size::new(800.0, 600.0),
             },
+            most_recent_update: Instant::now(),
         };
 
         // Create omnipresent root node.
@@ -108,7 +116,19 @@ impl Ui {
     /// Refresh the tree.
     pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
         self.begin_frame();
-        f(&mut UiFrame { ui: self });
+
+        let now = Instant::now();
+        let delta_time = {
+            let delta = now.duration_since(self.most_recent_update);
+            self.most_recent_update = now;
+            delta
+        };
+
+        f(&mut UiFrame {
+            ui: self,
+            delta_time,
+        });
+
         self.end_frame();
     }
 

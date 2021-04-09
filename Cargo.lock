@@ -828,6 +828,7 @@ dependencies = [
  "glium",
  "id-arena",
  "image",
+ "imui_glium",
  "lazy_static",
  "log",
  "lru",
