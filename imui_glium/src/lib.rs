@@ -86,6 +86,8 @@ impl Glue {
     /// Handle glutin input and window resize events. Returns `true` if an `update()` call is recommended.
     #[must_use = "if true is returned, call update"]
     pub fn handle_window_event(&mut self, event: &WindowEvent, display: &Display) -> bool {
+        use glium::glutin::event::*;
+
         let dpi_scale = || {
             let gl_window = display.gl_window();
             gl_window.window().scale_factor()
@@ -108,6 +110,20 @@ impl Glue {
             WindowEvent::CursorMoved { position, .. } => {
                 let position = position.to_logical(dpi_scale());
                 self.ui.set_mouse_pos(Point::new(position.x, position.y))
+            }
+
+            WindowEvent::CursorLeft { .. } => self.ui.set_mouse_pos(Point::new(-1000.0, -1000.0)),
+
+            WindowEvent::MouseInput { state, button, .. } => {
+                match (state, button) {
+                    (ElementState::Pressed, MouseButton::Left) => self.ui.set_left_mouse(true),
+                    (ElementState::Pressed, MouseButton::Right) => false,
+                    (ElementState::Pressed, MouseButton::Middle) => false,
+                    (ElementState::Released, MouseButton::Left) => self.ui.set_left_mouse(false),
+                    (ElementState::Released, MouseButton::Right) => false,
+                    (ElementState::Released, MouseButton::Middle) => false,
+                    (_, MouseButton::Other(_)) => false
+                }
             }
 
             _ => false
@@ -176,24 +192,30 @@ impl Glue {
                 vtx_number += 4;
             };
 
-            self.ui.iter_depth_first_visible(&Key::root(), &mut |_key, widget, region| {
+            self.ui.iter_depth_first(&Key::root(), &mut |ctrl| {
+                let Control { widget, region, .. } = ctrl;
+
                 match widget {
-                    Widget::Button {} | Widget::Div => {
+                    Widget::Group => {}
+                    Widget::Button { label } => {
                         // TODO: get uv coordinates from atlas struct
                         let uv = Rect {
                             origin: Point::new(0.0, 0.0),
                             size: Size::new(1.0, 1.0),
                         };
 
-                        // TODO: let widget style reference define this
-                        let top_left_color = [1.0, 1.0, 1.0, 1.0];
-                        let top_right_color = [1.0, 1.0, 1.0, 1.0];
-                        let bottom_left_color = [1.0, 1.0, 1.0, 1.0];
-                        let bottom_right_color = [1.0, 1.0, 1.0, 1.0];
+                        let color;
+                        if ctrl.left_click.is_press() {
+                            color = [0.6, 0.6, 0.6, 1.0];
+                        } else {
+                            color = [0.8, 0.8, 0.8, 1.0];
+                        }
 
                         // TODO: nine-slice for button
 
-                        render_quad(&region, &uv, top_left_color, top_right_color, bottom_left_color, bottom_right_color);
+                        // TODO: text label
+
+                        render_quad(&region, &uv, color, color, color, color);
                     }
                     _ => todo!()
                 }
@@ -202,15 +224,18 @@ impl Glue {
             // Upload the new data to the GPU.
             //self.vertex_buf.invalidate();
             //self.index_buf.invalidate();
-            self.vertex_buf.as_mut_slice().write(vertex_vec);
-            self.index_buf.as_mut_slice().write(index_vec);
+            if !index_vec.is_empty() {
+                // TODO: grow buffer capacity if required, panics right now if you have a complex ui
+                self.vertex_buf.as_mut_slice().write(vertex_vec);
+                self.index_buf.as_mut_slice().write(index_vec);
+            }
+
             self.buffers_need_writing = false;
-            println!("uploaded {} triangles", index_vec.len() / 3);
         }
 
         surface.draw(
             &self.vertex_buf,
-            &self.index_buf,//&self.index_buf.slice(0..self.index_vec.len()).unwrap(),
+            &self.index_buf.slice(0..self.index_vec.len()).unwrap(),
             &self.program,
             &uniform! {
                 tex: &self.texture,

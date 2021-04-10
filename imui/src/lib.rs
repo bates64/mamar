@@ -1,9 +1,9 @@
-mod layout;
+pub mod layout;
+pub mod input;
 
 use std::time::{Duration, Instant};
 use std::collections::BTreeMap;
 
-use layout::Dir;
 pub use layout::Layout;
 
 pub type Point = euclid::default::Point2D<f32>;
@@ -12,6 +12,8 @@ pub type Size = euclid::default::Size2D<f32>;
 pub type Vector = euclid::default::Vector2D<f32>;
 
 type Pool = std::collections::HashMap<Key, Control>;
+
+use input::{ClickFSM, Input, InputFlags};
 
 /// Lower values appear below higher values. Can be considered a Z position.
 pub type Layer = u8;
@@ -61,44 +63,59 @@ pub struct Key {
 }
 
 /// Absolutely-positioned region on-screen, used for input and layout.
+#[derive(Debug)]
 pub struct Region {
     pub rect: Rect,
     pub layer: Layer,
 }
 
-struct Control {
-    /// Unique identifier for this control; also allows access to parent.
-    key: Key,
+/// A UI element.
+#[derive(Debug)]
+pub struct Control {
+    /// Unique identifier for this control; also allows access to parent control(s).
+    pub key: Key,
 
-    widget: Option<Widget>,
+    /// The behaviour that this control inhibits.
+    pub widget: Widget,
+
+    /// The children of this control, if any.
+    pub children: Vec<Key>,
 
     /// The frame number this control was most recently touched on.
     /// After each update, we can garbage-collect all the controls with `updated_frame_no`s not equal to `Ui::frame_no`.
     updated_frame_no: u8,
 
-    /// This control's children, if any.
-    children: Vec<Key>,
-
-    /// If true, rendering of this control and its children will be skipped.
-    is_visible: bool,
-
-    /// Layout style of self and children.
+    /// Layout parameters of self (and children, if any).
     layout: Layout,
 
     /// The rectangle of space this control takes up, calculated via layout parameters.
-    calculated_region: Region,
+    pub region: Region,
 
-    /// Whether this control intersects the mouse on this layer. `false` could also mean 'unknown' if this is the first
-    /// frame where this control has asked to be added to `Ui::cares_about_mouse_intersect`.
-    is_mouse_intersecting: bool,
+    /// The input state, where flags are set for as long as that input is held.
+    pub inputs_active: InputFlags,
+
+    /// The inputs that this control requires a UI tree update to handle, i.e. those that this control 'cares about' for
+    /// things other than state.
+    inputs_trigger_update: InputFlags,
+
+    pub left_click: ClickFSM,
+    pub right_click: ClickFSM,
+    pub middle_click: ClickFSM,
 }
 
+/// A widget is the 'type' of a control. They are effectively bags of style properties intended to inform the
+/// renderer how a particular control should look.
+#[derive(Debug)]
 pub enum Widget {
-    Div, // TODO: color
+    /// Just holds children, like an HTML `<div>`.
+    Group,
 
-    Text(String),
+    /// A text label.
+    Label(String),
 
+    /// A button.
     Button {
+        label: String,
     },
 }
 
@@ -118,19 +135,7 @@ impl Ui {
         };
 
         // Create omnipresent root node.
-        ui.pool.insert(Key::root(), Control {
-            key: Key::root(),
-            widget: None,
-            is_visible: true,
-            updated_frame_no: ui.frame_no,
-            children: Vec::new(),
-            layout: Layout::default(),
-            calculated_region: Region {
-                rect: ui.screen.clone(),
-                layer: 0,
-            },
-            is_mouse_intersecting: false,
-        });
+        ui.pool.insert(Key::root(), Control::new(ui.frame_no, Key::root(), Widget::Group));
 
         ui
     }
@@ -170,50 +175,78 @@ impl Ui {
 
     #[must_use = "if true is returned, call update"]
     pub fn set_mouse_pos(&mut self, pos: Point) -> bool {
-        let mut hit = false;
-        let mut did_change = false;
+        let mut needs_update = false;
 
-        // Iterate over the controls that care about mouse intersection, highest layer first.
-        for (layer, keys) in self.cares_about_mouse_intersect.iter().rev() {
-            for key in keys {
-                let control = self.pool.get_mut(key).unwrap();
+        // TODO: raycast via layer (perhaps have layout::compute return a sorted Vec<Key>)
 
-                if !hit && control.calculated_region.rect.contains(pos) {
-                    if !control.is_mouse_intersecting {
-                        // Notify the control that it
-                        control.is_mouse_intersecting = true;
-                        did_change = true;
-                    }
+        self.iter_mut_depth_first(&Key::root(), &mut |ctrl: &mut Control| {
+            let is_hit = ctrl.region.rect.contains(pos);
+            let was_hit = ctrl.inputs_active.contains(Input::MouseOver);
 
-                    hit = true; // This control 'owns' the mouse.
-                } else if control.is_mouse_intersecting {
-                    // Notify the control that it isn't intersecting the mouse anymore.
-                    control.is_mouse_intersecting = false;
-                    did_change = true;
+            if is_hit != was_hit {
+                ctrl.inputs_active.toggle(Input::MouseOver);
+
+                if ctrl.inputs_trigger_update.contains(Input::MouseOver) {
+                    needs_update = true;
+                }
+            }
+        });
+
+        needs_update
+    }
+
+    fn set_input_flag_on_controls_if(&mut self, set: bool, flag: InputFlags, mask: InputFlags) -> bool {
+        let mut needs_update = false;
+
+        for (_, ctrl) in &mut self.pool {
+            let to_set;
+            if ctrl.inputs_active.contains(mask) {
+                to_set = set;
+            } else {
+                to_set = false;
+            }
+
+            let was_set = ctrl.inputs_active.contains(flag);
+
+            if to_set != was_set {
+                ctrl.inputs_active.toggle(flag);
+
+                if ctrl.inputs_trigger_update.contains(flag) {
+                    needs_update = true;
                 }
             }
         }
 
-        // a) No controls that contain pos care, so there's no need to update.
-        // b) If any changes were made to control state, we need to update.
-        // c) If we hit control(s) but they already knew they were being hit, there is no need to update.
-        did_change
+        needs_update
     }
 
-    /// Iterate through a tree and its children, depth-first.
+    #[must_use = "if true is returned, call update"]
+    pub fn set_left_mouse(&mut self, is_down: bool) -> bool {
+        self.set_input_flag_on_controls_if(is_down, Input::LeftMouseDown.into(), Input::MouseOver.into())
+    }
+
+    /// Iterate through a tree and its children, depth-first AKA post-order.
     /// (Depth-first is good for drawing - it ensures parents do not overwrite their children when on the same layer.)
-    pub fn iter_depth_first_visible<D: FnMut(&Key, &Widget, &Region)>(&self, key: &Key, f: &mut D) {
+    pub fn iter_depth_first<D: FnMut(&Control)>(&self, key: &Key, f: &mut D) {
         let control = self.pool.get(key).unwrap();
 
-        if control.is_visible {
-            for child in &control.children {
-                self.iter_depth_first_visible(child, f);
-            }
-
-            if let Some(widget) = &control.widget {
-                f(&control.key, widget, &control.calculated_region);
-            }
+        for child in control.children.iter() {
+            self.iter_depth_first(child, f);
         }
+
+        f(control);
+    }
+
+    pub fn iter_mut_depth_first<D: FnMut(&mut Control)>(&mut self, key: &Key, f: &mut D) {
+        let control = self.pool.get(key).unwrap();
+
+        for child in control.children.clone() {
+            self.iter_mut_depth_first(&child, f);
+        }
+
+        let control = self.pool.get_mut(key).unwrap();
+
+        f(control);
     }
 
     fn begin_frame(&mut self) {
@@ -246,7 +279,7 @@ impl Ui {
         }
     }
 
-    fn begin_control(&mut self, key: Key) {
+    fn begin_control(&mut self, key: Key, widget: Widget) {
         let parent = self.pool.get(&self.parent).expect("missing parent in pool");
 
         // Figure out where this new control needs to be placed in the parent's children.
@@ -297,26 +330,12 @@ impl Ui {
 
         // Set up (potentially new) control.
         let frame_no = self.frame_no;
-        let _control = self.pool.entry(key.clone())
-            .and_modify(|control| {
-                control.touch(frame_no);
-            })
-            .or_insert_with(|| Control {
-                key: key.clone(),
-                widget: None,
-                is_visible: true,
-                updated_frame_no: frame_no,
-                children: Vec::new(),
-                layout: Layout::default(),
-
-                // This will be calculated later.
-                calculated_region: Region {
-                    rect: Rect::zero(),
-                    layer: LAYER_DEFAULT,
-                },
-
-                is_mouse_intersecting: false,
-            });
+        if let Some(ctrl) = self.pool.get_mut(&key) {
+            ctrl.touch(frame_no);
+            ctrl.accept_widget(widget);
+        } else {
+            self.pool.insert(key.clone(), Control::new(frame_no, key.clone(), widget));
+        }
 
         // Enter into this control.
         self.parent = key;
@@ -399,81 +418,49 @@ impl UiFrame<'_> {
         layout.height = width..=height;
     }
 
-    /// Sets whether the current control is visible or not.
-    /// An invisible control does not get draw, and neither does its children.
-    pub fn set_visible(&mut self, is_visible: bool) {
-        self.current_mut().is_visible = is_visible;
-    }
-
+    /*
     /// Returns true if the mouse is over the current control, on this layer only.
     /// Inputs are reported on a need-to-know basis, so avoid conditionally calling this method.
     pub fn is_mouse_over(&mut self) -> bool {
-        let key = self.current().key.clone();
-        self.ui.cares_about_mouse_intersect.entry(LAYER_DEFAULT) // TODO: layer
-            .or_insert(Vec::new())
-            .push(key);
+        let ctrl = self.current_mut();
 
-        self.current_mut().is_mouse_intersecting
+        ctrl.inputs_capture |= Input::MouseOver;
+        ctrl.inputs_active.contains(Input::MouseOver)
     }
+    */
 
-    pub fn div<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    pub fn group<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
         let key = self.ui.key(key.into());
 
-        self.ui.begin_control(key);
-
-        let ctrl = self.current_mut();
-
-        if let Some(Widget::Div) = ctrl.widget.as_ref() {
-            // Update.
-        } else {
-            // Mount.
-            ctrl.widget = Some(Widget::Div);
-        }
-
+        self.ui.begin_control(key, Widget::Group);
         f(self);
-
         self.ui.end_control();
     }
 
-    /// Adds a basic text label.
-    pub fn text<K: Into<UserKey>, S: Into<String>>(&mut self, key: K, text: S) {
-        self.ui.begin_control(self.ui.key(key.into()));
-
-        let ctrl = self.current_mut();
-
-        if let Some(Widget::Text(string)) = ctrl.widget.as_mut() {
-            // Update.
-            *string = text.into();
-        } else {
-            // Mount.
-            ctrl.widget = Some(Widget::Text(text.into()));
-        }
-
+    pub fn label<K: Into<UserKey>>(&mut self, key: K, string: String) {
+        self.ui.begin_control(self.ui.key(key.into()), Widget::Label(string));
         self.ui.end_control();
     }
 
-    /// Adds a clickable button.
-    pub fn button<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    /// A button with a label. Returns `true` if left-clicked.
+    pub fn button<K: Into<UserKey>, S: Into<String>>(&mut self, key: K, label: S) -> bool {
         let key = self.ui.key(key.into());
 
-        self.ui.begin_control(key);
+        self.ui.begin_control(key, Widget::Button {
+            label: label.into(),
+        });
 
         let ctrl = self.current_mut();
 
-        ctrl.layout.direction = Dir::Row;
-        ctrl.layout.width = 100.0..=f32::INFINITY;
-        ctrl.layout.height = 32.0..=f32::INFINITY;
+        ctrl.layout.direction = layout::Dir::Row;
+        ctrl.layout.width = 100.0..=100.0;
+        ctrl.layout.height = 32.0..=32.0;
 
-        if let Some(Widget::Button {}) = ctrl.widget.as_ref() {
-            // Update.
-        } else {
-            // Mount.
-            ctrl.widget = Some(Widget::Button {});
-        }
-
-        f(self);
+        let is_click = ctrl.advance_left_click().is_click();
 
         self.ui.end_control();
+
+        is_click
     }
 }
 
@@ -488,11 +475,52 @@ impl Key {
 }
 
 impl Control {
+    fn new(frame_no: u8, key: Key, widget: Widget) -> Self {
+        Self {
+            key,
+            widget,
+            children: Vec::new(),
+            updated_frame_no: frame_no,
+            layout: Layout::default(),
+            region: Region {
+                rect: Rect::zero(),
+                layer: LAYER_DEFAULT,
+            },
+            inputs_active: InputFlags::empty(),
+            inputs_trigger_update: InputFlags::empty(),
+            left_click: Default::default(),
+            right_click: Default::default(),
+            middle_click: Default::default(),
+        }
+    }
+
     fn is_old(&self, frame_no: u8) -> bool {
         frame_no != self.updated_frame_no
     }
 
     fn touch(&mut self, frame_no: u8) {
         self.updated_frame_no = frame_no;
+    }
+
+    /// Advances the left_click FSM and sets the relevant inputs_trigger_update flags.
+    fn advance_left_click(&mut self) -> ClickFSM {
+        self.inputs_trigger_update |= Input::LeftMouseDown | Input::MouseOver;
+        self.left_click = self.left_click.advance(Input::LeftMouseDown, self.inputs_active);
+        self.left_click
+    }
+}
+
+impl Control {
+    /// Accept a new widget configuration, merging the previous widget's properties where possible to preserve state.
+    fn accept_widget(&mut self, new: Widget) {
+        match (&mut self.widget, new) {
+            (_, new) => self.widget = new,
+        }
+    }
+}
+
+impl Default for Widget {
+    fn default() -> Self {
+        Widget::Group
     }
 }

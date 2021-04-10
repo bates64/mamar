@@ -1,5 +1,36 @@
 use imui_glium::*;
 
+#[derive(Debug)]
+struct Interface {
+    num_buttons: u8,
+}
+
+impl Interface {
+    fn update(&mut self, glue: &mut Glue) {
+        loop {
+            let mut updated = false;
+
+            glue.update(|ui| {
+                for i in 0..self.num_buttons {
+                    if ui.button(i, "Hello!") {
+                        self.num_buttons += 1;
+
+                        // If state changes during an update, its recommended that you update again afterward so
+                        // you always show the latest data.
+                        updated = true;
+                    }
+                }
+            });
+
+            if !updated {
+                break;
+            }
+        }
+
+        println!("{:?}", &self);
+    }
+}
+
 fn main() {
     let event_loop = EventLoop::new();
 
@@ -13,8 +44,8 @@ fn main() {
 
     let mut glue = Glue::new(&display).unwrap();
 
-    // Initial interface.
-    update_interface(&mut glue);
+    let mut interface = Interface { num_buttons: 1 };
+    interface.update(&mut glue);
 
     {
         let mut surface = display.draw();
@@ -32,7 +63,7 @@ fn main() {
             Event::WindowEvent { event, window_id: _ } => {
                 if glue.handle_window_event(&event, &display) {
                     // Some input happened, update the interface.
-                    update_interface(&mut glue);
+                    interface.update(&mut glue);
                 }
 
                 if let WindowEvent::CloseRequested = event {
@@ -46,29 +77,10 @@ fn main() {
         }
 
         if glue.needs_redraw() || redraw {
-            println!("draw");
             let mut surface = display.draw();
             surface.clear_color(0.0, 0.0, 0.0, 1.0);
             glue.draw(&mut surface).unwrap();
             surface.finish().unwrap();
         }
     })
-}
-
-fn update_interface(glue: &mut Glue) {
-    println!("update");
-
-    glue.update(|ui| {
-        ui.div(0, |ui| {
-            if ui.is_mouse_over() {
-                ui.set_size(200.0, 128.0);
-            } else {
-                ui.set_size(100.0, 32.0);
-            }
-        });
-
-        ui.div(1, |ui| {
-            ui.set_size(200.0, 64.0);
-        });
-    });
 }

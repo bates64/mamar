@@ -69,7 +69,7 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
         ),
     };
 
-    control.calculated_region = Region {
+    control.region = Region {
         rect: rect.clone(),
         layer: LAYER_DEFAULT,
     };
@@ -96,7 +96,7 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
                         },
                     );
 
-                    let calc = &pool[child].calculated_region.rect;
+                    let calc = &pool[child].region.rect;
                     pos.x += calc.width();
                     if calc.height() > row_height {
                         row_height = calc.height();

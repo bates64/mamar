@@ -429,6 +429,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
+name = "enumflags2"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8672257d642ffdd235f6e9c723c2326ac1253c8f3c022e7cfd2e57da55b1131"
+dependencies = [
+ "enumflags2_derive",
+]
+
+[[package]]
+name = "enumflags2_derive"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33526f770a27828ce7c2792fdb7cb240220237e0ff12933ed6c23957fc5dd7cf"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "euclid"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,6 +662,7 @@ dependencies = [
 name = "imui"
 version = "0.1.0"
 dependencies = [
+ "enumflags2",
  "euclid",
 ]
 
