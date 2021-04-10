@@ -1,3 +1,5 @@
+mod atlas;
+
 use std::error::Error;
 
 pub use imui::*;
@@ -5,8 +7,10 @@ pub use glium;
 pub use glium::Surface;
 pub use glium::glutin::event::{Event, WindowEvent};
 pub use glium::glutin::event_loop::{EventLoop, ControlFlow};
-use glium::{uniform, implement_vertex, Display, VertexBuffer, IndexBuffer, Texture2d};
+use glium::{uniform, implement_vertex, Display, VertexBuffer, IndexBuffer};
 use glium::program::{Program, ProgramCreationInput};
+
+pub use atlas::TextureAtlas;
 
 type Transform3D = euclid::default::Transform3D<f32>;
 
@@ -22,7 +26,7 @@ pub struct Glue {
     index_buf: IndexBuffer<u16>,
     index_vec: Vec<u16>,
 
-    texture: Texture2d,
+    pub atlas: TextureAtlas,
     projection: Transform3D,
 }
 
@@ -68,17 +72,7 @@ impl Glue {
             index_buf: IndexBuffer::empty_dynamic(facade, glium::index::PrimitiveType::TrianglesList, 512)?,
             index_vec: Vec::with_capacity(512),
 
-            texture: {
-                use image::GenericImageView;
-                use glium::texture::RawImage2d;
-
-                let image = image::load_from_memory(include_bytes!("button.png"))?;
-                let data = image.as_rgba8().unwrap();
-                let raw = RawImage2d::from_raw_rgba(data.to_vec(), image.dimensions());
-
-                Texture2d::new(facade, raw)?
-            },
-
+            atlas: TextureAtlas::new(facade)?,
             projection: screen_to_clip(facade),
         })
     }
@@ -116,6 +110,7 @@ impl Glue {
 
             WindowEvent::MouseInput { state, button, .. } => {
                 match (state, button) {
+                    // TODO right, middle
                     (ElementState::Pressed, MouseButton::Left) => self.ui.set_left_mouse(true),
                     (ElementState::Pressed, MouseButton::Right) => false,
                     (ElementState::Pressed, MouseButton::Middle) => false,
@@ -192,6 +187,8 @@ impl Glue {
                 vtx_number += 4;
             };
 
+            let atlas = &self.atlas;
+
             self.ui.iter_depth_first(&Key::root(), &mut |ctrl| {
                 let Control { widget, region, .. } = ctrl;
 
@@ -199,10 +196,7 @@ impl Glue {
                     Widget::Group => {}
                     Widget::Button { label } => {
                         // TODO: get uv coordinates from atlas struct
-                        let uv = Rect {
-                            origin: Point::new(0.0, 0.0),
-                            size: Size::new(1.0, 1.0),
-                        };
+                        let uv = atlas.get("button").expect("missing texture: 'button'");
 
                         let color;
                         if ctrl.left_click.is_press() {
@@ -238,7 +232,7 @@ impl Glue {
             &self.index_buf.slice(0..self.index_vec.len()).unwrap(),
             &self.program,
             &uniform! {
-                tex: &self.texture,
+                tex: self.atlas.texture(),
                 projection: projection,
             },
             &glium::DrawParameters {

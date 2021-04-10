@@ -44,6 +44,8 @@ fn main() {
 
     let mut glue = Glue::new(&display).unwrap();
 
+    glue.atlas.insert("button", "assets/mamar.png").unwrap();
+
     let mut interface = Interface { num_buttons: 1 };
     interface.update(&mut glue);
 
