@@ -3,8 +3,11 @@ mod icon;
 use imui_glium::*;
 use imui_glium::glium::Display;
 use imui_glium::glium::glutin::dpi::LogicalSize;
+use imui_glium::glium::glutin::event::{ElementState, VirtualKeyCode, ModifiersState};
 
-#[derive(Default)]
+use crate::history::History;
+
+#[derive(Default, PartialEq, Clone)]
 pub struct State {
     clicks: u32,
 }
@@ -12,7 +15,7 @@ pub struct State {
 pub struct Interface {
     display: Display,
     glue: Glue,
-    state: State,
+    state: History<State>,
 }
 
 impl Interface {
@@ -33,24 +36,48 @@ impl Interface {
         (Self {
             display,
             glue,
-            state: Default::default(),
+            state: History::new(Default::default()),
         }, event_loop)
     }
 
     fn update(&mut self) {
         let state = &mut self.state;
 
-        self.glue.update(|ui| {
-            state.clicks += 1;
+        println!("clicks: {}", state.clicks);
 
-            ui.div(0, |ui| {
-                ui.set_size(100.0, 32.0);
+        loop {
+            self.glue.update(|ui| {
+                if ui.button(0, format!("Clicks: {}", state.clicks)) {
+                    state.clicks += 1;
+                }
             });
 
-            ui.div(1, |ui| {
-                ui.set_size(200.0, 64.0);
-            });
-        });
+            // Re-update if state changed.
+            if !state.commit() {
+                break;
+            }
+        }
+    }
+
+    /// Keybindings!
+    fn handle_key_press(&mut self, key: VirtualKeyCode, modifiers: ModifiersState) {
+        match key {
+            // Redo
+            VirtualKeyCode::Z if modifiers.ctrl() && modifiers.shift() => {
+                if self.state.redo() {
+                    self.update();
+                }
+            }
+
+            // Undo
+            VirtualKeyCode::Z if modifiers.ctrl() => {
+                if self.state.undo() {
+                    self.update();
+                }
+            }
+
+            _ => {}
+        }
     }
 
     fn draw(&mut self) {
@@ -64,6 +91,8 @@ impl Interface {
         self.update();
         self.draw();
 
+        let mut kbd_modifiers = ModifiersState::default();
+
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
 
@@ -75,8 +104,17 @@ impl Interface {
                         self.update();
                     }
 
-                    if let WindowEvent::CloseRequested = event {
-                        *control_flow = ControlFlow::Exit;
+                    match event {
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            if input.state == ElementState::Pressed {
+                                if let Some(key) = input.virtual_keycode {
+                                    self.handle_key_press(key, kbd_modifiers);
+                                }
+                            }
+                        },
+                        WindowEvent::ModifiersChanged(m) => kbd_modifiers = m,
+                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        _ => {}
                     }
                 }
                 Event::RedrawRequested(_window_id) => {

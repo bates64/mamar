@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 const NUM_STATES: usize = 32;
 
+// TODO: use https://lib.rs/crates/diff-struct instead of cloning entire state
 #[derive(Clone, PartialEq, Debug)]
 pub struct History<State: Clone + PartialEq> {
     mut_current_state: State,    // Copy of current state
@@ -30,6 +31,7 @@ impl<State: Clone + PartialEq> History<State> {
         }
     }
 
+    /// Returns true if state changed and a commit actually occurred.
     pub fn commit(&mut self) -> bool {
         // was the current state changed?
         if &self.mut_current_state != self.true_current_state() {
