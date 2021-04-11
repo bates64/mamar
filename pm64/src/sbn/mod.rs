@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 
 use crate::bgm::{self, Bgm};
-use crate::util::rw::*;
+use crate::rw::*;
 
 pub mod de;
 pub mod en;

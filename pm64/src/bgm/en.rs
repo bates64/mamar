@@ -6,7 +6,7 @@ use std::io::{self, SeekFrom};
 use log::{debug, info};
 
 use super::*;
-use crate::util::rw::*;
+use crate::rw::*;
 
 #[derive(Debug)]
 pub enum Error {

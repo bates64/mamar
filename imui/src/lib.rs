@@ -424,30 +424,6 @@ impl UiFrame<'_> {
         self.ui.pool.get_mut(key).unwrap()
     }
 
-    /// Sets the layout parameters of the current control.
-    pub fn set_layout(&mut self, layout: Layout) {
-        self.current_mut().layout = layout;
-    }
-
-    /// Force-sets the size of the current control.
-    pub fn set_size(&mut self, width: f32, height: f32) {
-        let layout = &mut self.current_mut().layout;
-
-        layout.width = width..=width;
-        layout.height = width..=height;
-    }
-
-    /*
-    /// Returns true if the mouse is over the current control, on this layer only.
-    /// Inputs are reported on a need-to-know basis, so avoid conditionally calling this method.
-    pub fn is_mouse_over(&mut self) -> bool {
-        let ctrl = self.current_mut();
-
-        ctrl.inputs_capture |= Input::MouseOver;
-        ctrl.inputs_active.contains(Input::MouseOver)
-    }
-    */
-
     pub fn group<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
         let key = self.ui.key(key.into());
 
@@ -461,8 +437,8 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
-    /// A button with a label. Returns `true` if left-clicked.
-    pub fn button<K: Into<UserKey>, S: Into<String>>(&mut self, key: K, label: S) -> bool {
+    /// A button with a label.
+    pub fn button<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, label: S) -> Button<'a> {
         let key = self.ui.key(key.into());
 
         self.ui.begin_control(key, Widget::Button {
@@ -472,14 +448,17 @@ impl UiFrame<'_> {
         let ctrl = self.current_mut();
 
         ctrl.layout.direction = layout::Dir::Row;
-        ctrl.layout.width = 100.0..=100.0;
+        ctrl.layout.width = 100.0..=100.0; // TODO: query renderer how wide text would be
         ctrl.layout.height = 32.0..=32.0;
 
         let is_click = ctrl.advance_left_click().is_click();
 
         self.ui.end_control();
 
-        is_click
+        Button {
+            ctrl: self.current_mut(),
+            is_click,
+        }
     }
 }
 
@@ -541,5 +520,21 @@ impl Control {
 impl Default for Widget {
     fn default() -> Self {
         Widget::Group
+    }
+}
+
+pub struct Button<'a> {
+    ctrl: &'a mut Control,
+    is_click: bool,
+}
+
+impl Button<'_> {
+    pub fn clicked(&self) -> bool {
+        self.is_click
+    }
+
+    pub fn with_width(&mut self, width: f32) -> &mut Self {
+        self.ctrl.layout.width = width..=width;
+        self
     }
 }

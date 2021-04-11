@@ -12,7 +12,7 @@ impl Interface {
 
             glue.update(|ui| {
                 for i in 0..self.num_buttons {
-                    if ui.button(i, format!("Button {}", i)) {
+                    if ui.button(i, format!("Button {}", i)).clicked() {
                         println!("button {} clicked", i);
 
                         self.num_buttons += 1;

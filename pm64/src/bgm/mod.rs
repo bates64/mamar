@@ -1,14 +1,17 @@
-use std::fmt;
-use std::ops::{Deref, Range};
-use std::rc::Rc;
-
-use id_arena::{Arena, Id};
-
 /// Encoder ([Bgm] -> .bin)
 pub mod en;
 
 /// Decoder (.bin -> [Bgm])
 pub mod de;
+
+#[cfg(feature = "midly")]
+pub mod midi;
+
+use std::fmt;
+use std::ops::{Deref, Range};
+use std::rc::Rc;
+
+use id_arena::{Arena, Id};
 
 mod cmd;
 pub use cmd::*;
@@ -160,6 +163,7 @@ impl<T> Deref for TaggedRc<T> {
 }
 
 impl Bgm {
+    #[deprecated]
     pub fn write_kdl<W: fmt::Write>(&self, f: &mut W) -> Result<(), fmt::Error> {
         writeln!(f, "index {:?}", self.index)?;
         writeln!(f)?;
@@ -296,11 +300,5 @@ impl Bgm {
         }
 
         Ok(())
-    }
-
-    pub fn as_kdl(&self) -> Result<String, fmt::Error> {
-        let mut s = String::with_capacity(128);
-        self.write_kdl(&mut s)?;
-        Ok(s)
     }
 }

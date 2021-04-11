@@ -6,20 +6,10 @@ edition = "2018"
 
 [dependencies]
 imui_glium = { path = "../imui_glium" }
-glium = "0.29"
-lyon = "0.17"
-euclid = "0.22"
-lru = "0.6"
+pm64 = { path = "../pm64", features = ["midly"] }
 lazy_static = "1"
-smallvec = { version = "1.5.0", features = ["write"] } # TODO: remove
-image = "0.23"
-ttf-parser = "0.9"
 tinyfiledialogs = "3.0"
-log = "0.4.14"
-midly = "0.5.1"
-id-arena = "2.2.1"
-rayon = "1.5.0"
-cached = { version = "0.23", default-features = false }
+log = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["shellscalingapi"] }

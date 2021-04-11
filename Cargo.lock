@@ -34,12 +34,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
 
 [[package]]
-name = "ahash"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
-
-[[package]]
 name = "andrew"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -57,12 +51,6 @@ name = "android_glue"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
-
-[[package]]
-name = "arrayvec"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "autocfg"
@@ -107,16 +95,6 @@ name = "byteorder"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
-
-[[package]]
-name = "cached"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e2afe73808fbaac302e39c9754bfc3c4b4d0f99c9c240b9f4e4efc841ad1b74"
-dependencies = [
- "hashbrown 0.9.1",
- "once_cell",
-]
 
 [[package]]
 name = "calloop"
@@ -475,7 +453,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3203e88e086474e56b0785255804a0c23542f76253584d3f43152cd2bb95d0b7"
 dependencies = [
- "hashbrown 0.8.2",
+ "hashbrown",
  "ttf-parser 0.8.3",
 ]
 
@@ -631,17 +609,8 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
 dependencies = [
- "ahash 0.3.8",
+ "ahash",
  "autocfg",
-]
-
-[[package]]
-name = "hashbrown"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
-dependencies = [
- "ahash 0.4.7",
 ]
 
 [[package]]
@@ -800,66 +769,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lru"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aae342b73d57ad0b8b364bd12584819f2c1fe9114285dfcf8b0722607671635"
-dependencies = [
- "hashbrown 0.9.1",
-]
-
-[[package]]
-name = "lyon"
-version = "0.17.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a146a460c58fb5361fc7faf8d7a68b274f11969ee1f6856875c162d679d0306"
-dependencies = [
- "lyon_algorithms",
- "lyon_tessellation",
-]
-
-[[package]]
-name = "lyon_algorithms"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac507017460ad0b92198503945cb164e71465cdfd84063f5eed9af9356ccd093"
-dependencies = [
- "lyon_path",
- "sid",
-]
-
-[[package]]
-name = "lyon_geom"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edb987cd391542608ca8d43c0cd5ec44ebe4a0957eb89769a316c99d7fe14537"
-dependencies = [
- "arrayvec",
- "euclid",
- "num-traits",
-]
-
-[[package]]
-name = "lyon_path"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d64beb93be63439bc744041d132d62fdec831181eeb474f675e5f6a81f5ac1"
-dependencies = [
- "lyon_geom",
-]
-
-[[package]]
-name = "lyon_tessellation"
-version = "0.17.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f982ed26be45d240227e7e1b1f7368b8e671512deb2c441c47c5c77e2a179648"
-dependencies = [
- "arrayvec",
- "lyon_path",
- "sid",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -872,21 +781,11 @@ dependencies = [
 name = "mamar"
 version = "0.3.0"
 dependencies = [
- "cached",
- "euclid",
- "glium",
- "id-arena",
- "image",
  "imui_glium",
  "lazy_static",
  "log",
- "lru",
- "lyon",
- "midly",
- "rayon",
- "smallvec",
+ "pm64",
  "tinyfiledialogs",
- "ttf-parser 0.9.0",
  "winapi 0.3.9",
  "winres",
 ]
@@ -1220,6 +1119,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 
 [[package]]
+name = "pm64"
+version = "0.1.0"
+dependencies = [
+ "id-arena",
+ "lazy_static",
+ "log",
+ "midly",
+ "smallvec",
+]
+
+[[package]]
 name = "png"
 version = "0.16.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1364,15 +1274,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sid"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd5ac56c121948b4879bba9e519852c211bcdd8f014efff766441deff0b91bdb"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1487,12 +1388,6 @@ name = "ttf-parser"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7622061403fd00f0820df288e5a580e87d3ce15a1c4313c59fd1ffb77129903f"
-
-[[package]]
-name = "ttf-parser"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62ddb402ac6c2af6f7a2844243887631c4e94b51585b229fcfddb43958cd55ca"
 
 [[package]]
 name = "unicode-xid"

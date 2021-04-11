@@ -1,8 +1,22 @@
 use std::error::Error;
+use std::io::prelude::*;
+use std::io::SeekFrom;
 
 use midly::{MetaMessage, Smf};
 
 use crate::bgm::*;
+use crate::rw::*;
+
+pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
+    let previous_pos = file.pos().unwrap_or_default();
+
+    file.seek(SeekFrom::Start(0))?;
+    let is_midi = file.read_cstring(4)? == "MThd";
+
+    file.seek(SeekFrom::Start(previous_pos))?;
+
+    Ok(is_midi)
+}
 
 pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     let smf = Smf::parse(raw)?;

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "mamar",
+    "pm64",
     "imui",
     "imui_glium",
 ]

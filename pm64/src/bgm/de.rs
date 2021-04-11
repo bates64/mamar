@@ -8,7 +8,7 @@ use log::{debug, warn};
 use smallvec::smallvec;
 
 use super::*;
-use crate::util::rw::*;
+use crate::rw::*;
 
 #[derive(Debug)]
 pub enum Error {

@@ -1,9 +1,11 @@
+// TODO: migrate this to its own module probably, shouldn't live in pm64
+
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
 
-use crate::util::rw::*;
+use crate::rw::*;
 
 // Server implementation of https://github.com/pmret/hot-reload/blob/main/protocol.md
 // TODO: implement rest of protocol (i.e. ERROR)
@@ -12,11 +14,11 @@ use crate::util::rw::*;
 // TODO: communicate list of connected clients to UI thread
 pub fn run(rx: Receiver<Vec<u8>>) -> ! {
     let listener = TcpListener::bind("127.0.0.1:65432").unwrap();
-    println!("listening for hot-reload clients");
+    log::debug!("listening for hot-reload clients");
 
     let (mut stream, _) = listener.accept().unwrap();
 
-    println!("client connected, performing handshake");
+    log::info!("client connected, performing handshake");
 
     struct Packet<'a> {
         message: &'a str,
@@ -57,12 +59,12 @@ pub fn run(rx: Receiver<Vec<u8>>) -> ! {
         }
     }
 
-    println!("handshake ok");
+    log::info!("handshake ok");
 
     loop {
         let bgm_data = rx.recv().unwrap();
 
-        println!("sending BGM to client");
+        log::info!("sending BGM to client");
 
         Packet {
             message: "HOT_BGM",

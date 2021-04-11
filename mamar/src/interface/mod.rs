@@ -1,25 +1,44 @@
 mod icon;
+mod state;
+
+use std::sync::mpsc::{channel, Sender};
+use std::thread;
+use std::error::Error;
 
 use imui_glium::*;
 use imui_glium::glium::Display;
+use imui_glium::glium::glutin::window::Window;
 use imui_glium::glium::glutin::dpi::LogicalSize;
 use imui_glium::glium::glutin::event::{ElementState, VirtualKeyCode, ModifiersState};
 
 use crate::history::History;
 
-#[derive(Default, PartialEq, Clone)]
-pub struct State {
-    clicks: u32,
-}
-
 pub struct Interface {
     display: Display,
     glue: Glue,
-    state: History<State>,
+
+    state: History<state::State>,
+
+    // TODO: use an actor or something so we can ask it who is connected
+    hot_reload_tx: Option<Sender<Vec<u8>>>,
+
+    queued_action: Action,
+}
+
+/// UI things that can't happen during updates, like opening file dialogs.
+#[derive(Clone)]
+enum Action {
+    None,
+    OpenDocument,
+    SaveDocument,
+    SaveDocumentAs,
 }
 
 impl Interface {
     pub fn new() -> (Self, EventLoop<()>) {
+        use std::io::prelude::*;
+        use std::fs::File;
+
         let event_loop = EventLoop::new();
 
         let wb = imui_glium::glium::glutin::window::WindowBuilder::new()
@@ -35,32 +54,101 @@ impl Interface {
 
         let mut glue = Glue::new(&display).unwrap();
 
+        log::info!("loading assets");
+
         glue.atlas().insert("button", "assets/tex/button.png").unwrap();
         glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
 
-        glue.load_font(include_bytes!("../../../assets/Inter-Medium.otf")).unwrap();
+        glue.load_font(&{
+            let mut font = File::open("assets/Inter-Medium.otf").unwrap();
+            let mut buf = Vec::new();
+            font.read_to_end(&mut buf).unwrap();
+            buf
+        }).unwrap();
 
         (Self {
             display,
             glue,
             state: History::new(Default::default()),
+            hot_reload_tx: None,
+            queued_action: Action::None,
         }, event_loop)
+    }
+
+    pub fn with_window<F: FnOnce(&Window)>(&self, f: F) {
+        f(self.display.gl_window().window())
     }
 
     fn update(&mut self) {
         let state = &mut self.state;
+        let hot_reload_tx = &mut self.hot_reload_tx;
+        let queued_action = &mut self.queued_action;
 
         loop {
+            let mut force_update = false;
+
             self.glue.update(|ui| {
-                if ui.button(0, format!("Clicks: {}", state.clicks)) {
-                    state.clicks += 1;
+                // Hot-reload server controls.
+                if hot_reload_tx.is_none() {
+                    if ui.button(0, "Start playback server")
+                        .with_width(200.0)
+                        .clicked()
+                    {
+                        let (tx, hot_reload_rx) = channel();
+
+                        thread::spawn(move || pm64::hot::run(hot_reload_rx));
+
+                        *hot_reload_tx = Some(tx);
+                        force_update = true;
+                    }
+                }
+
+                // File controls. We have to show file dialogs after rendering is complete (otherwise the window
+                // freezes) so we only set that 'X has been requested' when these buttons are clicked.
+                if ui.button(1, "Open File...").clicked() {
+                    *queued_action = Action::OpenDocument;
+                }
+
+                if let Some(doc) = state.document.as_mut() {
+                    if doc.can_save() && ui.button(2, "Save").clicked() {
+                        *queued_action = Action::SaveDocument;
+                    }
+                    if ui.button(3, "Save As...").clicked() {
+                        *queued_action = Action::SaveDocumentAs;
+                    }
+                    if let Some(hot_reload_tx) = hot_reload_tx {
+                        if ui.button(4, "Play in Project64")
+                            .with_width(200.0)
+                            .clicked()
+                        {
+                            if let Ok(data) = doc.bgm.as_bytes() {
+                                let _ = hot_reload_tx.send(data);
+                            } else {
+                                todo!("surface bgm::en error");
+                            }
+                        }
+                    }
+
+                    ui.group(5, |ui| doc.update(ui));
                 }
             });
 
             // Re-update if state changed.
-            if !state.commit() {
+            if !force_update && !state.commit() {
                 break;
             }
+        }
+
+        if let Some(title) = self.state.document.as_ref().map(|doc| {
+            doc.path.file_name().map(|s| format!("{} - Mamar", s.to_string_lossy()))
+        }).flatten() {
+            self.with_window(|w| {
+                w.set_title(&title);
+            });
+        } else {
+            self.with_window(|w| {
+                w.set_title("Mamar");
+            });
         }
     }
 
@@ -81,8 +169,43 @@ impl Interface {
                 }
             }
 
+            // Open
+            VirtualKeyCode::O if modifiers.ctrl() => self.queued_action = Action::OpenDocument,
+
+            // Save As
+            VirtualKeyCode::S if modifiers.ctrl() && modifiers.shift() => self.queued_action = Action::SaveDocumentAs,
+
+            // Save
+            VirtualKeyCode::S if modifiers.ctrl() => self.queued_action = Action::SaveDocument,
+
             _ => {}
         }
+    }
+
+    fn do_queued_action(&mut self) -> Result<bool, Box<dyn Error>> {
+        let action = self.queued_action.clone();
+        self.queued_action = Action::None;
+
+        match action {
+            Action::None => return Ok(false),
+            Action::OpenDocument => {
+                if let Some(doc) = state::Document::open()? {
+                    self.state.document = Some(doc);
+                }
+            }
+            Action::SaveDocument => {
+                if let Some(doc) = &self.state.document {
+                    doc.save()?;
+                }
+            }
+            Action::SaveDocumentAs => {
+                if let Some(doc) = &mut self.state.document {
+                    doc.save_as()?;
+                }
+            }
+        }
+
+        Ok(self.state.commit())
     }
 
     fn draw(&mut self) {
@@ -95,7 +218,7 @@ impl Interface {
     pub fn show(mut self, event_loop: EventLoop<()>) -> ! {
         self.update();
         self.draw();
-        self.display.gl_window().window().set_visible(true);
+        self.with_window(|w| w.set_visible(true));
 
         let mut kbd_modifiers = ModifiersState::default();
 
@@ -131,6 +254,18 @@ impl Interface {
 
             if self.glue.needs_redraw() || redraw {
                 self.draw();
+            }
+
+            match self.do_queued_action() {
+                Ok(true) => {
+                    self.update();
+                    self.draw();
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    // TODO: surface error in the UI somepalce
+                    log::error!("error: {}", error);
+                }
             }
         })
     }
