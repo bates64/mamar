@@ -1,3 +1,9 @@
+## 0.5.0
+
+- Added ability to view segment, subsegment, and track flags. You can also swap tracks between 'Voice' and 'Drum' mode.
+- Added _Reload File_ action (for @eldexterr)
+- Fixed _Save_ action
+
 ## 0.4.1
 
 ## 0.4.0
