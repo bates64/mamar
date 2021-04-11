@@ -25,13 +25,20 @@ impl Interface {
         let wb = imui_glium::glium::glutin::window::WindowBuilder::new()
             .with_title("Mamar")
             .with_inner_size(LogicalSize::new(800.0, 600.0))
-            .with_window_icon(icon::get_icon());
+            .with_min_inner_size(LogicalSize::new(800.0, 600.0))
+            .with_window_icon(icon::get_icon())
+            .with_visible(false);
         let cb = imui_glium::glium::glutin::ContextBuilder::new()
             .with_multisampling(4)
             .with_srgb(true);
         let display = Display::new(wb, cb, &event_loop).unwrap();
 
-        let glue = Glue::new(&display).unwrap();
+        let mut glue = Glue::new(&display).unwrap();
+
+        glue.atlas().insert("button", "assets/tex/button.png").unwrap();
+        glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
+
+        glue.load_font(include_bytes!("../../../assets/Inter-Medium.otf")).unwrap();
 
         (Self {
             display,
@@ -42,8 +49,6 @@ impl Interface {
 
     fn update(&mut self) {
         let state = &mut self.state;
-
-        println!("clicks: {}", state.clicks);
 
         loop {
             self.glue.update(|ui| {
@@ -83,13 +88,14 @@ impl Interface {
     fn draw(&mut self) {
         let mut surface = self.display.draw();
         surface.clear_color(0.0, 0.0, 0.0, 1.0);
-        self.glue.draw(&mut surface).unwrap();
+        self.glue.draw(&mut surface, &self.display).unwrap();
         surface.finish().unwrap();
     }
 
     pub fn show(mut self, event_loop: EventLoop<()>) -> ! {
         self.update();
         self.draw();
+        self.display.gl_window().window().set_visible(true);
 
         let mut kbd_modifiers = ModifiersState::default();
 

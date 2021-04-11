@@ -10,6 +10,6 @@ glium = "0.29"
 image = "0.23"
 euclid = "0.22"
 rect_packer = "0.2"
-crossfont = "0.2"
+fontdue = "0.4"
 
 [dev-dependencies]

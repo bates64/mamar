@@ -13,6 +13,8 @@ impl Interface {
             glue.update(|ui| {
                 for i in 0..self.num_buttons {
                     if ui.button(i, format!("Button {}", i)) {
+                        println!("button {} clicked", i);
+
                         self.num_buttons += 1;
 
                         // If state changes during an update, its recommended that you update again afterward so
@@ -26,8 +28,6 @@ impl Interface {
                 break;
             }
         }
-
-        println!("{:?}", &self);
     }
 }
 
@@ -36,7 +36,8 @@ fn main() {
 
     let wb = imui_glium::glium::glutin::window::WindowBuilder::new()
         .with_title("imui_glium")
-        .with_inner_size(imui_glium::glium::glutin::dpi::LogicalSize::new(800.0, 600.0));
+        .with_inner_size(imui_glium::glium::glutin::dpi::LogicalSize::new(800.0, 600.0))
+        .with_visible(false); // Font loading can take a while, so we'll only show the window once loading is done.
     let cb = imui_glium::glium::glutin::ContextBuilder::new()
         .with_multisampling(4)
         .with_srgb(true);
@@ -46,7 +47,7 @@ fn main() {
 
     glue.atlas().insert("button", "assets/tex/button.png").unwrap();
     glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
-    glue.load_font("Arial".to_owned(), &display).unwrap();
+    glue.load_font(include_bytes!("../../assets/Inter-Medium.otf")).unwrap();
 
     let mut interface = Interface { num_buttons: 1 };
     interface.update(&mut glue);
@@ -57,6 +58,9 @@ fn main() {
         glue.draw(&mut surface, &display).unwrap();
         surface.finish().unwrap();
     }
+
+    // Loading is done and we've drawn something; show the window.
+    display.gl_window().window().set_visible(true);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

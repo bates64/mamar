@@ -8,8 +8,8 @@ use rect_packer::Packer;
 use glium::backend::Facade;
 use glium::texture::{Texture2d, RawImage2d, TextureCreationError};
 
-const INITIAL_HEIGHT: u32 = 256;
-const INITIAL_WIDTH: u32 = 256;
+const INITIAL_HEIGHT: u32 = 1024;
+const INITIAL_WIDTH: u32 = 1024;
 
 pub struct TextureAtlas {
     texture: Texture2d,
@@ -28,7 +28,7 @@ pub struct Sprite {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum SpriteId {
     StaticStr(&'static str),
-    Char(char),
+    Glyph(fontdue::layout::GlyphRasterConfig),
 }
 
 impl TextureAtlas {
@@ -66,6 +66,8 @@ impl TextureAtlas {
         I: Into<SpriteId>,
         R: glium::texture::PixelValue + Clone,
     {
+        let id = id.into();
+
         if let Some(rect) = self.packer.pack(image.width as i32, image.height as i32, false) {
             assert!(rect.width == image.width as i32);
             assert!(rect.height == image.height as i32);
@@ -89,7 +91,7 @@ impl TextureAtlas {
             assert!(uv_rect.max_y() <= 1.0);
 
             // Add the sprite to the map.
-            let old = self.map.insert(id.into(), Sprite {
+            let old = self.map.insert(id, Sprite {
                 uv_rect,
                 src_dimensions: Size::new(rect.width as f32, rect.height as f32),
             });
@@ -122,8 +124,8 @@ impl From<&'static str> for SpriteId {
     }
 }
 
-impl From<char> for SpriteId {
-    fn from(ch: char) -> Self {
-        SpriteId::Char(ch)
+impl From<fontdue::layout::GlyphRasterConfig> for SpriteId {
+    fn from(g: fontdue::layout::GlyphRasterConfig) -> Self {
+        SpriteId::Glyph(g)
     }
 }

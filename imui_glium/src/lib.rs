@@ -47,6 +47,8 @@ struct Renderer {
     pub vertex_vec: Vec<Vertex>,
     pub index_vec: Vec<u16>,
     pub atlas: TextureAtlas,
+    pub face: Option<font::Face>,
+    pub dpi: f32,
 }
 
 /// Calculates a screen-space projection matrix for the given display.
@@ -84,6 +86,11 @@ impl Glue {
                 vertex_vec: Vec::with_capacity(INITIAL_VERTEX_BUF_CAPACITY),
                 index_vec: Vec::with_capacity(INITIAL_INDEX_BUF_CAPACITY),
                 atlas: TextureAtlas::new(facade)?,
+                face: None,
+                dpi: {
+                    let gl_window = facade.gl_window();
+                    gl_window.window().scale_factor() as f32
+                },
             }
         })
     }
@@ -100,13 +107,15 @@ impl Glue {
 
         match event {
             WindowEvent::Resized(size) => {
-                let size = size.to_logical(dpi_scale());
+                let dpi = dpi_scale();
+                let size = size.to_logical(dpi);
 
                 self.projection = screen_to_clip(display);
                 self.ui.resize(Rect {
                     origin: Point::zero(),
                     size: Size::new(size.width, size.height),
                 });
+                self.renderer.dpi = dpi as f32;
 
                 self.need_render = true;
                 false // Only the layout changed, which imui handles internally.
@@ -150,17 +159,9 @@ impl Glue {
         &mut self.renderer.atlas
     }
 
-    pub fn load_font(&mut self, font_name: String, display: &Display) -> Result<(), Box<dyn Error>> {
-        // ASCII printable (TODO: add more).
-        const CHARS: &str =
-            "!\"#$%&'()*+,-./0123456789;;<=>/@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-
-        let dpi_scale = {
-            let gl_window = display.gl_window();
-            gl_window.window().scale_factor() as f32
-        };
-
-        font::load(self.atlas(), font_name, CHARS.chars(), dpi_scale)
+    pub fn load_font(&mut self, font_bytes: &[u8]) -> Result<(), &'static str> {
+        self.renderer.face = Some(font::Face::load(font_bytes)?);
+        Ok(())
     }
 
     pub fn draw<S: Surface, F: Facade>(&mut self, surface: &mut S, facade: &F)  -> Result<(), Box<dyn Error>> {
@@ -218,7 +219,7 @@ impl Renderer {
         self.vertex_vec.clear();
     }
 
-    pub fn render_sprite_scaled<I: Into<SpriteId>>(&mut self, region: &Region, sprite_id: I, color: Color) {
+    fn render_sprite_scaled<I: Into<SpriteId>>(&mut self, region: &Region, sprite_id: I, color: Color) {
         let rect = &region.rect;
         let uv = &self.atlas.get(sprite_id).expect("tried to render unknown sprite").uv_rect;
 
@@ -267,35 +268,54 @@ impl Renderer {
 
 impl Render for Renderer {
     fn render_text(&mut self, region: &Region, text: &str) {
-        let mut offset = Point::zero();
         let color = [1.0, 1.0, 1.0, 1.0];
 
-        let x_size = self.atlas.get('x').unwrap().src_dimensions;
+        // Text layouting and rendering happens in physical coordinates (DPI-unaware), so account for that.
+        let size = 14.0 * self.dpi;
+        let offset = Point::new(region.rect.origin.x, region.rect.origin.y);
+        let layout_rect = Rect {
+            origin: Point::zero(), // For some reason we have to apply `offset` later or layouting goes haywire...
+            size: Size::new(region.rect.size.width * self.dpi, region.rect.size.height * self.dpi),
+        };
+        let dpi = self.dpi;
 
-        for ch in text.chars() {
-            if let Some(sprite) = self.atlas.get(ch) {
-                let src_dimensions = sprite.src_dimensions;
+        if let Some(face) = &mut self.face {
+            let vtx = &mut self.vertex_vec;
+            let idx = &mut self.index_vec;
 
-                self.render_sprite_scaled(
-                    &Region {
-                        layer: region.layer,
-                        rect: Rect {
-                            origin: Point::new(
-                                region.rect.origin.x + offset.x,
-                                region.rect.origin.y + offset.y + (x_size.height - src_dimensions.height)
-                            ),
-                            size: src_dimensions,
-                        }
+            face.layout(&mut self.atlas, &layout_rect, &font::TextStyle::new(text, size, 0), |s, rect| {
+                let uv = &s.uv_rect;
+
+                // TODO: region.layer
+
+                let vtx_number = vtx.len() as u16;
+                idx.extend_from_slice(&[
+                    vtx_number + 0, vtx_number + 1, vtx_number + 2,
+                    vtx_number + 1, vtx_number + 3, vtx_number + 2,
+                ]);
+                vtx.extend_from_slice(&[
+                    Vertex {
+                        position: [offset.x + rect.min_x() / dpi, offset.y + rect.min_y() / dpi],
+                        uv: [uv.min_x(), uv.min_y()],
+                        color: color.clone(),
                     },
-                    ch,
-                    color,
-                );
-
-                offset.x += src_dimensions.width;
-            } else {
-                // Treat missing char as space
-                offset.x += x_size.width / 2.0;
-            }
+                    Vertex {
+                        position: [offset.x + rect.max_x() / dpi, offset.y + rect.min_y() / dpi],
+                        uv: [uv.max_x(), uv.min_y()],
+                        color: color.clone(),
+                    },
+                    Vertex {
+                        position: [offset.x + rect.min_x() / dpi, offset.y + rect.max_y() / dpi],
+                        uv: [uv.min_x(), uv.max_y()],
+                        color: color.clone(),
+                    },
+                    Vertex {
+                        position: [offset.x + rect.max_x() / dpi, offset.y + rect.max_y() / dpi],
+                        uv: [uv.max_x(), uv.max_y()],
+                        color: color.clone(),
+                    },
+                ]);
+            });
         }
     }
 

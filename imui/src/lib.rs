@@ -401,6 +401,7 @@ impl Ui {
 }
 
 impl UiFrame<'_> {
+    #[allow(unused)]
     fn current(&self) -> &Control {
         let key;
         if let Some(prev_sibling) = self.ui.prev_sibling.as_ref() {
