@@ -1,3 +1,5 @@
+## 0.5.1
+
 ## 0.5.0
 
 - Added ability to view segment, subsegment, and track flags. You can also swap tracks between 'Voice' and 'Drum' mode.
