@@ -62,7 +62,13 @@ impl Document {
     }
 
     pub fn can_save(&self) -> bool {
-        self.path.ends_with(".bgm") || self.path.ends_with(".bin")
+        let ext = self.path.extension().unwrap_or_default().to_str().unwrap_or_default();
+
+        match ext {
+            "bgm" => true,
+            "bin" => true,
+            _ => false,
+        }
     }
 
     pub fn save(&self) -> Result<(), Box<dyn Error>> {
