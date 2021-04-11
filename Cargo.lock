@@ -782,7 +782,6 @@ name = "mamar"
 version = "0.3.0"
 dependencies = [
  "imui_glium",
- "lazy_static",
  "log",
  "pm64",
  "tinyfiledialogs",

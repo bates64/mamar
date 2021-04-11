@@ -7,7 +7,6 @@ edition = "2018"
 [dependencies]
 imui_glium = { path = "../imui_glium" }
 pm64 = { path = "../pm64", features = ["midly"] }
-lazy_static = "1"
 tinyfiledialogs = "3.0"
 log = "0.4"
 
