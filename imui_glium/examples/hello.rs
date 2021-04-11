@@ -11,17 +11,28 @@ impl Interface {
             let mut updated = false;
 
             glue.update(|ui| {
-                for i in 0..self.num_buttons {
-                    if ui.button(i, format!("Button {}", i)).clicked() {
-                        println!("button {} clicked", i);
+                ui.vstack(0, |ui| {
+                    ui.text(0, "Hello, world!").center_x();
 
-                        self.num_buttons += 1;
+                    ui.hstack(1, |ui| {
+                        for i in 0..self.num_buttons {
+                            if ui.button(i, format!("Button {}", i))
+                                .with_height(32.0 + i as f32 * 8.0)
+                                .clicked()
+                            {
+                                println!("button {} clicked", i);
 
-                        // If state changes during an update, its recommended that you update again afterward so
-                        // you always show the latest data.
-                        updated = true;
-                    }
-                }
+                                self.num_buttons += 1;
+
+                                // If state changes during an update, its recommended that you update again afterward so
+                                // you always show the latest data.
+                                updated = true;
+                            }
+                        }
+                    });
+
+                    ui.text(2, format!("Above are {} buttons", self.num_buttons));
+                });
             });
 
             if !updated {

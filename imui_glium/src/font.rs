@@ -20,17 +20,17 @@ impl Face {
         })
     }
 
-    pub fn layout<R>(&mut self, atlas: &mut TextureAtlas, rect: &Rect, style: &TextStyle, mut render_quad: R)
+    pub fn layout<R>(&mut self, atlas: &mut TextureAtlas, rect: Option<&Rect>, style: &TextStyle, mut render_quad: R)
     where
         R: FnMut(&Sprite, Rect),
     {
         self.layout.reset(&LayoutSettings {
-            x: rect.min_x(),
-            y: rect.min_y(),
-            max_width: Some(rect.max_x()),
-            max_height: Some(rect.max_y()),
-            horizontal_align: HorizontalAlign::Center, // TODO make configurable
-            vertical_align: VerticalAlign::Middle, // TODO make configurable
+            x: rect.map(|r| r.min_x()).unwrap_or_default(),
+            y: rect.map(|r| r.min_y()).unwrap_or_default(),
+            max_width: rect.map(|r| r.max_x()),
+            max_height: rect.map(|r| r.max_y()),
+            horizontal_align: HorizontalAlign::Left, // TODO make configurable
+            vertical_align: VerticalAlign::Top, // TODO make configurable
             wrap_style: WrapStyle::Word,
             wrap_hard_breaks: true,
         });

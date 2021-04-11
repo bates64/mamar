@@ -114,12 +114,10 @@ pub enum Widget {
     Group,
 
     /// A text label.
-    Label(String),
+    Text(String),
 
     /// A button.
-    Button {
-        label: String,
-    },
+    Button,
 }
 
 impl Ui {
@@ -144,7 +142,7 @@ impl Ui {
     }
 
     /// Re-create the tree.
-    pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
+    pub fn update<F: FnOnce(&mut UiFrame<'_>), R: Render>(&mut self, f: F, renderer: &mut R) {
         self.begin_frame();
 
         let now = Instant::now();
@@ -160,6 +158,7 @@ impl Ui {
         });
 
         self.end_frame();
+        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer);
     }
 
     /// Returns the number of controls, besides the root, in the tree.
@@ -171,9 +170,9 @@ impl Ui {
         self.len() == 0
     }
 
-    pub fn resize(&mut self, screen: Rect) {
+    pub fn resize<R: Render>(&mut self, screen: Rect, renderer: &mut R) {
         self.screen = screen;
-        layout::compute(&mut self.pool, &Key::root(), self.screen.clone());
+        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer);
     }
 
     #[must_use = "if true is returned, call update"]
@@ -229,7 +228,6 @@ impl Ui {
     }
 
     /// Iterate through a tree and its children, depth-first AKA post-order.
-    /// (Depth-first is good for drawing - it ensures parents do not overwrite their children when on the same layer.)
     pub fn iter_depth_first<D: FnMut(&Control)>(&self, key: &Key, f: &mut D) {
         let control = self.pool.get(key).unwrap();
 
@@ -252,17 +250,25 @@ impl Ui {
         f(control);
     }
 
+    /// Iterate through a tree and its children, pre-order.
+    pub fn iter_breadth_first<D: FnMut(&Control)>(&self, key: &Key, f: &mut D) {
+        let control = self.pool.get(key).unwrap();
+
+        f(control);
+
+        for child in control.children.iter() {
+            self.iter_breadth_first(child, f);
+        }
+    }
+
     pub fn render<R: Render>(&mut self, renderer: &mut R) {
-        self.iter_depth_first(&Key::root(), &mut |ctrl| {
+        self.iter_breadth_first(&Key::root(), &mut |ctrl| {
             let Control { widget, region, .. } = ctrl;
 
             match widget {
                 Widget::Group => {}
-                Widget::Button { label } => {
-                    renderer.render_button(&region, ctrl.left_click.is_press());
-                    renderer.render_text(&region, label);
-                }
-                _ => todo!()
+                Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
+                Widget::Text(text) => renderer.render_text(&region, text),
             }
         });
     }
@@ -286,8 +292,6 @@ impl Ui {
         let frame_no = self.frame_no;
         self.forget_old_children(&Key::root());
         self.pool.retain(|_, control| !control.is_old(frame_no));
-
-        layout::compute(&mut self.pool, &Key::root(), self.screen.clone());
     }
 
     fn key(&self, user: UserKey) -> Key {
@@ -424,40 +428,63 @@ impl UiFrame<'_> {
         self.ui.pool.get_mut(key).unwrap()
     }
 
-    pub fn group<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    /// Create a group of controls laid out horizontally, left-to-right.
+    pub fn hstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
         let key = self.ui.key(key.into());
 
         self.ui.begin_control(key, Widget::Group);
+        self.current_mut().layout.direction = layout::Dir::LeftRight { wrap: true };
         f(self);
         self.ui.end_control();
     }
 
-    pub fn label<K: Into<UserKey>>(&mut self, key: K, string: String) {
-        self.ui.begin_control(self.ui.key(key.into()), Widget::Label(string));
+    /// Create a group of controls laid out vertically, top-to-bottom.
+    pub fn vstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+        let key = self.ui.key(key.into());
+
+        self.ui.begin_control(key, Widget::Group);
+        self.current_mut().layout.direction = layout::Dir::TopBottom { wrap: false };
+        f(self);
         self.ui.end_control();
+    }
+
+    /// Create a group of controls laid out back-to-front, on top of one another.
+    /// Later children appear above earlier children.
+    pub fn zstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+        let key = self.ui.key(key.into());
+
+        self.ui.begin_control(key, Widget::Group);
+        self.current_mut().layout.direction = layout::Dir::BackFront;
+        f(self);
+        self.ui.end_control();
+    }
+
+    /// Create a simple block of text.
+    pub fn text<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, string: S) -> Text<'a> {
+        self.ui.begin_control(self.ui.key(key.into()), Widget::Text(string.into()));
+        self.ui.end_control();
+
+        Text {
+            ctrl: self.current_mut(),
+        }
     }
 
     /// A button with a label.
     pub fn button<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, label: S) -> Button<'a> {
         let key = self.ui.key(key.into());
 
-        self.ui.begin_control(key, Widget::Button {
-            label: label.into(),
-        });
+        self.ui.begin_control(key, Widget::Button);
+        self.text(0, label).center_x().center_y();
+        self.ui.end_control();
 
         let ctrl = self.current_mut();
 
-        ctrl.layout.direction = layout::Dir::Row;
-        ctrl.layout.width = 100.0..=100.0; // TODO: query renderer how wide text would be
+        ctrl.layout.width = 100.0..=100.0;
         ctrl.layout.height = 32.0..=32.0;
 
-        let is_click = ctrl.advance_left_click().is_click();
-
-        self.ui.end_control();
-
         Button {
-            ctrl: self.current_mut(),
-            is_click,
+            is_click: ctrl.advance_left_click().is_click(),
+            ctrl,
         }
     }
 }
@@ -533,8 +560,35 @@ impl Button<'_> {
         self.is_click
     }
 
+    pub fn with_auto_size(&mut self) -> &mut Self {
+        self.ctrl.layout.width = 0.0..=f32::INFINITY;
+        self.ctrl.layout.height = 0.0..=f32::INFINITY;
+        self
+    }
+
     pub fn with_width(&mut self, width: f32) -> &mut Self {
         self.ctrl.layout.width = width..=width;
+        self
+    }
+
+    pub fn with_height(&mut self, height: f32) -> &mut Self {
+        self.ctrl.layout.height = height..=height;
+        self
+    }
+}
+
+pub struct Text<'a> {
+    ctrl: &'a mut Control,
+}
+
+impl Text<'_> {
+    pub fn center_x(&mut self) -> &mut Self {
+        self.ctrl.layout.center_x = true;
+        self
+    }
+
+    pub fn center_y(&mut self) -> &mut Self {
+        self.ctrl.layout.center_y = true;
         self
     }
 }

@@ -114,7 +114,7 @@ impl Glue {
                 self.ui.resize(Rect {
                     origin: Point::zero(),
                     size: Size::new(size.width, size.height),
-                });
+                }, &mut self.renderer);
                 self.renderer.dpi = dpi as f32;
 
                 self.need_render = true;
@@ -147,7 +147,7 @@ impl Glue {
 
     /// Update the UI tree.
     pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
-        self.ui.update(f);
+        self.ui.update(f, &mut self.renderer);
         self.need_render = true;
     }
 
@@ -267,6 +267,28 @@ impl Renderer {
 }
 
 impl Render for Renderer {
+    fn measure_text(&mut self, text: &str) -> Size {
+        let size = 14.0 * self.dpi;
+
+        if let Some(face) = &mut self.face {
+            let mut dimensions = Size::zero();
+
+            face.layout(&mut self.atlas, None, &font::TextStyle::new(text, size, 0), |_, rect| {
+                if rect.max_x() > dimensions.width {
+                    dimensions.width = rect.max_x();
+                }
+
+                if rect.max_y() > dimensions.height {
+                    dimensions.height = rect.max_y();
+                }
+            });
+
+            Size::new(dimensions.width / self.dpi, dimensions.height / self.dpi)
+        } else {
+            Size::zero()
+        }
+    }
+
     fn render_text(&mut self, region: &Region, text: &str) {
         let color = [1.0, 1.0, 1.0, 1.0];
 
@@ -275,7 +297,10 @@ impl Render for Renderer {
         let offset = Point::new(region.rect.origin.x, region.rect.origin.y);
         let layout_rect = Rect {
             origin: Point::zero(), // For some reason we have to apply `offset` later or layouting goes haywire...
-            size: Size::new(region.rect.size.width * self.dpi, region.rect.size.height * self.dpi),
+            size: Size::new(
+                region.rect.size.width * self.dpi + 16.0, // FIXME remove this +16
+                region.rect.size.height * self.dpi,
+            ),
         };
         let dpi = self.dpi;
 
@@ -283,7 +308,7 @@ impl Render for Renderer {
             let vtx = &mut self.vertex_vec;
             let idx = &mut self.index_vec;
 
-            face.layout(&mut self.atlas, &layout_rect, &font::TextStyle::new(text, size, 0), |s, rect| {
+            face.layout(&mut self.atlas, Some(&layout_rect), &font::TextStyle::new(text, size, 0), |s, rect| {
                 let uv = &s.uv_rect;
 
                 // TODO: region.layer

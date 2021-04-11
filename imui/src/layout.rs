@@ -10,15 +10,21 @@ pub struct Layout {
 
     /// The direction in which to lay out children.
     pub direction: Dir,
+
+    pub center_x: bool,
+    pub center_y: bool,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dir {
-    /// Left-to-right.
-    Row,
+    /// No layout, later children are placed over the top of previous ones.
+    BackFront,
 
-    /// Top-to-bottom.
-    Column,
+    /// Horizontal direction.
+    LeftRight { wrap: bool },
+
+    /// Vertical direction.
+    TopBottom { wrap: bool },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,9 +37,11 @@ impl Default for Layout {
     fn default() -> Self {
         Self {
             position: Position::Relative(Point::new(0.0, 0.0)),
-            direction: Dir::Row, // TEMP
+            direction: Dir::BackFront,
             width: 0.0..=f32::INFINITY,
             height: 0.0..=f32::INFINITY,
+            center_x: false,
+            center_y: false,
         }
     }
 }
@@ -57,21 +65,31 @@ impl Position {
     }
 }
 
-pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
-    let control = pool.get_mut(key).unwrap();
+pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, renderer: &mut R) {
+    let control = pool.get(key).unwrap();
 
-    let rect = Rect {
-        // TODO: option to centre
-        origin: control.layout.position.resolve(&rect.origin),
-        size: Size::new(
-            clamp(rect.size.width, &control.layout.width),
-            clamp(rect.size.height, &control.layout.height),
-        ),
+    let mut recommendation = match &control.widget {
+        Widget::Text(text) => renderer.measure_text(text),
+        _ => parent_rect.size,
     };
 
-    control.region = Region {
-        rect: rect.clone(),
-        layer: LAYER_DEFAULT,
+    if recommendation.width > parent_rect.width() {
+        recommendation.width = parent_rect.width();
+    }
+
+    if recommendation.height > parent_rect.height() {
+        recommendation.height = parent_rect.height();
+    }
+
+    let width_range = control.layout.width.clone();
+    let height_range = control.layout.height.clone();
+
+    let mut rect = Rect {
+        origin: control.layout.position.resolve(&parent_rect.origin),
+        size: Size::new(
+            clamp(recommendation.width, &width_range),
+            clamp(recommendation.height, &height_range),
+        ),
     };
 
     let children = control.children.clone();
@@ -79,10 +97,19 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
         0 => {}
         1 => {
             // Single child gets all the space its parent has.
-            compute(pool, &children[0], rect);
+            compute(pool, &children[0], rect, renderer);
+
+            let calc = &pool[&children[0]].region.rect;
+            rect.size.width = clamp(calc.height(), &width_range);
+            rect.size.height = clamp(calc.width(), &height_range);
         }
         _ => match control.layout.direction {
-            Dir::Row => {
+            Dir::BackFront => {
+                for child in &children {
+                    compute(pool, child, rect.clone(), renderer);
+                }
+            }
+            Dir::LeftRight { wrap } => {
                 let mut pos = Vector::zero();
                 let mut row_height = 0.0;
 
@@ -94,6 +121,7 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
                             origin: Point::new(rect.min_x() + pos.x, rect.min_y() + pos.y),
                             size: Size::new(rect.width() - pos.x, rect.height() - pos.y),
                         },
+                        renderer,
                     );
 
                     let calc = &pool[child].region.rect;
@@ -102,16 +130,68 @@ pub(crate) fn compute(pool: &mut Pool, key: &Key, rect: Rect) {
                         row_height = calc.height();
                     }
 
-                    // Wrap.
-                    // TODO: relayout prev child if it is too wide (gt, not eq)
-                    if pos.x >= rect.width() {
-                        pos.x = 0.0;
-                        pos.y += row_height;
-                        row_height = 0.0;
+                    if wrap {
+                        // TODO: relayout prev child if it is too wide (gt, not eq)
+                        if pos.x >= rect.width() {
+                            pos.x = 0.0;
+                            pos.y += row_height;
+                            row_height = 0.0;
+                        }
                     }
                 }
+
+                rect.size.height = clamp(pos.y + row_height, &height_range);
             }
-            Dir::Column => todo!("column layout")
+            Dir::TopBottom { wrap } => {
+                let mut pos = Vector::zero();
+                let mut col_width = 0.0;
+
+                for child in &children {
+                    compute(
+                        pool,
+                        child,
+                        Rect {
+                            origin: Point::new(rect.min_x() + pos.x, rect.min_y() + pos.y),
+                            size: Size::new(rect.width() - pos.x, rect.height() - pos.y),
+                        },
+                        renderer,
+                    );
+
+                    let calc = &pool[child].region.rect;
+                    pos.y += calc.height();
+                    if calc.width() > col_width {
+                        col_width = calc.width();
+                    }
+
+                    if wrap {
+                        // TODO: relayout prev child if it is too wide (gt, not eq)
+                        if pos.x >= rect.width() {
+                            pos.x += col_width;
+                            pos.y = 0.0;
+                            col_width = 0.0;
+                        }
+                    }
+                }
+
+                rect.size.width = clamp(pos.x + col_width, &width_range);
+            }
         }
     }
+
+    let control = pool.get_mut(key).unwrap();
+
+    if control.layout.center_x {
+        rect.origin.x += parent_rect.size.width / 2.0;
+        rect.origin.x -= rect.size.width / 2.0;
+    }
+
+    if control.layout.center_y {
+        rect.origin.y += parent_rect.size.height / 2.0;
+        rect.origin.y -= rect.size.height / 2.0;
+    }
+
+    control.region = Region {
+        rect,
+        layer: LAYER_DEFAULT, // TODO: remove notion of layers? can use zstack
+    };
 }

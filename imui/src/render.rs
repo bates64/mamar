@@ -1,7 +1,10 @@
-use super::Region;
+use super::{Region, Size};
 
-/// Rendering visitor.
 pub trait Render {
+    // Layout utilities.
+    fn measure_text(&mut self, text: &str) -> Size;
+
+    // Visitor pattern for rendering.
     fn render_text(&mut self, region: &Region, text: &str);
     fn render_button(&mut self, region: &Region, is_pressed: bool);
 }

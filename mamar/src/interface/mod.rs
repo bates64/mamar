@@ -88,49 +88,55 @@ impl Interface {
             let mut force_update = false;
 
             self.glue.update(|ui| {
-                // Hot-reload server controls.
-                if hot_reload_tx.is_none() {
-                    if ui.button(0, "Start playback server")
-                        .with_width(200.0)
-                        .clicked()
-                    {
-                        let (tx, hot_reload_rx) = channel();
+                ui.vstack(0, |ui| {
+                    ui.hstack(0, |ui| {
+                        // Hot-reload server controls.
+                        if hot_reload_tx.is_none() {
+                            if ui.button(0, "Start playback server")
+                                .with_width(200.0)
+                                .clicked()
+                            {
+                                let (tx, hot_reload_rx) = channel();
 
-                        thread::spawn(move || pm64::hot::run(hot_reload_rx));
+                                thread::spawn(move || pm64::hot::run(hot_reload_rx));
 
-                        *hot_reload_tx = Some(tx);
-                        force_update = true;
-                    }
-                }
-
-                // File controls. We have to show file dialogs after rendering is complete (otherwise the window
-                // freezes) so we only set that 'X has been requested' when these buttons are clicked.
-                if ui.button(1, "Open File...").clicked() {
-                    *queued_action = Action::OpenDocument;
-                }
-
-                if let Some(doc) = state.document.as_mut() {
-                    if doc.can_save() && ui.button(2, "Save").clicked() {
-                        *queued_action = Action::SaveDocument;
-                    }
-                    if ui.button(3, "Save As...").clicked() {
-                        *queued_action = Action::SaveDocumentAs;
-                    }
-                    if let Some(hot_reload_tx) = hot_reload_tx {
-                        if ui.button(4, "Play in Project64")
-                            .with_width(200.0)
-                            .clicked()
-                        {
-                            if let Ok(data) = doc.bgm.as_bytes() {
-                                let _ = hot_reload_tx.send(data);
-                            } else {
-                                todo!("surface bgm::en error");
+                                *hot_reload_tx = Some(tx);
+                                force_update = true;
                             }
                         }
-                    }
 
-                    ui.group(5, |ui| doc.update(ui));
-                }
+                        // File controls. We have to show file dialogs after rendering is complete (otherwise the window
+                        // freezes) so we only set that 'X has been requested' when these buttons are clicked.
+                        if ui.button(1, "Open File...").clicked() {
+                            *queued_action = Action::OpenDocument;
+                        }
+
+                        if let Some(doc) = state.document.as_mut() {
+                            if doc.can_save() && ui.button(2, "Save").clicked() {
+                                *queued_action = Action::SaveDocument;
+                            }
+                            if ui.button(3, "Save As...").clicked() {
+                                *queued_action = Action::SaveDocumentAs;
+                            }
+                            if let Some(hot_reload_tx) = hot_reload_tx {
+                                if ui.button(4, "Play in Project64")
+                                    .with_width(200.0)
+                                    .clicked()
+                                {
+                                    if let Ok(data) = doc.bgm.as_bytes() {
+                                        let _ = hot_reload_tx.send(data);
+                                    } else {
+                                        todo!("surface bgm::en error");
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    if let Some(doc) = state.document.as_mut() {
+                        ui.hstack(1, |ui| doc.update(ui));
+                    }
+                });
             });
 
             // Re-update if state changed.
