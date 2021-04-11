@@ -29,7 +29,7 @@ impl PartialEq for Document {
 
 impl Document {
     /// Prompt an 'Open File' dialog to open a document. Must be run on the main thread.
-    pub fn open() -> Result<Option<Self>, Box<dyn Error>> {
+    pub fn open_prompt() -> Result<Option<Self>, Box<dyn Error>> {
         let path = tinyfiledialogs::open_file_dialog("Open File", "", Some((&[
             "*.bgm",
             "*.mid",
@@ -39,26 +39,30 @@ impl Document {
 
         if let Some(path) = path {
             let path = PathBuf::from(path);
-            let mut file = File::open(&path)?;
-
-            let bgm;
-            if pm64::bgm::midi::is_midi(&mut file)? {
-                let mut buf = Vec::new();
-                file.read_to_end(&mut buf)?;
-                bgm = pm64::bgm::midi::to_bgm(&buf)?;
-            } else {
-                bgm = Bgm::decode(&mut file)?;
-            }
-
-            Ok(Some(Document {
-                bgm,
-                path,
-                selected_segment_idx: 0,
-                selected_subsegment_idx: 0,
-            }))
+            Self::open_from_path(path)
         } else {
             Ok(None)
         }
+    }
+
+    pub fn open_from_path(path: PathBuf) -> Result<Option<Self>, Box<dyn Error>> {
+        let mut file = File::open(&path)?;
+
+        let bgm;
+        if pm64::bgm::midi::is_midi(&mut file)? {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf)?;
+            bgm = pm64::bgm::midi::to_bgm(&buf)?;
+        } else {
+            bgm = Bgm::decode(&mut file)?;
+        }
+
+        Ok(Some(Document {
+            bgm,
+            path,
+            selected_segment_idx: 0,
+            selected_subsegment_idx: 0,
+        }))
     }
 
     pub fn can_save(&self) -> bool {

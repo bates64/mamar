@@ -33,6 +33,7 @@ enum Action {
     OpenDocument,
     SaveDocument,
     SaveDocumentAs,
+    ReloadDocument,
 }
 
 impl Interface {
@@ -113,14 +114,20 @@ impl Interface {
                         }
 
                         if let Some(doc) = state.document.as_mut() {
-                            if doc.can_save() && ui.button(2, "Save").clicked() {
+                            if ui.button(2, "Reload File").clicked() {
+                                *queued_action = Action::ReloadDocument;
+                            }
+
+                            if doc.can_save() && ui.button(3, "Save").clicked() {
                                 *queued_action = Action::SaveDocument;
                             }
-                            if ui.button(3, "Save As...").clicked() {
+
+                            if ui.button(4, "Save As...").clicked() {
                                 *queued_action = Action::SaveDocumentAs;
                             }
+
                             if let Some(hot_reload_tx) = hot_reload_tx {
-                                if ui.button(4, "Play in Project64")
+                                if ui.button(5, "Play in Project64")
                                     .with_width(200.0)
                                     .clicked()
                                 {
@@ -198,8 +205,15 @@ impl Interface {
         match action {
             Action::None => return Ok(false),
             Action::OpenDocument => {
-                if let Some(doc) = state::Document::open()? {
+                if let Some(doc) = state::Document::open_prompt()? {
                     self.state.document = Some(doc);
+                }
+            }
+            Action::ReloadDocument => {
+                if let Some(doc) = self.state.document.as_ref() {
+                    if let Some(reloaded) = state::Document::open_from_path(doc.path.clone())? {
+                        self.state.document = Some(reloaded);
+                    }
                 }
             }
             Action::SaveDocument => {
