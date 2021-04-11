@@ -1,4 +1,5 @@
-mod atlas;
+pub mod atlas;
+pub mod font;
 
 use std::error::Error;
 
@@ -7,27 +8,30 @@ pub use glium;
 pub use glium::Surface;
 pub use glium::glutin::event::{Event, WindowEvent};
 pub use glium::glutin::event_loop::{EventLoop, ControlFlow};
-use glium::{uniform, implement_vertex, Display, VertexBuffer, IndexBuffer};
+use glium::{Display, IndexBuffer, VertexBuffer, implement_vertex, uniform};
 use glium::program::{Program, ProgramCreationInput};
+use glium::backend::Facade;
 
-pub use atlas::TextureAtlas;
+use atlas::{TextureAtlas, SpriteId};
+
+const INITIAL_VERTEX_BUF_CAPACITY: usize = 512;
+const INITIAL_INDEX_BUF_CAPACITY: usize = INITIAL_VERTEX_BUF_CAPACITY * 3 / 4;
 
 type Transform3D = euclid::default::Transform3D<f32>;
 
+/// RGBA colour.
+type Color = [f32; 4];
+
 pub struct Glue {
     ui: Ui,
-    buffers_need_writing: bool,
+    need_render: bool,
 
     program: Program,
-
     vertex_buf: VertexBuffer<Vertex>,
-    vertex_vec: Vec<Vertex>,
-
     index_buf: IndexBuffer<u16>,
-    index_vec: Vec<u16>,
-
-    pub atlas: TextureAtlas,
     projection: Transform3D,
+
+    renderer: Renderer,
 }
 
 #[derive(Clone, Copy)]
@@ -38,6 +42,12 @@ struct Vertex {
 }
 
 implement_vertex!(Vertex, position, uv, color);
+
+struct Renderer {
+    pub vertex_vec: Vec<Vertex>,
+    pub index_vec: Vec<u16>,
+    pub atlas: TextureAtlas,
+}
 
 /// Calculates a screen-space projection matrix for the given display.
 fn screen_to_clip(display: &Display) -> Transform3D {
@@ -53,7 +63,7 @@ impl Glue {
     pub fn new(facade: &Display) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             ui: Ui::new(),
-            buffers_need_writing: false, // Nothing in UI yet to be drawn.
+            need_render: false, // Nothing in UI yet to be drawn.
 
             program: Program::new(facade, ProgramCreationInput::SourceCode {
                 vertex_shader: include_str!("shader.vert"),
@@ -66,14 +76,15 @@ impl Glue {
                 uses_point_size: false,
             })?,
 
-            vertex_buf: VertexBuffer::empty_dynamic(facade, 1024)?,
-            vertex_vec: Vec::with_capacity(1024),
-
-            index_buf: IndexBuffer::empty_dynamic(facade, glium::index::PrimitiveType::TrianglesList, 512)?,
-            index_vec: Vec::with_capacity(512),
-
-            atlas: TextureAtlas::new(facade)?,
+            vertex_buf: VertexBuffer::empty_dynamic(facade, INITIAL_VERTEX_BUF_CAPACITY)?,
+            index_buf: IndexBuffer::empty_dynamic(facade, glium::index::PrimitiveType::TrianglesList, INITIAL_INDEX_BUF_CAPACITY)?,
             projection: screen_to_clip(facade),
+
+            renderer: Renderer {
+                vertex_vec: Vec::with_capacity(INITIAL_VERTEX_BUF_CAPACITY),
+                index_vec: Vec::with_capacity(INITIAL_INDEX_BUF_CAPACITY),
+                atlas: TextureAtlas::new(facade)?,
+            }
         })
     }
 
@@ -97,7 +108,7 @@ impl Glue {
                     size: Size::new(size.width, size.height),
                 });
 
-                self.buffers_need_writing = true;
+                self.need_render = true;
                 false // Only the layout changed, which imui handles internally.
             }
 
@@ -128,117 +139,175 @@ impl Glue {
     /// Update the UI tree.
     pub fn update<F: FnOnce(&mut UiFrame<'_>)>(&mut self, f: F) {
         self.ui.update(f);
-        self.buffers_need_writing = true;
+        self.need_render = true;
     }
 
     pub fn needs_redraw(&self) -> bool {
-        self.buffers_need_writing
+        self.need_render
     }
 
-    pub fn draw<S: Surface>(&mut self, surface: &mut S)  -> Result<(), glium::DrawError> {
+    pub fn atlas(&mut self) -> &mut TextureAtlas {
+        &mut self.renderer.atlas
+    }
+
+    pub fn load_font(&mut self, font_name: String, display: &Display) -> Result<(), Box<dyn Error>> {
+        // ASCII printable (TODO: add more).
+        const CHARS: &str =
+            "!\"#$%&'()*+,-./0123456789;;<=>/@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+        let dpi_scale = {
+            let gl_window = display.gl_window();
+            gl_window.window().scale_factor() as f32
+        };
+
+        font::load(self.atlas(), font_name, CHARS.chars(), dpi_scale)
+    }
+
+    pub fn draw<S: Surface, F: Facade>(&mut self, surface: &mut S, facade: &F)  -> Result<(), Box<dyn Error>> {
         let projection: [[f32; 4]; 4] = self.projection.to_arrays();
 
-        if self.buffers_need_writing {
-            let vertex_vec = &mut self.vertex_vec;
-            let index_vec = &mut self.index_vec;
-            let mut vtx_number = 0;
+        if self.need_render {
+            self.renderer.clear();
+            self.ui.render(&mut self.renderer);
 
-            vertex_vec.clear();
-            index_vec.clear();
-
-            let mut render_quad = |region: &Region, uv: &Rect, top_left_color, top_right_color, bottom_left_color, bottom_right_color| {
-                let rect = &region.rect;
-
-                // TODO: handle layer
-
-                // Render a quad:
-                //
-                //    0 -- 1
-                //    |  / |
-                //    | /  |
-                //    2 -- 3
-                //
-                index_vec.extend_from_slice(&[
-                    vtx_number + 0, vtx_number + 1, vtx_number + 2,
-                    vtx_number + 2, vtx_number + 1, vtx_number + 3,
-                ]);
-                vertex_vec.extend_from_slice(&[
-                    Vertex {
-                        position: [rect.min_x(), rect.min_y()],
-                        uv: [uv.min_x(), uv.min_y()],
-                        color: top_left_color,
-                    },
-                    Vertex {
-                        position: [rect.max_x(), rect.min_y()],
-                        uv: [uv.max_x(), uv.min_y()],
-                        color: top_right_color,
-                    },
-                    Vertex {
-                        position: [rect.min_x(), rect.max_y()],
-                        uv: [uv.min_x(), uv.max_y()],
-                        color: bottom_left_color,
-                    },
-                    Vertex {
-                        position: [rect.max_x(), rect.max_y()],
-                        uv: [uv.max_y(), uv.max_y()],
-                        color: bottom_right_color,
-                    },
-                ]);
-                vtx_number += 4;
-            };
-
-            let atlas = &self.atlas;
-
-            self.ui.iter_depth_first(&Key::root(), &mut |ctrl| {
-                let Control { widget, region, .. } = ctrl;
-
-                match widget {
-                    Widget::Group => {}
-                    Widget::Button { label } => {
-                        // TODO: get uv coordinates from atlas struct
-                        let uv = atlas.get("button").expect("missing texture: 'button'");
-
-                        let color;
-                        if ctrl.left_click.is_press() {
-                            color = [0.6, 0.6, 0.6, 1.0];
-                        } else {
-                            color = [0.8, 0.8, 0.8, 1.0];
-                        }
-
-                        // TODO: nine-slice for button
-
-                        // TODO: text label
-
-                        render_quad(&region, &uv, color, color, color, color);
-                    }
-                    _ => todo!()
+            if !self.renderer.index_vec.is_empty() {
+                // Increase buffer sizes to fit the vectors if required.
+                if self.renderer.vertex_vec.capacity() > (self.vertex_buf.get_size() / std::mem::size_of::<Vertex>()) {
+                    self.vertex_buf = VertexBuffer::empty_dynamic(
+                        facade,
+                        self.renderer.vertex_vec.capacity(),
+                    )?;
                 }
-            });
+                if self.renderer.index_vec.capacity() > (self.index_buf.get_size() / std::mem::size_of::<u16>()) {
+                    self.index_buf = IndexBuffer::empty_dynamic(
+                        facade,
+                        glium::index::PrimitiveType::TrianglesList,
+                        self.renderer.index_vec.capacity(),
+                    )?;
+                }
 
-            // Upload the new data to the GPU.
-            //self.vertex_buf.invalidate();
-            //self.index_buf.invalidate();
-            if !index_vec.is_empty() {
-                // TODO: grow buffer capacity if required, panics right now if you have a complex ui
-                self.vertex_buf.as_mut_slice().write(vertex_vec);
-                self.index_buf.as_mut_slice().write(index_vec);
+                // Upload the new data to the GPU.
+                self.vertex_buf.as_mut_slice().write(&self.renderer.vertex_vec);
+                self.index_buf.as_mut_slice().write(&self.renderer.index_vec);
             }
 
-            self.buffers_need_writing = false;
+            self.need_render = false;
         }
 
         surface.draw(
             &self.vertex_buf,
-            &self.index_buf.slice(0..self.index_vec.len()).unwrap(),
+            &self.index_buf.slice(0..self.renderer.index_vec.len()).unwrap(),
             &self.program,
             &uniform! {
-                tex: self.atlas.texture(),
+                tex: self.renderer.atlas.texture(),
                 projection: projection,
             },
             &glium::DrawParameters {
                 blend: glium::draw_parameters::Blend::alpha_blending(),
                 ..Default::default()
             },
-        )
+        )?;
+
+        Ok(())
+    }
+}
+
+impl Renderer {
+    pub fn clear(&mut self) {
+        self.index_vec.clear();
+        self.vertex_vec.clear();
+    }
+
+    pub fn render_sprite_scaled<I: Into<SpriteId>>(&mut self, region: &Region, sprite_id: I, color: Color) {
+        let rect = &region.rect;
+        let uv = &self.atlas.get(sprite_id).expect("tried to render unknown sprite").uv_rect;
+
+        let top_left_color = color.clone();
+        let top_right_color = color.clone();
+        let bottom_left_color = color.clone();
+        let bottom_right_color = color;
+
+        // TODO: handle layer
+
+        //
+        //    0 -- 1
+        //    |  / |
+        //    | /  |
+        //    2 -- 3
+        //
+        let vtx_number = self.vertex_vec.len() as u16;
+        self.index_vec.extend_from_slice(&[
+            vtx_number + 0, vtx_number + 1, vtx_number + 2,
+            vtx_number + 1, vtx_number + 3, vtx_number + 2,
+        ]);
+        self.vertex_vec.extend_from_slice(&[
+            Vertex {
+                position: [rect.min_x(), rect.min_y()],
+                uv: [uv.min_x(), uv.min_y()],
+                color: top_left_color,
+            },
+            Vertex {
+                position: [rect.max_x(), rect.min_y()],
+                uv: [uv.max_x(), uv.min_y()],
+                color: top_right_color,
+            },
+            Vertex {
+                position: [rect.min_x(), rect.max_y()],
+                uv: [uv.min_x(), uv.max_y()],
+                color: bottom_left_color,
+            },
+            Vertex {
+                position: [rect.max_x(), rect.max_y()],
+                uv: [uv.max_x(), uv.max_y()],
+                color: bottom_right_color,
+            },
+        ]);
+    }
+}
+
+impl Render for Renderer {
+    fn render_text(&mut self, region: &Region, text: &str) {
+        let mut offset = Point::zero();
+        let color = [1.0, 1.0, 1.0, 1.0];
+
+        let x_size = self.atlas.get('x').unwrap().src_dimensions;
+
+        for ch in text.chars() {
+            if let Some(sprite) = self.atlas.get(ch) {
+                let src_dimensions = sprite.src_dimensions;
+
+                self.render_sprite_scaled(
+                    &Region {
+                        layer: region.layer,
+                        rect: Rect {
+                            origin: Point::new(
+                                region.rect.origin.x + offset.x,
+                                region.rect.origin.y + offset.y + (x_size.height - src_dimensions.height)
+                            ),
+                            size: src_dimensions,
+                        }
+                    },
+                    ch,
+                    color,
+                );
+
+                offset.x += src_dimensions.width;
+            } else {
+                // Treat missing char as space
+                offset.x += x_size.width / 2.0;
+            }
+        }
+    }
+
+    fn render_button(&mut self, region: &Region, is_pressed: bool) {
+        let sprite;
+
+        if is_pressed {
+            sprite = "button_pressed";
+        } else {
+            sprite = "button";
+        }
+
+        self.render_sprite_scaled(region, sprite, [1.0, 1.0, 1.0, 1.0]);
     }
 }

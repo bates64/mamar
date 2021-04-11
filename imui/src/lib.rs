@@ -1,5 +1,6 @@
 pub mod layout;
 pub mod input;
+mod render;
 
 use std::time::{Duration, Instant};
 use std::collections::BTreeMap;
@@ -14,6 +15,8 @@ pub type Vector = euclid::default::Vector2D<f32>;
 type Pool = std::collections::HashMap<Key, Control>;
 
 use input::{ClickFSM, Input, InputFlags};
+
+pub use render::Render;
 
 /// Lower values appear below higher values. Can be considered a Z position.
 pub type Layer = u8;
@@ -247,6 +250,21 @@ impl Ui {
         let control = self.pool.get_mut(key).unwrap();
 
         f(control);
+    }
+
+    pub fn render<R: Render>(&mut self, renderer: &mut R) {
+        self.iter_depth_first(&Key::root(), &mut |ctrl| {
+            let Control { widget, region, .. } = ctrl;
+
+            match widget {
+                Widget::Group => {}
+                Widget::Button { label } => {
+                    renderer.render_button(&region, ctrl.left_click.is_press());
+                    renderer.render_text(&region, label);
+                }
+                _ => todo!()
+            }
+        });
     }
 
     fn begin_frame(&mut self) {

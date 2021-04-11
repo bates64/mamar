@@ -12,7 +12,7 @@ impl Interface {
 
             glue.update(|ui| {
                 for i in 0..self.num_buttons {
-                    if ui.button(i, "Hello!") {
+                    if ui.button(i, format!("Button {}", i)) {
                         self.num_buttons += 1;
 
                         // If state changes during an update, its recommended that you update again afterward so
@@ -44,7 +44,9 @@ fn main() {
 
     let mut glue = Glue::new(&display).unwrap();
 
-    glue.atlas.insert("button", "assets/mamar.png").unwrap();
+    glue.atlas().insert("button", "assets/tex/button.png").unwrap();
+    glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
+    glue.load_font("Arial".to_owned(), &display).unwrap();
 
     let mut interface = Interface { num_buttons: 1 };
     interface.update(&mut glue);
@@ -52,7 +54,7 @@ fn main() {
     {
         let mut surface = display.draw();
         surface.clear_color(0.0, 0.0, 0.0, 1.0);
-        glue.draw(&mut surface).unwrap();
+        glue.draw(&mut surface, &display).unwrap();
         surface.finish().unwrap();
     }
 
@@ -81,7 +83,7 @@ fn main() {
         if glue.needs_redraw() || redraw {
             let mut surface = display.draw();
             surface.clear_color(0.0, 0.0, 0.0, 1.0);
-            glue.draw(&mut surface).unwrap();
+            glue.draw(&mut surface, &display).unwrap();
             surface.finish().unwrap();
         }
     })
