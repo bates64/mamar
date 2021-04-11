@@ -66,7 +66,7 @@ pub struct Key {
 }
 
 /// Absolutely-positioned region on-screen, used for input and layout.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Region {
     pub rect: Rect,
     pub layer: Layer,
@@ -263,7 +263,23 @@ impl Ui {
 
     pub fn render<R: Render>(&mut self, renderer: &mut R) {
         self.iter_breadth_first(&Key::root(), &mut |ctrl| {
-            let Control { widget, region, .. } = ctrl;
+            let Control { widget, region, layout, .. } = ctrl;
+
+            let mut region = region.clone();
+
+            if layout.center_x {
+                let parent = &self.pool[ctrl.key.parent.as_ref().unwrap()];
+
+                region.rect.origin.x += parent.region.rect.size.width / 2.0;
+                region.rect.origin.x -= region.rect.size.width / 2.0;
+            }
+
+            if layout.center_y {
+                let parent = &self.pool[ctrl.key.parent.as_ref().unwrap()];
+
+                region.rect.origin.y += parent.region.rect.size.height / 2.0;
+                region.rect.origin.y -= region.rect.size.height / 2.0;
+            }
 
             match widget {
                 Widget::Group => {}
@@ -429,7 +445,7 @@ impl UiFrame<'_> {
     }
 
     /// Create a group of controls laid out horizontally, left-to-right.
-    pub fn hstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    pub fn hbox<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
         let key = self.ui.key(key.into());
 
         self.ui.begin_control(key, Widget::Group);
@@ -439,7 +455,7 @@ impl UiFrame<'_> {
     }
 
     /// Create a group of controls laid out vertically, top-to-bottom.
-    pub fn vstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    pub fn vbox<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
         let key = self.ui.key(key.into());
 
         self.ui.begin_control(key, Widget::Group);
@@ -448,14 +464,40 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
-    /// Create a group of controls laid out back-to-front, on top of one another.
-    /// Later children appear above earlier children.
-    pub fn zstack<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+    pub fn known_size<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, width: f32, height: f32, f: F) {
         let key = self.ui.key(key.into());
 
         self.ui.begin_control(key, Widget::Group);
-        self.current_mut().layout.direction = layout::Dir::BackFront;
+
+        let ctrl = self.current_mut();
+        ctrl.layout.direction = layout::Dir::BackFront;
+        ctrl.layout.width = width..=width;
+        ctrl.layout.height = height..=height;
+
         f(self);
+
+        self.ui.end_control();
+    }
+
+    pub fn pad<K: Into<UserKey>>(&mut self, key: K, padding: f32) {
+        let key = self.ui.key(key.into());
+
+        let parent_direction = self.ui.pool[&self.ui.parent].layout.direction;
+
+        self.ui.begin_control(key, Widget::Group);
+
+        let ctrl = self.current_mut();
+        ctrl.layout.direction = layout::Dir::BackFront;
+
+        ctrl.layout.width = 0.0..=0.0;
+        ctrl.layout.height = 0.0..=0.0;
+
+        match parent_direction {
+            layout::Dir::BackFront => (),
+            layout::Dir::LeftRight { .. } => ctrl.layout.width = padding..=padding,
+            layout::Dir::TopBottom { .. } => ctrl.layout.height = padding..=padding,
+        }
+
         self.ui.end_control();
     }
 
@@ -560,12 +602,6 @@ impl Button<'_> {
         self.is_click
     }
 
-    pub fn with_auto_size(&mut self) -> &mut Self {
-        self.ctrl.layout.width = 0.0..=f32::INFINITY;
-        self.ctrl.layout.height = 0.0..=f32::INFINITY;
-        self
-    }
-
     pub fn with_width(&mut self, width: f32) -> &mut Self {
         self.ctrl.layout.width = width..=width;
         self
@@ -589,6 +625,16 @@ impl Text<'_> {
 
     pub fn center_y(&mut self) -> &mut Self {
         self.ctrl.layout.center_y = true;
+        self
+    }
+
+    pub fn with_width(&mut self, width: f32) -> &mut Self {
+        self.ctrl.layout.width = width..=width;
+        self
+    }
+
+    pub fn with_height(&mut self, height: f32) -> &mut Self {
+        self.ctrl.layout.height = height..=height;
         self
     }
 }

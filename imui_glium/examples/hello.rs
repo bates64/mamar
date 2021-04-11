@@ -11,10 +11,10 @@ impl Interface {
             let mut updated = false;
 
             glue.update(|ui| {
-                ui.vstack(0, |ui| {
+                ui.vbox(0, |ui| {
                     ui.text(0, "Hello, world!").center_x();
 
-                    ui.hstack(1, |ui| {
+                    ui.hbox(1, |ui| {
                         for i in 0..self.num_buttons {
                             if ui.button(i, format!("Button {}", i))
                                 .with_height(32.0 + i as f32 * 8.0)

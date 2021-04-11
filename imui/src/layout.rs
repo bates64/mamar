@@ -180,16 +180,6 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
 
     let control = pool.get_mut(key).unwrap();
 
-    if control.layout.center_x {
-        rect.origin.x += parent_rect.size.width / 2.0;
-        rect.origin.x -= rect.size.width / 2.0;
-    }
-
-    if control.layout.center_y {
-        rect.origin.y += parent_rect.size.height / 2.0;
-        rect.origin.y -= rect.size.height / 2.0;
-    }
-
     control.region = Region {
         rect,
         layer: LAYER_DEFAULT, // TODO: remove notion of layers? can use zstack

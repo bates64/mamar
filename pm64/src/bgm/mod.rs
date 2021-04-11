@@ -22,6 +22,8 @@ pub const MAGIC: &str = "BGM ";
 /// An offset relative to the beginning of the decoded/encoded BGM.
 pub type FilePos = u64;
 
+pub type TrackListId = Id<TrackList>;
+
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct Bgm {
     /// ASCII song index.
@@ -300,5 +302,19 @@ impl Bgm {
         }
 
         Ok(())
+    }
+}
+
+impl Track {
+    pub fn is_drum(&self) -> bool {
+        (self.flags & 0x0080) != 0
+    }
+
+    pub fn set_drum(&mut self, enable: bool) {
+        if enable {
+            self.flags |= 0x0080;
+        } else {
+            self.flags &= !0x0080;
+        }
     }
 }

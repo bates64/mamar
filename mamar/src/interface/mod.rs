@@ -1,5 +1,6 @@
 mod icon;
 mod state;
+mod form;
 
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
@@ -84,12 +85,13 @@ impl Interface {
         let hot_reload_tx = &mut self.hot_reload_tx;
         let queued_action = &mut self.queued_action;
 
+        let mut updates = 0;
         loop {
-            let mut force_update = false;
+            updates += 1;
 
             self.glue.update(|ui| {
-                ui.vstack(0, |ui| {
-                    ui.hstack(0, |ui| {
+                ui.vbox(0, |ui| {
+                    ui.hbox(0, |ui| {
                         // Hot-reload server controls.
                         if hot_reload_tx.is_none() {
                             if ui.button(0, "Start playback server")
@@ -101,7 +103,6 @@ impl Interface {
                                 thread::spawn(move || pm64::hot::run(hot_reload_rx));
 
                                 *hot_reload_tx = Some(tx);
-                                force_update = true;
                             }
                         }
 
@@ -133,14 +134,16 @@ impl Interface {
                         }
                     });
 
+                    ui.pad(1, 10.0);
+
                     if let Some(doc) = state.document.as_mut() {
-                        ui.hstack(1, |ui| doc.update(ui));
+                        ui.hbox(2, |ui| doc.update(ui));
                     }
                 });
             });
 
             // Re-update if state changed.
-            if !force_update && !state.commit() {
+            if updates >= 2 && !state.commit() {
                 break;
             }
         }

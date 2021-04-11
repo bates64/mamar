@@ -2,17 +2,29 @@ use std::{error::Error, io::Read};
 use std::path::PathBuf;
 use std::fs::File;
 
-use pm64::bgm::Bgm;
+use pm64::bgm::*;
+
+use crate::interface::form::range_select;
 
 #[derive(Default, PartialEq, Clone)]
 pub struct State {
     pub document: Option<Document>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Clone)]
 pub struct Document {
     pub bgm: Bgm,
     pub path: PathBuf,
+
+    selected_segment_idx: u8,
+    selected_subsegment_idx: u8,
+}
+
+// Change of anything other than self.bgm should not be considered a History-changing action.
+impl PartialEq for Document {
+    fn eq(&self, other: &Self) -> bool {
+        self.bgm == other.bgm
+    }
 }
 
 impl Document {
@@ -41,6 +53,8 @@ impl Document {
             Ok(Some(Document {
                 bgm,
                 path,
+                selected_segment_idx: 0,
+                selected_subsegment_idx: 0,
             }))
         } else {
             Ok(None)
@@ -93,7 +107,86 @@ impl Document {
         }
     }
 
-    pub fn update(&mut self, _ui: &mut imui_glium::UiFrame<'_>) {
-        // TODO
+    pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
+        ui.vbox(0, |ui| {
+            range_select(
+                ui,
+                0,
+                0..self.bgm.segments.len() as isize,
+                1,
+                &mut self.selected_segment_idx,
+                |v| format!("Segment {}", v + 1),
+            );
+
+            ui.pad(1, 5.0);
+
+            if let Some(segment) = self.bgm.segments[self.selected_segment_idx as usize].as_mut() {
+                let range = 0..segment.subsegments.len() as isize;
+
+                if !range.contains(&(self.selected_subsegment_idx as isize)) {
+                    self.selected_subsegment_idx = 0;
+                }
+
+                range_select(
+                    ui,
+                    2,
+                    range,
+                    1,
+                    &mut self.selected_subsegment_idx,
+                    |v| format!("Subsegment {}", v + 1),
+                );
+
+                ui.pad(3, 10.0);
+
+                if let Some(subseg) = segment.subsegments.get_mut(self.selected_subsegment_idx as usize) {
+                    ui.text(4, format!("Flags: {:08X}", subseg.flags()));
+
+                    match subseg {
+                        Subsegment::Unknown { data, .. } => {
+                            ui.text(5, format!("Control data: {:02X}{:02X}{:02X}", data[0], data[1], data[2]));
+                        }
+                        Subsegment::Tracks { track_list, .. } => {
+                            let track_list = &mut self.bgm.track_lists[*track_list];
+
+                            ui.pad(6, 10.0);
+
+                            ui.vbox(7, |ui| {
+                                draw_track_list(ui, track_list);
+                            });
+                        }
+                    }
+                }
+            } else {
+                ui.text(99, "This segment has no data.");
+            }
+        });
+    }
+}
+
+fn draw_track_list(ui: &mut imui_glium::UiFrame<'_>, track_list: &mut TrackList) {
+    for (i, track) in track_list.tracks.iter_mut().enumerate() {
+        ui.hbox(i as u8, |ui| {
+            ui.button(0, format!("Track {}", i + 1));
+
+            ui.pad(1, 8.0);
+
+            ui.text(2, format!("Flags: {:04X}", track.flags)).center_y();
+
+            if track.flags != 0 {
+                ui.pad(3, 8.0);
+
+                if ui.button(
+                    4,
+                    if track.is_drum() {
+                        "Drum"
+                    } else {
+                        "Voice"
+                    })
+                    .clicked()
+                {
+                    track.set_drum(!track.is_drum());
+                }
+            }
+        });
     }
 }
