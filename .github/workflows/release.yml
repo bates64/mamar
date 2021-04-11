@@ -61,14 +61,8 @@ jobs:
           dest: ${{ matrix.asset_name }}
 
       - name: Upload to release
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{ matrix.asset_name }}
-          path: mamar.zip
-
-      - name: Upload to release
         uses: alexellis/upload-assets@0.2.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: ${{ format('["./{{0}}"]', matrix.asset_name) }}
+          asset_paths: ${{ format('["./{0}"]', matrix.asset_name) }}
