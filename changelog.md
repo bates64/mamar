@@ -1,3 +1,7 @@
+## 0.4.0
+
+- UI rewrite
+
 ## 0.3.0
 
 - MIDI files can now be opened and played
