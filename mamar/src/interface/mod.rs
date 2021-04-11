@@ -194,8 +194,12 @@ impl Interface {
                 }
             }
             Action::SaveDocument => {
-                if let Some(doc) = &self.state.document {
-                    doc.save()?;
+                if let Some(doc) = &mut self.state.document {
+                    if doc.can_save() {
+                        doc.save()?;
+                    } else {
+                        doc.save_as()?;
+                    }
                 }
             }
             Action::SaveDocumentAs => {
