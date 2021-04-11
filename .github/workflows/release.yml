@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
       - uses: taiki-e/create-gh-release-action@v1
         with:
           changelog: changelog.md
@@ -20,16 +21,47 @@ jobs:
   upload-assets:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        name: [linux, windows, macos]
+        include:
+          - name: linux
+            os: ubuntu-latest
+            exe_file: target/release/mamar
+            exe_file_root: mamar
+            asset_name: mamar-linux.zip
+
+          - name: windows
+            os: windows-latest
+            exe_file: target/release/mamar.exe
+            exe_file_root: mamar.exe
+            asset_name: mamar-win.zip
+
+          - name: macos
+            os: macos-latest
+            exe_file: target/release/mamar
+            exe_file_root: mamar
+            asset_name: mamar-mac.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - uses: taiki-e/upload-rust-binary-action@v1
+
+      - uses: actions-rs/toolchain@v1
         with:
-          bin: mamar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_PROFILE_RELEASE_LTO: true
+          profile: minimal
+          toolchain: stable
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - run: cp ${{ matrix.exe_file }} ${{ matrix.exe_file_root }}
+
+      - name: Zip assets and executable
+        uses: papeloto/action-zip@v1
+        with:
+          files: assets/ license changelog.md ${{ matrix.exe_file_root }}
+          dest: mamar.zip
+
+      - name: Upload to release
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.asset_name }}
+          path: mamar.zip
