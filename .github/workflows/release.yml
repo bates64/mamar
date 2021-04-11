@@ -58,10 +58,17 @@ jobs:
         uses: papeloto/action-zip@v1
         with:
           files: assets/ license changelog.md ${{ matrix.exe_file_root }}
-          dest: mamar.zip
+          dest: ${{ matrix.asset_name }}
 
       - name: Upload to release
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.asset_name }}
           path: mamar.zip
+
+      - name: Upload to release
+        uses: alexellis/upload-assets@0.2.2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: ${{ format('["./{{0}}"]', matrix.asset_name) }}
