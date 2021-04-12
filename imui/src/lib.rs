@@ -522,7 +522,7 @@ impl UiFrame<'_> {
         let ctrl = self.current_mut();
 
         ctrl.layout.width = 100.0..=100.0;
-        ctrl.layout.height = 32.0..=32.0;
+        ctrl.layout.height = 36.0..=36.0;
 
         Button {
             is_click: ctrl.advance_left_click().is_click(),

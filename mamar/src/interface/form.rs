@@ -12,20 +12,20 @@ where
     let cur_val: isize = (*value).into();
 
     ui.hbox(key, |ui| {
-        if ui.button(0, "<").with_width(32.0).clicked() {
+        if ui.button(0, "<").with_width(36.0).clicked() {
             let prec = cur_val - step;
             if range.contains(&prec) {
                 *value = prec.try_into().unwrap_or(*value);
             }
         }
 
-        ui.known_size(1, 120.0, 32.0, |ui| {
+        ui.known_size(1, 120.0, 36.0, |ui| {
             ui.text(1, label(value))
                 .center_x()
                 .center_y();
         });
 
-        if ui.button(2, ">").with_width(32.0).clicked() {
+        if ui.button(2, ">").with_width(36.0).clicked() {
             let succ = cur_val + step;
             if range.contains(&succ) {
                 *value = succ.try_into().unwrap_or(*value);

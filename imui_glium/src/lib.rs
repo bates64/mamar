@@ -264,6 +264,173 @@ impl Renderer {
             },
         ]);
     }
+
+    /// Render a sprite using 9-slice scaling.
+    /// This means that the corners of the sprite will stay their source size, with the other segments scaled.
+    fn render_sprite_9slice<I: Into<SpriteId>>(&mut self, region: &Region, sprite_id: I, color: Color) {
+        let rect = &region.rect;
+        let sprite = &self.atlas.get(sprite_id).expect("tried to render unknown sprite");
+
+        let corner_pos = Size::new(
+            sprite.src_dimensions.width / 3.0,
+            sprite.src_dimensions.height / 3.0,
+        );
+        let corner_uv = Size::new(
+            sprite.uv_rect.width() / 3.0,
+            sprite.uv_rect.height() / 3.0,
+        );
+
+        //    0 -- 1 -- 2 -- 3
+        //    |  / |  / |  / |
+        //    | /  | /  | /  |
+        //    4 -- 5 -- 6 -- 7
+        //    |  / |  / |  / |
+        //    | /  | /  | /  |
+        //    8 -- 9 -- 10--11
+        //    |  / |  / |  / |
+        //    | /  | /  | /  |
+        //    12-- 13-- 14--15
+
+        let vtx_number = self.vertex_vec.len() as u16;
+        self.index_vec.extend_from_slice(&[
+            // Top-left corner.
+            vtx_number + 0, vtx_number + 1, vtx_number + 4,
+            vtx_number + 4, vtx_number + 5, vtx_number + 1,
+
+            // Top scaled segment.
+            vtx_number + 1, vtx_number + 2, vtx_number + 5,
+            vtx_number + 5, vtx_number + 6, vtx_number + 2,
+
+            // Top-right corner.
+            vtx_number + 2, vtx_number + 3, vtx_number + 6,
+            vtx_number + 6, vtx_number + 7, vtx_number + 3,
+
+            // Left scaled segment.
+            vtx_number + 4, vtx_number + 5, vtx_number + 8,
+            vtx_number + 8, vtx_number + 9, vtx_number + 5,
+
+            // Central scaled segment.
+            vtx_number + 5, vtx_number + 6, vtx_number + 9,
+            vtx_number + 9, vtx_number + 10, vtx_number + 6,
+
+            // Right scaled segment.
+            vtx_number + 6, vtx_number + 7, vtx_number + 10,
+            vtx_number + 10, vtx_number + 7, vtx_number + 11,
+
+            // Bottom-left corner.
+            vtx_number + 8, vtx_number + 9, vtx_number + 12,
+            vtx_number + 12, vtx_number + 9, vtx_number + 13,
+
+            // Bottom scaled segment.
+            vtx_number + 9, vtx_number + 10, vtx_number + 13,
+            vtx_number + 13, vtx_number + 14, vtx_number + 10,
+
+            // Bottom-right corner.
+            vtx_number + 10, vtx_number + 11, vtx_number + 14,
+            vtx_number + 14, vtx_number + 15, vtx_number + 11,
+        ]);
+        self.vertex_vec.extend_from_slice(&[
+            // 0
+            Vertex {
+                position: [rect.min_x(), rect.min_y()],
+                uv: [sprite.uv_rect.min_x(), sprite.uv_rect.min_y()],
+                color: color.clone(),
+            },
+            // 1
+            Vertex {
+                position: [rect.min_x() + corner_pos.width, rect.min_y()],
+                uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.min_y()],
+                color: color.clone(),
+            },
+            // 2
+            Vertex {
+                position: [rect.max_x() - corner_pos.width, rect.min_y()],
+                uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.min_y()],
+                color: color.clone(),
+            },
+            // 3
+            Vertex {
+                position: [rect.max_x(), rect.min_y()],
+                uv: [sprite.uv_rect.max_x(), sprite.uv_rect.min_y()],
+                color: color.clone(),
+            },
+
+            // 4
+            Vertex {
+                position: [rect.min_x(), rect.min_y() + corner_pos.height],
+                uv: [sprite.uv_rect.min_x(), sprite.uv_rect.min_y() + corner_uv.height],
+                color: color.clone(),
+            },
+            // 5
+            Vertex {
+                position: [rect.min_x() + corner_pos.width, rect.min_y() + corner_pos.height],
+                uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.min_y() + corner_uv.height],
+                color: color.clone(),
+            },
+            // 6
+            Vertex {
+                position: [rect.max_x() - corner_pos.width, rect.min_y() + corner_pos.height],
+                uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.min_y() + corner_uv.height],
+                color: color.clone(),
+            },
+            // 7
+            Vertex {
+                position: [rect.max_x(), rect.min_y() + corner_pos.height],
+                uv: [sprite.uv_rect.max_x(), sprite.uv_rect.min_y() + corner_uv.height],
+                color: color.clone(),
+            },
+
+            // 8
+            Vertex {
+                position: [rect.min_x(), rect.max_y() - corner_pos.height],
+                uv: [sprite.uv_rect.min_x(), sprite.uv_rect.max_y() - corner_uv.height],
+                color: color.clone(),
+            },
+            // 9
+            Vertex {
+                position: [rect.min_x() + corner_pos.width, rect.max_y() - corner_pos.height],
+                uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.max_y() - corner_uv.height],
+                color: color.clone(),
+            },
+            // 10
+            Vertex {
+                position: [rect.max_x() - corner_pos.width, rect.max_y() - corner_pos.height],
+                uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.max_y() - corner_uv.height],
+                color: color.clone(),
+            },
+            // 11
+            Vertex {
+                position: [rect.max_x(), rect.max_y() - corner_pos.height],
+                uv: [sprite.uv_rect.max_x(), sprite.uv_rect.max_y() - corner_uv.height],
+                color: color.clone(),
+            },
+
+            // 12
+            Vertex {
+                position: [rect.min_x(), rect.max_y()],
+                uv: [sprite.uv_rect.min_x(), sprite.uv_rect.max_y()],
+                color: color.clone(),
+            },
+            // 13
+            Vertex {
+                position: [rect.min_x() + corner_pos.width, rect.max_y()],
+                uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.max_y()],
+                color: color.clone(),
+            },
+            // 14
+            Vertex {
+                position: [rect.max_x() - corner_pos.width, rect.max_y()],
+                uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.max_y()],
+                color: color.clone(),
+            },
+            // 15
+            Vertex {
+                position: [rect.max_x(), rect.max_y()],
+                uv: [sprite.uv_rect.max_x(), sprite.uv_rect.max_y()],
+                color: color.clone(),
+            },
+        ]);
+    }
 }
 
 impl Render for Renderer {
@@ -353,6 +520,6 @@ impl Render for Renderer {
             sprite = "button";
         }
 
-        self.render_sprite_scaled(region, sprite, [1.0, 1.0, 1.0, 1.0]);
+        self.render_sprite_9slice(region, sprite, [1.0, 1.0, 1.0, 1.0]);
     }
 }
