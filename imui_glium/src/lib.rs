@@ -219,6 +219,7 @@ impl Renderer {
         self.vertex_vec.clear();
     }
 
+    #[allow(dead_code)]
     fn render_sprite_scaled<I: Into<SpriteId>>(&mut self, region: &Region, sprite_id: I, color: Color) {
         let rect = &region.rect;
         let uv = &self.atlas.get(sprite_id).expect("tried to render unknown sprite").uv_rect;
@@ -521,5 +522,9 @@ impl Render for Renderer {
         }
 
         self.render_sprite_9slice(region, sprite, [1.0, 1.0, 1.0, 1.0]);
+    }
+
+    fn render_window(&mut self, region: &Region) {
+        self.render_sprite_9slice(region, "window", [1.0, 1.0, 1.0, 1.0]);
     }
 }

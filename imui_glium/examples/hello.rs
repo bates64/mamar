@@ -11,10 +11,10 @@ impl Interface {
             let mut updated = false;
 
             glue.update(|ui| {
-                ui.vbox(0, |ui| {
-                    ui.text(0, "Hello, world!").center_x();
+                ui.window(0, true, (500.0, 500.0), |ui| {
+                    ui.text(1, "Hello, world!").center_x();
 
-                    ui.hbox(1, |ui| {
+                    ui.hbox(2, |ui| {
                         for i in 0..self.num_buttons {
                             if ui.button(i, format!("Button {}", i))
                                 .with_height(32.0 + i as f32 * 8.0)
@@ -31,7 +31,7 @@ impl Interface {
                         }
                     });
 
-                    ui.text(2, format!("Above are {} buttons", self.num_buttons));
+                    ui.text(3, format!("Above are {} buttons", self.num_buttons));
                 });
             });
 
@@ -58,6 +58,7 @@ fn main() {
 
     glue.atlas().insert("button", "assets/tex/button.png").unwrap();
     glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
+    glue.atlas().insert("window", "assets/tex/window.png").unwrap();
     glue.load_font(include_bytes!("../../assets/Inter-Medium.otf")).unwrap();
 
     let mut interface = Interface { num_buttons: 1 };

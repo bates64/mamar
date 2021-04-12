@@ -3,7 +3,6 @@ pub mod input;
 mod render;
 
 use std::time::{Duration, Instant};
-use std::collections::BTreeMap;
 
 pub use layout::Layout;
 
@@ -16,6 +15,7 @@ type Pool = std::collections::HashMap<Key, Control>;
 
 use input::{ClickFSM, Input, InputFlags};
 
+use layout::Position;
 pub use render::Render;
 
 /// Lower values appear below higher values. Can be considered a Z position.
@@ -42,8 +42,7 @@ pub struct Ui {
     /// The time at which the previous update occurred.
     most_recent_update: Instant,
 
-    /// Controls that care about whether the mouse intersects them, indexed by layer.
-    cares_about_mouse_intersect: BTreeMap<Layer, Vec<Key>>,
+    mouse_pos: Point,
 }
 
 /// Interface for adding controls to the UI tree.
@@ -79,7 +78,7 @@ pub struct Control {
     pub key: Key,
 
     /// The behaviour that this control inhibits.
-    pub widget: Widget,
+    widget: Widget,
 
     /// The children of this control, if any.
     pub children: Vec<Key>,
@@ -104,12 +103,22 @@ pub struct Control {
     pub left_click: ClickFSM,
     pub right_click: ClickFSM,
     pub middle_click: ClickFSM,
+
+    drag: Option<Drag>,
+    drag_trigger_update: bool,
+}
+
+#[derive(Debug)]
+struct Drag {
+    start_position: layout::Position,
+    start_mouse_pos: Point,
+    current_mouse_pos: Point,
 }
 
 /// A widget is the 'type' of a control. They are effectively bags of style properties intended to inform the
 /// renderer how a particular control should look.
 #[derive(Debug)]
-pub enum Widget {
+enum Widget {
     /// Just holds children, like an HTML `<div>`.
     Group,
 
@@ -118,13 +127,17 @@ pub enum Widget {
 
     /// A button.
     Button,
+
+    Window {
+        z: u16,
+        size: Size,
+    },
 }
 
 impl Ui {
     pub fn new() -> Self {
         let mut ui = Self {
             pool: Pool::with_capacity(1),
-            cares_about_mouse_intersect: BTreeMap::new(),
             frame_no: 0,
             parent: Key::root(),
             prev_sibling: None,
@@ -132,6 +145,7 @@ impl Ui {
                 origin: Point::new(0.0, 0.0),
                 size: Size::new(800.0, 600.0),
             },
+            mouse_pos: Point::zero(),
             most_recent_update: Instant::now(),
         };
 
@@ -178,11 +192,10 @@ impl Ui {
     #[must_use = "if true is returned, call update"]
     pub fn set_mouse_pos(&mut self, pos: Point) -> bool {
         let mut needs_update = false;
-
-        // TODO: raycast via layer (perhaps have layout::compute return a sorted Vec<Key>)
+        let mut captured = false;
 
         self.iter_mut_depth_first(&Key::root(), &mut |ctrl: &mut Control| {
-            let is_hit = ctrl.region.rect.contains(pos);
+            let is_hit = if captured { false } else { ctrl.region.rect.contains(pos) };
             let was_hit = ctrl.inputs_active.contains(Input::MouseOver);
 
             if is_hit != was_hit {
@@ -192,7 +205,20 @@ impl Ui {
                     needs_update = true;
                 }
             }
+
+            if ctrl.drag_trigger_update {
+                if let Some(drag) = ctrl.drag.as_mut() {
+                    drag.current_mouse_pos = pos;
+                    needs_update = true;
+                }
+            }
+
+            if is_hit && ctrl.inputs_trigger_update.contains(Input::MouseOver) {
+                captured = true;
+            }
         });
+
+        self.mouse_pos = pos;
 
         needs_update
     }
@@ -215,6 +241,25 @@ impl Ui {
 
                 if ctrl.inputs_trigger_update.contains(flag) {
                     needs_update = true;
+                }
+            }
+
+            // XXX this should not be in this method
+            if ctrl.drag_trigger_update {
+                if set {
+                    if ctrl.drag.is_none() {
+                        ctrl.drag = Some(Drag {
+                            start_mouse_pos: self.mouse_pos,
+                            current_mouse_pos: self.mouse_pos,
+                            start_position: ctrl.layout.position.clone(),
+                        });
+                        needs_update = true;
+                    }
+                } else {
+                    if ctrl.drag.is_some() {
+                        ctrl.drag = None;
+                        needs_update = true;
+                    }
                 }
             }
         }
@@ -285,6 +330,7 @@ impl Ui {
                 Widget::Group => {}
                 Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
                 Widget::Text(text) => renderer.render_text(&region, text),
+                Widget::Window { .. } => renderer.render_window(&region),
             }
         });
     }
@@ -294,8 +340,6 @@ impl Ui {
 
         // Touch the root so it isn't removed by end_frame() later.
         self.pool.get_mut(&Key::root()).unwrap().updated_frame_no = self.frame_no;
-
-        self.cares_about_mouse_intersect.clear();
 
         self.parent = Key::root();
         self.prev_sibling = None;
@@ -501,6 +545,53 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
+    pub fn window<K, F>(&mut self, key: K, draggable: bool, min_size: (f32, f32), children: F)
+    where
+        K: Into<UserKey>,
+        F: FnOnce(&mut Self),
+    {
+        let key = self.ui.key(key.into());
+
+        self.ui.begin_control(key, Widget::Window {
+            z: 0,
+            size: Size::new(min_size.0, min_size.1),
+        });
+
+        let ctrl = self.current_mut();
+
+        ctrl.layout.direction = layout::Dir::TopBottom { wrap: true };
+
+        if draggable {
+            ctrl.update_drag();
+        }
+
+        let width;
+        let height;
+
+        if let Widget::Window { size, .. } = &mut ctrl.widget {
+            ctrl.layout.width = size.width..=size.width;
+            ctrl.layout.height = size.height..=size.height;
+
+            width = size.width;
+            height = size.height;
+        } else {
+            panic!();
+        }
+
+        // Pad the elements inside.
+        let margin = 10.0;
+        self.ui.begin_control(self.ui.key(0), Widget::Group);
+        let ctrl = self.current_mut();
+        ctrl.layout.direction = layout::Dir::TopBottom { wrap: false };
+        ctrl.layout.position = Position::Relative(Point::new(margin, margin));
+        ctrl.layout.width = (width - margin * 2.0) ..= (width - margin * 2.0);
+        ctrl.layout.height = (height - margin * 2.0) ..= (height - margin * 2.0);
+        children(self);
+        self.ui.end_control();
+
+        self.ui.end_control();
+    }
+
     /// Create a simple block of text.
     pub fn text<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, string: S) -> Text<'a> {
         self.ui.begin_control(self.ui.key(key.into()), Widget::Text(string.into()));
@@ -553,11 +644,16 @@ impl Control {
                 rect: Rect::zero(),
                 layer: LAYER_DEFAULT,
             },
+
             inputs_active: InputFlags::empty(),
             inputs_trigger_update: InputFlags::empty(),
+
             left_click: Default::default(),
             right_click: Default::default(),
             middle_click: Default::default(),
+
+            drag: None,
+            drag_trigger_update: false,
         }
     }
 
@@ -575,12 +671,31 @@ impl Control {
         self.left_click = self.left_click.advance(Input::LeftMouseDown, self.inputs_active);
         self.left_click
     }
+
+    fn update_drag(&mut self) {
+        self.drag_trigger_update = true;
+        self.inputs_trigger_update |= Input::MouseOver | Input::LeftMouseDown;
+
+        if let Some(drag) = self.drag.as_ref() {
+            let delta = drag.current_mouse_pos - drag.start_mouse_pos;
+
+            match drag.start_position {
+                Position::Absolute(p) => {
+                    self.layout.position = Position::Absolute(p + delta);
+                }
+                Position::Relative(p) => {
+                    self.layout.position = Position::Relative(p + delta);
+                }
+            }
+        }
+    }
 }
 
 impl Control {
     /// Accept a new widget configuration, merging the previous widget's properties where possible to preserve state.
     fn accept_widget(&mut self, new: Widget) {
         match (&mut self.widget, new) {
+            (Widget::Window { .. }, Widget::Window { .. }) => (),
             (_, new) => self.widget = new,
         }
     }

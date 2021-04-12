@@ -60,6 +60,7 @@ impl Interface {
 
         glue.atlas().insert("button", "assets/tex/button.png").unwrap();
         glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
+        glue.atlas().insert("window", "assets/tex/window.png").unwrap();
 
         glue.load_font(&{
             let mut font = File::open("assets/Inter-Medium.otf").unwrap();
