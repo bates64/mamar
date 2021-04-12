@@ -111,6 +111,8 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
             let mut track = Track {
                 flags: 0xA000,
                 commands: CommandSeq::new(),
+                mute: false,
+                solo: false,
             };
 
             let mut time = 0;

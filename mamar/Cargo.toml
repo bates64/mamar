@@ -9,6 +9,7 @@ imui_glium = { path = "../imui_glium" }
 pm64 = { path = "../pm64", features = ["midly"] }
 tinyfiledialogs = "3.0"
 log = "0.4"
+glob = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["shellscalingapi"] }

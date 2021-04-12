@@ -221,28 +221,38 @@ impl Bgm {
                     f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
                     encoded_tracks.insert(track_list_id, track_data_start);
 
+                    let any_solo = track_list.tracks.iter().any(|t| t.solo);
+
                     // Write flags
                     let mut todo_commands = Vec::new();
-                    for Track { flags, commands } in track_list.tracks.iter() {
-                        //debug!("write commands_offset {:#X}", f.pos()?);
+                    for Track { flags, commands, mute, solo } in track_list.tracks.iter() {
+                        let is_silent;
+                        if *mute {
+                            is_silent = true;
+                        } else if any_solo {
+                            is_silent = !*solo;
+                        } else {
+                            is_silent = false;
+                        }
+
                         if !commands.is_empty() {
                             // Need to write command data after the track
-                            todo_commands.push((f.pos()?, commands));
+                            todo_commands.push((f.pos()?, commands, is_silent));
                         }
-                        f.write_u16_be(0)?; // Replaced later if commands.len() > 0
+                        f.write_u16_be(0)?; // Replaced later if !null
 
                         f.write_u16_be(*flags)?;
                     }
 
                     // Write command sequences
-                    for (offset, seq) in todo_commands.into_iter() {
+                    for (offset, seq, is_silent) in todo_commands.into_iter() {
                         //debug!("commandseq = {:#X} (offset = {:#X})", f.pos()?, f.pos()? - track_data_start);
 
                         // Write pointer to here
                         let pos = f.pos()? - track_data_start; // Notice no shift
                         f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
 
-                        seq.encode(f)?;
+                        seq.encode(f, is_silent)?;
                     }
                 }
                 ToWrite::Unknown(unk) => {
@@ -344,7 +354,7 @@ impl Subsegment {
 }
 
 impl CommandSeq {
-    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W, is_silent: bool) -> Result<(), Error> {
         let mut marker_to_offset = HashMap::new();
         let mut todo_subroutines = Vec::new();
 
@@ -381,7 +391,11 @@ impl CommandSeq {
                     let length = if *length > 0xD3FF { 0xD3FF } else { *length };
 
                     f.write_u8(*pitch)?;
-                    f.write_u8(*velocity)?;
+                    if is_silent {
+                        f.write_u8(0)?;
+                    } else {
+                        f.write_u8(*velocity)?;
+                    }
                     if length < 0xC0 {
                         f.write_u8(length as u8)?;
                     } else {

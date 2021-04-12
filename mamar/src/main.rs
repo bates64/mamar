@@ -3,6 +3,12 @@
 fn main() {
     mamar::init();
 
-    let (interface, event_loop) = mamar::interface::Interface::new();
-    interface.show(event_loop)
+    match mamar::interface::Interface::new() {
+        Ok((interface, event_loop)) => interface.show(event_loop),
+        Err(error) => tinyfiledialogs::message_box_ok(
+            "Error starting Mamar",
+            &format!("{}", error),
+            tinyfiledialogs::MessageBoxIcon::Error,
+        ),
+    }
 }

@@ -182,7 +182,7 @@ fn draw_track_list(ui: &mut imui_glium::UiFrame<'_>, track_list: &mut TrackList)
 
             ui.text(2, format!("Flags: {:04X}", track.flags)).center_y();
 
-            if track.flags != 0 {
+            if track.flags != 0 && i != 0 {
                 ui.pad(3, 8.0);
 
                 if ui.button(
@@ -196,6 +196,9 @@ fn draw_track_list(ui: &mut imui_glium::UiFrame<'_>, track_list: &mut TrackList)
                 {
                     track.set_drum(!track.is_drum());
                 }
+
+                ui.toggle_button(5, "S", &mut track.solo).with_width(36.0);
+                ui.toggle_button(6, "M", &mut track.mute).with_width(36.0);
             }
         });
     }

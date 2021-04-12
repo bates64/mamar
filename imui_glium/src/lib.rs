@@ -524,6 +524,17 @@ impl Render for Renderer {
         self.render_sprite_9slice(region, sprite, [1.0, 1.0, 1.0, 1.0]);
     }
 
+    fn render_toggle_button(&mut self, region: &Region, is_pressed: bool, is_enabled: bool) {
+        let sprite = match (is_pressed, is_enabled) {
+            (true, true) => "toggle_button_on_pressed",
+            (true, false) => "toggle_button_off_pressed",
+            (false, true) => "toggle_button_on",
+            (false, false) => "toggle_button_off",
+        };
+
+        self.render_sprite_9slice(region, sprite, [1.0, 1.0, 1.0, 1.0]);
+    }
+
     fn render_window(&mut self, region: &Region) {
         self.render_sprite_9slice(region, "window", [1.0, 1.0, 1.0, 1.0]);
     }

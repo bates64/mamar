@@ -102,6 +102,9 @@ pub struct TrackList {
 pub struct Track {
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,
+
+    pub mute: bool,
+    pub solo: bool,
 }
 
 impl Subsegment {

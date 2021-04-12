@@ -37,7 +37,7 @@ enum Action {
 }
 
 impl Interface {
-    pub fn new() -> (Self, EventLoop<()>) {
+    pub fn new() -> Result<(Self, EventLoop<()>), Box<dyn Error>> {
         use std::io::prelude::*;
         use std::fs::File;
 
@@ -52,30 +52,34 @@ impl Interface {
         let cb = imui_glium::glium::glutin::ContextBuilder::new()
             .with_multisampling(4)
             .with_srgb(true);
-        let display = Display::new(wb, cb, &event_loop).unwrap();
+        let display = Display::new(wb, cb, &event_loop)?;
 
-        let mut glue = Glue::new(&display).unwrap();
+        let mut glue = Glue::new(&display)?;
 
         log::info!("loading assets");
 
-        glue.atlas().insert("button", "assets/tex/button.png").unwrap();
-        glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
-        glue.atlas().insert("window", "assets/tex/window.png").unwrap();
+        glue.atlas().insert("button", "assets/tex/button.png")?;
+        glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png")?;
+        glue.atlas().insert("toggle_button_on", "assets/tex/toggle_button_on.png")?;
+        glue.atlas().insert("toggle_button_on_pressed", "assets/tex/toggle_button_on_pressed.png")?;
+        glue.atlas().insert("toggle_button_off", "assets/tex/toggle_button_off.png")?;
+        glue.atlas().insert("toggle_button_off_pressed", "assets/tex/toggle_button_off_pressed.png")?;
+        glue.atlas().insert("window", "assets/tex/window.png")?;
 
         glue.load_font(&{
-            let mut font = File::open("assets/Inter-Medium.otf").unwrap();
+            let mut font = File::open("assets/Inter-Medium.otf")?;
             let mut buf = Vec::new();
-            font.read_to_end(&mut buf).unwrap();
+            font.read_to_end(&mut buf)?;
             buf
-        }).unwrap();
+        })?;
 
-        (Self {
+        Ok((Self {
             display,
             glue,
             state: History::new(Default::default()),
             hot_reload_tx: None,
             queued_action: Action::None,
-        }, event_loop)
+        }, event_loop))
     }
 
     pub fn with_window<F: FnOnce(&Window)>(&self, f: F) {

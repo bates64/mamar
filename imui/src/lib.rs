@@ -119,15 +119,10 @@ struct Drag {
 /// renderer how a particular control should look.
 #[derive(Debug)]
 enum Widget {
-    /// Just holds children, like an HTML `<div>`.
     Group,
-
-    /// A text label.
     Text(String),
-
-    /// A button.
     Button,
-
+    ToggleButton(bool),
     Window {
         z: u16,
         size: Size,
@@ -328,8 +323,9 @@ impl Ui {
 
             match widget {
                 Widget::Group => {}
-                Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
                 Widget::Text(text) => renderer.render_text(&region, text),
+                Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
+                Widget::ToggleButton(v) => renderer.render_toggle_button(&region, ctrl.left_click.is_press(), *v),
                 Widget::Window { .. } => renderer.render_window(&region),
             }
         });
@@ -617,6 +613,30 @@ impl UiFrame<'_> {
 
         Button {
             is_click: ctrl.advance_left_click().is_click(),
+            ctrl,
+        }
+    }
+
+    pub fn toggle_button<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, label: S, state: &mut bool) -> Button<'a> {
+        let key = self.ui.key(key.into());
+
+        self.ui.begin_control(key, Widget::ToggleButton(*state));
+        self.text(0, label).center_x().center_y();
+        self.ui.end_control();
+
+        let ctrl = self.current_mut();
+
+        ctrl.layout.width = 100.0..=100.0;
+        ctrl.layout.height = 36.0..=36.0;
+
+        let is_click = ctrl.advance_left_click().is_click();
+
+        if is_click {
+            *state = !*state;
+        }
+
+        Button {
+            is_click,
             ctrl,
         }
     }

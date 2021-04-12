@@ -312,6 +312,8 @@ impl Track {
 
                 seq
             },
+            mute: false,
+            solo: false,
         })
     }
 }
