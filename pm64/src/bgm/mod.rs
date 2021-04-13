@@ -111,8 +111,10 @@ pub struct TrackList {
     pub tracks: [Track; 16],
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Track {
+    pub name: String,
+
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,
 
@@ -320,9 +322,21 @@ impl Track {
     }
 }
 
+impl Default for Track {
+    fn default() -> Self {
+        Track {
+            name: String::from("New Track"),
+            flags: 0x0000,
+            mute: false,
+            solo: false,
+            commands: CommandSeq::default(),
+        }
+    }
+}
+
 pub mod track_flags {
     pub const DRUM_TRACK: u16  = 0x0080;
-    pub const MUTE: u16        = 0x1000;
+    pub const LOW_PITCH: u16   = 0x1000; // May be wrong
     pub const POLYPHONY_1: u16 = 0x2000;
     pub const POLYPHONY_2: u16 = 0x4000;
     pub const POLYPHONY_3: u16 = 0x8000;

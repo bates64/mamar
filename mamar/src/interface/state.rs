@@ -152,8 +152,8 @@ impl Document {
                 }
 
                 if self.viewing_seg_list {
-                    ui.modal(2, false, (300.0, 300.0), |ui| {
-                        ui.text(0, "Segment list").center_x();
+                    ui.modal(2, true, (300.0, 300.0), |ui| {
+                        ui.text(0, "Song Variations").center_x();
                         ui.pad(1, 30.0);
                         ui.known_size(2, 300.0, 32.0 * self.bgm.segments.len() as f32, |ui| {
                             ui.vbox(0, |ui| {

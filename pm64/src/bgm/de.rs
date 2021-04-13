@@ -303,6 +303,11 @@ impl Track {
         let flags = f.read_u16_be()?;
 
         Ok(Self {
+            name: if commands_offset == 0 {
+                String::from("Empty track")
+            } else {
+                format!("Track {:#06X}", commands_offset)
+            },
             flags,
             commands: if commands_offset == 0 {
                 CommandSeq::with_capacity(0)
@@ -316,7 +321,7 @@ impl Track {
 
                 seq
             },
-            mute: (flags & track_flags::MUTE) != 0,
+            mute: false,
             solo: false,
         })
     }
