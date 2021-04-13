@@ -66,7 +66,7 @@ fn main() {
 
     {
         let mut surface = display.draw();
-        surface.clear_color(0.0, 0.0, 0.0, 1.0);
+        surface.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), -1000.0);
         glue.draw(&mut surface, &display).unwrap();
         surface.finish().unwrap();
     }

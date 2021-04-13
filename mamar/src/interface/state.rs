@@ -129,13 +129,20 @@ impl Document {
     pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
         ui.vbox(0, |ui| {
             ui.hbox(0, |ui| {
+                let segments = &self.bgm.segments;
                 if range_select(
                     ui,
                     0,
                     0..self.bgm.segments.len() as isize,
                     1,
                     &mut self.selected_segment_idx,
-                    |v| format!("Segment {}", v + 1),
+                    |i| {
+                        if let Some(seg) = &segments[*i as usize] {
+                            seg.name.to_owned()
+                        } else {
+                            String::from("(no data)")
+                        }
+                    },
                 ) {
                     self.track_list_interface = TrackListInterface::new();
                 }
@@ -155,10 +162,10 @@ impl Document {
                                 for (i, seg) in self.bgm.segments.iter().enumerate() {
                                     ui.hbox(i as u8, |ui| {
                                         ui.known_size(0, 220.0, 32.0,|ui| {
-                                            ui.text(0, if seg.is_some() {
-                                                format!("Segment {}", i + 1)
+                                            ui.text(0, if let Some(seg) = seg {
+                                                &seg.name
                                             } else {
-                                                format!("Segment {} (no data)", i + 1)
+                                                "(no data)"
                                             }).center_y();
                                         });
 
@@ -229,8 +236,6 @@ impl Document {
                         }
                     }
                 }
-            } else {
-                ui.text(99, "This segment has no data.");
             }
         });
     }

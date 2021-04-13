@@ -39,9 +39,10 @@ struct Vertex {
     position: [f32; 2],
     uv: [f32; 2],
     color: [f32; 4],
+    z: f32,
 }
 
-implement_vertex!(Vertex, position, uv, color);
+implement_vertex!(Vertex, position, uv, color, z);
 
 struct Renderer {
     pub vertex_vec: Vec<Vertex>,
@@ -205,6 +206,11 @@ impl Glue {
             },
             &glium::DrawParameters {
                 blend: glium::draw_parameters::Blend::alpha_blending(),
+                depth: glium::draw_parameters::Depth {
+                    test: glium::draw_parameters::DepthTest::IfMoreOrEqual,
+                    write: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )?;
@@ -229,8 +235,6 @@ impl Renderer {
         let bottom_left_color = color.clone();
         let bottom_right_color = color;
 
-        // TODO: handle layer
-
         //
         //    0 -- 1
         //    |  / |
@@ -247,21 +251,25 @@ impl Renderer {
                 position: [rect.min_x(), rect.min_y()],
                 uv: [uv.min_x(), uv.min_y()],
                 color: top_left_color,
+                z: region.layer as f32,
             },
             Vertex {
                 position: [rect.max_x(), rect.min_y()],
                 uv: [uv.max_x(), uv.min_y()],
                 color: top_right_color,
+                z: region.layer as f32,
             },
             Vertex {
                 position: [rect.min_x(), rect.max_y()],
                 uv: [uv.min_x(), uv.max_y()],
                 color: bottom_left_color,
+                z: region.layer as f32,
             },
             Vertex {
                 position: [rect.max_x(), rect.max_y()],
                 uv: [uv.max_x(), uv.max_y()],
                 color: bottom_right_color,
+                z: region.layer as f32,
             },
         ]);
     }
@@ -336,24 +344,28 @@ impl Renderer {
                 position: [rect.min_x(), rect.min_y()],
                 uv: [sprite.uv_rect.min_x(), sprite.uv_rect.min_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 1
             Vertex {
                 position: [rect.min_x() + corner_pos.width, rect.min_y()],
                 uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.min_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 2
             Vertex {
                 position: [rect.max_x() - corner_pos.width, rect.min_y()],
                 uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.min_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 3
             Vertex {
                 position: [rect.max_x(), rect.min_y()],
                 uv: [sprite.uv_rect.max_x(), sprite.uv_rect.min_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
 
             // 4
@@ -361,24 +373,28 @@ impl Renderer {
                 position: [rect.min_x(), rect.min_y() + corner_pos.height],
                 uv: [sprite.uv_rect.min_x(), sprite.uv_rect.min_y() + corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 5
             Vertex {
                 position: [rect.min_x() + corner_pos.width, rect.min_y() + corner_pos.height],
                 uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.min_y() + corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 6
             Vertex {
                 position: [rect.max_x() - corner_pos.width, rect.min_y() + corner_pos.height],
                 uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.min_y() + corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 7
             Vertex {
                 position: [rect.max_x(), rect.min_y() + corner_pos.height],
                 uv: [sprite.uv_rect.max_x(), sprite.uv_rect.min_y() + corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
 
             // 8
@@ -386,24 +402,28 @@ impl Renderer {
                 position: [rect.min_x(), rect.max_y() - corner_pos.height],
                 uv: [sprite.uv_rect.min_x(), sprite.uv_rect.max_y() - corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 9
             Vertex {
                 position: [rect.min_x() + corner_pos.width, rect.max_y() - corner_pos.height],
                 uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.max_y() - corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 10
             Vertex {
                 position: [rect.max_x() - corner_pos.width, rect.max_y() - corner_pos.height],
                 uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.max_y() - corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 11
             Vertex {
                 position: [rect.max_x(), rect.max_y() - corner_pos.height],
                 uv: [sprite.uv_rect.max_x(), sprite.uv_rect.max_y() - corner_uv.height],
                 color: color.clone(),
+                z: region.layer as f32,
             },
 
             // 12
@@ -411,24 +431,28 @@ impl Renderer {
                 position: [rect.min_x(), rect.max_y()],
                 uv: [sprite.uv_rect.min_x(), sprite.uv_rect.max_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 13
             Vertex {
                 position: [rect.min_x() + corner_pos.width, rect.max_y()],
                 uv: [sprite.uv_rect.min_x() + corner_uv.width, sprite.uv_rect.max_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 14
             Vertex {
                 position: [rect.max_x() - corner_pos.width, rect.max_y()],
                 uv: [sprite.uv_rect.max_x() - corner_uv.width, sprite.uv_rect.max_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
             // 15
             Vertex {
                 position: [rect.max_x(), rect.max_y()],
                 uv: [sprite.uv_rect.max_x(), sprite.uv_rect.max_y()],
                 color: color.clone(),
+                z: region.layer as f32,
             },
         ]);
     }
@@ -491,21 +515,25 @@ impl Render for Renderer {
                         position: [offset.x + rect.min_x() / dpi, offset.y + rect.min_y() / dpi],
                         uv: [uv.min_x(), uv.min_y()],
                         color: color.clone(),
+                        z: region.layer as f32,
                     },
                     Vertex {
                         position: [offset.x + rect.max_x() / dpi, offset.y + rect.min_y() / dpi],
                         uv: [uv.max_x(), uv.min_y()],
                         color: color.clone(),
+                        z: region.layer as f32,
                     },
                     Vertex {
                         position: [offset.x + rect.min_x() / dpi, offset.y + rect.max_y() / dpi],
                         uv: [uv.min_x(), uv.max_y()],
                         color: color.clone(),
+                        z: region.layer as f32,
                     },
                     Vertex {
                         position: [offset.x + rect.max_x() / dpi, offset.y + rect.max_y() / dpi],
                         uv: [uv.max_x(), uv.max_y()],
                         color: color.clone(),
+                        z: region.layer as f32,
                     },
                 ]);
             });

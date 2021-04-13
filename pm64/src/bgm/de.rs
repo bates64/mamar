@@ -198,7 +198,10 @@ impl Bgm {
 
                     debug!("segment end {:#X}", f.pos()?);
 
-                    Ok(Some(Segment { subsegments }))
+                    Ok(Some(Segment {
+                        name: format!("Variation {:#06X}", pos),
+                        subsegments,
+                    }))
                 }
             })
             .collect_array_pedantic()?;

@@ -76,6 +76,9 @@ impl Bgm {
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Segment {
+    /// Not encoded in BGM data.
+    pub name: String,
+
     pub subsegments: Vec<Subsegment>,
 }
 
