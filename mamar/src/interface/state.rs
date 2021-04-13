@@ -20,7 +20,7 @@ pub struct Document {
     pub path: PathBuf,
 
     selected_segment_idx: u8,
-    selected_subsegment_idx: u8,
+    selected_track_subseg_idx: u8,
 
     viewing_seg_list: bool,
 
@@ -68,7 +68,7 @@ impl Document {
             bgm,
             path,
             selected_segment_idx: 0,
-            selected_subsegment_idx: 0,
+            selected_track_subseg_idx: 0,
             viewing_seg_list: false,
             track_list_interface: TrackListInterface::new(),
         }))
@@ -198,44 +198,47 @@ impl Document {
             ui.pad(3, 5.0);
 
             if let Some(segment) = self.bgm.segments[self.selected_segment_idx as usize].as_mut() {
-                let range = 0..segment.subsegments.len() as isize;
+                let track_subsegs: Vec<(&u8, &TrackListId)> = segment.subsegments
+                    .iter()
+                    .filter_map(|s| match s {
+                        Subsegment::Tracks { flags, track_list } => Some((flags, track_list)),
+                        Subsegment::Unknown { .. } => None,
+                    })
+                    .collect();
 
-                if !range.contains(&(self.selected_subsegment_idx as isize)) {
-                    self.selected_subsegment_idx = 0;
+                let range = 0..track_subsegs.len() as isize;
+
+                if !range.contains(&(self.selected_track_subseg_idx as isize)) {
+                    self.selected_track_subseg_idx = 0;
                 }
 
+                let track_lists = &self.bgm.track_lists;
                 if range_select(
                     ui,
                     4,
                     range,
                     1,
-                    &mut self.selected_subsegment_idx,
-                    |v| format!("Subsegment {}", v + 1),
+                    &mut self.selected_track_subseg_idx,
+                    |v| {
+                        let (_, track_list_id) = track_subsegs[*v as usize];
+                        let track_list = &track_lists[*track_list_id];
+                        track_list.name.to_owned()
+                    },
                 ) {
                     self.track_list_interface = TrackListInterface::new();
                 }
 
                 ui.pad(7, 10.0);
 
-                if let Some(subseg) = segment.subsegments.get_mut(self.selected_subsegment_idx as usize) {
-                    ui.text(8, format!("Flags: {:08X}", subseg.flags()));
+                let (flags, track_list_id) = track_subsegs[self.selected_track_subseg_idx as usize];
+                let track_list = &mut self.bgm.track_lists[*track_list_id];
+                let track_list_interface = &mut self.track_list_interface;
 
-                    match subseg {
-                        Subsegment::Unknown { data, .. } => {
-                            ui.text(9, format!("Control data: {:02X}{:02X}{:02X}", data[0], data[1], data[2]));
-                        }
-                        Subsegment::Tracks { track_list, .. } => {
-                            let track_list = &mut self.bgm.track_lists[*track_list];
-                            let track_list_interface = &mut self.track_list_interface;
-
-                            ui.pad(10, 10.0);
-
-                            ui.vbox(11, |ui| {
-                                track_list_interface.update(ui, track_list);
-                            });
-                        }
-                    }
-                }
+                ui.text(8, format!("Flags: {:08X}", flags));
+                ui.pad(9, 10.0);
+                ui.vbox(10, |ui| {
+                    track_list_interface.update(ui, track_list);
+                });
             }
         });
     }

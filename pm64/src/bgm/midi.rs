@@ -54,6 +54,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     log::debug!("song length: {} ticks (48 ticks/beat)", total_song_length);
 
     let track_list = bgm.track_lists.alloc(TrackList {
+        name: "Imported from MIDI".to_owned(),
         pos: None,
         tracks: [
             midi_track_to_bgm_track(smf.tracks.get(0), total_song_length, true, time_divisor),

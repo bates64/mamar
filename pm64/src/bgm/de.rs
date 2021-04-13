@@ -275,6 +275,7 @@ impl Subsegment {
                     }
 
                     bgm.track_lists.alloc(TrackList {
+                        name: format!("Section {:#06X}", track_list_pos),
                         pos: Some(track_list_pos),
                         tracks: unsafe {
                             // SAFETY: the for loop above has initialised the array. This is also how the std

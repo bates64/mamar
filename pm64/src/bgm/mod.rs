@@ -8,8 +8,7 @@ pub mod de;
 pub mod midi;
 
 use std::fmt;
-use std::ops::{Deref, Range};
-use std::rc::Rc;
+use std::ops::Range;
 
 use id_arena::{Arena, Id};
 
@@ -97,7 +96,12 @@ pub enum Subsegment {
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct TrackList {
+    /// Not encoded in BGM data.
+    pub name: String,
+
+    /// Encode/decode file position.
     pub pos: Option<FilePos>,
+
     pub tracks: [Track; 16],
 }
 
@@ -153,21 +157,6 @@ pub struct Voice {
 pub struct Unknown {
     pub range: Range<u64>,
     pub data: Vec<u8>,
-}
-
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct TaggedRc<T> {
-    /// The original file position T was decoded from.
-    pub decoded_pos: Option<u64>,
-    pub rc: Rc<T>,
-}
-
-impl<T> Deref for TaggedRc<T> {
-    type Target = Rc<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.rc
-    }
 }
 
 impl Bgm {
