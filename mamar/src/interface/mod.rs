@@ -242,7 +242,7 @@ impl Interface {
 
     fn draw(&mut self) {
         let mut surface = self.display.draw();
-        surface.clear_color(0.0, 0.0, 0.0, 1.0);
+        surface.clear_color_srgb(21.0 / 255.0, 26.0 / 255.0, 30.0 / 255.0, 1.0);
         self.glue.draw(&mut surface, &self.display).unwrap();
         surface.finish().unwrap();
     }
