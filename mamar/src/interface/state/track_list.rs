@@ -48,21 +48,18 @@ impl TrackListInterface {
                     ui.toggle_button(0, "Drum track", &mut flag);
                     track.set_flag(track_flags::DRUM_TRACK, flag);
 
-                    let mut flag = track.get_flag(0x2000);
-                    ui.toggle_button(1, "0x2000", &mut flag);
-                    track.set_flag(0x2000, flag);
+                    let mut flag = track.get_flag(track_flags::POLYPHONY_1);
+                    ui.toggle_button(1, "Polyphony 1", &mut flag);
+                    track.set_flag(track_flags::POLYPHONY_1, flag);
 
-                    let mut flag = track.get_flag(0x4000);
-                    ui.toggle_button(2, "0x4000", &mut flag);
-                    track.set_flag(0x4000, flag);
+                    let mut flag = track.get_flag(track_flags::POLYPHONY_2);
+                    ui.toggle_button(2, "Polyphony 2", &mut flag);
+                    track.set_flag(track_flags::POLYPHONY_2, flag);
 
-                    let mut flag = track.get_flag(0x8000);
-                    ui.toggle_button(3, "0x8000", &mut flag);
-                    track.set_flag(0x8000, flag);
+                    let mut flag = track.get_flag(track_flags::POLYPHONY_3);
+                    ui.toggle_button(3, "Polyphony 3", &mut flag);
+                    track.set_flag(track_flags::POLYPHONY_3, flag);
                 });
-
-                ui.pad(5, 10.0);
-                ui.text(6, "If you figure out what these flags do, please let me know.\nThey seem to have something to do with polyphony.");
 
                 ui.pad(98, 50.0);
 

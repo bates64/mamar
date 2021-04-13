@@ -316,7 +316,7 @@ impl Track {
 
                 seq
             },
-            mute: false,
+            mute: (flags & track_flags::MUTE) != 0,
             solo: false,
         })
     }

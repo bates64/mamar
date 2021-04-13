@@ -226,6 +226,8 @@ impl Bgm {
                     // Write flags
                     let mut todo_commands = Vec::new();
                     for Track { flags, commands, mute, solo } in track_list.tracks.iter() {
+                        let mut flags = *flags;
+
                         let is_silent;
                         if *mute {
                             is_silent = true;
@@ -235,24 +237,28 @@ impl Bgm {
                             is_silent = false;
                         }
 
+                        if is_silent {
+                            flags |= track_flags::MUTE;
+                        }
+
                         if !commands.is_empty() {
                             // Need to write command data after the track
-                            todo_commands.push((f.pos()?, commands, is_silent));
+                            todo_commands.push((f.pos()?, commands));
                         }
                         f.write_u16_be(0)?; // Replaced later if !null
 
-                        f.write_u16_be(*flags)?;
+                        f.write_u16_be(flags)?;
                     }
 
                     // Write command sequences
-                    for (offset, seq, is_silent) in todo_commands.into_iter() {
+                    for (offset, seq) in todo_commands.into_iter() {
                         //debug!("commandseq = {:#X} (offset = {:#X})", f.pos()?, f.pos()? - track_data_start);
 
                         // Write pointer to here
                         let pos = f.pos()? - track_data_start; // Notice no shift
                         f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
 
-                        seq.encode(f, is_silent)?;
+                        seq.encode(f, false)?;
                     }
                 }
                 ToWrite::Unknown(unk) => {

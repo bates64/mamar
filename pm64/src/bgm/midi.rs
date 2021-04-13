@@ -110,7 +110,9 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
         None => Track::default(),
         Some(events) => {
             let mut track = Track {
-                flags: 0xA000,
+                // NOTE: lack of polyphony by default, this prevents crashes on complex MIDIs
+                flags: 0,
+
                 commands: CommandSeq::new(),
                 mute: false,
                 solo: false,

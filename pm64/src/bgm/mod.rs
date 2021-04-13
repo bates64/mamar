@@ -51,12 +51,18 @@ impl Bgm {
     }
 
     pub fn add_segment(&mut self) -> Result<&mut Segment, NoSpace> {
-        let empty_seg: Option<&mut Option<Segment>> = self.segments.iter_mut().find(|s| s.is_none());
+        let empty_seg: Option<(usize, &mut Option<Segment>)> = self.segments
+            .iter_mut()
+            .enumerate()
+            .find(|(_, s)| s.is_none());
 
         match empty_seg {
             None => Err(NoSpace),
-            Some(slot) => {
-                *slot = Some(Segment::default());
+            Some((idx, slot)) => {
+                *slot = Some(Segment {
+                    name: format!("Variation {}", idx + 1),
+                    subsegments: Default::default(),
+                });
                 Ok(slot.as_mut().unwrap())
             }
         }
@@ -73,7 +79,7 @@ impl Bgm {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Segment {
     /// Not encoded in BGM data.
     pub name: String,
@@ -315,5 +321,9 @@ impl Track {
 }
 
 pub mod track_flags {
-    pub const DRUM_TRACK: u16 = 0x0080;
+    pub const DRUM_TRACK: u16  = 0x0080;
+    pub const MUTE: u16        = 0x1000;
+    pub const POLYPHONY_1: u16 = 0x2000;
+    pub const POLYPHONY_2: u16 = 0x4000;
+    pub const POLYPHONY_3: u16 = 0x8000;
 }
