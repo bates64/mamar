@@ -22,6 +22,8 @@ pub struct Document {
     selected_segment_idx: u8,
     selected_subsegment_idx: u8,
 
+    viewing_seg_list: bool,
+
     track_list_interface: TrackListInterface,
 }
 
@@ -67,6 +69,7 @@ impl Document {
             path,
             selected_segment_idx: 0,
             selected_subsegment_idx: 0,
+            viewing_seg_list: false,
             track_list_interface: TrackListInterface::new(),
         }))
     }
@@ -125,18 +128,67 @@ impl Document {
 
     pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
         ui.vbox(0, |ui| {
-            if range_select(
-                ui,
-                0,
-                0..self.bgm.segments.len() as isize,
-                1,
-                &mut self.selected_segment_idx,
-                |v| format!("Segment {}", v + 1),
-            ) {
-                self.track_list_interface = TrackListInterface::new();
-            }
+            ui.hbox(0, |ui| {
+                if range_select(
+                    ui,
+                    0,
+                    0..self.bgm.segments.len() as isize,
+                    1,
+                    &mut self.selected_segment_idx,
+                    |v| format!("Segment {}", v + 1),
+                ) {
+                    self.track_list_interface = TrackListInterface::new();
+                }
 
-            ui.pad(1, 5.0);
+                if ui.button(1, "Edit").clicked() {
+                    self.viewing_seg_list = true;
+                }
+
+                if self.viewing_seg_list {
+                    ui.modal(2, false, (300.0, 300.0), |ui| {
+                        ui.text(0, "Segment list").center_x();
+                        ui.pad(1, 30.0);
+                        ui.known_size(2, 300.0, 32.0 * self.bgm.segments.len() as f32, |ui| {
+                            ui.vbox(0, |ui| {
+                                let mut swap = None;
+
+                                for (i, seg) in self.bgm.segments.iter().enumerate() {
+                                    ui.hbox(i as u8, |ui| {
+                                        ui.known_size(0, 220.0, 32.0,|ui| {
+                                            ui.text(0, if seg.is_some() {
+                                                format!("Segment {}", i + 1)
+                                            } else {
+                                                format!("Segment {} (no data)", i + 1)
+                                            }).center_y();
+                                        });
+
+                                        if ui.button(1, "^").with_width(32.0).clicked() {
+                                            if i > 0 {
+                                                swap = Some((i, i - 1));
+                                            }
+                                        }
+                                        if ui.button(2, "v").with_width(32.0).clicked() {
+                                            if i < self.bgm.segments.len() - 1 {
+                                                swap = Some((i, i + 1));
+                                            }
+                                        }
+                                    });
+                                }
+
+                                if let Some((a, b)) = swap {
+                                    self.bgm.segments.swap(a, b);
+                                }
+                            });
+                        });
+                        ui.pad(3, 50.0);
+                        if ui.button(4, "Close").clicked() {
+                            self.viewing_seg_list = false;
+                        }
+                    })
+                }
+            });
+
+            ui.pad(3, 5.0);
 
             if let Some(segment) = self.bgm.segments[self.selected_segment_idx as usize].as_mut() {
                 let range = 0..segment.subsegments.len() as isize;
@@ -147,7 +199,7 @@ impl Document {
 
                 if range_select(
                     ui,
-                    2,
+                    4,
                     range,
                     1,
                     &mut self.selected_subsegment_idx,
@@ -156,22 +208,22 @@ impl Document {
                     self.track_list_interface = TrackListInterface::new();
                 }
 
-                ui.pad(3, 10.0);
+                ui.pad(7, 10.0);
 
                 if let Some(subseg) = segment.subsegments.get_mut(self.selected_subsegment_idx as usize) {
-                    ui.text(4, format!("Flags: {:08X}", subseg.flags()));
+                    ui.text(8, format!("Flags: {:08X}", subseg.flags()));
 
                     match subseg {
                         Subsegment::Unknown { data, .. } => {
-                            ui.text(5, format!("Control data: {:02X}{:02X}{:02X}", data[0], data[1], data[2]));
+                            ui.text(9, format!("Control data: {:02X}{:02X}{:02X}", data[0], data[1], data[2]));
                         }
                         Subsegment::Tracks { track_list, .. } => {
                             let track_list = &mut self.bgm.track_lists[*track_list];
                             let track_list_interface = &mut self.track_list_interface;
 
-                            ui.pad(6, 10.0);
+                            ui.pad(10, 10.0);
 
-                            ui.vbox(7, |ui| {
+                            ui.vbox(11, |ui| {
                                 track_list_interface.update(ui, track_list);
                             });
                         }

@@ -132,6 +132,11 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
                         layer,
                     );
 
+                    // Absolutely-positioned children don't take up space in their parent.
+                    if let Position::Absolute(..) = &pool[child].layout.position {
+                        continue;
+                    }
+
                     let calc = &pool[child].region.rect;
                     pos.x += calc.width();
                     if calc.height() > row_height {
@@ -165,6 +170,11 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
                         renderer,
                         layer,
                     );
+
+                    // Absolutely-positioned children don't take up space in their parent.
+                    if let Position::Absolute(..) = &pool[child].layout.position {
+                        continue;
+                    }
 
                     let calc = &pool[child].region.rect;
                     pos.y += calc.height();
