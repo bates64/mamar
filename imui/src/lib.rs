@@ -20,7 +20,7 @@ pub use render::Render;
 
 /// Lower values appear below higher values. Can be considered a Z position.
 pub type Layer = u8;
-pub const LAYER_DEFAULT: Layer = 255;
+pub const LAYER_DEFAULT: Layer = 0;
 
 /// A UI tree.
 pub struct Ui {
@@ -43,6 +43,9 @@ pub struct Ui {
     most_recent_update: Instant,
 
     mouse_pos: Point,
+
+    /// The layer that is allowed to receive input right now.
+    active_layer: Layer,
 }
 
 /// Interface for adding controls to the UI tree.
@@ -123,8 +126,7 @@ enum Widget {
     Text(String),
     Button,
     ToggleButton(bool),
-    Window {
-        z: u16,
+    Modal {
         size: Size,
     },
 }
@@ -142,6 +144,7 @@ impl Ui {
             },
             mouse_pos: Point::zero(),
             most_recent_update: Instant::now(),
+            active_layer: LAYER_DEFAULT,
         };
 
         // Create omnipresent root node.
@@ -167,7 +170,17 @@ impl Ui {
         });
 
         self.end_frame();
-        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer);
+
+        // Relayout.
+        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer, LAYER_DEFAULT);
+
+        // Set the active layer to the highest layer of any control.
+        self.active_layer = 0;
+        for (_, ctrl) in &self.pool {
+            if ctrl.region.layer > self.active_layer {
+                self.active_layer = ctrl.region.layer;
+            }
+        }
     }
 
     /// Returns the number of controls, besides the root, in the tree.
@@ -181,16 +194,17 @@ impl Ui {
 
     pub fn resize<R: Render>(&mut self, screen: Rect, renderer: &mut R) {
         self.screen = screen;
-        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer);
+        layout::compute(&mut self.pool, &Key::root(), self.screen.clone(), renderer, LAYER_DEFAULT);
     }
 
     #[must_use = "if true is returned, call update"]
     pub fn set_mouse_pos(&mut self, pos: Point) -> bool {
         let mut needs_update = false;
         let mut captured = false;
+        let active_layer = self.active_layer;
 
         self.iter_mut_depth_first(&Key::root(), &mut |ctrl: &mut Control| {
-            let is_hit = if captured { false } else { ctrl.region.rect.contains(pos) };
+            let is_hit = !captured && ctrl.region.layer == active_layer && ctrl.region.rect.contains(pos);
             let was_hit = ctrl.inputs_active.contains(Input::MouseOver);
 
             if is_hit != was_hit {
@@ -241,7 +255,7 @@ impl Ui {
 
             // XXX this should not be in this method
             if ctrl.drag_trigger_update {
-                if set {
+                if to_set {
                     if ctrl.drag.is_none() {
                         ctrl.drag = Some(Drag {
                             start_mouse_pos: self.mouse_pos,
@@ -326,7 +340,7 @@ impl Ui {
                 Widget::Text(text) => renderer.render_text(&region, text),
                 Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
                 Widget::ToggleButton(v) => renderer.render_toggle_button(&region, ctrl.left_click.is_press(), *v),
-                Widget::Window { .. } => renderer.render_window(&region),
+                Widget::Modal { .. } => renderer.render_window(&region),
             }
         });
     }
@@ -541,21 +555,30 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
-    pub fn window<K, F>(&mut self, key: K, draggable: bool, min_size: (f32, f32), children: F)
+    pub fn modal<K, F>(&mut self, key: K, draggable: bool, size: (f32, f32), children: F)
     where
         K: Into<UserKey>,
         F: FnOnce(&mut Self),
     {
         let key = self.ui.key(key.into());
 
-        self.ui.begin_control(key, Widget::Window {
-            z: 0,
-            size: Size::new(min_size.0, min_size.1),
+        self.ui.begin_control(key, Widget::Modal {
+            size: Size::new(size.0, size.1),
         });
 
+        let screen = self.ui.screen.clone();
         let ctrl = self.current_mut();
 
         ctrl.layout.direction = layout::Dir::TopBottom { wrap: true };
+        ctrl.layout.new_layer = true;
+
+        if let Position::Relative(..) = ctrl.layout.position {
+            // Centre window on initial creation.
+            ctrl.layout.position = Position::Absolute(Point::new(
+                (screen.width() - size.0) / 2.0,
+                (screen.height() - size.1) / 2.0,
+            ));
+        }
 
         if draggable {
             ctrl.update_drag();
@@ -564,7 +587,7 @@ impl UiFrame<'_> {
         let width;
         let height;
 
-        if let Widget::Window { size, .. } = &mut ctrl.widget {
+        if let Widget::Modal { size, .. } = &mut ctrl.widget {
             ctrl.layout.width = size.width..=size.width;
             ctrl.layout.height = size.height..=size.height;
 
@@ -715,7 +738,7 @@ impl Control {
     /// Accept a new widget configuration, merging the previous widget's properties where possible to preserve state.
     fn accept_widget(&mut self, new: Widget) {
         match (&mut self.widget, new) {
-            (Widget::Window { .. }, Widget::Window { .. }) => (),
+            (Widget::Modal { .. }, Widget::Modal { .. }) => (),
             (_, new) => self.widget = new,
         }
     }

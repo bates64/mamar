@@ -1,9 +1,12 @@
+mod track_list;
+
 use std::{error::Error, io::Read};
 use std::path::PathBuf;
 use std::fs::File;
 
 use pm64::bgm::*;
 
+use track_list::TrackListInterface;
 use crate::interface::form::range_select;
 
 #[derive(Default, PartialEq, Clone)]
@@ -18,6 +21,8 @@ pub struct Document {
 
     selected_segment_idx: u8,
     selected_subsegment_idx: u8,
+
+    track_list_interface: TrackListInterface,
 }
 
 // Change of anything other than self.bgm should not be considered a History-changing action.
@@ -62,6 +67,7 @@ impl Document {
             path,
             selected_segment_idx: 0,
             selected_subsegment_idx: 0,
+            track_list_interface: TrackListInterface::new(),
         }))
     }
 
@@ -119,14 +125,16 @@ impl Document {
 
     pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
         ui.vbox(0, |ui| {
-            range_select(
+            if range_select(
                 ui,
                 0,
                 0..self.bgm.segments.len() as isize,
                 1,
                 &mut self.selected_segment_idx,
                 |v| format!("Segment {}", v + 1),
-            );
+            ) {
+                self.track_list_interface = TrackListInterface::new();
+            }
 
             ui.pad(1, 5.0);
 
@@ -137,14 +145,16 @@ impl Document {
                     self.selected_subsegment_idx = 0;
                 }
 
-                range_select(
+                if range_select(
                     ui,
                     2,
                     range,
                     1,
                     &mut self.selected_subsegment_idx,
                     |v| format!("Subsegment {}", v + 1),
-                );
+                ) {
+                    self.track_list_interface = TrackListInterface::new();
+                }
 
                 ui.pad(3, 10.0);
 
@@ -157,48 +167,18 @@ impl Document {
                         }
                         Subsegment::Tracks { track_list, .. } => {
                             let track_list = &mut self.bgm.track_lists[*track_list];
+                            let track_list_interface = &mut self.track_list_interface;
 
                             ui.pad(6, 10.0);
 
                             ui.vbox(7, |ui| {
-                                draw_track_list(ui, track_list);
+                                track_list_interface.update(ui, track_list);
                             });
                         }
                     }
                 }
             } else {
                 ui.text(99, "This segment has no data.");
-            }
-        });
-    }
-}
-
-fn draw_track_list(ui: &mut imui_glium::UiFrame<'_>, track_list: &mut TrackList) {
-    for (i, track) in track_list.tracks.iter_mut().enumerate() {
-        ui.hbox(i as u8, |ui| {
-            ui.button(0, format!("Track {}", i + 1));
-
-            ui.pad(1, 8.0);
-
-            ui.text(2, format!("Flags: {:04X}", track.flags)).center_y();
-
-            if track.flags != 0 && i != 0 {
-                ui.pad(3, 8.0);
-
-                if ui.button(
-                    4,
-                    if track.is_drum() {
-                        "Drum"
-                    } else {
-                        "Voice"
-                    })
-                    .clicked()
-                {
-                    track.set_drum(!track.is_drum());
-                }
-
-                ui.toggle_button(5, "S", &mut track.solo).with_width(36.0);
-                ui.toggle_button(6, "M", &mut track.mute).with_width(36.0);
             }
         });
     }

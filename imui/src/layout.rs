@@ -13,6 +13,8 @@ pub struct Layout {
 
     pub center_x: bool,
     pub center_y: bool,
+
+    pub new_layer: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +44,7 @@ impl Default for Layout {
             height: 0.0..=f32::INFINITY,
             center_x: false,
             center_y: false,
+            new_layer: false,
         }
     }
 }
@@ -65,8 +68,12 @@ impl Position {
     }
 }
 
-pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, renderer: &mut R) {
+pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, renderer: &mut R, mut layer: Layer) {
     let control = pool.get(key).unwrap();
+
+    if control.layout.new_layer {
+        layer += 1;
+    }
 
     let mut recommendation = match &control.widget {
         Widget::Text(text) => renderer.measure_text(text),
@@ -97,7 +104,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
         0 => {}
         1 => {
             // Single child gets all the space its parent has.
-            compute(pool, &children[0], rect, renderer);
+            compute(pool, &children[0], rect, renderer, layer);
 
             let calc = &pool[&children[0]].region.rect;
             rect.size.width = clamp(calc.height(), &width_range);
@@ -106,7 +113,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
         _ => match control.layout.direction {
             Dir::BackFront => {
                 for child in &children {
-                    compute(pool, child, rect.clone(), renderer);
+                    compute(pool, child, rect.clone(), renderer, layer);
                 }
             }
             Dir::LeftRight { wrap } => {
@@ -122,6 +129,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
                             size: Size::new(rect.width() - pos.x, rect.height() - pos.y),
                         },
                         renderer,
+                        layer,
                     );
 
                     let calc = &pool[child].region.rect;
@@ -155,6 +163,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
                             size: Size::new(rect.width() - pos.x, rect.height() - pos.y),
                         },
                         renderer,
+                        layer,
                     );
 
                     let calc = &pool[child].region.rect;
@@ -182,6 +191,6 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, parent_rect: Rect, 
 
     control.region = Region {
         rect,
-        layer: LAYER_DEFAULT, // TODO: remove notion of layers? can use zstack
+        layer,
     };
 }

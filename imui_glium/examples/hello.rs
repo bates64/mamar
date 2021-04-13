@@ -11,7 +11,7 @@ impl Interface {
             let mut updated = false;
 
             glue.update(|ui| {
-                ui.window(0, true, (500.0, 500.0), |ui| {
+                ui.modal(0, true, (500.0, 500.0), |ui| {
                     ui.text(1, "Hello, world!").center_x();
 
                     ui.hbox(2, |ui| {

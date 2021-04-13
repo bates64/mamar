@@ -309,15 +309,19 @@ impl Bgm {
 }
 
 impl Track {
-    pub fn is_drum(&self) -> bool {
-        (self.flags & 0x0080) != 0
+    pub fn get_flag(&self, flag: u16) -> bool {
+        (self.flags & flag) != 0
     }
 
-    pub fn set_drum(&mut self, enable: bool) {
+    pub fn set_flag(&mut self, flag: u16, enable: bool) {
         if enable {
-            self.flags |= 0x0080;
+            self.flags |= flag;
         } else {
-            self.flags &= !0x0080;
+            self.flags &= !flag;
         }
     }
+}
+
+pub mod track_flags {
+    pub const DRUM_TRACK: u16 = 0x0080;
 }
