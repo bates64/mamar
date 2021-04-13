@@ -1,3 +1,12 @@
+## 0.6.0
+
+- Added solo (S) and mute (M) toggles to tracks.
+    - Muted tracks have their note velocities set to zero.
+    - If any tracks are solo'd, only those that are solo'd will play.
+    - Solo/mute state becomes permanent when you save the file; muting a track, saving the file, then reloading it will cause all the notes in that track to become irrecovably silent.
+- Added a track flag editor window. Click the track name in the list to view.
+- Various grapical improvements.
+
 ## 0.5.1
 
 ## 0.5.0
