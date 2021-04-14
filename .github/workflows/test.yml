@@ -27,6 +27,8 @@ jobs:
     - name: Extract assets from baserom
       run: python3 pm64/tests/bin/extract.py baserom.z64
 
+    - uses: Swatinem/rust-cache@v1
+
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
