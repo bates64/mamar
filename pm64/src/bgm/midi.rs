@@ -31,7 +31,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     log::debug!("original ticks/beat: {}", ticks_per_beat);
     let time_divisor = ticks_per_beat / 48.0; // Divide all MIDI times by this value to convert to BGM timescale!
 
-    bgm.index = "152 ".to_string(); // TODO: is this required?
+    bgm.name = "New Song".to_string();
 
     let total_song_length = {
         let mut max = 0;

@@ -1,5 +1,6 @@
 *.bin
 *.z64
+*.ron
 
 # debug output from failed tests
 *.decoded.txt

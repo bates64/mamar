@@ -39,10 +39,11 @@ impl Document {
     pub fn open_prompt() -> Result<Option<Self>, Box<dyn Error>> {
         let path = tinyfiledialogs::open_file_dialog("Open File", "", Some((&[
             "*.bgm",
+            "*.ron",
             "*.mid",
             "*.midi",
             "*.bin",
-        ], "BGM and MIDI files")));
+        ], "")));
 
         if let Some(path) = path {
             let path = PathBuf::from(path);
@@ -56,7 +57,9 @@ impl Document {
         let mut file = File::open(&path)?;
 
         let bgm;
-        if pm64::bgm::midi::is_midi(&mut file)? {
+        if path.extension().unwrap_or_default() == "ron" {
+            bgm = ron::de::from_reader(file)?;
+        } else if pm64::bgm::midi::is_midi(&mut file)? {
             let mut buf = Vec::new();
             file.read_to_end(&mut buf)?;
             bgm = pm64::bgm::midi::to_bgm(&buf)?;
@@ -80,6 +83,7 @@ impl Document {
         match ext {
             "bgm" => true,
             "bin" => true,
+            "ron" => true,
             _ => false,
         }
     }
@@ -88,7 +92,18 @@ impl Document {
         assert!(self.can_save()); // TODO: return Err
 
         let mut file = File::create(&self.path)?;
-        self.bgm.encode(&mut file)?;
+
+        if self.path.extension().unwrap_or_default() == "ron" {
+            ron::ser::to_writer_pretty(
+                &mut file,
+                &self.bgm,
+                ron::ser::PrettyConfig::new()
+                    .with_indentor("  ".to_string())
+                    .with_depth_limit(5),
+            )?;
+        } else {
+            self.bgm.encode(&mut file)?;
+        }
 
         Ok(())
     }
@@ -100,8 +115,8 @@ impl Document {
         let path = tinyfiledialogs::save_file_dialog_with_filter(
             "Save As",
             current_path.to_str().unwrap_or_default(),
-            &["*.bgm"],
-            "BGM",
+            &["*.bgm", "*.ron"],
+            "",
         );
 
         if let Some(path) = path {

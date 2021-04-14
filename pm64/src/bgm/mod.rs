@@ -12,6 +12,8 @@ pub mod midi;
 use std::ops::Range;
 use std::collections::HashMap;
 
+use serde_derive::{Serialize, Deserialize};
+
 mod cmd;
 pub use cmd::*;
 
@@ -23,18 +25,20 @@ pub type FilePos = u64;
 
 pub type TrackListId = u64;
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Bgm {
-    /// ASCII song index.
-    pub index: String,
+    pub name: String,
 
-    pub track_lists: HashMap<TrackListId, TrackList>,
-
+    #[serde(rename = "variations")]
     pub segments: [Option<Segment>; 4],
 
     pub drums: Vec<Drum>,
     pub voices: Vec<Voice>,
 
+    pub track_lists: HashMap<TrackListId, TrackList>,
+
+    #[serde(skip)]
     pub unknowns: Vec<Unknown>,
 }
 
@@ -93,16 +97,17 @@ impl Bgm {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Segment {
     /// Not encoded in BGM data.
     pub name: String,
 
+    #[serde(rename = "sections")]
     pub subsegments: Vec<Subsegment>,
 }
 
 // TODO: better representation for `flags`
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Subsegment {
     Tracks {
         flags: u8,
@@ -110,29 +115,35 @@ pub enum Subsegment {
     },
     Unknown {
         flags: u8,
-        data: [u8; 3], // Is this always padding?
+        data: [u8; 3],
     },
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct TrackList {
     /// Not encoded in BGM data.
     pub name: String,
 
     /// Encode/decode file position.
+    #[serde(skip_serializing_if="Option::is_none")]
     pub pos: Option<FilePos>,
 
     pub tracks: [Track; 16],
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Track {
     pub name: String,
 
     pub flags: u16, // TODO: better representation
     pub commands: CommandSeq,
 
+    #[serde(skip_serializing_if="is_default")]
     pub mute: bool,
+
+    #[serde(skip_serializing_if="is_default")]
     pub solo: bool,
 }
 
@@ -145,7 +156,8 @@ impl Subsegment {
     }
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Drum {
     pub bank: u8,
     pub patch: u8,
@@ -154,16 +166,23 @@ pub struct Drum {
     pub volume: u8,
     pub pan: i8,
     pub reverb: u8,
+
+    #[serde(skip_serializing_if="is_default")]
     pub unk_07: u8,
 
     // The following are possibly just padding, or they just have unused uses. Needs testing
+    #[serde(skip_serializing_if="is_default")]
     pub unk_08: u8, // Unused; zero in all original songs
+    #[serde(skip_serializing_if="is_default")]
     pub unk_09: u8, // Unused
+    #[serde(skip_serializing_if="is_default")]
     pub unk_0a: u8, // Unused
+    #[serde(skip_serializing_if="is_default")]
     pub unk_0b: u8, // Unused
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Voice {
     pub bank: u8,
     pub patch: u8,
@@ -175,6 +194,8 @@ pub struct Voice {
     pub reverb: u8,
     pub coarse_tune: u8,
     pub fine_tune: u8,
+
+    #[serde(skip_serializing_if="is_default")]
     pub unk_07: u8,
 }
 
@@ -216,4 +237,8 @@ pub mod track_flags {
     pub const POLYPHONY_1: u16 = 0x2000;
     pub const POLYPHONY_2: u16 = 0x4000;
     pub const POLYPHONY_3: u16 = 0x8000;
+}
+
+fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    t == &T::default()
 }

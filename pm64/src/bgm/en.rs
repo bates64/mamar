@@ -72,7 +72,7 @@ impl Bgm {
         };
 
         debug_assert_eq!(f.pos()?, 0x08);
-        f.write_all(&self.index.as_bytes())?;
+        f.write_all(&self.name.as_bytes())?;
         f.seek(SeekFrom::Start(0x0C))?;
 
         f.write_all(&[0, 0, 0, 0, self.segments.len() as u8, 0, 0, 0])?;
@@ -273,10 +273,10 @@ impl Bgm {
         let mut file_size = f.pos()? as u32;
 
         // Matching: file size overrides (!)
-        if self.index.as_str() == "117 " && file_size == 0x19A0 {
+        if self.name.as_str() == "117 " && file_size == 0x19A0 {
             // Battle Fanfare's file size does not include the junk unknown at the end of it.
             file_size = 0x1998;
-        } else if self.index.as_str() == "322 " && file_size == 0x0D70 {
+        } else if self.name.as_str() == "322 " && file_size == 0x0D70 {
             // Bowser's Castle Explodes
             file_size = 0x0D64;
         }

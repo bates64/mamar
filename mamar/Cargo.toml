@@ -10,6 +10,7 @@ pm64 = { path = "../pm64", features = ["midly"] }
 tinyfiledialogs = "3.0"
 log = "0.4"
 discord-rpc-client = "0.3"
+ron = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["shellscalingapi"] }

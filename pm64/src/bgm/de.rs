@@ -127,7 +127,7 @@ impl Bgm {
         let mut bgm = Bgm::new();
 
         f.seek(SeekFrom::Start(0x08))?;
-        bgm.index = f.read_cstring(4)?;
+        bgm.name = f.read_cstring(4)?;
 
         debug_assert!(f.pos()? == 0x0C);
         f.read_padding(4)?;
@@ -158,7 +158,7 @@ impl Bgm {
         let mut furthest_read_pos = 0; // TODO: have `f` track this (i.e. a wrapper over f)
 
         // Special cases to get problematic BGMs to match
-        bgm.unknowns = match bgm.index.as_str() {
+        bgm.unknowns = match bgm.name.as_str() {
             "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], /* Bowser's Castle Caves (entire segment? TODO look */
             // into this)
             "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
