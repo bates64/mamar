@@ -456,6 +456,7 @@ impl CommandSeq {
                 0xF9 => Command::Unknown(vec![0xF9]),
                 0xFA => Command::Unknown(vec![0xFA]),
                 0xFB => Command::Unknown(vec![0xFB]),
+                /*
                 0xFC => {
                     let _set_pos = f.read_u16_be()?;
                     let _count = f.read_u8()?;
@@ -463,6 +464,7 @@ impl CommandSeq {
                     // TODO Jump random
                     todo!("Jump random");
                 }
+                */
                 0xFD => Command::Unknown(vec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
