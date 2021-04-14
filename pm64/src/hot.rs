@@ -3,7 +3,7 @@
 use std::io::prelude::*;
 use std::io::{Cursor, ErrorKind};
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc::{Sender, Receiver, TryRecvError};
+use std::sync::mpsc::{Sender, Receiver, RecvTimeoutError};
 
 use crate::rw::*;
 
@@ -107,7 +107,7 @@ pub fn run(state_sender: Sender<bool>, bgm_receiver: Receiver<Vec<u8>>) -> Resul
             }
 
             // Wait for some BGM data on the channel, and send it.
-            match bgm_receiver.try_recv() {
+            match bgm_receiver.recv_timeout(std::time::Duration::from_millis(500)) {
                 Ok(bgm_data) => {
                     log::info!("sending BGM to client");
 
@@ -117,8 +117,8 @@ pub fn run(state_sender: Sender<bool>, bgm_receiver: Receiver<Vec<u8>>) -> Resul
                         Err(_) => break,
                     }
                 },
-                Err(TryRecvError::Disconnected) => break 'listen, // Channel was closed, so we'll return
-                Err(TryRecvError::Empty) => (),
+                Err(RecvTimeoutError::Disconnected) => break 'listen, // Channel was closed, so we'll return
+                Err(RecvTimeoutError::Timeout) => (),
             }
 
             // Don't eat the CPU!!
