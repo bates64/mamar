@@ -19,7 +19,6 @@ pub struct Interface {
     glue: Glue,
 
     state: History<state::State>,
-
     hot: Hot,
     queued_action: Action,
 }
