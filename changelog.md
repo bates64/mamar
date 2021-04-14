@@ -1,3 +1,13 @@
+## 0.7.0
+
+- Voice (instrument) editing. Click a track and press 'Edit voice'.
+- Much improved hot-reload server. It now tells you if an emulator is connected and lets you reconnect after a disconnection.
+    - No changes to the Project64 script.
+- Segments are now called "Variations".
+- Subsegments are now called "Sections", and only those with tracks are shown in the UI.
+- Tracks, variations, and sections are now given names when importing from a MIDI or named by file offset when viewing a BGM.
+- Some track flags have been given names.
+
 ## 0.6.0
 
 - Added solo (S) and mute (M) toggles to tracks.
