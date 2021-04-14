@@ -226,8 +226,6 @@ impl Bgm {
                     // Write flags
                     let mut todo_commands = Vec::new();
                     for Track { flags, commands, mute, solo, .. } in track_list.tracks.iter() {
-                        let mut flags = *flags;
-
                         let is_silent;
                         if *mute {
                             is_silent = true;
@@ -243,7 +241,7 @@ impl Bgm {
                         }
                         f.write_u16_be(0)?; // Replaced later if !null
 
-                        f.write_u16_be(flags)?;
+                        f.write_u16_be(*flags)?;
                     }
 
                     // Write command sequences

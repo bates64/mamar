@@ -1,9 +1,8 @@
 mod icon;
 mod state;
 mod form;
+mod hot;
 
-use std::sync::mpsc::{channel, Sender};
-use std::thread;
 use std::error::Error;
 
 use imui_glium::*;
@@ -13,6 +12,7 @@ use imui_glium::glium::glutin::dpi::LogicalSize;
 use imui_glium::glium::glutin::event::{ElementState, VirtualKeyCode, ModifiersState};
 
 use crate::history::History;
+use hot::Hot;
 
 pub struct Interface {
     display: Display,
@@ -20,9 +20,7 @@ pub struct Interface {
 
     state: History<state::State>,
 
-    // TODO: use an actor or something so we can ask it who is connected
-    hot_reload_tx: Option<Sender<Vec<u8>>>,
-
+    hot: Hot,
     queued_action: Action,
 }
 
@@ -77,7 +75,7 @@ impl Interface {
             display,
             glue,
             state: History::new(Default::default()),
-            hot_reload_tx: None,
+            hot: Hot::new(),
             queued_action: Action::None,
         }, event_loop))
     }
@@ -88,7 +86,7 @@ impl Interface {
 
     fn update(&mut self) {
         let state = &mut self.state;
-        let hot_reload_tx = &mut self.hot_reload_tx;
+        let hot = &mut self.hot;
         let queued_action = &mut self.queued_action;
 
         let mut updates = 0;
@@ -98,20 +96,6 @@ impl Interface {
             self.glue.update(|ui| {
                 ui.vbox(0, |ui| {
                     ui.hbox(0, |ui| {
-                        // Hot-reload server controls.
-                        if hot_reload_tx.is_none() {
-                            if ui.button(0, "Start playback server")
-                                .with_width(200.0)
-                                .clicked()
-                            {
-                                let (tx, hot_reload_rx) = channel();
-
-                                thread::spawn(move || pm64::hot::run(hot_reload_rx));
-
-                                *hot_reload_tx = Some(tx);
-                            }
-                        }
-
                         // File controls. We have to show file dialogs after rendering is complete (otherwise the window
                         // freezes) so we only set that 'X has been requested' when these buttons are clicked.
                         if ui.button(1, "Open File...").clicked() {
@@ -131,17 +115,18 @@ impl Interface {
                                 *queued_action = Action::SaveDocumentAs;
                             }
 
-                            if let Some(hot_reload_tx) = hot_reload_tx {
+                            if hot.has_connections() {
                                 if ui.button(5, "Play in Project64")
                                     .with_width(200.0)
                                     .clicked()
                                 {
-                                    if let Ok(data) = doc.bgm.as_bytes() {
-                                        let _ = hot_reload_tx.send(data);
-                                    } else {
-                                        todo!("surface bgm::en error");
+                                    if let Err(error) = hot.play_bgm(&doc.bgm) {
+                                        todo!("surface error: {}", error);
                                     }
                                 }
+                            } else {
+                                ui.pad(6, 20.0);
+                                ui.text(7, "No emulator connected").center_y();
                             }
                         }
                     });
@@ -258,6 +243,10 @@ impl Interface {
             *control_flow = ControlFlow::Wait;
 
             let mut redraw = false;
+
+            if self.hot.update() {
+                self.update();
+            }
 
             match event {
                 Event::WindowEvent { event, window_id: _ } => {
