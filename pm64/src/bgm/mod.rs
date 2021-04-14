@@ -1,3 +1,5 @@
+pub mod voice;
+
 /// Encoder ([Bgm] -> .bin)
 pub mod en;
 
@@ -155,7 +157,7 @@ pub struct Voice {
     pub patch: u8,
     pub volume: u8,
 
-    /// Negative = left, positive = right.
+    /// Negative = left, positive = right. (?)
     pub pan: i8,
 
     pub reverb: u8,

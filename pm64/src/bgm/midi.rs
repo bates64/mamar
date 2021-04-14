@@ -125,8 +125,7 @@ fn midi_track_to_bgm_track(
                     format!("Track {}", track_number)
                 },
 
-                // NOTE: lack of polyphony by default, this prevents crashes on complex MIDIs
-                flags: 0,
+                flags: track_flags::POLYPHONY_1 | track_flags::POLYPHONY_3,
 
                 commands: CommandSeq::new(),
                 mute: false,
@@ -135,17 +134,21 @@ fn midi_track_to_bgm_track(
 
             let voice_idx = voices.len();
             voices.push(Voice {
-                bank: 48,
+                bank: 0x30,
+                pan: 64,
                 patch: 1,
                 volume: 100,
                 ..Default::default()
             });
+            let mut set_bank_patch = false;
 
             let mut time = 0;
             let mut started_notes: HashMap<u8, Note> = HashMap::new(); // Maps key to notes that have not finished yet
 
             let mut instrument_name = None;
             let mut track_name = None;
+
+            let mut is_pitch_bent = false;
 
             for event in events {
                 time += event.delta.as_int() as usize;
@@ -167,6 +170,17 @@ fn midi_track_to_bgm_track(
                                             length: convert_time(length as usize, time_divisor) as u16,
                                         },
                                     );
+
+                                    if is_pitch_bent {
+                                        is_pitch_bent = false;
+                                        track.commands.insert(
+                                            convert_time(time, time_divisor),
+                                            Command::SegTrackTune {
+                                                coarse: 0,
+                                                fine: 0,
+                                            }
+                                        );
+                                    }
                                 } else {
                                     log::warn!("found NoteOff {} but saw no NoteOn", key);
                                 }
@@ -194,13 +208,31 @@ fn midi_track_to_bgm_track(
                                     started_notes.insert(key, Note { time, vel });
                                 }
                             }
-                            MidiMessage::ProgramChange { program } => {
-                                // TODO: start a new voice or edit current
-                                log::debug!("program change: {}", program);
+                            MidiMessage::PitchBend { bend } => {
+                                // FIXME commands should use signed types?
+                                let bend: u16 = unsafe { std::mem::transmute(bend.as_int()) }; // bleh
+                                let bend_lower = (bend & 0xFF) as u8;
+                                let bend_upper = (bend >> 8) as u8;
+
                                 track.commands.insert(
                                     convert_time(time, time_divisor),
-                                    Command::TrackOverridePatch { bank: 48, patch: program.as_int() },
+                                    Command::SegTrackTune {
+                                        coarse: bend_upper,
+                                        fine: bend_lower,
+                                    }
                                 );
+                                is_pitch_bent = true;
+                            }
+                            MidiMessage::ProgramChange { program } => {
+                                if !set_bank_patch {
+                                    voices[voice_idx].patch = program.as_int();
+                                    set_bank_patch = true;
+                                } else {
+                                    track.commands.insert(
+                                        convert_time(time, time_divisor),
+                                        Command::TrackOverridePatch { bank: 48, patch: program.as_int() },
+                                    );
+                                }
                             }
                             _ => {}
                         }

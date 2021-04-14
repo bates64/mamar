@@ -7,14 +7,16 @@ pub struct TrackListInterface {
     /// Index of the track we are editing, if any.
     editing_index: Option<usize>,
 
-    is_changing_instrument: bool,
+    is_edit_voice: bool,
+    is_set_instrument: bool,
 }
 
 impl TrackListInterface {
     pub fn new() -> Self {
         TrackListInterface {
             editing_index: None,
-            is_changing_instrument: false,
+            is_edit_voice: false,
+            is_set_instrument: false,
         }
     }
 
@@ -85,21 +87,23 @@ impl TrackListInterface {
 
                     ui.pad(5, 20.0);
 
-                    if ui.button(6, "Edit Voice").clicked() {
-                        self.is_changing_instrument = true;
+                    if ui.button(6, "Edit Voice...").clicked() {
+                        self.is_edit_voice = true;
+                        self.is_set_instrument = false;
                     }
 
-                    if self.is_changing_instrument {
+                    if self.is_edit_voice {
                         ui.modal(7, true, (600.0, 500.0), |ui| {
                             ui.text(0, format!("Voice of '{}'", track.name));
                             ui.pad(1, 20.0);
 
                             let mut voice = None;
-                            let overrides: Vec<usize> = track.commands
+                            let overrides: Vec<(usize, &Command)> = track.commands
                                 .iter()
                                 .enumerate()
                                 .filter(|(_, cmd)| match cmd {
                                     Command::TrackOverridePatch { .. } => true,
+                                    // TODO: add reverby stuff
                                     Command::TrackVoice(a) => {
                                         match voice {
                                             Some(b) if a == b => false, // Same as current voice
@@ -113,11 +117,10 @@ impl TrackListInterface {
                                     }
                                     _ => false,
                                 })
-                                .map(|(idx, _)| idx)
                                 .collect();
 
                             if let Some(voice) = voice {
-                                ui.known_size(2, 300.0, 300.0, |ui| {
+                                ui.known_size(2, 480.0, 400.0, |ui| {
                                     self.voice_ui(ui, &mut voices[*voice as usize]);
                                 });
                             } else {
@@ -127,18 +130,37 @@ impl TrackListInterface {
 
                             if !overrides.is_empty() {
                                 ui.pad(4, 10.0);
-                                ui.text(5, "This track has commands which override its voice.");
-                                ui.pad(6, 10.0);
-                                if ui.button(7, "Remove voice overrides").with_width(200.0).clicked() {
-                                    for idx in overrides {
-                                        track.commands.clear_command(idx)
+                                ui.text(5, "This track has commands which override its voice:");
+                                ui.hbox(6, |ui| {
+                                    let mut i = 0;
+                                    for (_, cmd) in &overrides {
+                                        match cmd {
+                                            Command::TrackOverridePatch { bank, patch } => {
+                                                ui.text(i, format!("bank={:#04X} patch={:#04X}", bank, patch));
+                                                i += 1;
+                                                ui.pad(i, 10.0);
+                                                i += 1;
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                });
+                                ui.pad(7, 10.0);
+                                if ui.button(8, "Remove voice overrides").with_width(200.0).clicked() {
+                                    let mut to_delete = Vec::with_capacity(overrides.len());
+                                    for (idx, _) in &overrides {
+                                        to_delete.push(*idx);
+                                    }
+                                    for idx in to_delete {
+                                        track.commands.clear_command(idx);
                                     }
                                 }
-                                ui.pad(8, 20.0);
+                                ui.pad(9, 20.0);
                             }
 
                             if ui.button(99, "Close").clicked() {
-                                self.is_changing_instrument = false;
+                                self.is_edit_voice = false;
+                                self.is_set_instrument = false;
                             }
                         });
                     }
@@ -159,14 +181,61 @@ impl TrackListInterface {
     }
 
     pub fn voice_ui(&mut self, ui: &mut imui_glium::UiFrame<'_>, voice: &mut Voice) {
+        use pm64::bgm::voice::*;
+
+        // The bank u8 is split into two nibbles: "bank" and "staccatoness" (awful names, I know).
+        let mut bank_upper = voice.bank >> 4; // TODO: range 0..=6?
+        let mut bank_lower = voice.bank & 0xF;
+
         ui.vbox(0, |ui| {
-            range_select(ui, 0, 0..=255, 1, &mut voice.bank, |v| format!("Bank {:#04X}", v));
-            range_select(ui, 1, 0..=255, 1, &mut voice.patch, |v| format!("Patch {:#04X}", v));
-            range_select(ui, 2, 0..=255, 1, &mut voice.volume, |v| format!("Volume {}", v));
-            range_select(ui, 3, -128..127, 1, &mut voice.pan, |v| format!("Pan {}", v));
-            range_select(ui, 4, 0..=255, 1, &mut voice.reverb, |v| format!("Reverb {}", v));
-            range_select(ui, 5, 0..=255, 1, &mut voice.coarse_tune, |v| format!("Coarse tune {}", v));
-            range_select(ui, 6, 0..=255, 1, &mut voice.fine_tune, |v| format!("Fine tune {}", v));
+            ui.hbox(0, |ui| {
+                if ui.button(0, "Set instrument...").with_width(210.0).clicked() {
+                    self.is_set_instrument = true;
+                }
+
+                ui.pad(1, 20.0);
+
+                if let Some(name) = INSTRUMENTS_BY_ID.get(&(bank_upper, voice.patch)) {
+                    ui.text(2, *name).center_y();
+                }
+            });
+
+            if self.is_set_instrument {
+                ui.modal(1, true, (600.0, 500.0), |ui| {
+                    ui.hbox(0, |ui| {
+                        let mut i = 0; // TODO wider imui keys
+                        for (name, (instr_bank_upper, patch)) in INSTRUMENTS_BY_NAME.iter() {
+                            let approx_width = name.len() as f32 * 10.0; // XXX
+
+                            if ui.button(i, *name).with_width(approx_width).clicked() {
+                                bank_upper = *instr_bank_upper;
+                                voice.patch = *patch;
+                                self.is_set_instrument = false;
+                            }
+                            i += 1;
+                        }
+                    });
+                });
+            }
+
+            ui.pad(2, 10.0);
+
+            range_select(ui, 3, 0..=255, 1, &mut bank_upper, |v| format!("Bank {}", v));
+            range_select(ui, 4, 0..=255, 1, &mut voice.patch, |v| format!("Patch {:#04X}", v));
+
+            range_select(ui, 5, 0..=4, 1, &mut bank_lower, |v| {
+                match *v {
+                    0 => "Staccato: no".to_string(),
+                    _ => format!("Staccato: {}", v),
+                }
+            });
+            range_select(ui, 6, 0..=255, 1, &mut voice.volume, |v| format!("Volume {}", v));
+            range_select(ui, 7, -128..127, 1, &mut voice.pan, |v| format!("Pan {}", v));
+            range_select(ui, 8, 0..=255, 1, &mut voice.reverb, |v| format!("Reverb {}", v));
+            range_select(ui, 9, 0..=255, 1, &mut voice.coarse_tune, |v| format!("Coarse tune {}", v));
+            range_select(ui, 10, 0..=255, 1, &mut voice.fine_tune, |v| format!("Fine tune {}", v));
         });
+
+        voice.bank = (bank_upper << 4) | bank_lower;
     }
 }

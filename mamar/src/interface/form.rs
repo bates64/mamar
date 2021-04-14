@@ -12,7 +12,7 @@ where
     let cur_val: isize = (*value).into();
     let mut changed = false;
 
-    ui.known_size(key, 200.0 + 36.0 + 36.0, 36.0, |ui| {
+    ui.known_size(key, 150.0 + 36.0 + 36.0, 36.0, |ui| {
         ui.hbox(0, |ui| {
             if ui.button(0, "<").with_width(36.0).clicked() {
                 let prec = cur_val - step;
@@ -22,7 +22,7 @@ where
                 }
             }
 
-            ui.known_size(1, 200.0, 36.0, |ui| {
+            ui.known_size(1, 150.0, 36.0, |ui| {
                 ui.text(1, label(value))
                     .center_x()
                     .center_y();
