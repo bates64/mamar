@@ -45,7 +45,7 @@ macro_rules! test_matching {
                                     seg_no,
                                     subseg_no,
                                     flags,
-                                    bgm.track_lists[*track_list].pos.unwrap()
+                                    bgm.track_lists[track_list].pos.unwrap()
                                 ),
                                 Subsegment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)
@@ -66,7 +66,7 @@ macro_rules! test_matching {
                                     seg_no,
                                     subseg_no,
                                     flags,
-                                    bgm.track_lists[*track_list].pos.unwrap()
+                                    bgm.track_lists[track_list].pos.unwrap()
                                 ),
                                 Subsegment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)

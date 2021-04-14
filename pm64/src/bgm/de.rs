@@ -274,7 +274,7 @@ impl Subsegment {
                         }
                     }
 
-                    bgm.track_lists.alloc(TrackList {
+                    bgm.add_track_list(TrackList {
                         name: format!("Section {:#06X}", track_list_pos),
                         pos: Some(track_list_pos),
                         tracks: unsafe {

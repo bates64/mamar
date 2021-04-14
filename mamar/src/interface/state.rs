@@ -221,7 +221,7 @@ impl Document {
                     &mut self.selected_track_subseg_idx,
                     |v| {
                         let (_, track_list_id) = track_subsegs[*v as usize];
-                        let track_list = &track_lists[*track_list_id];
+                        let track_list = &track_lists[track_list_id];
                         track_list.name.to_owned()
                     },
                 ) {
@@ -231,7 +231,7 @@ impl Document {
                 ui.pad(7, 10.0);
 
                 let (flags, track_list_id) = track_subsegs[self.selected_track_subseg_idx as usize];
-                let track_list = &mut self.bgm.track_lists[*track_list_id];
+                let track_list = self.bgm.track_lists.get_mut(track_list_id).unwrap();
                 let track_list_interface = &mut self.track_list_interface;
                 let voices = &mut self.bgm.voices;
 

@@ -9,10 +9,8 @@ pub mod de;
 #[cfg(feature = "midly")]
 pub mod midi;
 
-use std::fmt;
 use std::ops::Range;
-
-use id_arena::{Arena, Id};
+use std::collections::HashMap;
 
 mod cmd;
 pub use cmd::*;
@@ -23,14 +21,14 @@ pub const MAGIC: &str = "BGM ";
 /// An offset relative to the beginning of the decoded/encoded BGM.
 pub type FilePos = u64;
 
-pub type TrackListId = Id<TrackList>;
+pub type TrackListId = u64;
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct Bgm {
     /// ASCII song index.
     pub index: String,
 
-    pub track_lists: Arena<TrackList>,
+    pub track_lists: HashMap<TrackListId, TrackList>,
 
     pub segments: [Option<Segment>; 4],
 
@@ -70,14 +68,28 @@ impl Bgm {
         }
     }
 
-    pub fn find_track_list_with_pos(&self, pos: FilePos) -> Option<Id<TrackList>> {
-        for (id, track_list) in self.track_lists.iter() {
-            if track_list.pos == Some(pos) {
-                return Some(id);
+    pub fn find_track_list_with_pos(&self, pos: FilePos) -> Option<TrackListId> {
+        self.track_lists
+            .iter()
+            .find(|(_, track)| track.pos == Some(pos))
+            .map(|(id, _)| *id)
+    }
+
+    pub fn add_track_list(&mut self, track_list: TrackList) -> TrackListId {
+        let mut max_id = 0;
+
+        for id in self.track_lists.keys() {
+            if *id > max_id {
+                max_id = *id;
             }
         }
 
-        None
+        let id = max_id.wrapping_add(1);
+
+        debug_assert!(self.track_lists.get(&id).is_none());
+
+        self.track_lists.insert(id, track_list);
+        id
     }
 }
 
@@ -94,7 +106,7 @@ pub struct Segment {
 pub enum Subsegment {
     Tracks {
         flags: u8,
-        track_list: Id<TrackList>,
+        track_list: TrackListId,
     },
     Unknown {
         flags: u8,
@@ -170,147 +182,6 @@ pub struct Voice {
 pub struct Unknown {
     pub range: Range<u64>,
     pub data: Vec<u8>,
-}
-
-impl Bgm {
-    #[deprecated]
-    pub fn write_kdl<W: fmt::Write>(&self, f: &mut W) -> Result<(), fmt::Error> {
-        writeln!(f, "index {:?}", self.index)?;
-        writeln!(f)?;
-        writeln!(f, "voices {{")?;
-        for voice in &self.voices {
-            writeln!(
-                f,
-                "    voice bank={:#X} patch={:#X} coarse_tune={} fine_tune={} volume={} pan={} reverb={}",
-                voice.bank, voice.patch, voice.coarse_tune, voice.fine_tune, voice.volume, voice.pan, voice.reverb
-            )?;
-        }
-        writeln!(f, "}}")?;
-        writeln!(f)?;
-        writeln!(f, "drums {{")?;
-        for drum in &self.drums {
-            writeln!(
-                f,
-                "    drum bank={:#X} patch={:#X} coarse_tune={} fine_tune={} volume={} pan={} reverb={}",
-                drum.bank, drum.patch, drum.coarse_tune, drum.fine_tune, drum.volume, drum.pan, drum.reverb
-            )?;
-        }
-        writeln!(f, "}}")?;
-        writeln!(f)?;
-        for segment in &self.segments {
-            if let Some(subsegment) = segment {
-                writeln!(f, "segment {{")?;
-                for subsegment in &subsegment.subsegments {
-                    match subsegment {
-                        Subsegment::Tracks { flags, track_list } => {
-                            let track_list = &self.track_lists[*track_list];
-
-                            if let Some(offset) = track_list.pos {
-                                writeln!(f, "    // offset {:#X}", offset)?;
-                            }
-                            writeln!(f, "    tracks flags={:#X} {{", flags)?;
-                            for track in track_list.tracks.iter() {
-                                if !track.commands.is_empty() {
-                                    writeln!(f, "        track flags={:#X} {{", track.flags)?;
-                                    for command in track.commands.iter() {
-                                        match command {
-                                            Command::Delay(t) => writeln!(f, "            delay {}", t)?,
-                                            Command::Note {
-                                                pitch,
-                                                velocity,
-                                                length,
-                                            } => {
-                                                writeln!(f, "            note {} {} {}", pitch, velocity, length)?
-                                            }
-                                            Command::MasterTempo(bpm) => writeln!(f, "            set_tempo {}", bpm)?,
-                                            Command::MasterTempoFade { time, bpm } => {
-                                                writeln!(f, "            fade_tempo {} {}", bpm, time)?
-                                            }
-                                            Command::MasterVolume(vol) => {
-                                                writeln!(f, "            set_master_volume {}", vol)?
-                                            }
-                                            Command::MasterVolumeFade { time, volume } => {
-                                                writeln!(f, "            fade_master_volume {} {}", volume, time)?
-                                            }
-                                            Command::SubTrackVolume(vol) => {
-                                                writeln!(f, "            set_volume {}", vol)?
-                                            }
-                                            Command::SegTrackVolume(vol) => {
-                                                writeln!(f, "            set_volume_longterm {}", vol)?
-                                            }
-                                            Command::TrackVolumeFade { time, volume } => {
-                                                writeln!(f, "            fade_volume {} {}", volume, time)?
-                                            }
-                                            Command::MasterTranspose(t) => writeln!(f, "            transpose {}", t)?,
-                                            Command::MasterEffect(a, b) => writeln!(f, "            effect {} {}", a, b)?,
-                                            Command::TrackOverridePatch { bank, patch } => {
-                                                writeln!(f, "            override_bank_patch {} {}", bank, patch)?
-                                            }
-                                            Command::SubTrackPan(pan) => writeln!(f, "            set_pan {}", pan)?,
-                                            Command::SubTrackReverb(r) => writeln!(f, "            set_reverb {}", r)?,
-                                            Command::SubTrackReverbType(ty) => {
-                                                writeln!(f, "            set_reverb_type {}", ty)?
-                                            }
-                                            Command::SubTrackCoarseTune(coarse) => {
-                                                writeln!(f, "            set_tune coarse={}", coarse)?
-                                            }
-                                            Command::SubTrackFineTune(fine) => {
-                                                writeln!(f, "            set_tune fine={}", fine)?
-                                            }
-                                            Command::SegTrackTune { coarse, fine } => {
-                                                writeln!(f, "            set_tune coarse={} fine={}", coarse, fine)?
-                                            }
-                                            Command::TrackTremolo { amount, speed, unknown } => {
-                                                writeln!(f, "            tremolo {} {} {}", amount, speed, unknown)?
-                                            }
-                                            Command::TrackTremoloStop => writeln!(f, "            end_tremolo")?,
-                                            Command::TrackVoice(v) => writeln!(f, "            set_voice {}", v)?,
-                                            Command::Marker(id) => writeln!(f, "            marker {:?}", id)?,
-                                            Command::Subroutine(range) => {
-                                                writeln!(
-                                                    f,
-                                                    "            subroutine {:?} start={:?} end={:?}",
-                                                    range.name, range.start, range.end
-                                                )?;
-                                            }
-                                            Command::Unknown(data) => {
-                                                write!(f, "            raw")?;
-                                                for byte in data {
-                                                    write!(f, " {:#02X}", byte)?;
-                                                }
-                                                writeln!(f)?;
-                                            }
-                                            Command::End => writeln!(f, "            end_track")?,
-                                        }
-                                    }
-                                    writeln!(f, "        }}")?;
-                                } else {
-                                    writeln!(f, "        track flags={:#X}", track.flags)?;
-                                }
-                            }
-                            writeln!(f, "    }}")?;
-                        }
-                        Subsegment::Unknown { flags, data } => {
-                            if data[0] == 0 && data[1] == 0 && data[2] == 0 {
-                                writeln!(f, "    unknown flags={:#X}", flags)?;
-                            } else {
-                                writeln!(f, "    unknown flags={:#X} {{", flags)?;
-                                writeln!(f, "        data {:#02X}", data[0])?;
-                                writeln!(f, "        data {:#02X}", data[1])?;
-                                writeln!(f, "        data {:#02X}", data[2])?;
-                                writeln!(f, "    }}")?;
-                            }
-                        }
-                    }
-                }
-                writeln!(f, "}}")?;
-            } else {
-                writeln!(f, "segment")?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl Track {

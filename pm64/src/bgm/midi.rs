@@ -53,7 +53,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
 
     log::debug!("song length: {} ticks (48 ticks/beat)", total_song_length);
 
-    let track_list = bgm.track_lists.alloc(TrackList {
+    let track_list = TrackList {
         name: "Imported from MIDI".to_owned(),
         pos: None,
         tracks: [
@@ -74,7 +74,8 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
             midi_track_to_bgm_track(smf.tracks.get(14), total_song_length, 14, time_divisor, &mut bgm.voices),
             midi_track_to_bgm_track(smf.tracks.get(15), total_song_length, 15, time_divisor, &mut bgm.voices),
         ],
-    });
+    };
+    let track_list_id = bgm.add_track_list(track_list);
 
     let mut segment = bgm.add_segment().unwrap();
     segment.subsegments = vec![
@@ -84,7 +85,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
         },
         Subsegment::Tracks {
             flags: 0x10,
-            track_list,
+            track_list: track_list_id,
         },
         Subsegment::Unknown { // loop end
             flags: 0x50,
@@ -102,8 +103,6 @@ fn midi_track_to_bgm_track(
     time_divisor: f32,
     voices: &mut Vec<Voice>,
 ) -> Track {
-    use std::collections::HashMap;
-
     use midly::{MidiMessage, TrackEventKind};
 
     /// NoteOn data

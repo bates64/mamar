@@ -133,7 +133,7 @@ impl Bgm {
 
         enum ToWrite {
             TrackList {
-                track_list_id: Id<TrackList>,
+                track_list_id: TrackListId,
                 tracks_pos: u64,
                 segment_start: u64,
             },
@@ -173,11 +173,11 @@ impl Bgm {
         // Write track lists
 
         to_write.sort_by_key(|w| match w {
-            ToWrite::TrackList { track_list_id, .. } => self.track_lists[*track_list_id].pos.unwrap_or_default(),
+            ToWrite::TrackList { track_list_id, .. } => self.track_lists[track_list_id].pos.unwrap_or_default(),
             ToWrite::Unknown(unk) => unk.range.start,
         });
 
-        let mut encoded_tracks: HashMap<Id<TrackList>, u64> = HashMap::new();
+        let mut encoded_tracks: HashMap<TrackListId, u64> = HashMap::new();
 
         for w in to_write.into_iter() {
             match w {
@@ -186,7 +186,7 @@ impl Bgm {
                     track_list_id,
                     tracks_pos,
                 } => {
-                    let track_list = &self.track_lists[track_list_id];
+                    let track_list = &self.track_lists[&track_list_id];
 
                     // If we've encoded this track list already, just point to that instead.
                     if let Some(track_data_start) = encoded_tracks.get(&track_list_id) {
@@ -230,7 +230,7 @@ impl Bgm {
                         if *mute {
                             is_silent = true;
                         } else if any_solo {
-                            is_silent = !*solo;
+                            is_silent = !solo;
                         } else {
                             is_silent = false;
                         }
@@ -329,7 +329,7 @@ impl Voice {
 }
 
 impl Subsegment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, Id<TrackList>)>, Error> {
+    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {
