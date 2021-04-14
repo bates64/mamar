@@ -1,3 +1,9 @@
+## 0.8.0
+
+- Some instruments are named, press the _Set Instrument..._ button in the voice editor to view
+- The lower nibble of voice banks is now called 'staccato' (higher values have a shorter release time) and appears in the voice editor
+- MIDI pitch shift events are now translated to PM64 ones. The tuning will probably be off
+
 ## 0.7.0
 
 - Voice (instrument) editing. Click a track and press 'Edit voice'.
