@@ -138,7 +138,7 @@ pub struct Drum {
     pub coarse_tune: u8,
     pub fine_tune: u8,
     pub volume: u8,
-    pub pan: u8,
+    pub pan: i8,
     pub reverb: u8,
     pub unk_07: u8,
 
@@ -154,7 +154,10 @@ pub struct Voice {
     pub bank: u8,
     pub patch: u8,
     pub volume: u8,
-    pub pan: u8,
+
+    /// Negative = left, positive = right.
+    pub pan: i8,
+
     pub reverb: u8,
     pub coarse_tune: u8,
     pub fine_tune: u8,

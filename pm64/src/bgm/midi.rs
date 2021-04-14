@@ -57,28 +57,28 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
         name: "Imported from MIDI".to_owned(),
         pos: None,
         tracks: [
-            midi_track_to_bgm_track(smf.tracks.get(0), total_song_length, 0, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(1), total_song_length, 1, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(2), total_song_length, 2, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(3), total_song_length, 3, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(4), total_song_length, 4, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(5), total_song_length, 5, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(6), total_song_length, 6, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(7), total_song_length, 7, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(8), total_song_length, 8, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(9), total_song_length, 9, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(10), total_song_length, 10, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(11), total_song_length, 11, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(12), total_song_length, 12, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(13), total_song_length, 13, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(14), total_song_length, 14, time_divisor),
-            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length, 15, time_divisor),
+            midi_track_to_bgm_track(smf.tracks.get(0), total_song_length, 0, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(1), total_song_length, 1, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(2), total_song_length, 2, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(3), total_song_length, 3, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(4), total_song_length, 4, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(5), total_song_length, 5, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(6), total_song_length, 6, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(7), total_song_length, 7, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(8), total_song_length, 8, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(9), total_song_length, 9, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(10), total_song_length, 10, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(11), total_song_length, 11, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(12), total_song_length, 12, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(13), total_song_length, 13, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(14), total_song_length, 14, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length, 15, time_divisor, &mut bgm.voices),
         ],
     });
 
     let mut segment = bgm.add_segment().unwrap();
     segment.subsegments = vec![
-        Subsegment::Unknown {
+        Subsegment::Unknown { // loop start
             flags: 0x30,
             data: [0, 0, 0],
         },
@@ -86,7 +86,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
             flags: 0x10,
             track_list,
         },
-        Subsegment::Unknown {
+        Subsegment::Unknown { // loop end
             flags: 0x50,
             data: [0, 0, 0],
         },
@@ -95,7 +95,13 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     Ok(bgm)
 }
 
-fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_length: usize, track_number: usize, time_divisor: f32) -> Track {
+fn midi_track_to_bgm_track(
+    events: Option<&Vec<midly::TrackEvent>>,
+    total_song_length: usize,
+    track_number: usize,
+    time_divisor: f32,
+    voices: &mut Vec<Voice>,
+) -> Track {
     use std::collections::HashMap;
 
     use midly::{MidiMessage, TrackEventKind};
@@ -126,6 +132,14 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                 mute: false,
                 solo: false,
             };
+
+            let voice_idx = voices.len();
+            voices.push(Voice {
+                bank: 48,
+                patch: 1,
+                volume: 100,
+                ..Default::default()
+            });
 
             let mut time = 0;
             let mut started_notes: HashMap<u8, Note> = HashMap::new(); // Maps key to notes that have not finished yet
@@ -181,6 +195,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                                 }
                             }
                             MidiMessage::ProgramChange { program } => {
+                                // TODO: start a new voice or edit current
                                 log::debug!("program change: {}", program);
                                 track.commands.insert(
                                     convert_time(time, time_divisor),
@@ -233,9 +248,9 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
                 // Required else the game crashes D:
                 track.commands.insert_many(0, vec![
                     Command::SubTrackReverb(0),
-                    Command::TrackOverridePatch { bank: 48, patch: 1 },
                     Command::SubTrackVolume(100),
                     Command::SubTrackPan(64),
+                    Command::TrackVoice(voice_idx as u8)
                 ]);
             }
 
@@ -252,6 +267,7 @@ fn midi_track_to_bgm_track(events: Option<&Vec<midly::TrackEvent>>, total_song_l
             // There's not a very good way to detect MIDI drum tracks, so we'll just make a best guess by seeing if the
             // designated track title contains 'drums' or not.
             if track.name.to_lowercase().contains("drums") {
+                // TODO: insert voice instead of drum
                 track.flags = track_flags::DRUM_TRACK;
             }
 

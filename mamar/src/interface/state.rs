@@ -233,11 +233,12 @@ impl Document {
                 let (flags, track_list_id) = track_subsegs[self.selected_track_subseg_idx as usize];
                 let track_list = &mut self.bgm.track_lists[*track_list_id];
                 let track_list_interface = &mut self.track_list_interface;
+                let voices = &mut self.bgm.voices;
 
                 ui.text(8, format!("Flags: {:08X}", flags));
                 ui.pad(9, 10.0);
                 ui.vbox(10, |ui| {
-                    track_list_interface.update(ui, track_list);
+                    track_list_interface.update(ui, track_list, voices);
                 });
             }
         });

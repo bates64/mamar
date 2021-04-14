@@ -298,36 +298,32 @@ impl Bgm {
 
 impl Drum {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
-        f.write_all(&[
-            self.bank,
-            self.patch,
-            self.coarse_tune,
-            self.fine_tune,
-            self.volume,
-            self.pan,
-            self.reverb,
-            self.unk_07,
-            self.unk_08,
-            self.unk_09,
-            self.unk_0a,
-            self.unk_0b,
-        ])?;
+        f.write_u8(self.bank)?;
+        f.write_u8(self.patch)?;
+        f.write_u8(self.coarse_tune)?;
+        f.write_u8(self.fine_tune)?;
+        f.write_u8(self.volume)?;
+        f.write_i8(self.pan)?;
+        f.write_u8(self.reverb)?;
+        f.write_u8(self.unk_07)?;
+        f.write_u8(self.unk_08)?;
+        f.write_u8(self.unk_09)?;
+        f.write_u8(self.unk_0a)?;
+        f.write_u8(self.unk_0b)?;
         Ok(())
     }
 }
 
 impl Voice {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
-        f.write_all(&[
-            self.bank,
-            self.patch,
-            self.volume,
-            self.pan,
-            self.reverb,
-            self.coarse_tune,
-            self.fine_tune,
-            self.unk_07,
-        ])?;
+        f.write_u8(self.bank)?;
+        f.write_u8(self.patch)?;
+        f.write_u8(self.volume)?;
+        f.write_i8(self.pan)?;
+        f.write_u8(self.reverb)?;
+        f.write_u8(self.coarse_tune)?;
+        f.write_u8(self.fine_tune)?;
+        f.write_u8(self.unk_07)?;
         Ok(())
     }
 }

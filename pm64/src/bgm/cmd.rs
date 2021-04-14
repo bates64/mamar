@@ -372,6 +372,10 @@ impl CommandSeq {
         range
     }
 
+    pub fn clear_command(&mut self, idx: usize) {
+        self.vec[idx] = Command::Delay(0);
+    }
+
     // TODO
     /*
     /// Combines two sequences with the same relative-time space.
