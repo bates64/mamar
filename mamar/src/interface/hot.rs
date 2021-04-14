@@ -14,7 +14,7 @@ impl Hot {
         let (conn_state_tx, conn_state_rx) = channel();
 
         // This thread runs in the background, but it will kill itself once `bgm_rx` is dropped (i.e. Hot is dropped).
-        std::thread::spawn(|| {
+        std::thread::spawn(move || {
             pm64::hot::run(conn_state_tx, bgm_rx)
                 .expect("hot thread died unexpectedly");
         });

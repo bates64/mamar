@@ -46,7 +46,7 @@ const PONG: Packet = Packet {
     data: &[1, 0, 0],
 };
 
-/// Noncompliant server implementation of https://github.com/pmret/hot-reload/blob/main/protocol.md. Allows sending
+/// Server implementation of https://github.com/pmret/hot-reload/blob/main/protocol.md. Allows sending
 /// BGM data to an emulator for it to be played back.
 ///
 /// - `state_sender`: A sender of `true` when a client connects or `false` when a client disconnects.
@@ -94,13 +94,15 @@ pub fn run(state_sender: Sender<bool>, bgm_receiver: Receiver<Vec<u8>>) -> Resul
         // Tell the main thread that a connection has been made.
         let _ = state_sender.send(true);
 
+        stream.set_nonblocking(true).unwrap();
+
         loop {
-            // Attempt to read a byte from the client, then throw it away.
+            // Attempt to read data from the client, then throw it away.
             // We do this to check if the client is still connected.
-            let mut buf  = [0];
-            match stream.read(&mut buf) {
-                Ok(_) => (), // Throw it away
+            match stream.read(&mut Vec::new()) {
+                Ok(_) => (), // TODO: actually read the packet
                 Err(error) if error.kind() == ErrorKind::Interrupted => (),
+                Err(error) if error.kind() == ErrorKind::WouldBlock => (),
                 Err(_) => break,
             }
 

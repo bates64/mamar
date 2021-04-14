@@ -184,6 +184,15 @@ impl Interface {
             // Save
             VirtualKeyCode::S if modifiers.ctrl() => self.queued_action = Action::SaveDocument,
 
+            // Play
+            VirtualKeyCode::Space => if self.hot.has_connections() {
+                if let Some(doc) = &self.state.document {
+                    if let Err(error) = self.hot.play_bgm(&doc.bgm) {
+                        todo!("surface error: {}", error);
+                    }
+                }
+            },
+
             _ => {}
         }
     }
