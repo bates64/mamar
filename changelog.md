@@ -1,3 +1,7 @@
+## 0.8.1
+
+- Reduced CPU use when connected to an emulator
+
 ## 0.8.0
 
 - Some instruments are named, press the _Set Instrument..._ button in the voice editor to view
