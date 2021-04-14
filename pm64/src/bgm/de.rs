@@ -5,7 +5,6 @@ use std::io::{self, SeekFrom};
 use std::mem::MaybeUninit;
 
 use log::{debug, warn};
-use smallvec::smallvec;
 
 use super::*;
 use crate::rw::*;
@@ -413,7 +412,7 @@ impl CommandSeq {
                 0xE0 => Command::MasterTempo(f.read_u16_be()?),
                 0xE1 => Command::MasterVolume(f.read_u8()?),
                 0xE2 => Command::MasterTranspose(f.read_i8()?),
-                0xE3 => Command::Unknown(smallvec![0xE3, f.read_u8()?]),
+                0xE3 => Command::Unknown(vec![0xE3, f.read_u8()?]),
                 0xE4 => Command::MasterTempoFade {
                     time: f.read_u16_be()?,
                     bpm: f.read_u16_be()?,
@@ -423,7 +422,7 @@ impl CommandSeq {
                     volume: f.read_u8()?,
                 },
                 0xE6 => Command::MasterEffect(f.read_u8()?, f.read_u8()?),
-                0xE7 => Command::Unknown(smallvec![0xE7]),
+                0xE7 => Command::Unknown(vec![0xE7]),
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,
                     patch: f.read_u8()?,
@@ -443,20 +442,20 @@ impl CommandSeq {
                     speed: f.read_u8()?,
                     unknown: f.read_u8()?,
                 },
-                0xF1 => Command::Unknown(smallvec![0xF1, f.read_u8()?]),
-                0xF2 => Command::Unknown(smallvec![0xF2, f.read_u8()?]),
+                0xF1 => Command::Unknown(vec![0xF1, f.read_u8()?]),
+                0xF2 => Command::Unknown(vec![0xF2, f.read_u8()?]),
                 0xF3 => Command::TrackTremoloStop,
-                0xF4 => Command::Unknown(smallvec![0xF4, f.read_u8()?, f.read_u8()?]),
+                0xF4 => Command::Unknown(vec![0xF4, f.read_u8()?, f.read_u8()?]),
                 0xF5 => Command::TrackVoice(f.read_u8()?),
                 0xF6 => Command::TrackVolumeFade {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
                 0xF7 => Command::SubTrackReverbType(f.read_u8()?),
-                0xF8 => Command::Unknown(smallvec![0xF8]),
-                0xF9 => Command::Unknown(smallvec![0xF9]),
-                0xFA => Command::Unknown(smallvec![0xFA]),
-                0xFB => Command::Unknown(smallvec![0xFB]),
+                0xF8 => Command::Unknown(vec![0xF8]),
+                0xF9 => Command::Unknown(vec![0xF9]),
+                0xFA => Command::Unknown(vec![0xFA]),
+                0xFB => Command::Unknown(vec![0xFB]),
                 0xFC => {
                     let _set_pos = f.read_u16_be()?;
                     let _count = f.read_u8()?;
@@ -464,7 +463,7 @@ impl CommandSeq {
                     // TODO Jump random
                     todo!("Jump random");
                 }
-                0xFD => Command::Unknown(smallvec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xFD => Command::Unknown(vec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
@@ -477,9 +476,9 @@ impl CommandSeq {
                         end: commands.upsert_marker(end_offset),
                     })
                 }
-                0xFF => Command::Unknown(smallvec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xFF => Command::Unknown(vec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
 
-                _ => Command::Unknown(smallvec![cmd_byte]),
+                _ => Command::Unknown(vec![cmd_byte]),
             };
 
             commands.insert(cmd_offset, command);

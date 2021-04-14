@@ -1118,7 +1118,6 @@ dependencies = [
  "lazy_static",
  "log",
  "midly",
- "smallvec",
 ]
 
 [[package]]

@@ -2,8 +2,6 @@ use std::hash::Hash;
 use std::iter;
 use std::ops::Range;
 
-use smallvec::SmallVec;
-
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
 ///
@@ -639,7 +637,7 @@ pub enum Command {
     Subroutine(CommandRange),
 
     /// An unknown/unimplemented command.
-    Unknown(SmallVec<[u8; 4]>),
+    Unknown(Vec<u8>),
 
     /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
     /// via a [`Subroutine`](Command::Subroutine) jump.
