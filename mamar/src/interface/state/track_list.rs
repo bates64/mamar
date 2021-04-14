@@ -223,7 +223,7 @@ impl TrackListInterface {
             range_select(ui, 3, 0..=255, 1, &mut bank_upper, |v| format!("Bank {}", v));
             range_select(ui, 4, 0..=255, 1, &mut voice.patch, |v| format!("Patch {:#04X}", v));
 
-            range_select(ui, 5, 0..=4, 1, &mut bank_lower, |v| {
+            range_select(ui, 5, 0..=3, 1, &mut bank_lower, |v| {
                 match *v {
                     0 => "Staccato: no".to_string(),
                     _ => format!("Staccato: {}", v),
