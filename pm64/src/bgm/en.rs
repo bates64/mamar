@@ -440,7 +440,7 @@ impl CommandSeq {
                 }
                 Command::SubTrackPan(a) => {
                     f.write_u8(0xEA)?;
-                    f.write_u8(*a)?;
+                    f.write_i8(*a)?;
                 }
                 Command::SubTrackReverb(a) => {
                     f.write_u8(0xEB)?;

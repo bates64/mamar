@@ -428,7 +428,7 @@ impl CommandSeq {
                     patch: f.read_u8()?,
                 },
                 0xE9 => Command::SubTrackVolume(f.read_u8()?),
-                0xEA => Command::SubTrackPan(f.read_u8()?),
+                0xEA => Command::SubTrackPan(f.read_i8()?),
                 0xEB => Command::SubTrackReverb(f.read_u8()?),
                 0xEC => Command::SegTrackVolume(f.read_u8()?),
                 0xED => Command::SubTrackCoarseTune(f.read_u8()?),

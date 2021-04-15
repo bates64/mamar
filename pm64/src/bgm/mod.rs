@@ -164,7 +164,12 @@ pub struct Drum {
     pub coarse_tune: u8,
     pub fine_tune: u8,
     pub volume: u8,
+
+    /// Left = 0
+    /// Middle = 64
+    /// Right = 128
     pub pan: i8,
+
     pub reverb: u8,
 
     #[serde(skip_serializing_if="is_default")]
@@ -184,11 +189,17 @@ pub struct Drum {
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Voice {
+    /// Upper nibble = bank. (0..=6 are valid?)
+    /// Lower nibble = staccatoness mod 3 (0 = sustain, 3 = staccato).
     pub bank: u8,
+
     pub patch: u8,
     pub volume: u8,
 
-    /// Negative = left, positive = right. (?)
+    /// Values are just like in MIDI:
+    /// Left = 0.
+    /// Middle = (+/-)64.
+    /// Right = (+/-)127.
     pub pan: i8,
 
     pub reverb: u8,

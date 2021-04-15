@@ -124,7 +124,7 @@ fn midi_track_to_bgm_track(
                     format!("Track {}", track_number)
                 },
 
-                flags: track_flags::POLYPHONY_1 | track_flags::POLYPHONY_3,
+                flags: track_flags::POLYPHONY_1, // Sounds better with more polyphony, but can cause crashes
 
                 commands: CommandSeq::new(),
                 mute: false,
@@ -222,6 +222,12 @@ fn midi_track_to_bgm_track(
                                 );
                                 is_pitch_bent = true;
                             }
+                            MidiMessage::Aftertouch { key: _, vel } | MidiMessage::ChannelAftertouch { vel } => {
+                                track.commands.insert(
+                                    convert_time(time, time_divisor),
+                                    Command::SubTrackVolume(vel.as_int()),
+                                );
+                            }
                             MidiMessage::ProgramChange { program } => {
                                 if !set_bank_patch {
                                     voices[voice_idx].patch = program.as_int();
@@ -233,7 +239,126 @@ fn midi_track_to_bgm_track(
                                     );
                                 }
                             }
-                            _ => {}
+                            MidiMessage::Controller { controller, value } => {
+                                let controller = controller.as_int();
+                                let value = value.as_int(); // Note this is in the range 0..=127
+
+                                // See page 12 of the specification:
+                                // https://www.cs.cmu.edu/~music/cmsip/readings/Standard-MIDI-file-format-updated.pdf
+                                // Or:
+                                // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
+                                match controller {
+                                    // Modulation wheel
+                                    1 | 33 => {
+                                        // Stack exchange says that the synthesizer (that's us!) gets to define
+                                        // what the modulation wheel does:
+                                        // https://music.stackexchange.com/questions/42847
+                                        //
+                                        // I declare it...tremolo!
+                                        track.commands.insert(
+                                            convert_time(time, time_divisor),
+                                            Command::TrackTremolo {
+                                                // XXX: These values are total guesses. Investigate!
+                                                amount: 8,
+                                                speed: value,
+                                                unknown: 8,
+                                            },
+                                        );
+                                    }
+                                    // Channel Volume
+                                    7 | 39 => track.commands.insert(
+                                        convert_time(time, time_divisor),
+                                        Command::SubTrackVolume(value),
+                                    ),
+                                    // Pan
+                                    10 | 42 | 8 | 40 => track.commands.insert(
+                                        convert_time(time, time_divisor),
+                                        Command::SubTrackPan(value as i8),
+                                    ),
+                                    // Effect control 1
+                                    12 | 44 => track.commands.insert(
+                                        convert_time(time, time_divisor),
+                                        Command::SubTrackReverb(value),
+                                    ),
+                                    // Damper pedal on/off (sustain)
+                                    64 => {
+                                        let sustain = if value >= 64 {
+                                            // Sustain on
+                                            0
+                                        } else {
+                                            // Sustain off
+                                            3
+                                        };
+
+                                        track.commands.insert(
+                                            convert_time(time, time_divisor),
+                                            Command::TrackOverridePatch {
+                                                bank: voices[voice_idx].bank & 0xF0 | sustain,
+                                                patch: voices[voice_idx].bank,
+                                            },
+                                        );
+                                    }
+                                    // Sound Controller 3 (Release Time)
+                                    72 => {
+                                        // The lower nibble of the bank mod 3 is the 'staccatoness' (how short the
+                                        // notes are). The MIDI value for this event is the release time (sustain),
+                                        // change it to one of 4 levels:
+                                        let sustain = if value < (127 / 4) * 1 {
+                                            3 // Staccato
+                                        } else if value < (127 / 4) * 2 {
+                                            2 // Sustain even less
+                                        } else if value < (127 / 4) * 3 {
+                                            1 // Sustain less
+                                        } else {
+                                            0 // Default (sustain)
+                                        };
+
+                                        track.commands.insert(
+                                            convert_time(time, time_divisor),
+                                            Command::TrackOverridePatch {
+                                                bank: voices[voice_idx].bank & 0xF0 | sustain,
+                                                patch: voices[voice_idx].bank,
+                                            },
+                                        );
+                                    }
+                                    // All notes off / All sound off
+                                    123 | 120 => for (key, start) in started_notes.drain() {
+                                        let length = time - start.time;
+                                        track.commands.insert(
+                                            convert_time(start.time, time_divisor),
+                                            Command::Note {
+                                                pitch: key + 104,
+                                                velocity: start.vel,
+                                                length: convert_time(length as usize, time_divisor) as u16,
+                                            },
+                                        );
+                                    }
+                                    // Poly[phonic] mode on/off
+                                    126 => {
+                                        if value == 0 {
+                                            // Off
+                                            track.flags &= !(
+                                                track_flags::POLYPHONY_1 |
+                                                track_flags::POLYPHONY_2 |
+                                                track_flags::POLYPHONY_3);
+                                        } else {
+                                            // On
+                                            track.flags |=
+                                                track_flags::POLYPHONY_1 |
+                                                track_flags::POLYPHONY_2 |
+                                                track_flags::POLYPHONY_3;
+                                        }
+                                    }
+                                    // Poly[phonic] mode on
+                                    127 => {
+                                        track.flags |=
+                                            track_flags::POLYPHONY_1 |
+                                            track_flags::POLYPHONY_2 |
+                                            track_flags::POLYPHONY_3;
+                                    }
+                                    _ => {}
+                                }
+                            }
                         }
                     }
                     TrackEventKind::Meta(MetaMessage::Tempo(tempo)) => if track_number == 0 {
@@ -252,6 +377,15 @@ fn midi_track_to_bgm_track(
                     }
                     TrackEventKind::Meta(MetaMessage::TrackName(s)) => {
                         track_name = String::from_utf8(s.to_owned()).ok();
+                    }
+                    TrackEventKind::Meta(MetaMessage::CuePoint(s))
+                    | TrackEventKind::Meta(MetaMessage::Marker(s)) => {
+                        if let Ok(s) = String::from_utf8(s.to_owned()) {
+                            track.commands.insert(
+                                convert_time(time, time_divisor),
+                                Command::Marker(s),
+                            );
+                        }
                     }
                     _ => {}
                 }
@@ -297,7 +431,8 @@ fn midi_track_to_bgm_track(
 
             // There's not a very good way to detect MIDI drum tracks, so we'll just make a best guess by seeing if the
             // designated track title contains 'drums' or not.
-            if track.name.to_lowercase().contains("drums") {
+            let name_lower = track.name.to_lowercase();
+            if name_lower.contains("drums") | name_lower.contains("percussion") {
                 // TODO: insert voice instead of drum
                 track.flags = track_flags::DRUM_TRACK;
             }

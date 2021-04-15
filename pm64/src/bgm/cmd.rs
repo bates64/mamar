@@ -609,7 +609,11 @@ pub enum Command {
         patch: u8,
     },
 
-    SubTrackPan(u8), // TODO: better type for field
+    /// Left = (+/-)0.
+    /// Middle = (+/-)64.
+    /// Right = (+/-)127.
+    SubTrackPan(i8),
+
     SubTrackReverb(u8),
     SubTrackReverbType(u8), // TODO: enum for field
 
@@ -626,6 +630,9 @@ pub enum Command {
         speed: u8,
         unknown: u8,
     },
+
+    // XXX: Angry_Bowser_67 doesn't have any TrackTremolo but does have TrackTremoloStop.
+    // It may reset SubTrackVolume also?
     TrackTremoloStop,
 
     // TODO: figure out whether Seg or Sub

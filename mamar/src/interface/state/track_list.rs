@@ -93,7 +93,7 @@ impl TrackListInterface {
                     }
 
                     if self.is_edit_voice {
-                        ui.modal(7, true, (600.0, 500.0), |ui| {
+                        ui.modal(7, true, (600.0, 700.0), |ui| {
                             ui.text(0, format!("Voice of '{}'", track.name));
                             ui.pad(1, 20.0);
 
@@ -230,7 +230,10 @@ impl TrackListInterface {
                 }
             });
             range_select(ui, 6, 0..=255, 1, &mut voice.volume, |v| format!("Volume {}", v));
-            range_select(ui, 7, -128..127, 1, &mut voice.pan, |v| format!("Pan {}", v));
+            range_select(ui, 7, -128..=127, 1, &mut voice.pan, |v| {
+                let a = v.abs();
+                format!("Pan {} ({})", v, if a > 64 { "right" } else if a == 64 { "middle" } else { "left" })
+            });
             range_select(ui, 8, 0..=255, 1, &mut voice.reverb, |v| format!("Reverb {}", v));
             range_select(ui, 9, 0..=255, 1, &mut voice.coarse_tune, |v| format!("Coarse tune {}", v));
             range_select(ui, 10, 0..=255, 1, &mut voice.fine_tune, |v| format!("Fine tune {}", v));
