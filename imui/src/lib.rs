@@ -1,10 +1,16 @@
 pub mod layout;
 pub mod input;
 mod render;
+mod key;
 
 use std::time::{Duration, Instant};
 
 pub use layout::Layout;
+use input::{ClickFSM, Input, InputFlags};
+use layout::Position;
+pub use render::Render;
+pub use key::UniqueKey;
+use key::UserKey;
 
 pub type Point = euclid::default::Point2D<f32>;
 pub type Rect = euclid::default::Rect<f32>;
@@ -12,11 +18,6 @@ pub type Size = euclid::default::Size2D<f32>;
 pub type Vector = euclid::default::Vector2D<f32>;
 
 type Pool = std::collections::HashMap<Key, Control>;
-
-use input::{ClickFSM, Input, InputFlags};
-
-use layout::Position;
-pub use render::Render;
 
 /// Lower values appear below higher values. Can be considered a Z position.
 pub type Layer = u8;
@@ -54,12 +55,11 @@ pub struct UiFrame<'ui> {
     pub delta_time: Duration,
 }
 
-type UserKey = u8;
-
 /// A key that uniquely identifies a control.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Key {
-    /// User-provided ID, uniquely identifies control between its *possible* siblings. The actual value doesn't matter.
+    /// User-provided ID, uniquely identifies control between its *possible* siblings.
+    /// See also the id::Id trait.
     user: UserKey,
 
     /// Key of parent(s). This means you don't have to worry about creating _globally_ unique `user` values, and allows
@@ -499,8 +499,8 @@ impl UiFrame<'_> {
     }
 
     /// Create a group of controls laid out horizontally, left-to-right.
-    pub fn hbox<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
-        let key = self.ui.key(key.into());
+    pub fn hbox<K: UniqueKey, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::Group);
         self.current_mut().layout.direction = layout::Dir::LeftRight { wrap: true };
@@ -509,8 +509,8 @@ impl UiFrame<'_> {
     }
 
     /// Create a group of controls laid out vertically, top-to-bottom.
-    pub fn vbox<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
-        let key = self.ui.key(key.into());
+    pub fn vbox<K: UniqueKey, F: FnOnce(&mut Self)>(&mut self, key: K, f: F) {
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::Group);
         self.current_mut().layout.direction = layout::Dir::TopBottom { wrap: false };
@@ -518,8 +518,8 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
-    pub fn known_size<K: Into<UserKey>, F: FnOnce(&mut Self)>(&mut self, key: K, width: f32, height: f32, f: F) {
-        let key = self.ui.key(key.into());
+    pub fn known_size<K: UniqueKey, F: FnOnce(&mut Self)>(&mut self, key: K, width: f32, height: f32, f: F) {
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::Group);
 
@@ -533,8 +533,8 @@ impl UiFrame<'_> {
         self.ui.end_control();
     }
 
-    pub fn pad<K: Into<UserKey>>(&mut self, key: K, padding: f32) {
-        let key = self.ui.key(key.into());
+    pub fn pad<K: UniqueKey>(&mut self, key: K, padding: f32) {
+        let key = self.ui.key(key.key());
 
         let parent_direction = self.ui.pool[&self.ui.parent].layout.direction;
 
@@ -557,10 +557,10 @@ impl UiFrame<'_> {
 
     pub fn modal<K, F>(&mut self, key: K, draggable: bool, size: (f32, f32), children: F)
     where
-        K: Into<UserKey>,
+        K: UniqueKey,
         F: FnOnce(&mut Self),
     {
-        let key = self.ui.key(key.into());
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::Modal {
             size: Size::new(size.0, size.1),
@@ -599,7 +599,7 @@ impl UiFrame<'_> {
 
         // Pad the elements inside.
         let margin = 10.0;
-        self.ui.begin_control(self.ui.key(0), Widget::Group);
+        self.ui.begin_control(self.ui.key(UserKey(0)), Widget::Group);
         let ctrl = self.current_mut();
         ctrl.layout.direction = layout::Dir::TopBottom { wrap: false };
         ctrl.layout.position = Position::Relative(Point::new(margin, margin));
@@ -612,8 +612,8 @@ impl UiFrame<'_> {
     }
 
     /// Create a simple block of text.
-    pub fn text<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, string: S) -> Text<'a> {
-        self.ui.begin_control(self.ui.key(key.into()), Widget::Text(string.into()));
+    pub fn text<'a, K: UniqueKey, S: Into<String>>(&'a mut self, key: K, string: S) -> Text<'a> {
+        self.ui.begin_control(self.ui.key(key.key()), Widget::Text(string.into()));
         self.ui.end_control();
 
         Text {
@@ -622,8 +622,8 @@ impl UiFrame<'_> {
     }
 
     /// A button with a label.
-    pub fn button<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, label: S) -> Button<'a> {
-        let key = self.ui.key(key.into());
+    pub fn button<'a, K: UniqueKey, S: Into<String>>(&'a mut self, key: K, label: S) -> Button<'a> {
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::Button);
         self.text(0, label).center_x().center_y();
@@ -640,8 +640,8 @@ impl UiFrame<'_> {
         }
     }
 
-    pub fn toggle_button<'a, K: Into<UserKey>, S: Into<String>>(&'a mut self, key: K, label: S, state: &mut bool) -> Button<'a> {
-        let key = self.ui.key(key.into());
+    pub fn toggle_button<'a, K: UniqueKey, S: Into<String>>(&'a mut self, key: K, label: S, state: &mut bool) -> Button<'a> {
+        let key = self.ui.key(key.key());
 
         self.ui.begin_control(key, Widget::ToggleButton(*state));
         self.text(0, label).center_x().center_y();
@@ -669,7 +669,7 @@ impl Key {
     /// Returns the key of the root control. The root is guaranteed to always exist in `Ui::pool`.
     pub const fn root() -> Self {
         Self {
-            user: 0,
+            user: UserKey(0),
             parent: None,
         }
     }

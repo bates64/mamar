@@ -54,7 +54,7 @@ impl Bgm {
         self.segments.iter().any(|s| s.is_none())
     }
 
-    pub fn add_segment(&mut self) -> Result<&mut Segment, NoSpace> {
+    pub fn add_segment(&mut self) -> Result<(usize, &mut Segment), NoSpace> {
         let empty_seg: Option<(usize, &mut Option<Segment>)> = self.segments
             .iter_mut()
             .enumerate()
@@ -67,7 +67,7 @@ impl Bgm {
                     name: format!("Variation {}", idx + 1),
                     subsegments: Default::default(),
                 });
-                Ok(slot.as_mut().unwrap())
+                Ok((idx, slot.as_mut().unwrap()))
             }
         }
     }

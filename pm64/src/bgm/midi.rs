@@ -77,7 +77,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     };
     let track_list_id = bgm.add_track_list(track_list);
 
-    let mut segment = bgm.add_segment().unwrap();
+    let (_, segment) = bgm.add_segment().unwrap();
     segment.subsegments = vec![
         Subsegment::Unknown { // loop start
             flags: 0x30,

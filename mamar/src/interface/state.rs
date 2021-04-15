@@ -23,8 +23,16 @@ pub struct Document {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 enum UiState {
-    Overview {
+    None,
+
+    /// Top-level view of a whole segment ("variation") and its subsegments ("sections").
+    Segment {
+        segment_idx: usize,
+    },
+
+    OldOverview {
         selected_segment_idx: u8,
         track_list_interface: TrackListInterface,
         viewing_seg_list: bool,
@@ -75,11 +83,8 @@ impl Document {
         Ok(Some(Document {
             bgm,
             path,
-            ui_state: UiState::Overview {
-                selected_segment_idx: 0,
-                track_list_interface: TrackListInterface::new(),
-                viewing_seg_list: false,
-                selected_track_subseg_idx: 0,
+            ui_state: UiState::Segment {
+                segment_idx: 0,
             },
         }))
     }
@@ -150,8 +155,32 @@ impl Document {
 
     pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
         let bgm = &mut self.bgm;
+
         match &mut self.ui_state {
-            UiState::Overview {
+            UiState::None => {}
+
+            UiState::Segment {
+                segment_idx,
+            } => {
+                // Segment selector.
+                // TODO
+
+                // View actual segment.
+                let segment = &mut bgm.segments[*segment_idx];
+
+                if let Some(segment) = segment {
+                    ui.text("seg name", &segment.name);
+                } else {
+                    // Segment is empty, allow user to populate it.
+                    ui.text("seg no data", "This variation has no data.").center_x();
+                    if ui.button("seg no data btn", "New variation").clicked() {
+                        let (idx, _) = bgm.add_segment().expect("no space for new segment");
+                        *segment_idx = idx;
+                    }
+                }
+            }
+
+            UiState::OldOverview {
                 selected_segment_idx,
                 track_list_interface,
                 viewing_seg_list,
