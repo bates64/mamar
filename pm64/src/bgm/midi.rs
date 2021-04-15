@@ -430,9 +430,9 @@ fn midi_track_to_bgm_track(
             }
 
             // There's not a very good way to detect MIDI drum tracks, so we'll just make a best guess by seeing if the
-            // designated track title contains 'drums' or not.
+            // designated track title contains 'drums' or 'percussion' (excluding 'steel drums').
             let name_lower = track.name.to_lowercase();
-            if name_lower.contains("drums") | name_lower.contains("percussion") {
+            if (name_lower.contains("drum") && !name_lower.contains("steel")) | name_lower.contains("percussion") {
                 // TODO: insert voice instead of drum
                 track.flags = track_flags::DRUM_TRACK;
             }
