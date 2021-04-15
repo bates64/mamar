@@ -1,3 +1,12 @@
+## 0.9.0
+
+- Greatly improved MIDI importing
+- Added a new file open/save type: `.ron` files
+    - These are structured, human-readable text files that Mamar can open and save
+    - This feature is intended for manually doing things that the Mamar interface doesn't (yet) support
+    - The file format is not guaranteed to stay stable between releases of Mamar; if the format changes, you will always be able to open the file in an older version of Mamar, save it as a `.bgm` file, then open the `.bgm` file in the latest release. Note however that this will discard some data such as the names of tracks.
+- Added Discord Rich Presence support ('Playing Mamar' status)
+
 ## 0.8.1
 
 - Reduced CPU use when connected to an emulator
