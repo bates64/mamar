@@ -540,16 +540,8 @@ impl Render for Renderer {
         }
     }
 
-    fn render_button(&mut self, region: &Region, is_pressed: bool) {
-        let sprite;
-
-        if is_pressed {
-            sprite = "button_pressed";
-        } else {
-            sprite = "button";
-        }
-
-        self.render_sprite_9slice(region, sprite, [1.0, 1.0, 1.0, 1.0]);
+    fn render_button(&mut self, region: &Region, texture: &'static str) {
+        self.render_sprite_9slice(region, texture, [1.0, 1.0, 1.0, 1.0]);
     }
 
     fn render_toggle_button(&mut self, region: &Region, is_pressed: bool, is_enabled: bool) {

@@ -62,6 +62,9 @@ impl Interface {
         glue.atlas().insert("toggle_button_off", "assets/tex/toggle_button_off.png")?;
         glue.atlas().insert("toggle_button_off_pressed", "assets/tex/toggle_button_off_pressed.png")?;
         glue.atlas().insert("window", "assets/tex/window.png")?;
+        glue.atlas().insert("tab", "assets/tex/tab.png")?;
+        glue.atlas().insert("tab_selected", "assets/tex/tab_selected.png")?;
+        glue.atlas().insert("tab_pressed", "assets/tex/tab_pressed.png")?;
 
         glue.load_font(&{
             let mut font = File::open("assets/Inter-Medium.otf")?;

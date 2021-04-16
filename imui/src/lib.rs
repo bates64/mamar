@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 pub use layout::Layout;
 use input::{ClickFSM, Input, InputFlags};
-use layout::Position;
+use layout::{Dimension, Position};
 pub use render::Render;
 pub use key::UniqueKey;
 use key::UserKey;
@@ -124,7 +124,7 @@ struct Drag {
 enum Widget {
     Group,
     Text(String),
-    Button,
+    Button { texture: &'static str, texture_pressed: &'static str },
     ToggleButton(bool),
     Modal {
         size: Size,
@@ -338,7 +338,15 @@ impl Ui {
             match widget {
                 Widget::Group => {}
                 Widget::Text(text) => renderer.render_text(&region, text),
-                Widget::Button => renderer.render_button(&region, ctrl.left_click.is_press()),
+                Widget::Button { texture, texture_pressed } => {
+                    let tex = if ctrl.left_click.is_press() {
+                        texture_pressed
+                    } else {
+                        texture
+                    };
+
+                    renderer.render_button(&region, tex)
+                },
                 Widget::ToggleButton(v) => renderer.render_toggle_button(&region, ctrl.left_click.is_press(), *v),
                 Widget::Modal { .. } => renderer.render_window(&region),
             }
@@ -525,8 +533,8 @@ impl UiFrame<'_> {
 
         let ctrl = self.current_mut();
         ctrl.layout.direction = layout::Dir::BackFront;
-        ctrl.layout.width = width..=width;
-        ctrl.layout.height = height..=height;
+        ctrl.layout.width = Dimension::Range(width..=width);
+        ctrl.layout.height = Dimension::Range(height..=height);
 
         f(self);
 
@@ -543,13 +551,13 @@ impl UiFrame<'_> {
         let ctrl = self.current_mut();
         ctrl.layout.direction = layout::Dir::BackFront;
 
-        ctrl.layout.width = 0.0..=0.0;
-        ctrl.layout.height = 0.0..=0.0;
+        ctrl.layout.width = Dimension::Range(0.0..=0.0);
+        ctrl.layout.height = Dimension::Range(0.0..=0.0);
 
         match parent_direction {
             layout::Dir::BackFront => (),
-            layout::Dir::LeftRight { .. } => ctrl.layout.width = padding..=padding,
-            layout::Dir::TopBottom { .. } => ctrl.layout.height = padding..=padding,
+            layout::Dir::LeftRight { .. } => ctrl.layout.width = Dimension::Range(padding..=padding),
+            layout::Dir::TopBottom { .. } => ctrl.layout.height = Dimension::Range(padding..=padding),
         }
 
         self.ui.end_control();
@@ -588,8 +596,8 @@ impl UiFrame<'_> {
         let height;
 
         if let Widget::Modal { size, .. } = &mut ctrl.widget {
-            ctrl.layout.width = size.width..=size.width;
-            ctrl.layout.height = size.height..=size.height;
+            ctrl.layout.width = Dimension::Range(size.width..=size.width);
+            ctrl.layout.height = Dimension::Range(size.height..=size.height);
 
             width = size.width;
             height = size.height;
@@ -603,8 +611,8 @@ impl UiFrame<'_> {
         let ctrl = self.current_mut();
         ctrl.layout.direction = layout::Dir::TopBottom { wrap: false };
         ctrl.layout.position = Position::Relative(Point::new(margin, margin));
-        ctrl.layout.width = (width - margin * 2.0) ..= (width - margin * 2.0);
-        ctrl.layout.height = (height - margin * 2.0) ..= (height - margin * 2.0);
+        ctrl.layout.width = Dimension::Range((width - margin * 2.0) ..= (width - margin * 2.0));
+        ctrl.layout.height = Dimension::Range((height - margin * 2.0) ..= (height - margin * 2.0));
         children(self);
         self.ui.end_control();
 
@@ -623,21 +631,7 @@ impl UiFrame<'_> {
 
     /// A button with a label.
     pub fn button<'a, K: UniqueKey, S: Into<String>>(&'a mut self, key: K, label: S) -> Button<'a> {
-        let key = self.ui.key(key.key());
-
-        self.ui.begin_control(key, Widget::Button);
-        self.text(0, label).center_x().center_y();
-        self.ui.end_control();
-
-        let ctrl = self.current_mut();
-
-        ctrl.layout.width = 100.0..=100.0;
-        ctrl.layout.height = 36.0..=36.0;
-
-        Button {
-            is_click: ctrl.advance_left_click().is_click(),
-            ctrl,
-        }
+        self.custom_button(key, label, "button", "button_pressed")
     }
 
     pub fn toggle_button<'a, K: UniqueKey, S: Into<String>>(&'a mut self, key: K, label: S, state: &mut bool) -> Button<'a> {
@@ -649,8 +643,8 @@ impl UiFrame<'_> {
 
         let ctrl = self.current_mut();
 
-        ctrl.layout.width = 100.0..=100.0;
-        ctrl.layout.height = 36.0..=36.0;
+        ctrl.layout.width = Dimension::Range(100.0..=100.0);
+        ctrl.layout.height = Dimension::Range(36.0..=36.0);
 
         let is_click = ctrl.advance_left_click().is_click();
 
@@ -662,6 +656,66 @@ impl UiFrame<'_> {
             is_click,
             ctrl,
         }
+    }
+
+    pub fn custom_button<'a, K: UniqueKey, S: Into<String>>(
+        &'a mut self,
+        key: K,
+        label: S,
+        texture: &'static str,
+        texture_pressed: &'static str,
+    ) -> Button<'a> {
+        let key = self.ui.key(key.key());
+
+        self.ui.begin_control(key, Widget::Button { texture, texture_pressed });
+        self.text(0, label).center_x().center_y();
+        self.ui.end_control();
+
+        let ctrl = self.current_mut();
+
+        ctrl.layout.width = Dimension::Range(100.0..=100.0);
+        ctrl.layout.height = Dimension::Range(36.0..=36.0);
+
+        Button {
+            is_click: ctrl.advance_left_click().is_click(),
+            ctrl,
+        }
+    }
+
+    pub fn tabs<K, V, I>(&mut self, key: K, value: &mut V, tabs: I) -> bool
+    where
+        K: UniqueKey,
+        V: UniqueKey + PartialEq,
+        I: Iterator<Item = (V, String)>,
+    {
+        let key = self.ui.key(key.key());
+
+        self.ui.begin_control(key, Widget::Group);
+
+        let ctrl = self.current_mut();
+        ctrl.layout.direction = layout::Dir::LeftRight { wrap: false };
+
+        let mut changed = false;
+
+        for (i, (v, label)) in tabs.enumerate() {
+            let texture;
+            let texture_pressed;
+            if *value == v {
+                texture = "tab_selected";
+                texture_pressed = "tab_selected";
+            } else {
+                texture = "tab";
+                texture_pressed = "tab_pressed";
+            };
+
+            if self.custom_button(i, label, texture, texture_pressed).with_width(200.0).clicked() {
+                *value = v;
+                changed = true;
+            }
+        }
+
+        self.ui.end_control();
+        changed
     }
 }
 
@@ -761,12 +815,17 @@ impl Button<'_> {
     }
 
     pub fn with_width(&mut self, width: f32) -> &mut Self {
-        self.ctrl.layout.width = width..=width;
+        self.ctrl.layout.width = Dimension::Range(width..=width);
         self
     }
 
     pub fn with_height(&mut self, height: f32) -> &mut Self {
-        self.ctrl.layout.height = height..=height;
+        self.ctrl.layout.height = Dimension::Range(height..=height);
+        self
+    }
+
+    pub fn fill_width(&mut self) -> &mut Self {
+        self.ctrl.layout.width = Dimension::Fill;
         self
     }
 }
@@ -787,12 +846,12 @@ impl Text<'_> {
     }
 
     pub fn with_width(&mut self, width: f32) -> &mut Self {
-        self.ctrl.layout.width = width..=width;
+        self.ctrl.layout.width = Dimension::Range(width..=width);
         self
     }
 
     pub fn with_height(&mut self, height: f32) -> &mut Self {
-        self.ctrl.layout.height = height..=height;
+        self.ctrl.layout.height = Dimension::Range(height..=height);
         self
     }
 }

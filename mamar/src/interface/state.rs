@@ -162,22 +162,133 @@ impl Document {
             UiState::Segment {
                 segment_idx,
             } => {
-                // Segment selector.
-                // TODO
+                ui.vbox("seg", |ui| {
+                    ui.hbox("seg selector", |ui| {
+                        // TODO: allow dragging of tabs around (e.g. pass a &mut Vec)
+                        ui.tabs(
+                            "seg tabs",
+                            segment_idx,
+                            bgm.segments
+                                .iter()
+                                .enumerate()
+                                .map(|(idx, seg)| {
+                                    (idx, seg.as_ref().map(|seg| {
+                                        format!("{}", seg.name)
+                                    }).unwrap_or_else(|| String::from("(no data)")))
+                                })
+                        );
+                    });
 
-                // View actual segment.
-                let segment = &mut bgm.segments[*segment_idx];
+                    // View actual segment.
+                    let opt_segment = &mut bgm.segments[*segment_idx];
+                    let track_lists = &bgm.track_lists;
 
-                if let Some(segment) = segment {
-                    ui.text("seg name", &segment.name);
-                } else {
-                    // Segment is empty, allow user to populate it.
-                    ui.text("seg no data", "This variation has no data.").center_x();
-                    if ui.button("seg no data btn", "New variation").clicked() {
-                        let (idx, _) = bgm.add_segment().expect("no space for new segment");
-                        *segment_idx = idx;
+                    ui.pad("top pad", 16.0);
+
+                    if let Some(segment) = opt_segment {
+                        let mut to_delete_segment = false;
+                        let mut to_add_subseg = false;
+
+                        ui.vbox(0, |ui| {
+                            ui.hbox("toolbar", |ui| {
+                                if ui.button("del seg", "Delete variation").with_width(250.0).clicked() {
+                                    to_delete_segment = true;
+                                }
+
+                                // TODO: add loop
+                            });
+
+                            ui.pad("top pad", 30.0);
+
+                            let mut swap = None;
+                            let mut delete = None;
+
+                            for (i, subseg) in segment.subsegments.iter().enumerate() {
+                                ui.hbox(i, |ui| {
+                                    if ui.button("subseg up", "^")
+                                        .with_width(32.0)
+                                        .with_height(32.0)
+                                        .clicked() && i != 0
+                                    {
+                                        swap = Some((i, i - 1));
+                                    }
+                                    if ui.button("subseg down", "v")
+                                        .with_width(32.0)
+                                        .with_height(32.0)
+                                        .clicked() && i != segment.subsegments.len() - 1
+                                    {
+                                        swap = Some((i, i + 1));
+                                    }
+                                    if ui.button("subseg del", "X")
+                                        .with_width(32.0)
+                                        .with_height(32.0)
+                                        .clicked()
+                                    {
+                                        delete = Some(i);
+                                    }
+
+                                    ui.pad("subseg btn pad", 10.0);
+
+                                    match subseg {
+                                        Subsegment::Tracks { track_list, .. } => {
+                                            let name = &track_lists[track_list].name;
+                                            ui.button("subseg tracks name", name).with_width(400.0);
+                                        },
+                                        Subsegment::Unknown { flags, .. } => {
+                                            let label;
+
+                                            // TODO update the enum in pm64::bgm instead
+                                            if *flags == 0x30 {
+                                                label = "Loop start";
+                                            } else if *flags == 0x50 {
+                                                label = "Loop end";
+                                            } else {
+                                                label = "Unknown";
+                                            }
+
+                                            ui.pad("subseg unk pad", 20.0);
+                                            ui.text("subseg loop name", label).center_y();
+                                        }
+                                    }
+                                });
+
+                                ui.pad((i, "pad"), 10.0);
+                            }
+
+                            if let Some((a, b)) = swap {
+                                segment.subsegments.swap(a, b);
+                            }
+
+                            if let Some(i) = delete {
+                                segment.subsegments.remove(i);
+                            }
+
+                            ui.pad("btm pad", 30.0);
+
+                            if ui.button("add subseg", "New section").clicked() {
+                                to_add_subseg = true;
+                            }
+                        });
+
+                        if to_add_subseg {
+                            let track_list = bgm.add_track_list(TrackList::default());
+                            bgm.segments[*segment_idx].as_mut().unwrap().subsegments.push(Subsegment::Tracks {
+                                flags: 0x10,
+                                track_list,
+                            });
+                        } else if to_delete_segment {
+                            *opt_segment = None;
+                        }
+                    } else {
+                        // Segment is (no data)
+                        if ui.button("new seg", "New variation").with_width(200.0).clicked() {
+                            *opt_segment = Some(Segment {
+                                name: format!("Variation {}", *segment_idx + 1),
+                                subsegments: Default::default(),
+                            });
+                        }
                     }
-                }
+                });
             }
 
             UiState::OldOverview {

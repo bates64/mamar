@@ -6,7 +6,7 @@ pub trait Render {
 
     // Visitor pattern for rendering.
     fn render_text(&mut self, region: &Region, text: &str);
-    fn render_button(&mut self, region: &Region, is_pressed: bool);
+    fn render_button(&mut self, region: &Region, texture: &'static str);
     fn render_toggle_button(&mut self, region: &Region, is_pressed: bool, is_enabled: bool);
     fn render_window(&mut self, region: &Region);
 }

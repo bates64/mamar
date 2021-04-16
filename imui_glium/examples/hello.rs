@@ -11,15 +11,12 @@ impl Interface {
             let mut updated = false;
 
             glue.update(|ui| {
-                ui.modal(0, true, (500.0, 500.0), |ui| {
-                    ui.text(1, "Hello, world!").center_x();
+                ui.vbox("container", |ui| {
+                    ui.text("hello", "Hello, world!").center_x();
 
-                    ui.hbox(2, |ui| {
+                    ui.hbox("buttons", |ui| {
                         for i in 0..self.num_buttons {
-                            if ui.button(i, format!("Button {}", i))
-                                .with_height(32.0 + i as f32 * 8.0)
-                                .clicked()
-                            {
+                            if ui.button(i, format!("Button {}", i)).clicked() {
                                 println!("button {} clicked", i);
 
                                 self.num_buttons += 1;
@@ -31,7 +28,7 @@ impl Interface {
                         }
                     });
 
-                    ui.text(3, format!("Above are {} buttons", self.num_buttons));
+                    ui.text("num buttons", format!("Above are {} buttons", self.num_buttons));
                 });
             });
 
