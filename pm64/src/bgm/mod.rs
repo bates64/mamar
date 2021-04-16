@@ -47,7 +47,10 @@ pub struct NoSpace;
 
 impl Bgm {
     pub fn new() -> Bgm {
-        Default::default()
+        Bgm {
+            name: "New Song".to_string(),
+            ..Default::default()
+        }
     }
 
     pub fn can_add_segment(&self) -> bool {

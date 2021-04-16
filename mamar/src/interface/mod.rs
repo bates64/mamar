@@ -27,6 +27,7 @@ pub struct Interface {
 #[derive(Clone)]
 enum Action {
     None,
+    NewDocument,
     OpenDocument,
     SaveDocument,
     SaveDocumentAs,
@@ -96,18 +97,27 @@ impl Interface {
             updates += 1;
 
             self.glue.update(|ui| {
-                ui.vbox(0, |ui| {
-                    ui.hbox(0, |ui| {
+                ui.vbox("main", |ui| {
+                    ui.hbox("toolbar", |ui| {
                         // File controls. We have to show file dialogs after rendering is complete (otherwise the window
                         // freezes) so we only set that 'X has been requested' when these buttons are clicked.
+
+                        if ui.button("new", "New File").clicked() {
+                            *queued_action = Action::NewDocument;
+                        }
+
                         if ui.button(1, "Open File...").clicked() {
                             *queued_action = Action::OpenDocument;
                         }
 
                         if let Some(doc) = state.document.as_mut() {
-                            if ui.button(2, "Reload File").clicked() {
-                                *queued_action = Action::ReloadDocument;
+                            if let state::DocPath::Import(_) = doc.path {
+                                if ui.button(2, "Reload File").clicked() {
+                                    *queued_action = Action::ReloadDocument;
+                                }
                             }
+
+                            ui.pad("pad", 10.0);
 
                             if doc.can_save() && ui.button(3, "Save").clicked() {
                                 *queued_action = Action::SaveDocument;
@@ -117,8 +127,10 @@ impl Interface {
                                 *queued_action = Action::SaveDocumentAs;
                             }
 
+                            ui.pad("pad2", 10.0);
+
                             if hot.has_connections() {
-                                if ui.button(5, "Play in Project64")
+                                if ui.button(5, "Play from beginning")
                                     .with_width(200.0)
                                     .clicked()
                                 {
@@ -127,7 +139,6 @@ impl Interface {
                                     }
                                 }
                             } else {
-                                ui.pad(6, 20.0);
                                 ui.text(7, "No emulator connected").center_y();
                             }
                         }
@@ -147,11 +158,9 @@ impl Interface {
             }
         }
 
-        if let Some(title) = self.state.document.as_ref().map(|doc| {
-            doc.path.file_name().map(|s| format!("{} - Mamar", s.to_string_lossy()))
-        }).flatten() {
+        if let Some(doc) = self.state.document.as_ref() {
             self.with_window(|w| {
-                w.set_title(&title);
+                w.set_title(&format!("{} - Mamar", doc.bgm.name));
             });
         } else {
             self.with_window(|w| {
@@ -205,6 +214,9 @@ impl Interface {
 
         match action {
             Action::None => return Ok(false),
+            Action::NewDocument => {
+                self.state.document = Some(state::Document::new());
+            }
             Action::OpenDocument => {
                 if let Some(doc) = state::Document::open_prompt()? {
                     self.state.document = Some(doc);
@@ -212,8 +224,11 @@ impl Interface {
             }
             Action::ReloadDocument => {
                 if let Some(doc) = self.state.document.as_ref() {
-                    if let Some(reloaded) = state::Document::open_from_path(doc.path.clone())? {
-                        self.state.document = Some(reloaded);
+                    match &doc.path {
+                        state::DocPath::Import(path) => {
+                            self.state.document = Some(state::Document::open_from_path(path.clone())?);
+                        }
+                        _ => {}
                     }
                 }
             }

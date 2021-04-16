@@ -17,9 +17,21 @@ pub struct State {
 #[derive(Clone)]
 pub struct Document {
     pub bgm: Bgm,
-    pub path: PathBuf,
+    pub path: DocPath,
 
     ui_state: UiState,
+}
+
+#[derive(Clone)]
+pub enum DocPath {
+    /// This document has no path associated with it at all, i.e. it was created with 'New File'.
+    New,
+
+    /// Natively-supported file types, i.e. bgm and ron.
+    Native(PathBuf),
+
+    /// Import-only file types, i.e. midi.
+    Import(PathBuf),
 }
 
 #[derive(Clone)]
@@ -40,6 +52,14 @@ enum UiState {
     },
 }
 
+impl Default for UiState {
+    fn default() -> Self {
+        UiState::Segment {
+            segment_idx: 0,
+        }
+    }
+}
+
 // Change of anything other than self.bgm should not be considered a History-changing action.
 impl PartialEq for Document {
     fn eq(&self, other: &Self) -> bool {
@@ -48,6 +68,14 @@ impl PartialEq for Document {
 }
 
 impl Document {
+    pub fn new() -> Self {
+        Document {
+            bgm: Bgm::new(),
+            path: DocPath::New,
+            ui_state: UiState::default(),
+        }
+    }
+
     /// Prompt an 'Open File' dialog to open a document. Must be run on the main thread.
     pub fn open_prompt() -> Result<Option<Self>, Box<dyn Error>> {
         let path = tinyfiledialogs::open_file_dialog("Open File", "", Some((&[
@@ -60,73 +88,82 @@ impl Document {
 
         if let Some(path) = path {
             let path = PathBuf::from(path);
-            Self::open_from_path(path)
+            Ok(Some(Self::open_from_path(path)?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn open_from_path(path: PathBuf) -> Result<Option<Self>, Box<dyn Error>> {
+    pub fn open_from_path(path: PathBuf) -> Result<Self, Box<dyn Error>> {
         let mut file = File::open(&path)?;
 
-        let bgm;
         if path.extension().unwrap_or_default() == "ron" {
-            bgm = ron::de::from_reader(file)?;
-        } else if pm64::bgm::midi::is_midi(&mut file)? {
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf)?;
-            bgm = pm64::bgm::midi::to_bgm(&buf)?;
+            Ok(Document {
+                bgm: ron::de::from_reader(file)?,
+                path: DocPath::Native(path),
+                ui_state: UiState::default(),
+            })
         } else {
-            bgm = Bgm::decode(&mut file)?;
-        }
+            // Import from BGM/MIDI
 
-        Ok(Some(Document {
-            bgm,
-            path,
-            ui_state: UiState::Segment {
-                segment_idx: 0,
-            },
-        }))
+            let mut bgm;
+            let doc_path;
+
+            if pm64::bgm::midi::is_midi(&mut file)? {
+                let mut buf = Vec::new();
+                file.read_to_end(&mut buf)?;
+                bgm = pm64::bgm::midi::to_bgm(&buf)?;
+
+                if let Some(name) = path.file_stem().map(|s| s.to_str()).flatten() {
+                    bgm.name = name.to_owned();
+                }
+
+                doc_path = DocPath::Import(path);
+            } else {
+                bgm = Bgm::decode(&mut file)?;
+                doc_path = DocPath::Native(path);
+            }
+
+            Ok(Document {
+                bgm,
+                path: doc_path,
+                ui_state: UiState::default(),
+            })
+        }
     }
 
     pub fn can_save(&self) -> bool {
-        let ext = self.path.extension().unwrap_or_default().to_str().unwrap_or_default();
-
-        match ext {
-            "bgm" => true,
-            "bin" => true,
-            "ron" => true,
-            _ => false,
-        }
+        matches!(self.path, DocPath::Native(_))
     }
 
     pub fn save(&self) -> Result<(), Box<dyn Error>> {
-        assert!(self.can_save()); // TODO: return Err
+        if let DocPath::Native(path) = &self.path {
+            let mut file = File::create(&path)?;
 
-        let mut file = File::create(&self.path)?;
+            if path.extension().unwrap_or_default() == "ron" {
+                ron::ser::to_writer_pretty(
+                    &mut file,
+                    &self.bgm,
+                    ron::ser::PrettyConfig::new()
+                        .with_indentor("  ".to_string())
+                        .with_depth_limit(5),
+                )?;
+            } else {
+                self.bgm.encode(&mut file)?;
+            }
 
-        if self.path.extension().unwrap_or_default() == "ron" {
-            ron::ser::to_writer_pretty(
-                &mut file,
-                &self.bgm,
-                ron::ser::PrettyConfig::new()
-                    .with_indentor("  ".to_string())
-                    .with_depth_limit(5),
-            )?;
+            Ok(())
         } else {
-            self.bgm.encode(&mut file)?;
+            // TODO: Err
+            Ok(())
         }
-
-        Ok(())
     }
 
     /// Shows as 'Save As' dialog prompt then saves the document to a file. Must be run on the main thread.
     pub fn save_as(&mut self) -> Result<(), Box<dyn Error>> {
-        let current_path = self.path.with_extension("bgm");
-
         let path = tinyfiledialogs::save_file_dialog_with_filter(
             "Save As",
-            current_path.to_str().unwrap_or_default(),
+            &format!("{}.bgm", self.bgm.name),
             &["*.bgm", "*.ron"],
             "",
         );
@@ -138,14 +175,14 @@ impl Document {
                 path.set_extension("bgm");
             }
 
-            std::mem::swap(&mut self.path, &mut path);
-            let prev_path = path;
+            let old_path = self.path.clone();
+            self.path = DocPath::Native(path);
 
             if self.can_save() {
                 self.save()
             } else {
-                self.path = prev_path;
-                // TODO: probably error
+                // TODO: error
+                self.path = old_path;
                 Ok(())
             }
         } else {
