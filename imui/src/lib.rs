@@ -21,7 +21,7 @@ type Pool = std::collections::HashMap<Key, Control>;
 
 /// Lower values appear below higher values. Can be considered a Z position.
 pub type Layer = u8;
-pub const LAYER_DEFAULT: Layer = 0;
+pub const LAYER_DEFAULT: Layer = 100;
 
 /// A UI tree.
 pub struct Ui {
@@ -47,6 +47,8 @@ pub struct Ui {
 
     /// The layer that is allowed to receive input right now.
     active_layer: Layer,
+
+    input_highlight: Option<Rect>,
 }
 
 /// Interface for adding controls to the UI tree.
@@ -108,6 +110,7 @@ pub struct Control {
     pub middle_click: ClickFSM,
 
     drag: Option<Drag>,
+    unhandled_drag_end: bool,
     drag_trigger_update: bool,
 }
 
@@ -145,6 +148,7 @@ impl Ui {
             mouse_pos: Point::zero(),
             most_recent_update: Instant::now(),
             active_layer: LAYER_DEFAULT,
+            input_highlight: None,
         };
 
         // Create omnipresent root node.
@@ -262,11 +266,13 @@ impl Ui {
                             current_mouse_pos: self.mouse_pos,
                             start_position: ctrl.layout.position.clone(),
                         });
+                        ctrl.unhandled_drag_end = false;
                         needs_update = true;
                     }
                 } else {
                     if ctrl.drag.is_some() {
                         ctrl.drag = None;
+                        ctrl.unhandled_drag_end = true;
                         needs_update = true;
                     }
                 }
@@ -351,6 +357,10 @@ impl Ui {
                 Widget::Modal { .. } => renderer.render_window(&region),
             }
         });
+
+        if let Some(rect) = &self.input_highlight {
+            renderer.render_input_highlight(rect);
+        }
     }
 
     fn begin_frame(&mut self) {
@@ -361,6 +371,8 @@ impl Ui {
 
         self.parent = Key::root();
         self.prev_sibling = None;
+
+        self.input_highlight = None;
     }
 
     fn end_frame(&mut self) {
@@ -589,7 +601,7 @@ impl UiFrame<'_> {
         }
 
         if draggable {
-            ctrl.update_drag();
+            ctrl.apply_drag();
         }
 
         let width;
@@ -717,6 +729,137 @@ impl UiFrame<'_> {
         self.ui.end_control();
         changed
     }
+
+    pub fn hdraglist<K, V, F>(&mut self, key: K, vec: &mut Vec<V>, draw: F) -> bool
+    where
+        K: UniqueKey,
+        F: FnMut(&mut Self, &mut V)
+    {
+        self.draglist(layout::Dir::LeftRight { wrap: false }, key, vec, draw)
+    }
+
+    pub fn vdraglist<K, V, F>(&mut self, key: K, vec: &mut Vec<V>, draw: F) -> bool
+    where
+        K: UniqueKey,
+        F: FnMut(&mut Self, &mut V)
+    {
+        self.draglist(layout::Dir::TopBottom { wrap: false }, key, vec, draw)
+    }
+
+    fn draglist<K, V, F>(&mut self, dir: layout::Dir, key: K, vec: &mut Vec<V>, mut draw: F) -> bool
+    where
+        K: UniqueKey,
+        F: FnMut(&mut Self, &mut V)
+    {
+        /// The distance a dropped control must be from a drag target (see drag_targets below) to actually get
+        /// inserted there.
+        const MIN_DISTANCE_FROM_DRAG_TARGET: f32 = 9999.0;
+
+        let key = self.ui.key(key.key());
+        self.ui.begin_control(key.clone(), Widget::Group);
+
+        let ctrl = self.current_mut();
+        ctrl.layout.direction = dir;
+
+        // drag_targets is a list of (position, idx) where:
+        //   - position is the point before or after each control
+        //   - idx is the index into vec where a dropped element should be inserted
+        //
+        // So for something that looks like below, drag_targets would be the points noted by the arrows:
+        //
+        //     [item 0]   [item 1]   [item 2]   [item 3]
+        //    ^        ^ ^        ^ ^        ^ ^        ^
+        //    |        | |        | |        | |        |
+        //    0        1 1        2 2        3 3        4
+        //
+        // These points are the places that will 'accept' the newly-dragged element. Note that the element currently
+        // being dragged will not be included in drag_targets.
+        let mut drag_targets = Vec::with_capacity(vec.len() * 2);
+
+        // The index of the element that we are dragging, if any.
+        let mut dragging = None;
+
+        // Whether to actually move `dragging` or not (i.e. has the drag ended).
+        let mut do_move = false;
+
+        for (idx, element) in vec.iter_mut().enumerate() {
+            let key = self.ui.key(idx.key());
+            self.ui.begin_control(key.clone(), Widget::Group);
+
+            let group = self.current_mut();
+
+            group.layout.direction = layout::Dir::LeftRight { wrap: false };
+
+            group.apply_drag();
+
+            // If the element is not currently being dragged, add its bounds to drag_targets.
+            if group.drag.is_none() {
+                drag_targets.extend_from_slice(&[
+                    (group.region.rect.min(), idx),
+                    (group.region.rect.max(), idx + 1),
+                ]);
+                group.layout.new_layer = false;
+            } else {
+                dragging = Some(idx);
+                group.layout.new_layer = true;
+            }
+
+            // Accept the drag end.
+            if group.unhandled_drag_end {
+                group.unhandled_drag_end = false;
+                group.layout.position = Position::Relative(Point::zero());
+
+                do_move = true;
+                dragging = Some(idx);
+            }
+
+            draw(self, element);
+
+            self.ui.end_control();
+        }
+
+        self.ui.end_control();
+
+        // Handle a drag that just finished by swapping the elements around in the vec.
+        if let Some(dragging_idx) = dragging {
+            // We need to figure out where the dragged element was moved to.
+            // To do this, we'll look for the drag_target that is closest to the new position of the dragged element.
+
+            let dragging_key = &self.current().children[dragging_idx];
+            let dragging_ctrl = self.ui.pool.get(dragging_key).unwrap();
+            let dragging_new_pos = dragging_ctrl.region.rect.center();
+
+            let mut target_idx = dragging_idx;
+            let mut closest_distance = MIN_DISTANCE_FROM_DRAG_TARGET;
+            let mut closest_pos = dragging_new_pos;
+
+            for (pos, idx) in drag_targets {
+                let distance = pos.distance_to(dragging_new_pos);
+
+                if distance < closest_distance {
+                    target_idx = idx;
+                    closest_distance = distance;
+                    closest_pos = pos;
+                }
+            }
+
+            if closest_distance < MIN_DISTANCE_FROM_DRAG_TARGET && target_idx != dragging_idx {
+                if do_move {
+                    // Move the dragged element and control (at dragged_idx) to index target_idx.
+                    move_vec_idx(vec, dragging_idx, target_idx);
+                    move_vec_idx(&mut self.current_mut().children, dragging_idx, target_idx);
+                } else {
+                    self.ui.input_highlight = Some(Rect {
+                        // TODO: line depending on dir
+                        origin: closest_pos,
+                        size: Size::new(10.0, 10.0),
+                    });
+                }
+            }
+        }
+
+        do_move
+    }
 }
 
 impl Key {
@@ -750,6 +893,7 @@ impl Control {
             middle_click: Default::default(),
 
             drag: None,
+            unhandled_drag_end: false,
             drag_trigger_update: false,
         }
     }
@@ -769,7 +913,7 @@ impl Control {
         self.left_click
     }
 
-    fn update_drag(&mut self) {
+    fn apply_drag(&mut self) {
         self.drag_trigger_update = true;
         self.inputs_trigger_update |= Input::MouseOver | Input::LeftMouseDown;
 
@@ -853,5 +997,27 @@ impl Text<'_> {
     pub fn with_height(&mut self, height: f32) -> &mut Self {
         self.ctrl.layout.height = Dimension::Range(height..=height);
         self
+    }
+}
+
+/// Move the element at `from_idx` to `to_idx` without cloning.
+fn move_vec_idx<T>(vec: &mut Vec<T>, src_idx: usize, dest_idx: usize) {
+    use std::mem::{replace, zeroed};
+
+    if src_idx == dest_idx {
+        return;
+    }
+
+    // Take the src element out of the vec, replacing it with uninitialised memory (!!!).
+    let src = replace(&mut vec[src_idx], unsafe { zeroed() });
+
+    vec.insert(dest_idx, src);
+
+    // Remove the zero memory that we left at `src_idx` previously.
+    if src_idx > dest_idx {
+        // `insert` shifts all elements after `dest_idx` to the right by 1.
+        vec.remove(src_idx + 1);
+    } else {
+        vec.remove(src_idx);
     }
 }

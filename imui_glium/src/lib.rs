@@ -558,4 +558,12 @@ impl Render for Renderer {
     fn render_window(&mut self, region: &Region) {
         self.render_sprite_9slice(region, "window", [1.0, 1.0, 1.0, 1.0]);
     }
+
+    fn render_input_highlight(&mut self, _rect: &Rect) {
+        // TODO
+        /*self.render_sprite_scaled(&Region {
+            rect: rect.clone(),
+            layer: u8::max_value(),
+        }, "white", [1.0, 1.0, 1.0, 1.0])*/
+    }
 }

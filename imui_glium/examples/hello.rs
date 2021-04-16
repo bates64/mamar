@@ -2,7 +2,8 @@ use imui_glium::*;
 
 #[derive(Debug)]
 struct Interface {
-    num_buttons: u8,
+    num_buttons: u32,
+    draggables: Vec<u32>,
 }
 
 impl Interface {
@@ -29,6 +30,15 @@ impl Interface {
                     });
 
                     ui.text("num buttons", format!("Above are {} buttons", self.num_buttons));
+
+                    if ui.vdraglist("draglist", &mut self.draggables, |ui, item| {
+                        ui.pad(-1, 10.0);
+                        ui.text(0, "Drag me!").center_y();
+                        ui.pad(1, 10.0);
+                        ui.button(2, format!("{}", item)).with_width(36.0);
+                    }) {
+                        updated = true;
+                    }
                 });
             });
 
@@ -56,9 +66,13 @@ fn main() {
     glue.atlas().insert("button", "assets/tex/button.png").unwrap();
     glue.atlas().insert("button_pressed", "assets/tex/button_pressed.png").unwrap();
     glue.atlas().insert("window", "assets/tex/window.png").unwrap();
+    glue.atlas().insert("white", "assets/tex/white.png").unwrap();
     glue.load_font(include_bytes!("../../assets/Inter-Medium.otf")).unwrap();
 
-    let mut interface = Interface { num_buttons: 1 };
+    let mut interface = Interface {
+        num_buttons: 1,
+        draggables: vec![1, 2, 3, 4, 5],
+    };
     interface.update(&mut glue);
 
     {
@@ -95,7 +109,7 @@ fn main() {
 
         if glue.needs_redraw() || redraw {
             let mut surface = display.draw();
-            surface.clear_color(0.0, 0.0, 0.0, 1.0);
+            surface.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), -1000.0);
             glue.draw(&mut surface, &display).unwrap();
             surface.finish().unwrap();
         }

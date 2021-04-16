@@ -132,11 +132,13 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
                     compute(pool, child, rect.clone(), renderer, layer);
                 }
             }
-            Dir::LeftRight { mut wrap } => {
+            Dir::LeftRight { wrap } => {
                 let mut pos = Vector::zero();
                 let mut row_height = 0.0;
 
                 for child in &children {
+                    let mut looped_already = false;
+
                     loop {
                         compute(
                             pool,
@@ -160,13 +162,13 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
                             row_height = calc.height();
                         }
 
-                        if wrap {
+                        if wrap && !looped_already {
                             if pos.x >= rect.width() && calc.width() < rect.width() {
                                 pos.x = 0.0;
                                 pos.y += row_height;
                                 row_height = 0.0;
 
-                                wrap = false; // Avoid infinite loop
+                                looped_already = true; // Avoid infinite loop
                                 continue; // Relayout the child on the next row
                             }
                         }

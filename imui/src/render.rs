@@ -1,4 +1,4 @@
-use super::{Region, Size};
+use super::{Region, Size, Rect};
 
 pub trait Render {
     // Layout utilities.
@@ -9,4 +9,5 @@ pub trait Render {
     fn render_button(&mut self, region: &Region, texture: &'static str);
     fn render_toggle_button(&mut self, region: &Region, is_pressed: bool, is_enabled: bool);
     fn render_window(&mut self, region: &Region);
+    fn render_input_highlight(&mut self, rect: &Rect);
 }
