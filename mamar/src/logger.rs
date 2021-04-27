@@ -10,8 +10,9 @@ impl log::Log for MyLogger {
     }
 
     fn log(&self, record: &Record) {
-        let is_mamar = record.file().map(|s| s.contains("mamar")).unwrap_or_default();
-        if !is_mamar {
+        // Silence logs from discord-rpc-client because it's really noisy and we don't care about its status
+        let is_discord_rpc = record.file().map(|s| s.contains("discord-rpc-client")).unwrap_or_default();
+        if is_discord_rpc {
             return;
         }
 

@@ -153,7 +153,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
 
                         // Absolutely-positioned children don't take up space in their parent.
                         if let Position::Absolute(..) = &pool[child].layout.position {
-                            continue;
+                            break;
                         }
 
                         let calc = &pool[child].region.rect;
@@ -204,7 +204,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
 
                         // Absolutely-positioned children don't take up space in their parent.
                         if let Position::Absolute(..) = &pool[child].layout.position {
-                            continue;
+                            break;
                         }
 
                         let calc = &pool[child].region.rect;

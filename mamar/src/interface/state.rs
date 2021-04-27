@@ -44,6 +44,12 @@ enum UiState {
         segment_idx: usize,
     },
 
+    Subsegment {
+        segment_idx: usize,
+        subseg_idx: usize,
+        track_list_interface: TrackListInterface,
+    },
+
     OldOverview {
         selected_segment_idx: u8,
         track_list_interface: TrackListInterface,
@@ -192,6 +198,7 @@ impl Document {
 
     pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
         let bgm = &mut self.bgm;
+        let mut next_state = None;
 
         match &mut self.ui_state {
             UiState::None => {}
@@ -269,7 +276,16 @@ impl Document {
                                     match subseg {
                                         Subsegment::Tracks { track_list, .. } => {
                                             let name = &track_lists[track_list].name;
-                                            ui.button("subseg tracks name", name).with_width(400.0);
+                                            if ui.button("subseg tracks name", name)
+                                                .with_width(400.0)
+                                                .clicked()
+                                            {
+                                                next_state = Some(UiState::Subsegment {
+                                                    segment_idx: *segment_idx,
+                                                    subseg_idx: i,
+                                                    track_list_interface: TrackListInterface::new(),
+                                                })
+                                            }
                                         },
                                         Subsegment::Unknown { flags, .. } => {
                                             let label;
@@ -323,6 +339,37 @@ impl Document {
                                 name: format!("Variation {}", *segment_idx + 1),
                                 subsegments: Default::default(),
                             });
+                        }
+                    }
+                });
+            }
+
+            UiState::Subsegment {
+                segment_idx,
+                subseg_idx,
+                track_list_interface,
+            } => {
+                ui.vbox(0, |ui| {
+                    if let Some(segment) = &bgm.segments[*segment_idx as usize] {
+                        let subseg = &segment.subsegments[*subseg_idx];
+
+                        if let Subsegment::Tracks { track_list, .. } = subseg {
+                            let track_list = bgm.track_lists.get_mut(track_list).unwrap();
+
+                            ui.hbox("subseg toolbar", |ui| {
+                                if ui.button("back btn", "Back").clicked() {
+                                    next_state = Some(UiState::Segment { segment_idx: *segment_idx });
+                                }
+
+                                ui.pad("pad", 10.0);
+
+                                ui.text("subseg name", track_list.name.clone())
+                                    .center_y();
+                            });
+
+                            ui.pad("pad", 10.0);
+
+                            track_list_interface.update(ui, track_list, &mut bgm.voices);
                         }
                     }
                 });
@@ -448,6 +495,11 @@ impl Document {
                     }
                 });
             }
+        }
+
+        // Switch to `next_state`
+        if let Some(state) = next_state {
+            self.ui_state = state;
         }
     }
 }
