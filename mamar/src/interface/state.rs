@@ -232,6 +232,7 @@ impl Document {
                     if let Some(segment) = opt_segment {
                         let mut to_delete_segment = false;
                         let mut to_add_subseg = false;
+                        let mut to_add_loops = false;
 
                         ui.vbox(0, |ui| {
                             ui.hbox("toolbar", |ui| {
@@ -321,6 +322,10 @@ impl Document {
                             if ui.button("add subseg", "New section").clicked() {
                                 to_add_subseg = true;
                             }
+
+                            if ui.button("loop subseg", "Add loop").clicked() {
+                                to_add_loops = true;
+                            }
                         });
 
                         if to_add_subseg {
@@ -328,6 +333,18 @@ impl Document {
                             bgm.segments[*segment_idx].as_mut().unwrap().subsegments.push(Subsegment::Tracks {
                                 flags: 0x10,
                                 track_list,
+                            });
+                        } else if to_add_loops {
+                            let subsegments = &mut bgm.segments[*segment_idx].as_mut().unwrap().subsegments;
+
+                            subsegments.insert(0, Subsegment::Unknown {
+                                flags: 0x30,
+                                data: [0, 0, 0],
+                            });
+
+                            subsegments.push(Subsegment::Unknown {
+                                flags: 0x30,
+                                data: [0, 0, 0],
                             });
                         } else if to_delete_segment {
                             *opt_segment = None;
