@@ -377,6 +377,14 @@ impl CommandSeq {
         self.vec[idx] = Command::Delay(0);
     }
 
+    pub fn zero_all_delays(&mut self) {
+        for cmd in &mut self.vec {
+            if let Command::Delay(_) = cmd {
+                *cmd = Command::Delay(0);
+            }
+        }
+    }
+
     // TODO
     /*
     /// Combines two sequences with the same relative-time space.

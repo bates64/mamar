@@ -256,3 +256,13 @@ pub mod track_flags {
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
 }
+
+impl TrackList {
+    pub fn silence_skip(&mut self) {
+        for track in &mut self.tracks {
+            track.mute = true;
+            track.solo = false;
+            track.commands.zero_all_delays();
+        }
+    }
+}

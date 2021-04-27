@@ -147,7 +147,7 @@ impl Interface {
                     ui.pad(1, 10.0);
 
                     if let Some(doc) = state.document.as_mut() {
-                        ui.hbox(2, |ui| doc.update(ui));
+                        ui.hbox(2, |ui| doc.update(ui, hot));
                     }
                 });
             });

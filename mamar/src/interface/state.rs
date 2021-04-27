@@ -9,6 +9,8 @@ use pm64::bgm::*;
 use track_list::TrackListInterface;
 use crate::interface::form::range_select;
 
+use super::hot::Hot;
+
 #[derive(Default, PartialEq, Clone)]
 pub struct State {
     pub document: Option<Document>,
@@ -196,7 +198,7 @@ impl Document {
         }
     }
 
-    pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>) {
+    pub fn update(&mut self, ui: &mut imui_glium::UiFrame<'_>, hot: &mut Hot) {
         let bgm = &mut self.bgm;
         let mut next_state = None;
 
@@ -231,8 +233,10 @@ impl Document {
 
                     if let Some(segment) = opt_segment {
                         let mut to_delete_segment = false;
+                        let mut to_play_segment = false;
                         let mut to_add_subseg = false;
                         let mut to_add_loops = false;
+                        let mut to_play_subseg = None;
 
                         ui.vbox(0, |ui| {
                             ui.hbox("toolbar", |ui| {
@@ -240,7 +244,9 @@ impl Document {
                                     to_delete_segment = true;
                                 }
 
-                                // TODO: add loop
+                                if ui.button("play", "Play").clicked() {
+                                    to_play_segment = true;
+                                }
                             });
 
                             ui.pad("top pad", 30.0);
@@ -286,6 +292,10 @@ impl Document {
                                                     subseg_idx: i,
                                                     track_list_interface: TrackListInterface::new(),
                                                 })
+                                            }
+
+                                            if ui.button("subseg play", "Play").clicked() {
+                                                to_play_subseg = Some(i);
                                             }
                                         },
                                         Subsegment::Unknown { flags, .. } => {
@@ -348,6 +358,40 @@ impl Document {
                             });
                         } else if to_delete_segment {
                             *opt_segment = None;
+                        } else if to_play_segment {
+                            let mut bgm = bgm.clone();
+
+                            let this_segment = bgm.segments[*segment_idx].clone();
+                            bgm.segments = [this_segment, None, None, None];
+
+                            let _ = hot.play_bgm(&bgm);
+                        } else if let Some(subseg_idx) = to_play_subseg {
+                            let mut bgm = bgm.clone();
+                            let segment = bgm.segments[*segment_idx].as_ref().unwrap();
+                            let mut subsegments = Vec::new();
+
+                            for (i, subseg) in segment.subsegments.iter().enumerate() {
+                                if i > subseg_idx {
+                                    break;
+                                }
+
+                                if let Subsegment::Tracks { flags, track_list } = subseg {
+                                    subsegments.push(Subsegment::Tracks { flags: *flags, track_list: *track_list });
+
+                                    if i != subseg_idx {
+                                        // Silence the subsegment and remove all delay commands inside.
+                                        // This effectively means we 'skip' this subsegment, but without losing state.
+                                        bgm.track_lists.get_mut(track_list).unwrap().silence_skip();
+                                    }
+                                }
+                            }
+
+                            bgm.segments = [Some(Segment {
+                                name: "".to_owned(),
+                                subsegments,
+                            }), None, None, None];
+
+                            let _ = hot.play_bgm(&bgm);
                         }
                     } else {
                         // Segment is (no data)
