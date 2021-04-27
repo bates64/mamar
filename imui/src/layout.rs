@@ -163,7 +163,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
                         }
 
                         if wrap && !looped_already {
-                            if pos.x >= rect.width() && calc.width() < rect.width() {
+                            if pos.x > rect.width() && calc.width() < rect.width() {
                                 pos.x = 0.0;
                                 pos.y += row_height;
                                 row_height = 0.0;
@@ -214,7 +214,7 @@ pub(crate) fn compute<R: Render>(pool: &mut Pool, key: &Key, space_rect: Rect, r
                         }
 
                         if wrap {
-                            if pos.x >= rect.width() {
+                            if pos.x > rect.width() {
                                 pos.x += col_width;
                                 pos.y = 0.0;
                                 col_width = 0.0;

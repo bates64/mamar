@@ -203,7 +203,7 @@ impl TrackListInterface {
             if self.is_set_instrument {
                 ui.modal(1, true, (600.0, 500.0), |ui| {
                     ui.hbox(0, |ui| {
-                        let mut i = 0; // TODO wider imui keys
+                        let mut i = 0;
                         for (name, (instr_bank_upper, patch)) in INSTRUMENTS_BY_NAME.iter() {
                             let approx_width = name.len() as f32 * 10.0; // XXX
 
