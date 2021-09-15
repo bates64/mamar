@@ -1,3 +1,11 @@
+## 0.10.0
+
+- Added tabs to switch variation
+- Added loop controls
+- Added 'New file' and 'Add section' buttons
+- Added buttons to reorder sections ('v' and '^' buttons)
+- When importing, MIDI tracks named "percussion" will be assumed to be drum tracks
+
 ## 0.9.0
 
 - Greatly improved MIDI importing
