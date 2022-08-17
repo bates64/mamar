@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap};
 
 use lazy_static::lazy_static;
 
 lazy_static! {
     /// name -> (upper bank, patch)
-    pub static ref INSTRUMENTS_BY_NAME: HashMap<&'static str, (u8, u8)> = {
-        let mut m = HashMap::new();
+    pub static ref INSTRUMENTS_BY_NAME: BTreeMap<&'static str, (u8, u8)> = {
+        let mut m = BTreeMap::new();
         /*
         m.insert("Synth Bass 1", (0, 0));
         m.insert("Air Blow", (0, 1));
@@ -69,8 +69,8 @@ lazy_static! {
         m
     };
 
-    pub static ref INSTRUMENTS_BY_ID: HashMap<(u8, u8), &'static str> = {
-        let mut m = HashMap::with_capacity(INSTRUMENTS_BY_NAME.capacity());
+    pub static ref INSTRUMENTS_BY_ID: BTreeMap<(u8, u8), &'static str> = {
+        let mut m = BTreeMap::new();
         for (k, v) in INSTRUMENTS_BY_NAME.iter() {
             m.insert(*v, *k);
         }
