@@ -1,0 +1,11 @@
+{
+  "name": "pm64-typegen",
+  "version": "0.1.0",
+  "module": "index.js",
+  "private": true,
+  "main": "index.js",
+  "types": "pm64.d.ts",
+  "scripts": {
+    "build": "cargo run"
+  }
+}

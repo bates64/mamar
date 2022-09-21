@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "workspaces": [
+    "mamar-web",
+    "mamar-wasm-bridge/pkg",
+    "pm64-typegen"
+  ],
+  "scripts": {
+    "preinstall": "cd mamar-wasm-bridge && wasm-pack build -t web"
+  },
+  "multipleStaticFileCopier": [
+    {
+      "origin": "../node_modules/mupen64plus-web/bin/web",
+      "destination": "dist/mupen64plus-web"
+    }
+  ]
+}

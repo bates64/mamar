@@ -3,6 +3,7 @@ use std::iter;
 use std::ops::Range;
 
 use serde_derive::{Serialize, Deserialize};
+use typescript_type_def::TypeDef;
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -38,7 +39,7 @@ use serde_derive::{Serialize, Deserialize};
 /// that this collection is not equivalent to [Vec] - in many ways it acts more like a
 /// [HashMap](std::collections::HashMap) (i.e. a dictionary) with relative-time keys and [Command] values (for
 /// example, you cannot lookup by vector index, because ordering is undefined between [Delay] partitions).
-#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
 #[serde(transparent)]
 pub struct CommandSeq {
     /// List of [Command]s in time order. Sets of [Command]s at the same time value have undefined ordering, so this
@@ -556,7 +557,7 @@ enum DelayLookup {
 /// do not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
 /// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
 /// relative time positioning.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
     Delay(usize),
@@ -782,7 +783,7 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 
 pub type MarkerId = String;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, TypeDef)]
 pub struct CommandRange {
     pub name: String,
 

@@ -13,6 +13,7 @@ use std::ops::Range;
 use std::collections::HashMap;
 
 use serde_derive::{Serialize, Deserialize};
+use typescript_type_def::TypeDef;
 
 mod cmd;
 pub use cmd::*;
@@ -25,7 +26,7 @@ pub type FilePos = u64;
 
 pub type TrackListId = u64;
 
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Bgm {
     pub name: String,
@@ -100,7 +101,7 @@ impl Bgm {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 pub struct Segment {
     /// Not encoded in BGM data.
     pub name: String,
@@ -110,7 +111,7 @@ pub struct Segment {
 }
 
 // TODO: better representation for `flags`
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 pub enum Subsegment {
     Tracks {
         flags: u8,
@@ -122,7 +123,7 @@ pub enum Subsegment {
     },
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct TrackList {
     /// Not encoded in BGM data.
@@ -135,7 +136,7 @@ pub struct TrackList {
     pub tracks: [Track; 16],
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Track {
     pub name: String,
@@ -159,7 +160,7 @@ impl Subsegment {
     }
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Drum {
     pub bank: u8,
@@ -189,7 +190,7 @@ pub struct Drum {
     pub unk_0b: u8, // Unused
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Voice {
     /// Upper nibble = bank. (0..=6 are valid?)

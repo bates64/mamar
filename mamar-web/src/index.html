@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+
+        <title>Mamar</title>
+        <meta name="description" content="Paper Mario music editor" />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#ea7aa1" />
+
+        <link rel="stylesheet" href="index.scss" />
+        <link rel="icon" href="mamar-flat.svg" />
+    </head>
+    <body>
+        <div id="root">
+            <main class="initial-load-container" aria-label="Loading">
+                <div>
+                    <h1>
+                        <img src="header/logo.svg" alt="Mamar" class="icon" />
+                    </h1>
+                    <p id="root-loading-status">
+                        <img src="icon/loadingspinner.svg" alt="" class="icon" />
+                        Mamar is loading...
+                    </p>
+                    <script>
+                        window.addEventListener("error", error => {
+                            const el = document.getElementById("root-loading-status")
+                            if (el) {
+                                el.innerText = "An error occurred while loading Mamar"
+                            }
+                        })
+                    </script>
+                    <noscript>
+                        <p>
+                            Please enable JavaScript to use Mamar.
+                        </p>
+                    </noscript>
+                </div>
+            </main>
+        </div>
+
+        <canvas id="canvas" aria-hidden="true"></canvas>
+
+        <script type="module" src="index.tsx"></script>
+    </body>
+</html>

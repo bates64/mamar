@@ -1,9 +1,10 @@
 [workspace]
 members = [
-    "mamar",
+    "mamar-wasm-bridge",
     "pm64",
-    "imui",
-    "imui_glium",
+    "pm64-typegen",
+    #"imui",
+    #"imui_glium",
 ]
 
 [profile.release]

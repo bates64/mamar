@@ -1,0 +1,43 @@
+{
+  "name": "mamar-web",
+  "version": "1.0.0",
+  "description": "Paper Mario music editor",
+  "repository": "https://github.com/nanaian/mamar",
+  "author": "Alex Bates <alex@nanaian.town>",
+  "private": true,
+  "scripts": {
+    "start": "parcel src/index.html",
+    "prestart": "sed -i 's/typeof process/\"undefined\"/g' ../node_modules/mupen64plus-web/bin/web/index.*.js && rm -rf dist .parcel-cache"
+  },
+  "dependencies": {
+    "@adobe/react-spectrum": "^3.21.2",
+    "@spectrum-icons/workflow": "^4.0.2",
+    "browser-fs-access": "^0.31.0",
+    "idb-keyval": "^6.2.0",
+    "mamar-wasm-bridge": "*",
+    "mupen64plus-web": "^1.3.2",
+    "pm64-typegen": "*",
+    "react": "^18.2.0",
+    "react-aria": "^3.19.0",
+    "react-dom": "^18.2.0",
+    "react-stately": "^3.17.0",
+    "react-tracked": "^1.7.10",
+    "use-undoable": "^3.3.11"
+  },
+  "devDependencies": {
+    "@axe-core/react": "^4.4.4",
+    "@parcel/optimizer-data-url": "2.7.0",
+    "@parcel/transformer-inline-string": "2.7.0",
+    "@parcel/transformer-sass": "2.7.0",
+    "@parcel/transformer-svg-react": "^2.7.0",
+    "@types/node": "^18.7.18",
+    "@types/react": "^18.0.20",
+    "@types/react-dom": "^18.0.6",
+    "eslint": "^8.23.1",
+    "eslint-config-react-app": "^7.0.1",
+    "parcel": "^2.7.0",
+    "parcel-reporter-multiple-static-file-copier": "^1.0.5",
+    "process": "^0.11.10",
+    "typescript": "^4.8.3"
+  }
+}

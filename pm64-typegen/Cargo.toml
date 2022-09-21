@@ -1,0 +1,9 @@
+[package]
+name = "pm64-typegen"
+version = "0.1.0"
+authors = ["Alex Bates <alex@nanaian.town>"]
+edition = "2018"
+
+[dependencies]
+typescript-type-def = "0.5"
+pm64 = { path = "../pm64" }
