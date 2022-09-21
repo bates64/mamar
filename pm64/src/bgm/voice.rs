@@ -98,7 +98,7 @@ lazy_static! {
         m.insert("Guitar Harmonics 1", (3, 0x52));
         m.insert("Guitar Harmonics 2", (3, 0x53));
         m.insert("Percussive Organ", (3, 0x54));
-        m.insert("Sitar", (3, 0x55));
+        m.insert("Sitar 1", (3, 0x55));
         m.insert("Bari Sax 1", (3, 0x56));
         m.insert("Bari Sax 2", (3, 0x57));
         m.insert("Muted Trumpet 3", (3, 0x58));
@@ -115,8 +115,8 @@ lazy_static! {
         m.insert("Rock Organ 1", (3, 0x63));
         m.insert("Rock Organ 2", (3, 0x64));
         m.insert("Muted Synth Bass", (3, 0x65));
-        m.insert("Sitar 1", (3, 0x66));
-        m.insert("Sitar 2", (3, 0x67));
+        m.insert("Sitar 2", (3, 0x66));
+        m.insert("Sitar 3", (3, 0x67));
         m.insert("Synth Bass 2", (3, 0x68));
         m.insert("Synth Bass 3", (3, 0x69));
         m.insert("Synth Brass 1", (3, 0x6A));
@@ -147,7 +147,7 @@ lazy_static! {
         m.insert("Dulcimer 2", (3, 0x83));
         m.insert("Beep", (3, 0x84));
         m.insert("Clean Beep", (3, 0x85));
-        m.insert("Sitar 2", (3, 0x86));
+        m.insert("Sitar 4", (3, 0x86));
         m.insert("Kalimba", (3, 0x87));
         m.insert("Orchestra Hit", (3, 0x88));
         m.insert("Accordion 1", (3, 0x89));
