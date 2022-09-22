@@ -2,11 +2,11 @@ import { View, ActionButton } from "@adobe/react-spectrum"
 
 import OpenButton from "./OpenButton"
 
-import { useRoot } from "../store"
+import { useDoc, useRoot } from "../store"
 
 export default function BgmActionGroup() {
-    const [root, dispatch] = useRoot()
-    const isDocOpen = root.activeDocId !== undefined
+    const [, dispatch] = useRoot()
+    const [doc, docDispatch] = useDoc()
 
     const props = {
         isQuiet: true,
@@ -20,9 +20,10 @@ export default function BgmActionGroup() {
         <OpenButton />
         <ActionButton
             onPress={async () => {
-                // TODO
+                // TODO: save file
+                docDispatch({ type: "mark_saved" })
             }}
-            isDisabled={!isDocOpen}
+            isDisabled={doc?.isSaved}
             {...props}
         >Save</ActionButton>
         <ActionButton

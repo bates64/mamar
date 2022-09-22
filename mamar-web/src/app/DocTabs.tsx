@@ -1,18 +1,33 @@
-import { View, Flex, DialogContainer } from "@adobe/react-spectrum"
+import { View, Flex } from "@adobe/react-spectrum"
+import CircleFilled from "@spectrum-icons/workflow/CircleFilled"
 import Close from "@spectrum-icons/workflow/Close"
-import { useState } from "react"
+import { useEffect } from "react"
 
-import PaperMarioRomInputDialog, { useCachedPaperMarioUsRom } from "./emu/PaperMarioRomInputDialog"
 import ErrorBoundaryView from "./ErrorBoundaryView"
-import { useDoc, useRoot } from "./store"
+import { Doc, useDoc, useRoot } from "./store"
 import WelcomeScreen from "./WelcomeScreen"
+
 import "./DocTabs.scss"
 
-function ActiveDoc({ romData }: { romData: ArrayBuffer }) {
+function ActiveDoc() {
     const [doc] = useDoc()
 
+    const title = doc ? (doc.isSaved ? doc.name : `${doc.name} (unsaved)`) : "Mamar"
+    useEffect(() => {
+        document.title = title
+
+        if (doc && !doc.isSaved) {
+            const onbeforeunload = (evt: BeforeUnloadEvent) => {
+                evt.preventDefault()
+                return evt.returnValue = "You have unsaved changes."
+            }
+            window.addEventListener("beforeunload", onbeforeunload)
+            return () => window.removeEventListener("beforeunload", onbeforeunload)
+        }
+    }, [title, doc])
+
     if (!doc) {
-        return <WelcomeScreen romData={romData} />
+        return <WelcomeScreen />
     }
 
     return <View padding="size-200">
@@ -20,54 +35,51 @@ function ActiveDoc({ romData }: { romData: ArrayBuffer }) {
     </View>
 }
 
-export default function DocTabs() {
+function TabButton({ doc }: { doc: Doc }) {
     const [root, dispatch] = useRoot()
+    const { id, name, isSaved } = doc
+    const isActive = root.activeDocId === id
+
+    return <button
+        key={id}
+        aria-label={name}
+        className={`DocTab active-${isActive}`}
+        onClick={() => dispatch({ type: "focus_doc", id })}
+        onAuxClick={() => dispatch({ type: "close_doc", id })}
+    >
+        <span>{name}</span>
+        <div
+            aria-label="Close tab"
+            role="button"
+            tabIndex={0}
+            className="DocTab_Close"
+            onClick={evt => {
+                evt.stopPropagation()
+                dispatch({ type: "close_doc", id })
+            }}
+            onKeyDown={evt => {
+                if (evt.key === "Enter") {
+                    evt.stopPropagation()
+                    dispatch({ type: "close_doc", id })
+                }
+            }}
+        >
+            <Close UNSAFE_className="DocTab_Close_CloseIcon" />
+            {!isSaved && <CircleFilled UNSAFE_className="DocTab_Close_UnsavedIcon" />}
+        </div>
+    </button>
+}
+
+export default function DocTabs() {
+    const [root] = useRoot()
     const docs = Object.values(root.docs)
-    const [romData, setRomData] = useState(useCachedPaperMarioUsRom())
 
     return <Flex direction="column" width="100vw" height="100%">
-        <Flex height="size-450">
-            <View minWidth="size-100" borderColor="gray-200" borderBottomWidth={1} />
-            {docs.map(doc => {
-                const { id } = doc
-                const name = doc.name
-                const isActive = root.activeDocId === doc.id
-
-                return <button
-                    key={id}
-                    aria-label={name}
-                    className={`DocTab active-${isActive}`}
-                    onClick={() => dispatch({ type: "focus_doc", id })}
-                    onAuxClick={() => dispatch({ type: "close_doc", id })}
-                >
-                    <span>{name}</span>
-                    <div
-                        aria-label="Close tab"
-                        role="button"
-                        tabIndex={0}
-                        className="DocTab_Close"
-                        onClick={evt => {
-                            evt.stopPropagation()
-                            dispatch({ type: "close_doc", id })
-                        }}
-                        onKeyDown={evt => {
-                            if (evt.key === "Enter") {
-                                evt.stopPropagation()
-                                dispatch({ type: "close_doc", id })
-                            }
-                        }}
-                    >
-                        <Close />
-                    </div>
-                </button>
-            })}
-            <View flex minWidth="size-100" borderColor="gray-200" borderBottomWidth={1} />
-        </Flex>
-        <ErrorBoundaryView flex backgroundColor={root.activeDocId ? "gray-100" : "gray-50"}>
-            {romData && <ActiveDoc romData={romData} />}
+        {docs.length >= 2 && <Flex height="size-450" UNSAFE_className="DocTabs_container">
+            {docs.map(doc => <TabButton key={doc.id} doc={doc} />)}
+        </Flex>}
+        <ErrorBoundaryView flex UNSAFE_className="DocTabs_main_content">
+            <ActiveDoc />
         </ErrorBoundaryView>
-        <DialogContainer onDismiss={() => {}} isDismissable={false} isKeyboardDismissDisabled={true}>
-            {!romData && <PaperMarioRomInputDialog onChange={setRomData} />}
-        </DialogContainer>
     </Flex>
 }

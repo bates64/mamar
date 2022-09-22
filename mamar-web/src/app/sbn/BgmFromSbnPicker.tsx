@@ -6,6 +6,7 @@ import { names } from "./songNames.json"
 import useDecodedSbn from "./useDecodedSbn"
 
 import { openData, useRoot } from "../store"
+import useRomData from "../util/hooks/useRomData"
 
 import "./BgmFromSbnPicker.scss"
 
@@ -35,9 +36,10 @@ function getRows(sbn: Sbn | null): Item[] {
     return items
 }
 
-export default function BgmFromSbnPicker({ romData }: { romData: ArrayBuffer }) {
+export default function BgmFromSbnPicker() {
     const [, dispatch] = useRoot()
     const [loadError, setLoadError] = useState<Error | null>(null)
+    const romData = useRomData()
     const sbn = useDecodedSbn(romData)
     const items = useMemo(() => {
         return getRows(sbn)
@@ -47,6 +49,7 @@ export default function BgmFromSbnPicker({ romData }: { romData: ArrayBuffer }) 
         <TableView
             aria-label="Song list"
             height="size-6000"
+            isQuiet
             onAction={key => {
                 const item = items.find(item => item.id.toString() === key)
 

@@ -1,19 +1,17 @@
-import { DialogContainer, Flex, ToggleButton, View } from "@adobe/react-spectrum"
+import { Flex, ToggleButton, View } from "@adobe/react-spectrum"
 import Play from "@spectrum-icons/workflow/Play"
 import { useEffect, useState } from "react"
 
-import PaperMarioRomInputDialog, { useCachedPaperMarioUsRom } from "./PaperMarioRomInputDialog"
-
 import { useBgm } from "../store"
 import useMupen from "../util/hooks/useMupen"
+import useRomData from "../util/hooks/useRomData"
 
 import "./PlaybackControls.scss"
 
 export default function PlaybackControls() {
     const [bgm] = useBgm()
     const [isPlaying, setIsPlaying] = useState(false)
-    const [romData, setRomData] = useState(useCachedPaperMarioUsRom())
-    const [showDialog, setShowDialog] = useState(false)
+    const romData = useRomData()
     const mupen = useMupen(romData)
 
     useEffect(() => {
@@ -49,18 +47,10 @@ export default function PlaybackControls() {
             isEmphasized
             isSelected={isPlaying}
             onChange={(p: boolean) => {
-                if (romData) {
-                    setIsPlaying(p)
-                } else {
-                    setShowDialog(true)
-                }
+                setIsPlaying(p)
             }}
         >
             <Play />
         </ToggleButton>
-
-        <DialogContainer onDismiss={() => setShowDialog(false)}>
-            {showDialog && <PaperMarioRomInputDialog onChange={setRomData} />}
-        </DialogContainer>
     </Flex>
 }

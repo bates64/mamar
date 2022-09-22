@@ -27,12 +27,15 @@ export interface Doc {
     id: string
     bgm: Bgm
     file?: FileWithHandle
-    name?: string
+    name: string
+    isSaved: boolean
 }
 
 export type DocAction = {
     type: "bgm"
     action: BgmAction
+} | {
+    type: "mark_saved"
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -41,6 +44,12 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             bgm: bgmReducer(state.bgm, action.action),
+            isSaved: false,
+        }
+    case "mark_saved":
+        return {
+            ...state,
+            isSaved: true,
         }
     }
 }
@@ -90,6 +99,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             bgm: action.bgm ?? new_bgm(),
             file: action.file,
             name: action.name ?? action.file?.name ?? "New song",
+            isSaved: true,
         }
         return {
             ...root,

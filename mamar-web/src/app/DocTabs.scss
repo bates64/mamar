@@ -1,6 +1,17 @@
+@use "../index.scss";
+
+.DocTabs_container {
+    padding: 0 8px;
+}
+
+.DocTabs_main_content {
+    @include index.faded-dot-background(300px);
+    border-top: 1px solid var(--grey-2);
+}
+
 .DocTab {
     margin: 0;
-    padding: 0 9px;
+    padding: 0 9px 0 12px;
 
     width: 160px;
     overflow: hidden;
@@ -11,25 +22,20 @@
 
     color: var(--spectrum-global-color-gray-600);
     background: transparent;
-    border: 1px solid transparent;
-    border-right: 1px solid var(--spectrum-global-color-gray-200);
-    border-bottom: 1px solid var(--spectrum-global-color-gray-200);
+    border: 0;
+    border-bottom: 2px solid transparent;
 
     user-select: none;
 
-    &:has(+ .active-true) {
-        border-right-color: transparent;
+    &:not(:last-child) {
+        border-right: 1px solid var(--spectrum-global-color-gray-100);
     }
 
     &.active-true {
         color: var(--spectrum-global-color-gray-900);
-        background: var(--spectrum-global-color-gray-100);
-        border-top-color: var(--spectrum-global-color-gray-200);
-        border-bottom-color: transparent;
-
-        &:not(:first-child) {
-            border-left-color: var(--spectrum-global-color-gray-200);
-        }
+        //background: var(--grey-0-alpha-50);
+        border-bottom-color: var(--spectrum-global-color-gray-900);
+        //backdrop-filter: blur(4px);
     }
 
     > span {
@@ -62,19 +68,34 @@
         &:hover {
             color: var(--spectrum-global-color-gray-900);
             background: var(--spectrum-global-color-gray-200);
+
+            .DocTab_Close_UnsavedIcon {
+                display: none;
+            }
         }
 
-        svg {
+        &:not(:hover):has(.DocTab_Close_UnsavedIcon) {
+            .DocTab_Close_CloseIcon {
+                display: none;
+            }
+        }
+
+        .DocTab_Close_CloseIcon {
             width: 14px;
             height: 14px;
+            opacity: 0;
         }
 
-        opacity: 0;
+        .DocTab_Close_UnsavedIcon {
+            width: 12px;
+            height: 12px;
+            color: var(--spectrum-global-color-gray-800);
+        }
     }
 
     &:hover,
     &.active-true {
-        .DocTab_Close {
+        .DocTab_Close_CloseIcon {
             opacity: 1;
         }
     }

@@ -1,32 +1,14 @@
 import { Text, Content, Dialog, Divider, Heading, Flex, useDialogContainer } from "@adobe/react-spectrum"
 import Alert from "@spectrum-icons/workflow/Alert"
-import { get, set } from "idb-keyval"
 import { useState } from "react"
-
-let rom: ArrayBuffer
-let loadingRom = true
-const romPromise = get("rom_papermario_us").then(romData => {
-    loadingRom = false
-    if (romData && isPaperMario(romData)) {
-        rom = romData
-    }
-})
 
 function getRomName(romData: ArrayBuffer) {
     const romName = new Uint8Array(romData, 0x20, 20)
     return String.fromCharCode(...romName)
 }
 
-function isPaperMario(romData: ArrayBuffer) {
+export function isPaperMario(romData: ArrayBuffer) {
     return getRomName(romData) === "PAPER MARIO         "
-}
-
-export function useCachedPaperMarioUsRom(): ArrayBuffer | undefined {
-    if (loadingRom) {
-        throw romPromise
-    }
-
-    return rom
 }
 
 export interface Props {
@@ -62,8 +44,6 @@ export default function PaperMarioRomInput({ onChange }: Props) {
 
                         dialog.dismiss()
                         onChange(data)
-                        await set("rom_papermario_us", data)
-                        rom = data
                     }}
                 />
                 {error && <div title="The selected file is not Paper Mario (US).">
