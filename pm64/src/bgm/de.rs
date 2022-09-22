@@ -198,7 +198,6 @@ impl Bgm {
                     debug!("segment end {:#X}", f.pos()?);
 
                     Ok(Some(Segment {
-                        name: format!("Variation {:#06X}", pos),
                         subsegments,
                     }))
                 }
@@ -274,7 +273,6 @@ impl Subsegment {
                     }
 
                     bgm.add_track_list(TrackList {
-                        name: format!("Section {:#06X}", track_list_pos),
                         pos: Some(track_list_pos),
                         tracks: unsafe {
                             // SAFETY: the for loop above has initialised the array. This is also how the std
@@ -302,11 +300,6 @@ impl Track {
         let flags = f.read_u16_be()?;
 
         Ok(Self {
-            name: if commands_offset == 0 {
-                String::from("Empty track")
-            } else {
-                format!("Track {:#06X}", commands_offset)
-            },
             flags,
             commands: if commands_offset == 0 {
                 CommandSeq::with_capacity(0)

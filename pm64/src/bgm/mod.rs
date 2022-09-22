@@ -68,7 +68,6 @@ impl Bgm {
             None => Err(NoSpace),
             Some((idx, slot)) => {
                 *slot = Some(Segment {
-                    name: format!("Variation {}", idx + 1),
                     subsegments: Default::default(),
                 });
                 Ok((idx, slot.as_mut().unwrap()))
@@ -104,14 +103,10 @@ impl Bgm {
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(rename_all = "camelCase")]
 pub struct Segment {
-    /// Not encoded in BGM data.
-    pub name: String,
-
     #[serde(rename = "sections")]
     pub subsegments: Vec<Subsegment>,
 }
 
-// TODO: better representation for `flags`
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(rename_all = "camelCase")]
 pub enum Subsegment {
@@ -129,9 +124,6 @@ pub enum Subsegment {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackList {
-    /// Not encoded in BGM data.
-    pub name: String,
-
     /// Encode/decode file position.
     #[serde(skip_serializing_if="Option::is_none")]
     pub pos: Option<FilePos>,
@@ -143,9 +135,7 @@ pub struct TrackList {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
-    pub name: String,
-
-    pub flags: u16, // TODO: better representation
+    pub flags: u16,
     pub commands: CommandSeq,
 
     #[serde(skip_serializing_if="is_default")]
@@ -243,7 +233,6 @@ impl Track {
 impl Default for Track {
     fn default() -> Self {
         Track {
-            name: String::from("New Track"),
             flags: 0x0000,
             mute: false,
             solo: false,
