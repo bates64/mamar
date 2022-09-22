@@ -3,10 +3,10 @@ import Close from "@spectrum-icons/workflow/Close"
 import { useState } from "react"
 
 import PaperMarioRomInputDialog, { useCachedPaperMarioUsRom } from "./emu/PaperMarioRomInputDialog"
+import ErrorBoundaryView from "./ErrorBoundaryView"
 import { useDoc, useRoot } from "./store"
-
-import "./DocTabs.scss"
 import WelcomeScreen from "./WelcomeScreen"
+import "./DocTabs.scss"
 
 function ActiveDoc({ romData }: { romData: ArrayBuffer }) {
     const [doc] = useDoc()
@@ -63,9 +63,9 @@ export default function DocTabs() {
             })}
             <View flex minWidth="size-100" borderColor="gray-200" borderBottomWidth={1} />
         </Flex>
-        <View flex backgroundColor={root.activeDocId ? "gray-100" : "gray-50"}>
+        <ErrorBoundaryView flex backgroundColor={root.activeDocId ? "gray-100" : "gray-50"}>
             {romData && <ActiveDoc romData={romData} />}
-        </View>
+        </ErrorBoundaryView>
         <DialogContainer onDismiss={() => {}} isDismissable={false} isKeyboardDismissDisabled={true}>
             {!romData && <PaperMarioRomInputDialog onChange={setRomData} />}
         </DialogContainer>
