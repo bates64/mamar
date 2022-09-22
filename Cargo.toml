@@ -3,8 +3,6 @@ members = [
     "mamar-wasm-bridge",
     "pm64",
     "pm64-typegen",
-    #"imui",
-    #"imui_glium",
 ]
 
 [profile.release]
