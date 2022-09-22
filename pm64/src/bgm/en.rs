@@ -354,7 +354,7 @@ impl CommandSeq {
         let mut marker_to_offset = HashMap::new();
         let mut todo_subroutines = Vec::new();
 
-        for command in self.iter() {
+        for Event { command, .. } in self.iter() {
             match command {
                 Command::Delay(mut delay) => {
                     // https://github.com/KernelEquinox/midi2bgm/blob/master/midi2bgm.cpp#L202

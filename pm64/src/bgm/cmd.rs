@@ -5,6 +5,8 @@ use std::ops::Range;
 use serde_derive::{Serialize, Deserialize};
 use typescript_type_def::TypeDef;
 
+use crate::id::{Id, gen_id};
+
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
 ///
@@ -47,7 +49,7 @@ pub struct CommandSeq {
     /// (which is as close as Rust gets to OOP-style inheritance).
     /// However, a number of [Vec] operations _are_ safe to provide; these are wrapped in the `impl CommandSeq`, such
     /// as [CommandSeq::len].
-    vec: Vec<Command>,
+    vec: Vec<Event>,
     /* TODO: consider implementing this optimisation because get/insert are hot */
     /*
     /// Lookup table (time -> vec index of first command with that time) for avoiding linear searches.
@@ -80,14 +82,14 @@ impl CommandSeq {
     ///
     /// sequence.insert(15, Command::MasterTempo(120));
     ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
+    /// assert_eq!(sequence.to_command_vec(), vec![
     ///     Command::Delay(10),
     ///
     ///     Command::Delay(5),         // Inserted automatically to reach t = 15
     ///     Command::MasterTempo(120),
     ///
     ///     Command::Delay(15),        // [Delay(10), Delay(10)] combined and adjusted
-    /// ]));
+    /// ]);
     /// ```
     ///
     /// A delay will also be inserted after the subsequence where required:
@@ -100,12 +102,12 @@ impl CommandSeq {
     ///
     /// sequence.insert(10, Command::MasterTempo(120));
     ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
+    /// assert_eq!(sequence.to_command_vec(), vec![
     ///     Command::Delay(10),
     ///     Command::MasterTempo(120),
     ///     Command::Delay(30),
     ///     Command::MasterTempo(140),
-    /// ]));
+    /// ]);
     /// ```
     /// With delays after the insertion point combined into one:
     /// ```
@@ -118,12 +120,12 @@ impl CommandSeq {
     ///
     /// sequence.insert(0x100, Command::MasterTempo(120));
     ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
+    /// assert_eq!(sequence.to_command_vec(), vec![
     ///     Command::Delay(0xFF),
     ///     Command::Delay(0x1),
     ///     Command::MasterTempo(120),
     ///     Command::Delay(0xFF + 0xFE), // Combined into a single delay
-    /// ]));
+    /// ]);
     /// ```
     ///
     /// The command is inserted at the **start** of the subequence at `time`. That means that insertion at the same time
@@ -137,11 +139,11 @@ impl CommandSeq {
     /// sequence.insert(10, Command::MasterTempo(60));  // (1)
     /// sequence.insert(10, Command::MasterTempo(120)); // (2)
     ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
+    /// assert_eq!(sequence.to_command_vec(), vec![
     ///     Command::Delay(10),        // Inserted during (1)
     ///     Command::MasterTempo(120), // (2)
     ///     Command::MasterTempo(60),  // (1) - Oh no! This overrides (2)!
-    /// ]));
+    /// ]);
     /// ```
     ///
     /// In cases such as the above example, you can use [`insert_many(time)`](CommandSeq::insert_many) to insert a
@@ -164,15 +166,15 @@ impl CommandSeq {
     ///     Command::MasterTempo(60),
     /// ]);
     ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
+    /// assert_eq!(sequence.to_command_vec(), vec![
     ///     Command::Delay(10),
     ///     Command::MasterTempo(120),
     ///     Command::MasterTempo(60),
-    /// ]));
+    /// ]);
     /// ```
     ///
     /// Has the side-effect of combining delays to the immediate right of the inserted subsequence.
-    pub fn insert_many<C: Into<Command>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
+    pub fn insert_many<C: Into<Event>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
         // Turn subsequence members into Commands if they are not already (C: Into<Command>)
         let subsequence = subsequence.into_iter().map(|cmd| cmd.into());
 
@@ -191,7 +193,7 @@ impl CommandSeq {
 
                 let mut old_delay_range = index..index;
                 let mut delta_time: usize = 0;
-                while let Some(Delay(t)) = self.vec.get(old_delay_range.end) {
+                while let Some(Event { command: Delay(t), .. }) = self.vec.get(old_delay_range.end) {
                     old_delay_range.end += 1;
                     delta_time += *t as usize;
                 }
@@ -202,9 +204,9 @@ impl CommandSeq {
                     (before_time, after_time)
                 };
 
-                fn delay(time: usize) -> Box<dyn Iterator<Item = Command>> {
+                fn delay(time: usize) -> Box<dyn Iterator<Item = Event>> {
                     if time > 0 {
-                        Box::new(iter::once(Command::Delay(time)))
+                        Box::new(iter::once(Command::Delay(time).into()))
                     } else {
                         Box::new(iter::empty())
                     }
@@ -232,16 +234,16 @@ impl CommandSeq {
     ///     Command::MasterTempo(80),
     /// ]);
     ///
-    /// assert_eq!(sequence.at_time(0),  vec![&Command::MasterTempo(60), &Command::Delay(30)]);
+    /// assert_eq!(sequence.at_time(0).len(),  2);
     /// assert_eq!(sequence.at_time(15).len(), 0); // No commands at time = 15
-    /// assert_eq!(sequence.at_time(30), vec![&Command::MasterTempo(120), &Command::Delay(10)]);
-    /// assert_eq!(sequence.at_time(40), vec![&Command::MasterTempo(80)]); // No Delay, because this is the tail
+    /// assert_eq!(sequence.at_time(30).len(), 2);
+    /// assert_eq!(sequence.at_time(40).len(), 1); // No Delay, because this is the tail
     ///
     /// sequence.insert(15, Command::MasterTempo(50));
-    /// assert_eq!(sequence.at_time(0),  vec![&Command::MasterTempo(60), &Command::Delay(15)]);
-    /// assert_eq!(sequence.at_time(15), vec![&Command::MasterTempo(50), &Command::Delay(15)]);
+    /// assert_eq!(sequence.at_time(0).len(),  2);
+    /// assert_eq!(sequence.at_time(15).len(), 2);
     /// ```
-    pub fn at_time(&self, wanted_time: usize) -> Vec<&Command> {
+    pub fn at_time(&self, wanted_time: usize) -> Vec<&Event> {
         self.iter_time_groups()
             .find(|&(time, _)| time == wanted_time)
             .map_or(Vec::new(), |(_, subseq)| subseq)
@@ -250,7 +252,7 @@ impl CommandSeq {
     // TODO: remove
 
     /// Iterates over the commands in this sequence in time-order.
-    pub fn iter(&self) -> std::slice::Iter<'_, Command> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Event> {
         self.vec.iter()
     }
 
@@ -293,7 +295,7 @@ impl CommandSeq {
         let mut time = 0;
 
         for command in self.vec.iter() {
-            if let Command::Delay(delta_time) = command {
+            if let Event { command: Delay(delta_time), .. } = command {
                 time += *delta_time as usize;
             }
         }
@@ -318,7 +320,7 @@ impl CommandSeq {
     /// assert_eq!(CommandSeq::new().playback_time(), 0);
     /// ```
     pub fn playback_time(&self) -> usize {
-        self.iter_time().last().map_or(0, |(time, command)| match *command {
+        self.iter_time().last().map_or(0, |(time, event)| match event.command {
             Command::Delay(delta) => time + delta as usize,
             Command::Note { length, .. } => time + length as usize,
             _ => time,
@@ -341,7 +343,7 @@ impl CommandSeq {
     }
 
     /// Appends the given [Command] to the end of the sequence.
-    pub fn push<C: Into<Command>>(&mut self, command: C) {
+    pub fn push<C: Into<Event>>(&mut self, command: C) {
         self.vec.push(command.into())
     }
 
@@ -351,14 +353,14 @@ impl CommandSeq {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0] == Command::End)
+        self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0].command == Command::End)
     }
 
     pub fn pitch_range(&self) -> Range<u8> {
         let mut range = 0..0;
 
         for cmd in self.iter() {
-            if let Command::Note { pitch, .. } = cmd {
+            if let Event { command: Command::Note { pitch, .. }, .. } = cmd {
                 let pitch = *pitch;
 
                 if pitch < range.start {
@@ -375,13 +377,13 @@ impl CommandSeq {
     }
 
     pub fn clear_command(&mut self, idx: usize) {
-        self.vec[idx] = Command::Delay(0);
+        self.vec[idx] = Command::Delay(0).into();
     }
 
     pub fn zero_all_delays(&mut self) {
         for cmd in &mut self.vec {
-            if let Command::Delay(_) = cmd {
-                *cmd = Command::Delay(0);
+            if let Event { command: Command::Delay(_), .. } = cmd {
+                *cmd = Command::Delay(0).into();
             }
         }
     }
@@ -466,7 +468,7 @@ impl CommandSeq {
         let mut current_time = 0;
 
         for (index, command) in self.vec.iter().enumerate() {
-            if let Command::Delay(delta_time) = command {
+            if let Event { command: Delay(delta_time), .. } = command {
                 let time_at_index = current_time;
 
                 // Advance past this Delay.
@@ -515,27 +517,22 @@ impl CommandSeq {
         // TODO: Attempt cache update
     }
     */
-}
 
-impl From<Vec<Command>> for CommandSeq {
-    /// ```
-    /// # use pm64::bgm::*;
-    /// assert_eq!({
-    ///     CommandSeq::from(vec![Command::Delay(10)])
-    /// }, {
-    ///     // Construct manually
-    ///     let mut sequence = CommandSeq::new();
-    ///     sequence.push(Command::Delay(10));
-    ///     sequence
-    /// });
-    /// ```
-    fn from(vec: Vec<Command>) -> Self {
-        Self { vec }
+    pub fn to_command_vec(self) -> Vec<Command> {
+        self.vec.into_iter().map(|e| e.command).collect()
     }
 }
 
-impl iter::FromIterator<Command> for CommandSeq {
-    fn from_iter<T: IntoIterator<Item = Command>>(iter: T) -> Self {
+impl<C: Into<Event>> From<Vec<C>> for CommandSeq {
+    fn from(vec: Vec<C>) -> Self {
+        let mut new = Self::new();
+        new.insert_many(0, vec);
+        new
+    }
+}
+
+impl iter::FromIterator<Event> for CommandSeq {
+    fn from_iter<T: IntoIterator<Item = Event>>(iter: T) -> Self {
         Self {
             vec: iter.into_iter().collect(),
         }
@@ -552,12 +549,17 @@ enum DelayLookup {
     Missing { index: usize, time_at_index: usize },
 }
 
-/// A Command (or in MIDI terms, an event) describes operations performed at a particular time and on a particular track
-/// during playback, like playing a note or changing the track instrument. CommandSeq are independent of (and therefore
-/// do not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
-/// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
-/// relative time positioning.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
+#[serde(rename_all = "camelCase")]
+pub struct Event {
+    pub id: Id,
+    #[serde(flatten)]
+    pub command: Command,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "command", content = "args")]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
     Delay(usize),
@@ -718,21 +720,30 @@ impl Command {
 }
 */
 
+impl Into<Event> for Command {
+    fn into(self) -> Event {
+        Event {
+            id: gen_id(),
+            command: self,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TimeIter<'a> {
-    seq: std::slice::Iter<'a, Command>,
+    seq: std::slice::Iter<'a, Event>,
     current_time: usize,
 }
 
 impl<'a> Iterator for TimeIter<'a> {
-    type Item = (usize, &'a Command);
+    type Item = (usize, &'a Event);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.seq.next() {
             Some(command) => {
                 let ret = (self.current_time, command);
 
-                if let Delay(delta_time) = command {
+                if let Event { command: Delay(delta_time), .. } = command {
                     self.current_time += *delta_time as usize;
                 }
 
@@ -748,7 +759,7 @@ pub struct TimeGroupIter<'a> {
 }
 
 impl<'a> Iterator for TimeGroupIter<'a> {
-    type Item = (usize, Vec<&'a Command>);
+    type Item = (usize, Vec<&'a Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.seq.next() {
@@ -784,6 +795,7 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 pub type MarkerId = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, TypeDef)]
+#[serde(rename_all = "camelCase")]
 pub struct CommandRange {
     pub name: String,
 

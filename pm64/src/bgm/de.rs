@@ -332,7 +332,7 @@ impl CommandSeq {
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
         // CommandSeq by performing an in-order traversal.
-        let mut commands = OffsetCommandMap::new();
+        let mut commands = OffsetEventMap::new();
 
         let mut seen_terminator = false;
 
@@ -483,14 +483,14 @@ impl CommandSeq {
                 _ => Command::Unknown(vec![cmd_byte]),
             };
 
-            commands.insert(cmd_offset, command);
+            commands.insert(cmd_offset, command.into());
         }
 
         let size = f.pos()? as usize - start;
         //debug!("end commandseq {:#X}", f.pos()?);
 
         // Explode if there are no commands (must be markers) past the end of the file
-        for (offset, command) in commands.0.split_off(&OffsetCommandMap::atob(size)).into_iter() {
+        for (offset, command) in commands.0.split_off(&OffsetEventMap::atob(size)).into_iter() {
             panic!("command after end of parsed sequence {:?} @ {:#X}", command, offset);
         }
 
@@ -500,9 +500,9 @@ impl CommandSeq {
 
 /// Temporary struct for [CommandSeq::decode].
 #[derive(Debug)]
-struct OffsetCommandMap(pub(self) BTreeMap<usize, Command>);
+struct OffsetEventMap(pub(self) BTreeMap<usize, Event>);
 
-impl OffsetCommandMap {
+impl OffsetEventMap {
     pub fn new() -> Self {
         Self(BTreeMap::new())
     }
@@ -518,7 +518,7 @@ impl OffsetCommandMap {
         key / 2
     }
 
-    pub fn insert(&mut self, offset: usize, command: Command) {
+    pub fn insert(&mut self, offset: usize, command: Event) {
         self.0.insert(Self::atob(offset), command);
     }
 
@@ -530,11 +530,11 @@ impl OffsetCommandMap {
             Entry::Vacant(entry) => {
                 // Insert the new marker here.
                 let id: MarkerId = format!("Offset {:#X}", offset);
-                entry.insert(Command::Marker(id.clone()));
+                entry.insert(Command::Marker(id.clone()).into());
                 id
             }
             Entry::Occupied(entry) => match entry.get() {
-                Command::Marker(id) => id.clone(),
+                Event { command: Command::Marker(id), .. } => id.clone(),
                 other_command => panic!(
                     "non-marker command {:?} found in label range (shifted_offset = {:#X})",
                     other_command, shifted_offset,
@@ -552,8 +552,8 @@ impl OffsetCommandMap {
     }
 }
 
-impl From<OffsetCommandMap> for CommandSeq {
-    fn from(map: OffsetCommandMap) -> CommandSeq {
+impl From<OffsetEventMap> for CommandSeq {
+    fn from(map: OffsetEventMap) -> CommandSeq {
         map.0.into_iter().map(|(_, cmd)| cmd).collect()
     }
 }
@@ -652,27 +652,27 @@ mod test {
         let start_labels: Vec<&MarkerId> = seq
             .at_time(0)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker(_), .. }))
             .map(|cmd| match cmd {
-                Command::Marker(id) => id,
+                Event { command: Command::Marker(id), .. } => id,
                 _ => unreachable!(),
             })
             .collect();
         let end_labels: Vec<&MarkerId> = seq
             .at_time(11)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker(_), .. }))
             .map(|cmd| match cmd {
-                Command::Marker(id) => id,
+                Event { command: Command::Marker(id), .. } => id,
                 _ => unreachable!(),
             })
             .collect();
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Subroutine(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Subroutine(_), .. }))
             .map(|cmd| match cmd {
-                Command::Subroutine(CommandRange { start, end, .. }) => (start, end),
+                Event { command: Command::Subroutine(CommandRange { start, end, .. }), .. } => (start, end),
                 _ => unreachable!(),
             })
             .collect();
