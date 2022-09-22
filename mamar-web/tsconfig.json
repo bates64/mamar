@@ -7,5 +7,6 @@
         "jsx": "preserve",
         "moduleResolution": "node",
         "module": "ES2020",
+        "resolveJsonModule": true
     },
 }

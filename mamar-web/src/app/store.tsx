@@ -27,6 +27,7 @@ export interface Doc {
     id: string
     bgm: Bgm
     file?: FileWithHandle
+    name?: string
 }
 
 export type DocAction = {
@@ -59,11 +60,10 @@ export type RootAction = {
     type: "focus_doc"
     id: string
 } | {
-    type: "new_doc"
-} | {
     type: "open_doc"
-    file: FileWithHandle
-    bgm: Bgm
+    file?: FileWithHandle
+    name?: string
+    bgm?: Bgm
 } | {
     type: "close_doc"
     id: string
@@ -84,24 +84,12 @@ export function rootReducer(root: Root, action: RootAction): Root {
             ...root,
             activeDocId: action.id,
         }
-    case "new_doc": {
-        const newDoc = {
+    case "open_doc": {
+        const newDoc: Doc = {
             id: generateId(),
-            bgm: new_bgm(),
-        }
-        return {
-            ...root,
-            docs: {
-                ...root.docs,
-                [newDoc.id]: newDoc,
-            },
-            activeDocId: newDoc.id,
-        }
-    } case "open_doc": {
-        const newDoc = {
-            id: generateId(),
-            bgm: action.bgm,
+            bgm: action.bgm ?? new_bgm(),
             file: action.file,
+            name: action.name ?? action.file?.name ?? "New song",
         }
         return {
             ...root,
@@ -127,7 +115,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
     }
 }
 
-export async function openDoc(file: FileWithHandle): Promise<RootAction> {
+export async function openFile(file: FileWithHandle): Promise<RootAction> {
     const data = new Uint8Array(await file.arrayBuffer())
     const bgm: Bgm | string = bgm_decode(data)
 
@@ -138,6 +126,20 @@ export async function openDoc(file: FileWithHandle): Promise<RootAction> {
     return {
         type: "open_doc",
         file,
+        bgm,
+    }
+}
+
+export function openData(data: Uint8Array, name?: string): RootAction {
+    const bgm: Bgm | string = bgm_decode(data)
+
+    if (typeof bgm === "string") {
+        throw new Error(bgm)
+    }
+
+    return {
+        type: "open_doc",
+        name,
         bgm,
     }
 }

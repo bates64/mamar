@@ -1,0 +1,5 @@
+.BgmFromSbnPicker {
+    div[role="row"]:not([aria-rowindex="1"]) {
+        cursor: pointer;
+    }
+}

@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use wasm_bindgen::prelude::*;
 use pm64::bgm::*;
+use pm64::sbn::Sbn;
 use std::io::Cursor;
 
 fn to_js<T: Serialize + for<'a> Deserialize<'a>>(t: &T) -> JsValue {
@@ -33,6 +34,18 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
     let mut f = Cursor::new(data);
     match Bgm::decode(&mut f) {
         Ok(bgm) => to_js(&bgm),
+        Err(e) => to_js(&e.to_string()),
+    }
+}
+
+#[wasm_bindgen]
+pub fn sbn_decode(rom: &[u8]) -> JsValue {
+    const SBN_START: usize = 0xF00000;
+    const SBN_END: usize = SBN_START + 0xA42C40;
+
+    let mut f = Cursor::new(&rom[SBN_START..SBN_END]);
+    match Sbn::decode(&mut f) {
+        Ok(sbn) => to_js(&sbn),
         Err(e) => to_js(&e.to_string()),
     }
 }

@@ -18,6 +18,7 @@ export default function PlaybackControls() {
 
     useEffect(() => {
         if (!mupen || !bgm) {
+            mupen?.pause?.()
             setIsPlaying(false)
             return
         }

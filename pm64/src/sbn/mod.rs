@@ -1,5 +1,8 @@
 use std::num::NonZeroU16;
 
+use serde_derive::{Serialize, Deserialize};
+use typescript_type_def::TypeDef;
+
 use crate::bgm::{self, Bgm};
 use crate::rw::*;
 
@@ -9,13 +12,13 @@ pub mod en;
 pub const MAGIC: &str = "SBN ";
 pub const SBN_START: u64 = 0xF00000;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 pub struct Sbn {
     pub files: Vec<File>,
     pub songs: Vec<Song>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq,  Serialize, Deserialize, TypeDef)]
 pub struct File {
     pub name: String,
     pub data: Vec<u8>,
@@ -32,7 +35,7 @@ impl File {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 pub struct Song {
     pub bgm_file: u16,
 

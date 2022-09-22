@@ -7,7 +7,7 @@ import { RootProvider } from "./store"
 export default function App() {
     return <RootProvider>
         <SpectrumProvider theme={defaultTheme}>
-            <View backgroundColor="gray-50">
+            <View UNSAFE_className="App">
                 <Grid
                     areas={[
                         "header",
@@ -21,7 +21,7 @@ export default function App() {
                     <View gridArea="header">
                         <Header />
                     </View>
-                    <View gridArea="content">
+                    <View gridArea="content" overflow="auto">
                         <main style={{ height: "100%" }}>
                             <DocTabs />
                         </main>

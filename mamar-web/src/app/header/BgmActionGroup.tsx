@@ -1,7 +1,7 @@
 import { View, ActionButton } from "@adobe/react-spectrum"
 import { fileOpen } from "browser-fs-access"
 
-import { useRoot, openDoc, RootAction } from "../store"
+import { useRoot, openFile, RootAction } from "../store"
 
 export default function BgmActionGroup() {
     const [root, dispatch] = useRoot()
@@ -13,20 +13,20 @@ export default function BgmActionGroup() {
 
     return <View>
         <ActionButton
-            onPress={() => dispatch({ type: "new_doc" })}
+            onPress={() => dispatch({ type: "open_doc" })}
             {...props}
         >New</ActionButton>
         <ActionButton
             onPress={async () => {
                 const file = await fileOpen({
-                    extensions: [".bgm", ".bin", ".midi", ".mid"],
+                    extensions: [".bgm", ".bin"],
                     description: "BGM files",
                     id: "bgm_open",
                 })
 
                 let action: RootAction
                 try {
-                    action = await openDoc(file)
+                    action = await openFile(file)
                 } catch (error) {
                     // TODO: use a dialog or something
                     alert(error)

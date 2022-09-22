@@ -1,4 +1,4 @@
-import { Text, Content, Dialog, Divider, Heading, Flex, ButtonGroup, Button, useDialogContainer } from "@adobe/react-spectrum"
+import { Text, Content, Dialog, Divider, Heading, Flex, useDialogContainer } from "@adobe/react-spectrum"
 import Alert from "@spectrum-icons/workflow/Alert"
 import { get, set } from "idb-keyval"
 import { useState } from "react"
@@ -37,15 +37,13 @@ export default function PaperMarioRomInput({ onChange }: Props) {
     const [error, setError] = useState<boolean>(false)
     const dialog = useDialogContainer()
 
-    return <Dialog size="S">
+    return <Dialog size="M">
         <Heading>ROM required</Heading>
         <Divider />
-        <ButtonGroup>
-            <Button variant="primary" onPress={dialog.dismiss}>Cancel</Button>
-        </ButtonGroup>
         <Content>
             <Text>
-                Playback requires a Paper Mario (US) ROM.
+                Mamar requires a clean Paper Mario (US) ROM.<br />
+                Please select a ROM file to continue.
             </Text>
             <Flex marginTop="size-200" width="100%" height="size-400" alignItems="center">
                 <input
@@ -55,16 +53,17 @@ export default function PaperMarioRomInput({ onChange }: Props) {
                     accept=".z64"
                     onChange={async evt => {
                         const file = (evt.target as HTMLInputElement).files?.[0]
-                        const rom = await file?.arrayBuffer()
+                        const data = await file?.arrayBuffer()
 
-                        if (!rom || !isPaperMario(rom)) {
+                        if (!data || !isPaperMario(data)) {
                             setError(true)
                             return
                         }
 
                         dialog.dismiss()
-                        onChange(rom)
-                        await set("rom_papermario_us", rom)
+                        onChange(data)
+                        await set("rom_papermario_us", data)
+                        rom = data
                     }}
                 />
                 {error && <div title="The selected file is not Paper Mario (US).">
