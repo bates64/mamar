@@ -98,7 +98,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             id: generateId(),
             bgm: action.bgm ?? new_bgm(),
             file: action.file,
-            name: action.name ?? action.file?.name ?? "New song",
+            name: action.name || action.file?.name || "New song",
             isSaved: true,
         }
         return {
