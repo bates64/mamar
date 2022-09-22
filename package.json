@@ -6,7 +6,7 @@
     "pm64-typegen"
   ],
   "scripts": {
-    "preinstall": "cd mamar-wasm-bridge && wasm-pack build -t web"
+    "build": "cd mamar-wasm-bridge && wasm-pack build -t web && cd ../pm64-typegen && cargo run && cd ../mamar-web && yarn build"
   },
   "multipleStaticFileCopier": [
     {
