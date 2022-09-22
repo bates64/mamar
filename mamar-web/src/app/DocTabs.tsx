@@ -1,39 +1,12 @@
-import { View, Flex } from "@adobe/react-spectrum"
+import { Flex } from "@adobe/react-spectrum"
 import CircleFilled from "@spectrum-icons/workflow/CircleFilled"
 import Close from "@spectrum-icons/workflow/Close"
-import { useEffect } from "react"
 
+import ActiveDoc from "./doc/ActiveDoc"
 import ErrorBoundaryView from "./ErrorBoundaryView"
-import { Doc, useDoc, useRoot } from "./store"
-import WelcomeScreen from "./WelcomeScreen"
+import { Doc, useRoot } from "./store"
 
 import "./DocTabs.scss"
-
-function ActiveDoc() {
-    const [doc] = useDoc()
-
-    const title = doc ? (doc.isSaved ? doc.name : `${doc.name} (unsaved)`) : "Mamar"
-    useEffect(() => {
-        document.title = title
-
-        if (doc && !doc.isSaved) {
-            const onbeforeunload = (evt: BeforeUnloadEvent) => {
-                evt.preventDefault()
-                return evt.returnValue = "You have unsaved changes."
-            }
-            window.addEventListener("beforeunload", onbeforeunload)
-            return () => window.removeEventListener("beforeunload", onbeforeunload)
-        }
-    }, [title, doc])
-
-    if (!doc) {
-        return <WelcomeScreen />
-    }
-
-    return <View padding="size-200">
-        Internal BGM filename: "{doc.bgm.name}"
-    </View>
-}
 
 function TabButton({ doc }: { doc: Doc }) {
     const [root, dispatch] = useRoot()
