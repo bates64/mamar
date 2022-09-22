@@ -23,7 +23,7 @@ export default function BgmActionGroup() {
                 // TODO: save file
                 docDispatch({ type: "mark_saved" })
             }}
-            isDisabled={doc?.isSaved}
+            isDisabled={!doc || !doc.isSaved}
             {...props}
         >Save</ActionButton>
         <ActionButton
