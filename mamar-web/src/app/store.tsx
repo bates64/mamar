@@ -187,7 +187,11 @@ const {
     const dispatch: Dispatch = action => {
         console.info("dispatch", action)
         setState(
-            state => rootReducer(state, action),
+            prevState => {
+                const newState = rootReducer(prevState, action)
+                console.log("new state", newState)
+                return newState
+            },
             undefined,
             !shouldActionCommitToHistory(action),
         )
