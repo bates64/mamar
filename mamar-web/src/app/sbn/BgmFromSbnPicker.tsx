@@ -1,10 +1,11 @@
 import { TableView, TableHeader, Column, Row, TableBody, Cell, View, DialogContainer, AlertDialog, Link } from "@adobe/react-spectrum"
-import { sbn_decode } from "mamar-wasm-bridge"
 import { Sbn, File, Song } from "pm64-typegen"
 import { useMemo, useState } from "react"
 
 import { names } from "./songNames.json"
-import { openData, useRoot } from "./store"
+import useDecodedSbn from "./useDecodedSbn"
+
+import { openData, useRoot } from "../store"
 
 import "./BgmFromSbnPicker.scss"
 
@@ -15,22 +16,20 @@ interface Item {
     song: Song
 }
 
-function getRows(sbn: Sbn | Error): Item[] {
-    if (sbn instanceof Error) {
-        return []
-    }
-
+function getRows(sbn: Sbn | null): Item[] {
     const items: Item[] = []
 
-    for (let i = 0; i < sbn.songs.length; i++) {
-        const song = sbn.songs[i]
+    if (sbn) {
+        for (let i = 0; i < sbn.songs.length; i++) {
+            const song = sbn.songs[i]
 
-        items.push({
-            id: i,
-            name: names[i] ?? "",
-            song,
-            file: sbn.files[song.bgm_file],
-        })
+            items.push({
+                id: i,
+                name: names[i] ?? "",
+                song,
+                file: sbn.files[song.bgm_file],
+            })
+        }
     }
 
     return items
@@ -39,28 +38,15 @@ function getRows(sbn: Sbn | Error): Item[] {
 export default function BgmFromSbnPicker({ romData }: { romData: ArrayBuffer }) {
     const [, dispatch] = useRoot()
     const [loadError, setLoadError] = useState<Error | null>(null)
-
-    const sbn = useMemo(() => {
-        const data = new Uint8Array(romData)
-        const sbn: Sbn | string = sbn_decode(data)
-
-        if (typeof sbn === "string") {
-            return new Error(sbn)
-        } else {
-            return sbn
-        }
-    }, [romData])
-
-    const items = useMemo(() => getRows(sbn), [sbn])
-
-    if (sbn instanceof Error) {
-        throw sbn
-    }
+    const sbn = useDecodedSbn(romData)
+    const items = useMemo(() => {
+        return getRows(sbn)
+    }, [sbn])
 
     return <View UNSAFE_className="BgmFromSbnPicker">
         <TableView
             aria-label="Song list"
-            maxHeight="size-6000"
+            height="size-6000"
             onAction={key => {
                 const item = items.find(item => item.id.toString() === key)
 
@@ -83,7 +69,7 @@ export default function BgmFromSbnPicker({ romData }: { romData: ArrayBuffer }) 
                 <Column>Extra soundbanks</Column>
                 <Column>Size</Column>
             </TableHeader>
-            <TableBody items={items}>
+            <TableBody items={items} loadingState={sbn === null ? "loading" : "idle"}>
                 {row => (
                     <Row key={row.id}>
                         <Cell>
@@ -109,7 +95,7 @@ export default function BgmFromSbnPicker({ romData }: { romData: ArrayBuffer }) 
                 primaryActionLabel="OK"
             >
                 Failed to decode the BGM.<br />
-                If this is a clean ROM, please <Link><a href="https://github.com/nanaian/mamar/issues/new">report this as a bug</a></Link>.
+                If this is an unmodified ROM, please <Link><a href="https://github.com/nanaian/mamar/issues/new">report this as a bug</a></Link>.
                 <pre>{loadError.message}</pre>
             </AlertDialog>}
         </DialogContainer>

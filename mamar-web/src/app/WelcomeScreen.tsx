@@ -1,6 +1,6 @@
 import { View } from "@adobe/react-spectrum"
 
-import BgmFromSbnPicker from "./BgmFromSbnPicker"
+import BgmFromSbnPicker from "./sbn/BgmFromSbnPicker"
 
 export default function WelcomeScreen({ romData }: { romData: ArrayBuffer }) {
     return <View
