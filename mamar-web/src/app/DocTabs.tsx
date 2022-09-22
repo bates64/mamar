@@ -23,7 +23,7 @@ export default function DocTabs() {
     const [root, dispatch] = useRoot()
     const docs = Object.values(root.docs)
 
-    return <Flex direction="column" height="100%">
+    return <Flex direction="column" width="100vw" height="100%">
         <Flex height="size-450">
             {docs.length > 0 && <View minWidth="size-100" borderColor="gray-200" borderBottomWidth={1} />}
             {docs.map(doc => {
@@ -33,17 +33,30 @@ export default function DocTabs() {
 
                 return <button
                     key={id}
+                    aria-label={name}
                     className={`DocTab active-${isActive}`}
                     onClick={() => dispatch({ type: "focus_doc", id })}
                     onAuxClick={() => dispatch({ type: "close_doc", id })}
                 >
                     <span>{name}</span>
-                    <button className="DocTab_Close" onClick={evt => {
-                        evt.stopPropagation()
-                        dispatch({ type: "close_doc", id })
-                    }}>
-                        <Close aria-label="Close" />
-                    </button>
+                    <div
+                        aria-label="Close tab"
+                        role="button"
+                        tabIndex={0}
+                        className="DocTab_Close"
+                        onClick={evt => {
+                            evt.stopPropagation()
+                            dispatch({ type: "close_doc", id })
+                        }}
+                        onKeyDown={evt => {
+                            if (evt.key === "Enter") {
+                                evt.stopPropagation()
+                                dispatch({ type: "close_doc", id })
+                            }
+                        }}
+                    >
+                        <Close />
+                    </div>
                 </button>
             })}
             {docs.length > 0 && <View flex minWidth="size-100" borderColor="gray-200" borderBottomWidth={1} />}

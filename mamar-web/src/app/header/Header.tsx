@@ -1,6 +1,8 @@
-import { Flex, Heading, View } from "@adobe/react-spectrum"
+import { Flex, Grid, Heading, View } from "@adobe/react-spectrum"
 
 import BgmActionGroup from "./BgmActionGroup"
+
+import PlaybackControls from "../emu/PlaybackControls"
 
 import "./Header.scss"
 
@@ -11,16 +13,24 @@ export default function Header() {
         <View
             paddingX="size-150"
         >
-            <Flex
-                height="size-500"
-                alignItems="center"
-                gap="size-100"
+            <Grid
+                columns={["1fr", "auto"]}
+                rows={["auto"]}
             >
-                <Heading level={1}>
-                    <img src={logo} alt="Mamar" />
-                </Heading>
-                <BgmActionGroup />
-            </Flex>
+                <Flex
+                    height="size-500"
+                    alignItems="center"
+                    gap="size-100"
+                >
+                    <Heading level={1}>
+                        <a href="/">
+                            <img src={logo} alt="Mamar" />
+                        </a>
+                    </Heading>
+                    <BgmActionGroup />
+                </Flex>
+                <PlaybackControls />
+            </Grid>
         </View>
     </header>
 }

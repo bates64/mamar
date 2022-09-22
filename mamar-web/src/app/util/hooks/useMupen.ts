@@ -25,6 +25,7 @@ export default function useMupen(romData: ArrayBuffer | undefined): EmulatorCont
                 },
                 setErrorState() {},
             }).then(async mupen => {
+                await mupen.start()
                 setMupen(mupen)
             })
         }
