@@ -39,6 +39,23 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
 }
 
 #[wasm_bindgen]
+pub fn bgm_encode(bgm: &JsValue) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    let mut f = Cursor::new(Vec::new());
+    match bgm.encode(&mut f) {
+        Ok(_) => {
+            let data: Vec<u8> = f.into_inner();
+            let arr = js_sys::Uint8Array::new_with_length(data.len() as u32);
+            for (i, v) in data.into_iter().enumerate() {
+                arr.set_index(i as u32, v);
+            }
+            arr.into()
+        },
+        Err(e) => e.to_string().into(),
+    }
+}
+
+#[wasm_bindgen]
 pub fn sbn_decode(rom: &[u8]) -> JsValue {
     const SBN_START: usize = 0xF00000;
     const SBN_END: usize = SBN_START + 0xA42C40;

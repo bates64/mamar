@@ -1,6 +1,6 @@
 SECTIONS
 {
-    .text 0x80040000 : {
+    .text 0x80400000 : {
         ../build/patches.o(.text)
     }
 }

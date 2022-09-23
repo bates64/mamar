@@ -1,5 +1,6 @@
 import createMupen64PlusWeb, { EmulatorControls } from "mupen64plus-web"
 import { useEffect, useRef, useState } from "react"
+import Stats from "stats.js"
 
 enum State {
     MOUNTING,
@@ -9,10 +10,18 @@ enum State {
     RELOADING,
 }
 
-export default function useMupen(romData: ArrayBuffer | undefined): EmulatorControls | undefined {
+const stats = new Stats()
+stats.showPanel(0)
+stats.dom.style.top = "auto"
+stats.dom.style.bottom = "0"
+
+export default function useMupen(romData: ArrayBuffer | undefined, vi: () => void): EmulatorControls | undefined {
     const [mupen, setMupen] = useState<EmulatorControls>()
     const [error, setError] = useState<any>()
     const state = useRef(State.MOUNTING)
+
+    const viRef = useRef(vi)
+    viRef.current = vi
 
     useEffect(() => {
         if (!romData) {
@@ -27,8 +36,11 @@ export default function useMupen(romData: ArrayBuffer | undefined): EmulatorCont
             createMupen64PlusWeb({
                 canvas: document.getElementById("canvas") as HTMLCanvasElement,
                 romData,
-                beginStats: () => {},
-                endStats: () => {},
+                beginStats: () => stats.begin(),
+                endStats: () => {
+                    stats.end()
+                    viRef.current()
+                },
                 coreConfig: {
                     emuMode: 0,
                 },
@@ -48,6 +60,7 @@ export default function useMupen(romData: ArrayBuffer | undefined): EmulatorCont
                 if (mupen) {
                     await mupen.start()
                     state.current = State.STARTED
+                    document.body.appendChild(stats.dom)
                     setMupen(mupen)
                 }
             }).catch(error => {

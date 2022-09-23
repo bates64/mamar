@@ -13,6 +13,7 @@
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
     "@spectrum-icons/workflow": "^4.0.2",
+    "@types/stats.js": "^0.17.0",
     "browser-fs-access": "^0.31.0",
     "idb-keyval": "^6.2.0",
     "mamar-wasm-bridge": "*",
@@ -24,6 +25,7 @@
     "react-dom": "^18.2.0",
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",
+    "stats.js": "^0.17.0",
     "use-undoable": "^3.3.11"
   },
   "devDependencies": {

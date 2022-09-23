@@ -7,6 +7,6 @@
   "types": "build/patches.d.ts",
   "scripts": {
     "build": "python3 build.py",
-    "postinstall": "cd papermario && ./install.sh && ./configure us && ninja"
+    "build-papermario": "cd papermario && ./install.sh && ./configure us && ninja"
   }
 }
