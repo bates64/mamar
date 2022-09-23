@@ -20,7 +20,7 @@ function TabButton({ doc }: { doc: Doc }) {
         onClick={() => dispatch({ type: "focus_doc", id })}
         onAuxClick={() => dispatch({ type: "close_doc", id })}
     >
-        <span>{name}</span>
+        <span title={name}>{name}</span>
         <div
             aria-label="Close tab"
             role="button"
