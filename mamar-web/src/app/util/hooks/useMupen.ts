@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 
 export default function useMupen(romData: ArrayBuffer | undefined): EmulatorControls | undefined {
     const [mupen, setMupen] = useState<EmulatorControls>()
+    const [error, setError] = useState<any>()
     const busy = useRef(false)
 
     useEffect(() => {
@@ -23,13 +24,23 @@ export default function useMupen(romData: ArrayBuffer | undefined): EmulatorCont
 
                     return prefix + path
                 },
-                setErrorState() {},
+                setErrorStatus(errorMessage) {
+                    setError(errorMessage)
+                },
             }).then(async mupen => {
-                await mupen.start()
-                setMupen(mupen)
+                if (mupen) {
+                    await mupen.start()
+                    setMupen(mupen)
+                }
+            }).catch(error => {
+                setError(error)
             })
         }
     }, [mupen, romData])
+
+    if (error) {
+        throw error
+    }
 
     return mupen
 }

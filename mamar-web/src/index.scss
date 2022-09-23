@@ -82,6 +82,21 @@ body {
             filter: grayscale(1);
         }
     }
+
+    p {
+        max-width: 60ch;
+        width: calc(100vw - 1em);
+
+        a:any-link {
+            color: var(--yellow);
+        }
+    }
+
+    .error-details {
+        color: var(--grey-6);
+        text-align: left;
+        font-family: monospace;
+    }
 }
 
 #canvas {

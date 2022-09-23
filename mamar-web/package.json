@@ -6,7 +6,7 @@
   "author": "Alex Bates <alex@nanaian.town>",
   "private": true,
   "scripts": {
-    "start": "parcel src/index.html src/app/index.html --open",
+    "start": "parcel src/index.html src/app/index.html",
     "prestart": "sed -i 's/typeof process/\"undefined\"/g' ../node_modules/mupen64plus-web/bin/web/index.*.js",
     "build": "parcel build src/index.html src/app/index.html"
   },

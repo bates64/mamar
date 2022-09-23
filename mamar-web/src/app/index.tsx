@@ -10,19 +10,24 @@ const root = ReactDOM.createRoot(rootEl)
 const loading = <div dangerouslySetInnerHTML={{ __html: rootEl.innerHTML }} />
 
 class ErrorBoundary extends React.Component {
-    state = { hasError: false }
+    state: { error: any } = { error: null }
 
-    static getDerivedStateFromError() {
-        return { hasError: true }
+    static getDerivedStateFromError(error: any) {
+        return { error }
     }
 
     render() {
-        if (this.state.hasError) {
+        if (this.state.error) {
+            const errorMessage = this.state.error.stack?.toString?.() || this.state.error.toString()
+
             return <main className="initial-load-container">
                 <div>
                     <h1>Something went wrong.</h1>
                     <p>
-                        An error occurred whilst rendering Mamar.
+                        An error occurred loading Mamar. If you think this is a bug, <a href="https://github.com/nanaian/mamar/issues/new">please report it</a>.
+                    </p>
+                    <p className="error-details">
+                        {errorMessage}
                     </p>
                 </div>
             </main>
