@@ -18,4 +18,5 @@
         "editor.defaultFormatter": "dbaeumer.vscode-eslint",
         "editor.formatOnSave": true,
     },
+    "clang-tidy.blacklist": ["*"]
 }

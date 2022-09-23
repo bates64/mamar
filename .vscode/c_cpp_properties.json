@@ -1,0 +1,31 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "papermario",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "${workspaceFolder}/patches/papermario/include",
+                    "${workspaceFolder}/patches/papermario/src"
+                ]
+            },
+            "includePath": [
+                "${workspaceFolder}/patches/papermario/include",
+                //"${workspaceFolder}/patches/papermario/ver/us/build/include",
+                "${workspaceFolder}/patches/papermario/src"
+                //"${workspaceFolder}/patches/papermario/assets/us"
+            ],
+            "defines": [
+                "F3DEX_GBI_2",
+                "_LANGUAGE_C",
+                "_MIPS_SZLONG=32",
+                "VERSION=us",
+                "VERSION_US"
+            ],
+            "cStandard": "c89",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "${default}"
+        }
+    ]
+}

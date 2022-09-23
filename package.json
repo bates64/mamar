@@ -3,7 +3,8 @@
   "workspaces": [
     "mamar-web",
     "mamar-wasm-bridge/pkg",
-    "pm64-typegen"
+    "pm64-typegen",
+    "patches"
   ],
   "scripts": {
     "build": "cd mamar-wasm-bridge && wasm-pack build -t web && cd ../pm64-typegen && cargo run && cd ../mamar-web && yarn build"

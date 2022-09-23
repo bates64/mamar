@@ -1,0 +1,3 @@
+[submodule "patches/papermario"]
+	path = patches/papermario
+	url = git@github.com:pmret/papermario.git

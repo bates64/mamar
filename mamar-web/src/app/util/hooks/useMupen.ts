@@ -63,10 +63,15 @@ export default function useMupen(romData: ArrayBuffer | undefined): EmulatorCont
                 break
             console.log("reloading ROM")
             state.current = State.RELOADING
-            mupen.reloadRom(romData).finally(() => {
-                console.log("rom reload complete")
-                state.current = State.READY
-            })
+
+            // Emulator must be running to reload rom
+            mupen.resume()
+                .then(() => new Promise(r => setTimeout(r, 100)))
+                .then(() => mupen.reloadRom(romData))
+                .finally(() => {
+                    console.log("rom reload complete")
+                    state.current = State.READY
+                })
             break
         case State.RELOADING:
             console.warn("ignoring ROM reload, already reloading")
