@@ -558,8 +558,7 @@ pub struct Event {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "command", content = "args")]
+#[serde(tag = "command", content = "data")]
 pub enum Command {
     /// Sleeps for however many ticks before continuing playback on this track.
     Delay(usize),

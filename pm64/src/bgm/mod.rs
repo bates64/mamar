@@ -108,8 +108,9 @@ pub struct Segment {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
 pub enum Subsegment {
+    #[serde(rename_all = "camelCase")]
     Tracks {
         flags: u8,
         track_list: TrackListId,
