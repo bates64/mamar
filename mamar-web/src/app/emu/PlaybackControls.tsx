@@ -1,4 +1,4 @@
-import { Flex, ToggleButton, View } from "@adobe/react-spectrum"
+import { ActionButton, Flex, ToggleButton, View } from "@adobe/react-spectrum"
 import Play from "@spectrum-icons/workflow/Play"
 import { useEffect, useState } from "react"
 
@@ -41,6 +41,22 @@ export default function PlaybackControls() {
     }
 
     return <Flex alignItems="center">
+        <ActionButton
+            onPress={() => {
+                mupen?.reloadRom(romData)
+            }}
+        >
+            Reload
+        </ActionButton>
+
+        <ActionButton
+            onPress={() => {
+                mupen?.softReset()
+            }}
+        >
+            {"<-" /* TODO: icon */}
+        </ActionButton>
+
         <ToggleButton
             aria-label="Toggle playback"
             UNSAFE_className="PlaybackControls_play"

@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "parcel src/index.html src/app/index.html",
-    "prestart": "sed -i 's/typeof process/\"undefined\"/g' ../node_modules/mupen64plus-web/bin/web/index.*.js",
+    "prestart": "sed -i 's/typeof process/\"undefined\"/g' ../node_modules/mupen64plus-web/bin/web/index.*.js && rm -rf ../.parcel-cache",
     "build": "parcel build src/index.html src/app/index.html"
   },
   "dependencies": {
