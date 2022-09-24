@@ -1,2 +1,6 @@
-* Rename segment->variation
-* Rename subsegment->segment (? check audio.h)
+* Copy rest of docs from audio.h
+* Port over all features from previous version to mamar-web
+    * Choose variation to play
+    * Modify segment order & add new ones
+    * Modify track settings (instrument, volume, pan, etc.)
+* CI & release

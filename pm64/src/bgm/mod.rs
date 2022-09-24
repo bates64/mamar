@@ -32,7 +32,7 @@ pub type TrackListId = u64;
 pub struct Bgm {
     pub name: String,
 
-    pub segments: [Option<Segment>; 4],
+    pub variations: [Option<Variation>; 4],
 
     pub drums: Vec<Drum>,
     pub voices: Vec<Voice>,
@@ -54,12 +54,12 @@ impl Bgm {
         }
     }
 
-    pub fn can_add_segment(&self) -> bool {
-        self.segments.iter().any(|s| s.is_none())
+    pub fn can_add_variation(&self) -> bool {
+        self.variations.iter().any(|s| s.is_none())
     }
 
-    pub fn add_segment(&mut self) -> Result<(usize, &mut Segment), NoSpace> {
-        let empty_seg: Option<(usize, &mut Option<Segment>)> = self.segments
+    pub fn add_variation(&mut self) -> Result<(usize, &mut Variation), NoSpace> {
+        let empty_seg: Option<(usize, &mut Option<Variation>)> = self.variations
             .iter_mut()
             .enumerate()
             .find(|(_, s)| s.is_none());
@@ -67,8 +67,8 @@ impl Bgm {
         match empty_seg {
             None => Err(NoSpace),
             Some((idx, slot)) => {
-                *slot = Some(Segment {
-                    subsegments: Default::default(),
+                *slot = Some(Variation {
+                    segments: Default::default(),
                 });
                 Ok((idx, slot.as_mut().unwrap()))
             }
@@ -102,14 +102,13 @@ impl Bgm {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(rename_all = "camelCase")]
-pub struct Segment {
-    #[serde(rename = "sections")]
-    pub subsegments: Vec<Subsegment>,
+pub struct Variation {
+    pub segments: Vec<Segment>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(tag = "type")]
-pub enum Subsegment {
+pub enum Segment {
     #[serde(rename_all = "camelCase")]
     Tracks {
         flags: u8,
@@ -146,11 +145,11 @@ pub struct Track {
     pub solo: bool,
 }
 
-impl Subsegment {
+impl Segment {
     pub fn flags(&self) -> u8 {
         match *self {
-            Subsegment::Tracks { flags, .. } => flags,
-            Subsegment::Unknown { flags, .. } => flags,
+            Segment::Tracks { flags, .. } => flags,
+            Segment::Unknown { flags, .. } => flags,
         }
     }
 }

@@ -75,10 +75,10 @@ impl Bgm {
         f.write_all(&self.name.as_bytes())?;
         f.seek(SeekFrom::Start(0x0C))?;
 
-        f.write_all(&[0, 0, 0, 0, self.segments.len() as u8, 0, 0, 0])?;
+        f.write_all(&[0, 0, 0, 0, self.variations.len() as u8, 0, 0, 0])?;
 
         debug_assert_eq!(f.pos()?, 0x14);
-        let segment_offsets = (0..self.segments.len())
+        let segment_offsets = (0..self.variations.len())
             .into_iter()
             .map(|_| {
                 let pos = f.pos()?;
@@ -142,7 +142,7 @@ impl Bgm {
         let mut to_write: Vec<ToWrite> = self.unknowns.iter().map(|unk| ToWrite::Unknown(unk.clone())).collect();
 
         // Write segments
-        for (offset, segment) in segment_offsets.into_iter().zip(self.segments.iter()) {
+        for (offset, segment) in segment_offsets.into_iter().zip(self.variations.iter()) {
             if let Some(segment) = segment {
                 f.align(4)?;
                 debug!("segment {:#X}", f.pos()?);
@@ -153,7 +153,7 @@ impl Bgm {
                 // Write segment header
                 let segment_start = f.pos()?;
 
-                for subsegment in &segment.subsegments {
+                for subsegment in &segment.segments {
                     debug!("subsegment {:#X}", f.pos()?);
                     if let Some((tracks_pos, track_list_id)) = subsegment.encode(f)? {
                         // Need to write track data after the header
@@ -328,12 +328,12 @@ impl Voice {
     }
 }
 
-impl Subsegment {
+impl Segment {
     pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
         f.write_u8(self.flags())?;
 
         match self {
-            Subsegment::Tracks { track_list, .. } => {
+            Segment::Tracks { track_list, .. } => {
                 f.write_u8(0)?;
 
                 let tracks_pos = f.pos()?;
@@ -341,7 +341,7 @@ impl Subsegment {
 
                 Ok(Some((tracks_pos, *track_list)))
             }
-            Subsegment::Unknown { flags: _, data } => {
+            Segment::Unknown { flags: _, data } => {
                 f.write_all(data)?;
                 Ok(None)
             }

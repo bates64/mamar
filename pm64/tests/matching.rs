@@ -36,18 +36,18 @@ macro_rules! test_matching {
                 log::error!("non-matching!! D:");
 
                 println!("original tracks allocation:");
-                for (seg_no, seg) in bgm.segments.iter().enumerate() {
+                for (seg_no, seg) in bgm.variations.iter().enumerate() {
                     if let Some(seg) = seg {
-                        for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
+                        for (subseg_no, subseg) in seg.segments.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, track_list } => println!(
+                                Segment::Tracks { flags, track_list } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
                                     seg_no,
                                     subseg_no,
                                     flags,
                                     bgm.track_lists[track_list].pos.unwrap()
                                 ),
-                                Subsegment::Unknown { flags, data } => {
+                                Segment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)
                                 }
                             }
@@ -57,18 +57,18 @@ macro_rules! test_matching {
 
                 let bgm = Bgm::decode(&mut Cursor::new(encoded.clone())).expect("re-decode error");
                 println!("non-matching tracks allocation:");
-                for (seg_no, seg) in bgm.segments.iter().enumerate() {
+                for (seg_no, seg) in bgm.variations.iter().enumerate() {
                     if let Some(seg) = seg {
-                        for (subseg_no, subseg) in seg.subsegments.iter().enumerate() {
+                        for (subseg_no, subseg) in seg.segments.iter().enumerate() {
                             match subseg {
-                                Subsegment::Tracks { flags, track_list } => println!(
+                                Segment::Tracks { flags, track_list } => println!(
                                     "    {}.{} flags={:#X} -> tracks @ {:#X}",
                                     seg_no,
                                     subseg_no,
                                     flags,
                                     bgm.track_lists[track_list].pos.unwrap()
                                 ),
-                                Subsegment::Unknown { flags, data } => {
+                                Segment::Unknown { flags, data } => {
                                     println!("    {}.{} flags={:#X} ??? {:?}", seg_no, subseg_no, flags, data)
                                 }
                             }
@@ -308,14 +308,14 @@ fn shared_subsegment_tracks_ptr() {
     let original = include_bytes!("bin/Fuzzy_s_Took_My_Shell_12.bin");
     let bgm = Bgm::decode(&mut Cursor::new(original)).expect("decode error");
 
-    let tracks_0_2 = if let Subsegment::Tracks { ref track_list, .. } = bgm.segments[0].as_ref().unwrap().subsegments[2]
+    let tracks_0_2 = if let Segment::Tracks { ref track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[2]
     {
         track_list
     } else {
         panic!();
     };
 
-    let tracks_1_1 = if let Subsegment::Tracks { ref track_list, .. } = bgm.segments[1].as_ref().unwrap().subsegments[1]
+    let tracks_1_1 = if let Segment::Tracks { ref track_list, .. } = bgm.variations[1].as_ref().unwrap().segments[1]
     {
         track_list
     } else {

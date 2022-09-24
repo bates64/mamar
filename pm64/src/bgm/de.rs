@@ -167,9 +167,9 @@ impl Bgm {
             _ => vec![],
         };
 
-        bgm.segments = segment_offsets
+        bgm.variations = segment_offsets
             .iter()
-            .map(|&pos| -> Result<Option<Segment>, Error> {
+            .map(|&pos| -> Result<Option<Variation>, Error> {
                 if pos == 0 {
                     // Null (no segments)
                     Ok(None)
@@ -190,15 +190,15 @@ impl Bgm {
                         f.seek(SeekFrom::Current(-4))?;
                         word != 0
                     } {
-                        subsegments.push(Subsegment::decode(f, &mut bgm, pos, &mut furthest_read_pos)?);
+                        subsegments.push(Segment::decode(f, &mut bgm, pos, &mut furthest_read_pos)?);
 
                         i += 1;
                     }
 
                     debug!("segment end {:#X}", f.pos()?);
 
-                    Ok(Some(Segment {
-                        subsegments,
+                    Ok(Some(Variation {
+                        segments: subsegments,
                     }))
                 }
             })
@@ -232,7 +232,7 @@ impl Bgm {
     }
 }
 
-impl Subsegment {
+impl Segment {
     fn decode<R: Read + Seek>(
         f: &mut R,
         bgm: &mut Bgm,
@@ -284,12 +284,12 @@ impl Subsegment {
                 }
             };
 
-            Ok(Subsegment::Tracks { flags, track_list })
+            Ok(Segment::Tracks { flags, track_list })
         } else {
             let mut data = [0; 3];
             f.read_exact(&mut data)?;
 
-            Ok(Subsegment::Unknown { flags, data })
+            Ok(Segment::Unknown { flags, data })
         }
     }
 }
