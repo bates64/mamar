@@ -17,7 +17,7 @@ export default function App() {
                             "footer",
                         ]}
                         columns={["1fr"]}
-                        rows={["size-500", "auto", "22px"]}
+                        rows={["auto", "1fr", "22px"]}
                         height="100vh"
                     >
                         <View gridArea="header">

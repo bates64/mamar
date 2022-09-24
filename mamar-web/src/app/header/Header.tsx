@@ -29,8 +29,8 @@ export default function Header() {
                     </Heading>
                     <BgmActionGroup />
                 </Flex>
-                <PlaybackControls />
             </Grid>
         </View>
+        <PlaybackControls />
     </header>
 }

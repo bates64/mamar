@@ -152,33 +152,38 @@ export default function PlaybackControls() {
         return <View />
     }
 
-    return <Flex alignItems="center" gap="size-50">
-        <span ref={bpmRef}></span>
+    return <View paddingX="size-200" paddingY="size-50">
+        <Flex alignItems="center" justifyContent="space-between" gap="size-200">
+            <Flex gap="size-50">
+                <ActionButton
+                    onPress={async () => {
+                        if (mupen) {
+                            const wasPlaying = isPlaying
+                            await mupen.pause()
+                            writePatches(mupen)
+                            writeBgm(mupen, bgm)
+                            if (wasPlaying)
+                                await mupen.resume()
+                        }
+                    }}
+                >
+                    {"Compile"}
+                </ActionButton>
 
-        <ActionButton
-            onPress={async () => {
-                if (mupen) {
-                    await mupen.pause()
-                    writePatches(mupen)
-                    writeBgm(mupen, bgm)
-                    await mupen.resume()
-                    setIsPlaying(true)
-                }
-            }}
-        >
-            {"Compile"}
-        </ActionButton>
+                <ToggleButton
+                    aria-label="Toggle playback"
+                    UNSAFE_className="PlaybackControls_play"
+                    isEmphasized
+                    isSelected={isPlaying}
+                    onChange={(p: boolean) => {
+                        setIsPlaying(p)
+                    }}
+                >
+                    <Play />
+                </ToggleButton>
+            </Flex>
 
-        <ToggleButton
-            aria-label="Toggle playback"
-            UNSAFE_className="PlaybackControls_play"
-            isEmphasized
-            isSelected={isPlaying}
-            onChange={(p: boolean) => {
-                setIsPlaying(p)
-            }}
-        >
-            <Play />
-        </ToggleButton>
-    </Flex>
+            <span ref={bpmRef}></span>
+        </Flex>
+    </View>
 }
