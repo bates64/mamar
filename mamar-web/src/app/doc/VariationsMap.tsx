@@ -26,7 +26,7 @@ function getXPosOfSegment(segment: pm64.Segment, segments: pm64.Segment[]) {
     return x
 }
 
-function Loop({ variationIndex, startLoopId, endLoopId, x, width }: {
+function LoopOverlay({ variationIndex, startLoopId, endLoopId, x, width }: {
     variationIndex: number
     startLoopId: number
     endLoopId: number
@@ -63,9 +63,7 @@ function Loop({ variationIndex, startLoopId, endLoopId, x, width }: {
     const middle = width / 2
     const spaceForLabel = focus ? 40 : 12 + iterCountStr.length * 6
 
-    return <li
-        tabIndex={0}
-        aria-label={`Loop ${startLoop.label_index}`}
+    return <div
         className={styles.loop}
         style={{
             top: (LOOP_HEIGHT_PX * startLoop.label_index) + "px",
@@ -83,7 +81,7 @@ function Loop({ variationIndex, startLoopId, endLoopId, x, width }: {
             <input
                 ref={inputRef}
                 type="number"
-                title="Iteration count (0 = infinite)"
+                aria-label={`Loop ${startLoop.label_index} iteration count (${iterCount === 0 ? "infinite" : iterCount})`}
                 className={isInfinite ? styles.loopIterInfiniteInput : ""}
                 value={iterCountStr}
                 step={1}
@@ -142,7 +140,7 @@ function Loop({ variationIndex, startLoopId, endLoopId, x, width }: {
             <line x1={0} y1={LOOP_HEIGHT_PX / 2} x2={0} y2={LOOP_HEIGHT_PX} />
             <line x1={width} y1={LOOP_HEIGHT_PX / 2} x2={width} y2={LOOP_HEIGHT_PX} />
         </svg>
-    </li>
+    </div>
 }
 
 function Segment({ segmentId, variationIndex }: {
@@ -171,7 +169,7 @@ function Segment({ segmentId, variationIndex }: {
             const endLoopX = getXPosOfSegment(endLoop, segments)
             const width = endLoopX - startLoopX
 
-            return <Loop
+            return <LoopOverlay
                 variationIndex={variationIndex}
                 startLoopId={segment.id}
                 endLoopId={endLoop.id}
@@ -203,13 +201,16 @@ function Segment({ segmentId, variationIndex }: {
         classNames.push(styles.blue)
     }
 
-    if (selection.isSelected(segment.id)) {
+    const isSelected = selection.isSelected(segment.id)
+    if (isSelected) {
         classNames.push(styles.selected)
     }
 
-    return <li
+    return <div
+        role="gridcell"
         tabIndex={0}
         className={classNames.join(" ")}
+        aria-selected={isSelected}
         onClick={evt => {
             if (evt.shiftKey) {
                 selection.multiSelect(segment.id)
@@ -222,7 +223,7 @@ function Segment({ segmentId, variationIndex }: {
         <div className={styles.segmentName}>
             {label}
         </div>
-    </li>
+    </div>
 }
 
 function Variation({ index }: {
@@ -232,13 +233,14 @@ function Variation({ index }: {
     const segments = bgm?.variations[index]?.segments ?? []
     const loopCount = segments.filter(s => s.type === "EndLoop").length
 
-    return <li className={styles.variation}>
+    return <div className={styles.variation}>
         <div className={styles.variationName}>
             Variation {index}
         </div>
 
         <div className={styles.segmentsListContainer}>
-            <ol
+            <div
+                role="row"
                 tabIndex={0}
                 aria-label="Segments"
                 className={styles.segmentsList}
@@ -249,16 +251,17 @@ function Variation({ index }: {
                     variationIndex={index}
                     segmentId={segment.id}
                 />)}
-            </ol>
+            </div>
         </div>
-    </li>
+    </div>
 }
 
 function VariationsMapInner() {
     const [bgm] = useBgm()
     const selection = useSelection()
 
-    return <ol
+    return <div
+        role="grid"
         className={styles.container}
         style={{ "--segment-width": `${SEGMENT_WIDTH_PX}px` } as CSSProperties}
         onClick={() => {
@@ -270,7 +273,7 @@ function VariationsMapInner() {
             key={i}
             index={i}
         />)}
-    </ol>
+    </div>
 }
 
 export default function VariationsMap() {
