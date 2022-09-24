@@ -15,6 +15,7 @@ pub enum Error {
     SizeMismatch { true_size: u32, internal_size: u32 },
     InvalidNumVariations(u8),
     UnknownSegmentCommand(u32),
+    UnknownSeqCommand(u8),
     Io(io::Error),
 }
 
@@ -42,6 +43,7 @@ impl fmt::Display for Error {
                 num_segments
             ),
             Error::UnknownSegmentCommand(cmd) => write!(f, "Unknown segment command: {:#X}", cmd),
+            Error::UnknownSeqCommand(cmd) => write!(f, "Unknown sequence command: {:#X}", cmd),
             Error::Io(source) => {
                 if let io::ErrorKind::UnexpectedEof = source.kind() {
                     write!(f, "Unexpected end-of-file")
@@ -385,7 +387,7 @@ impl CommandSeq {
                 }
 
                 // Delay
-                0x01..=0x77 => Command::Delay(cmd_byte as usize),
+                0x01..=0x77 => Command::Delay { value: cmd_byte as usize },
 
                 // Long delay
                 0x78..=0x7F => {
@@ -395,7 +397,7 @@ impl CommandSeq {
                     let num_256s = (cmd_byte - 0x78) as usize;
                     let extend = f.read_u8()? as usize;
 
-                    Command::Delay(0x78 + num_256s * 256 + extend)
+                    Command::Delay { value: 0x78 + num_256s * 256 + extend }
 
                     // This logic taken from N64MidiTool
                     //Command::Delay(0x78 + (cmd_byte as usize) + ((f.read_u8()? & 7) as usize) << 8)
@@ -428,30 +430,30 @@ impl CommandSeq {
                     }
                 }
 
-                0xE0 => Command::MasterTempo(f.read_u16_be()?),
-                0xE1 => Command::MasterVolume(f.read_u8()?),
-                0xE2 => Command::MasterTranspose(f.read_i8()?),
-                0xE3 => Command::Unknown(vec![0xE3, f.read_u8()?]),
+                0xE0 => Command::MasterTempo { value: f.read_u16_be()? },
+                0xE1 => Command::MasterVolume { value: f.read_u8()? },
+                0xE2 => Command::MasterPitchShift { cent: f.read_u8()? },
+                0xE3 => Command::UnkCmdE3 { bank: f.read_u8()? },
                 0xE4 => Command::MasterTempoFade {
                     time: f.read_u16_be()?,
-                    bpm: f.read_u16_be()?,
+                    value: f.read_u16_be()?,
                 },
                 0xE5 => Command::MasterVolumeFade {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
-                0xE6 => Command::MasterEffect(f.read_u8()?, f.read_u8()?),
-                0xE7 => Command::Unknown(vec![0xE7]),
+                0xE6 => Command::MasterEffect { index: f.read_u8()?, value: f.read_u8()? },
+                // command 0xE7 unused
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,
                     patch: f.read_u8()?,
                 },
-                0xE9 => Command::SubTrackVolume(f.read_u8()?),
-                0xEA => Command::SubTrackPan(f.read_i8()?),
+                0xE9 => Command::SubTrackVolume { value: f.read_u8()? },
+                0xEA => Command::SubTrackPan { value: f.read_i8()? },
                 0xEB => Command::SubTrackReverb(f.read_u8()?),
                 0xEC => Command::SegTrackVolume(f.read_u8()?),
-                0xED => Command::SubTrackCoarseTune(f.read_u8()?),
-                0xEE => Command::SubTrackFineTune(f.read_u8()?),
+                0xED => Command::SubTrackCoarseTune { value: f.read_u8()? },
+                0xEE => Command::SubTrackFineTune { value: f.read_u8()? },
                 0xEF => Command::SegTrackTune {
                     coarse: f.read_u8()?,
                     fine: f.read_u8()?,
@@ -459,47 +461,38 @@ impl CommandSeq {
                 0xF0 => Command::TrackTremolo {
                     amount: f.read_u8()?,
                     speed: f.read_u8()?,
-                    unknown: f.read_u8()?,
+                    time: f.read_u8()?,
                 },
-                0xF1 => Command::Unknown(vec![0xF1, f.read_u8()?]),
-                0xF2 => Command::Unknown(vec![0xF2, f.read_u8()?]),
+                0xF1 => Command::TrackTremoloSpeed { value: f.read_u8()? },
+                0xF2 => Command::TrackTremoloTime { time: f.read_u8()? },
                 0xF3 => Command::TrackTremoloStop,
-                0xF4 => Command::Unknown(vec![0xF4, f.read_u8()?, f.read_u8()?]),
-                0xF5 => Command::TrackVoice(f.read_u8()?),
+                0xF4 => Command::UnkCmdF4 { pan0: f.read_u8()?, pan1: f.read_u8()? },
+                0xF5 => Command::SetTrackVoice { index: f.read_u8()? },
                 0xF6 => Command::TrackVolumeFade {
                     time: f.read_u16_be()?,
-                    volume: f.read_u8()?,
+                    value: f.read_u8()?,
                 },
-                0xF7 => Command::SubTrackReverbType(f.read_u8()?),
-                0xF8 => Command::Unknown(vec![0xF8]),
-                0xF9 => Command::Unknown(vec![0xF9]),
-                0xFA => Command::Unknown(vec![0xFA]),
-                0xFB => Command::Unknown(vec![0xFB]),
-                /*
-                0xFC => {
-                    let _set_pos = f.read_u16_be()?;
-                    let _count = f.read_u8()?;
-
-                    // TODO Jump random
-                    todo!("Jump random");
-                }
-                */
-                0xFD => Command::Unknown(vec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xF7 => Command::SubTrackReverbType { index: f.read_u8()? },
+                // commands 0xF8-FB unused
+                0xFC => Command::Jump {
+                    unk_00: f.read_u16_be()?, // TODO: this is an offset, go there!!
+                    unk_02: f.read_u8()?,
+                },
+                0xFD => Command::EventTrigger { event_info: f.read_u32_be()? },
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
 
-                    //debug!("subroutine @ {:#X} (start = {:#X}; end = {:#X})", cmd_offset, start_offset, end_offset);
-
-                    Command::Subroutine(CommandRange {
-                        name: format!("Subroutine {:#X}", cmd_offset),
+                    Command::Detour(CommandRange {
                         start: commands.upsert_marker(start_offset),
                         end: commands.upsert_marker(end_offset),
                     })
                 }
-                0xFF => Command::Unknown(vec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xFF => Command::UnkCmdFF { unk_00: f.read_u8()?, unk_01: f.read_u8()?, unk_02: f.read_u8()? },
 
-                _ => Command::Unknown(vec![cmd_byte]),
+                _ => {
+                    return Err(Error::UnknownSeqCommand(cmd_byte))
+                }
             };
 
             commands.insert(cmd_offset, command.into());
@@ -689,9 +682,9 @@ mod test {
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Subroutine(_), .. }))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Detour(_), .. }))
             .map(|cmd| match cmd {
-                Event { command: Command::Subroutine(CommandRange { start, end, .. }), .. } => (start, end),
+                Event { command: Command::Detour(CommandRange { start, end, .. }), .. } => (start, end),
                 _ => unreachable!(),
             })
             .collect();

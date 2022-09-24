@@ -27,15 +27,15 @@ impl From<io::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::MissingStartMarker(range) => write!(f, "Missing start marker for range '{}'", range.name),
-            Error::MissingEndMarker(range) => write!(f, "Missing end marker for range '{}'", range.name),
+            Error::MissingStartMarker(range) => write!(f, "Missing start marker for range {:?}", range),
+            Error::MissingEndMarker(range) => write!(f, "Missing end marker for range {:?}", range),
             Error::UnorderedMarkers(range) => {
-                write!(f, "Start marker comes after end marker in range '{}'", range.name)
+                write!(f, "Start marker comes after end marker in range '{:?}'", range)
             }
             Error::EndMarkerTooFarAway(range) => write!(
                 f,
-                "End marker is too far away from start marker in range '{}'",
-                range.name
+                "End marker is too far away from start marker in range {:?}",
+                range,
             ),
             Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
@@ -376,7 +376,7 @@ impl CommandSeq {
 
         for Event { command, .. } in self.iter() {
             match command {
-                Command::Delay(mut delay) => {
+                Command::Delay { value: mut delay } => {
                     // https://github.com/KernelEquinox/midi2bgm/blob/master/midi2bgm.cpp#L202
                     while delay > 0 {
                         if delay < 0x78 {
@@ -422,19 +422,19 @@ impl CommandSeq {
                         f.write_all(&[first_byte | 0xC0, second_byte])?;
                     }
                 }
-                Command::MasterTempo(bpm) => {
+                Command::MasterTempo { value: bpm } => {
                     f.write_u8(0xE0)?;
                     f.write_u16_be(*bpm)?;
                 }
-                Command::MasterVolume(volume) => {
+                Command::MasterVolume { value: volume } => {
                     f.write_u8(0xE1)?;
                     f.write_u8(*volume)?;
                 }
-                Command::MasterTranspose(shift) => {
+                Command::MasterPitchShift { cent: shift } => {
                     f.write_u8(0xE2)?;
-                    f.write_i8(*shift)?;
+                    f.write_u8(*shift)?;
                 }
-                Command::MasterTempoFade { time, bpm } => {
+                Command::MasterTempoFade { time, value: bpm } => {
                     f.write_u8(0xE4)?;
                     f.write_u16_be(*time)?;
                     f.write_u16_be(*bpm)?;
@@ -444,7 +444,7 @@ impl CommandSeq {
                     f.write_u16_be(*time)?;
                     f.write_u8(*volume)?;
                 }
-                Command::MasterEffect(a, b) => {
+                Command::MasterEffect { index: a, value: b } => {
                     f.write_u8(0xE6)?;
                     f.write_u8(*a)?;
                     f.write_u8(*b)?;
@@ -454,11 +454,11 @@ impl CommandSeq {
                     f.write_u8(*bank)?;
                     f.write_u8(*patch)?;
                 }
-                Command::SubTrackVolume(a) => {
+                Command::SubTrackVolume { value: a } => {
                     f.write_u8(0xE9)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackPan(a) => {
+                Command::SubTrackPan { value: a } => {
                     f.write_u8(0xEA)?;
                     f.write_i8(*a)?;
                 }
@@ -470,11 +470,11 @@ impl CommandSeq {
                     f.write_u8(0xEC)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackCoarseTune(a) => {
+                Command::SubTrackCoarseTune { value: a } => {
                     f.write_u8(0xED)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackFineTune(a) => {
+                Command::SubTrackFineTune { value: a } => {
                     f.write_u8(0xEE)?;
                     f.write_u8(*a)?;
                 }
@@ -483,24 +483,24 @@ impl CommandSeq {
                     f.write_u8(*coarse)?;
                     f.write_u8(*fine)?;
                 }
-                Command::TrackTremolo { amount, speed, unknown } => {
+                Command::TrackTremolo { amount, speed, time: unknown } => {
                     f.write_all(&[0xF0, *amount, *speed, *unknown])?;
                 }
                 Command::TrackTremoloStop => f.write_u8(0xF3)?,
-                Command::TrackVoice(a) => {
+                Command::SetTrackVoice { index: a } => {
                     f.write_u8(0xF5)?;
                     f.write_u8(*a)?;
                 }
-                Command::TrackVolumeFade { time, volume } => {
+                Command::TrackVolumeFade { time, value: volume } => {
                     f.write_u8(0xF6)?;
                     f.write_u16_be(*time)?;
                     f.write_u8(*volume)?;
                 }
-                Command::SubTrackReverbType(a) => {
+                Command::SubTrackReverbType { index: a } => {
                     f.write_u8(0xF7)?;
                     f.write_u8(*a)?;
                 }
-                Command::Subroutine(range) => {
+                Command::Detour(range) => {
                     f.write_u8(0xFE)?;
 
                     let offset = f.pos()?;
@@ -510,7 +510,6 @@ impl CommandSeq {
                     f.write_u16_be(0)?;
                     f.write_u8(0)?;
                 }
-                Command::Unknown(bytes) => f.write_all(bytes)?,
 
                 // Markers aren't actually written to the data - we just need to record their file offset for later use.
                 Command::Marker(marker) => {
@@ -519,6 +518,38 @@ impl CommandSeq {
                 }
 
                 Command::End => f.write_u8(0)?,
+                Command::UnkCmdE3 { bank } => {
+                    f.write_u8(0xE3)?;
+                    f.write_u8(*bank)?;
+                }
+                Command::TrackTremoloSpeed { value } => {
+                    f.write_u8(0xF1)?;
+                    f.write_u8(*value)?;
+                }
+                Command::TrackTremoloTime { time } => {
+                    f.write_u8(0xF2)?;
+                    f.write_u8(*time)?;
+                }
+                Command::UnkCmdF4 { pan0, pan1 } => {
+                    f.write_u8(0xF4)?;
+                    f.write_u8(*pan0)?;
+                    f.write_u8(*pan1)?;
+                }
+                Command::Jump { unk_00, unk_02 } => {
+                    f.write_u8(0xF8)?;
+                    f.write_u16_be(*unk_00)?;
+                    f.write_u8(*unk_02)?;
+                }
+                Command::EventTrigger { event_info } => {
+                    f.write_u8(0xF9)?;
+                    f.write_u32_be(*event_info)?;
+                }
+                Command::UnkCmdFF { unk_00, unk_01, unk_02 } => {
+                    f.write_u8(0xFF)?;
+                    f.write_u8(*unk_00)?;
+                    f.write_u8(*unk_01)?;
+                    f.write_u8(*unk_02)?;
+                }
             }
         }
 
