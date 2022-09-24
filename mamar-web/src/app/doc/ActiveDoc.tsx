@@ -1,8 +1,6 @@
-import { View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 
-import SegmentsMap from "./SegmentsMap"
-import VariationSelect from "./VariationSelect"
+import VariationsMap from "./VariationsMap"
 
 import { useDoc } from "../store"
 import WelcomeScreen from "../WelcomeScreen"
@@ -28,10 +26,5 @@ export default function ActiveDoc() {
         return <WelcomeScreen />
     }
 
-    return <View>
-        <View padding="size-200">
-            <VariationSelect />
-        </View>
-        <SegmentsMap variationIndex={doc.selectedVariationIndex} />
-    </View>
+    return <VariationsMap />
 }

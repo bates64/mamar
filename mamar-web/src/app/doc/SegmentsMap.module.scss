@@ -1,13 +1,48 @@
 .container {
-    padding: var(--spectrum-global-dimension-size-200);
     margin: 0;
+    padding: 0;
 
-
+    list-style: none;
 
     overflow-x: overlay;
+
+    background: var(--spectrum-global-color-gray-100);
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
-.list {
+.variation {
+    padding: 0;
+
+    flex-grow: 1;
+
+    display: grid;
+    align-items: center;
+    grid-template-columns: var(--spectrum-global-dimension-size-1600) 1fr;
+
+    &:nth-child(2),
+    &:nth-child(4) {
+        background: var(--spectrum-global-color-gray-75);
+    }
+}
+
+.variationName {
+    margin: 0;
+    padding: var(--spectrum-global-dimension-size-200);
+
+    font-size: var(--spectrum-global-dimension-size-200);
+    font-weight: 300;
+
+    text-align: center;
+}
+
+.segmentsListContainer {
+    min-height: var(--spectrum-global-dimension-size-1000);
+}
+
+.segmentsList {
     position: relative;
     display: flex;
 
@@ -21,9 +56,9 @@
     flex-shrink: 0;
 
     width: 180px;
-    height: var(--spectrum-global-dimension-size-1200);
+    height: var(--spectrum-global-dimension-size-1000);
 
-    border: 1px solid var(--spectrum-global-color-gray-100);
+    border: 1px solid var(--spectrum-global-color-gray-300);
     background: linear-gradient(var(--spectrum-global-color-blue-500) 0%, var(--spectrum-global-color-blue-400) 100%);
     color: #ffffffee;
     border-radius: 6px;

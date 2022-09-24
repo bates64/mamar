@@ -134,7 +134,6 @@ export interface Doc {
     file?: FileWithHandle
     name: string
     isSaved: boolean
-    selectedVariationIndex: number
 }
 
 export type DocAction = {
@@ -142,9 +141,6 @@ export type DocAction = {
     action: BgmAction
 } | {
     type: "mark_saved"
-} | {
-    type: "select_variation"
-    index: number
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -159,11 +155,6 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             isSaved: true,
-        }
-    case "select_variation":
-        return {
-            ...state,
-            selectedVariationIndex: action.index,
         }
     }
 }
@@ -214,7 +205,6 @@ export function rootReducer(root: Root, action: RootAction): Root {
             file: action.file,
             name: action.name || action.file?.name || "New song",
             isSaved: true,
-            selectedVariationIndex: 0,
         }
         return {
             ...root,

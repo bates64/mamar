@@ -4,7 +4,6 @@ import { useRef, useEffect, useState } from "react"
 
 import styles from "./SegmentsMap.module.scss"
 
-import ErrorBoundaryView from "../ErrorBoundaryView"
 import { useBgm, useSegment } from "../store"
 
 const SEGMENT_WIDTH_PX = 180
@@ -208,27 +207,39 @@ function Segment({ segmentId, variationIndex }: {
     </li>
 }
 
-export interface Props {
-    variationIndex: number
-}
-
-export default function SegmentsMap({ variationIndex }: Props) {
+export function Variation({ index }: {
+    index: number
+}) {
     const [bgm] = useBgm()
-    const segments = bgm?.variations[variationIndex]?.segments ?? []
+    const segments = bgm?.variations[index]?.segments ?? []
     const loopCount = segments.filter(s => s.type === "EndLoop").length
 
-    return <ErrorBoundaryView UNSAFE_className={styles.container}>
-        <ol
-            tabIndex={0}
-            aria-label="Segments"
-            className={styles.list}
-            style={{ paddingTop: (loopCount * LOOP_HEIGHT_PX) + "px" }}
-        >
-            {segments.map(segment => <Segment
-                key={segment.id}
-                variationIndex={variationIndex}
-                segmentId={segment.id}
-            />)}
-        </ol>
-    </ErrorBoundaryView>
+    return <li className={styles.variation}>
+        <div className={styles.variationName}>
+            Variation {index}
+        </div>
+
+        <div className={styles.segmentsListContainer}>
+            <ol
+                tabIndex={0}
+                aria-label="Segments"
+                className={styles.segmentsList}
+                style={{ paddingTop: (loopCount * LOOP_HEIGHT_PX) + "px" }}
+            >
+                {segments.map(segment => <Segment
+                    key={segment.id}
+                    variationIndex={index}
+                    segmentId={segment.id}
+                />)}
+            </ol>
+        </div>
+    </li>
+}
+
+export default function VariationsMap() {
+    const [bgm] = useBgm()
+
+    return <ol className={styles.container}>
+        {bgm?.variations.map((_, i) => <Variation key={i} index={i} />)}
+    </ol>
 }

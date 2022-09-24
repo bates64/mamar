@@ -135,6 +135,7 @@ export default function PlaybackControls() {
         const onKeydown = (event: KeyboardEvent) => {
             if (event.key === " ") {
                 setIsPlaying(p => !p)
+                event.preventDefault()
             }
         }
         document.addEventListener("keydown", onKeydown)
