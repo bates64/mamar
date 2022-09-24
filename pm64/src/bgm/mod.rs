@@ -110,14 +110,35 @@ pub struct Variation {
 #[serde(tag = "type")]
 pub enum Segment {
     #[serde(rename_all = "camelCase")]
-    Tracks {
-        flags: u8,
+    Subseg {
         track_list: TrackListId,
     },
-    Unknown {
-        flags: u8,
-        data: [u8; 3],
+    StartLoop {
+        label_index: u16,
     },
+    Wait,
+    EndLoop {
+        label_index: u8,
+        iter_count: u8,
+    },
+    Unknown6 {
+        label_index: u8,
+        iter_count: u8,
+    },
+    Unknown7 {
+        label_index: u8,
+        iter_count: u8,
+    },
+}
+
+mod segment_commands {
+    pub const END: u32          = 0;
+    pub const SUBSEG: u32       = 1 << 16;
+    pub const START_LOOP: u32   = 3 << 16;
+    pub const WAIT: u32         = 4 << 16;
+    pub const END_LOOP: u32     = 5 << 16;
+    pub const UNKNOWN_6: u32    = 6 << 16;
+    pub const UNKNOWN_7: u32    = 7 << 16;
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -143,15 +164,6 @@ pub struct Track {
 
     #[serde(skip_serializing_if="is_default")]
     pub solo: bool,
-}
-
-impl Segment {
-    pub fn flags(&self) -> u8 {
-        match *self {
-            Segment::Tracks { flags, .. } => flags,
-            Segment::Unknown { flags, .. } => flags,
-        }
-    }
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]

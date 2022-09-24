@@ -13,7 +13,8 @@ use crate::rw::*;
 pub enum Error {
     InvalidMagic,
     SizeMismatch { true_size: u32, internal_size: u32 },
-    InvalidNumSegments(u8),
+    InvalidNumVariations(u8),
+    UnknownSegmentCommand(u32),
     Io(io::Error),
 }
 
@@ -35,11 +36,12 @@ impl fmt::Display for Error {
                 "The file says it is {}B, but it is actually {}B",
                 internal_size, true_size
             ),
-            Error::InvalidNumSegments(num_segments) => write!(
+            Error::InvalidNumVariations(num_segments) => write!(
                 f,
-                "Exactly 4 segment slots are supported, but this file has {}",
+                "Exactly 4 variations are supported, but this file has {}",
                 num_segments
             ),
+            Error::UnknownSegmentCommand(cmd) => write!(f, "Unknown segment command: {:#X}", cmd),
             Error::Io(source) => {
                 if let io::ErrorKind::UnexpectedEof = source.kind() {
                     write!(f, "Unexpected end-of-file")
@@ -133,16 +135,16 @@ impl Bgm {
         f.read_padding(4)?;
 
         debug_assert!(f.pos()? == 0x10);
-        let num_segments = f.read_u8()?;
-        if num_segments != 4 {
-            return Err(Error::InvalidNumSegments(num_segments));
+        let num_variations = f.read_u8()?;
+        if num_variations != 4 {
+            return Err(Error::InvalidNumVariations(num_variations));
         }
 
         debug_assert!(f.pos()? == 0x11);
         f.read_padding(3)?;
 
         debug_assert!(f.pos()? == 0x14);
-        let segment_offsets: Vec<u16> = (0..4)
+        let variation_offsets: Vec<u16> = (0..4)
             .into_iter()
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
             .collect::<Result<_, _>>()?; // We need to obtain all offsets before seeking to any
@@ -167,7 +169,7 @@ impl Bgm {
             _ => vec![],
         };
 
-        bgm.variations = segment_offsets
+        bgm.variations = variation_offsets
             .iter()
             .map(|&pos| -> Result<Option<Variation>, Error> {
                 if pos == 0 {
@@ -239,57 +241,81 @@ impl Segment {
         start: u64,
         furthest_read_pos: &mut u64,
     ) -> Result<Self, Error> {
+        // Equivalent engine func: au_bgm_player_read_segment
+
         debug!("subsegment {:#X}", f.pos()?);
-        let flags = f.read_u8()?;
+        let data = f.read_u32_be()?;
+        match data >> 12 {
+            segment_commands::END => unreachable!("END should be handled by the caller"),
+            segment_commands::SUBSEG => {
+                f.seek(SeekFrom::Current(-2))?;
+                let offset = (f.read_u16_be()? as u64) << 2;
+                let track_list_pos = start + offset;
+                debug!("tracks start = {:#X} (offset = {:#X})", track_list_pos, offset);
 
-        if flags & 0x70 == 0x10 {
-            f.read_padding(1)?;
+                // If we've decoded the track list at `track_list_pos` already, reference that.
+                // Otherwise, decode the track there and add it to `bgm.track_lists`.
+                let track_list = match bgm.find_track_list_with_pos(track_list_pos) {
+                    Some(id) => id,
+                    None => {
+                        let mut tracks: [MaybeUninit<Track>; 16] = unsafe {
+                            // SAFETY: this is an array of uninitialised elements, so the array overall does not require
+                            // initialisation.
+                            MaybeUninit::uninit().assume_init()
+                        };
 
-            let offset = (f.read_u16_be()? as u64) << 2;
-            let track_list_pos = start + offset;
-            debug!("tracks start = {:#X} (offset = {:#X})", track_list_pos, offset);
+                        for (track_no, track) in tracks.iter_mut().enumerate() {
+                            let track_no = track_no as u64;
 
-            // If we've decoded the track list at `track_list_pos` already, reference that.
-            // Otherwise, decode the track there and add it to `bgm.track_lists`.
-            let track_list = match bgm.find_track_list_with_pos(track_list_pos) {
-                Some(id) => id,
-                None => {
-                    let mut tracks: [MaybeUninit<Track>; 16] = unsafe {
-                        // SAFETY: this is an array of uninitialised elements, so the array overall does not require
-                        // initialisation.
-                        MaybeUninit::uninit().assume_init()
-                    };
+                            f.seek(SeekFrom::Start(track_list_pos + track_no * 4))?;
+                            *track = MaybeUninit::new(Track::decode(f, track_list_pos)?);
 
-                    for (track_no, track) in tracks.iter_mut().enumerate() {
-                        let track_no = track_no as u64;
-
-                        f.seek(SeekFrom::Start(track_list_pos + track_no * 4))?;
-                        *track = MaybeUninit::new(Track::decode(f, track_list_pos)?);
-
-                        let pos = f.pos()?;
-                        if pos > *furthest_read_pos {
-                            *furthest_read_pos = pos;
+                            let pos = f.pos()?;
+                            if pos > *furthest_read_pos {
+                                *furthest_read_pos = pos;
+                            }
                         }
+
+                        bgm.add_track_list(TrackList {
+                            pos: Some(track_list_pos),
+                            tracks: unsafe { // TODO: tbh just make this a vec, modding is a thing
+                                // SAFETY: the for loop above has initialised the array. This is also how the std
+                                // documentation suggests initialising an array element-by-element:
+                                // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
+                                std::mem::transmute(tracks)
+                            },
+                        })
                     }
+                };
 
-                    bgm.add_track_list(TrackList {
-                        pos: Some(track_list_pos),
-                        tracks: unsafe {
-                            // SAFETY: the for loop above has initialised the array. This is also how the std
-                            // documentation suggests initialising an array element-by-element:
-                            // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
-                            std::mem::transmute(tracks)
-                        },
-                    })
-                }
-            };
-
-            Ok(Segment::Tracks { flags, track_list })
-        } else {
-            let mut data = [0; 3];
-            f.read_exact(&mut data)?;
-
-            Ok(Segment::Unknown { flags, data })
+                Ok(Segment::Subseg { track_list })
+            }
+            segment_commands::START_LOOP => {
+                f.seek(SeekFrom::Current(-2))?;
+                Ok(Segment::StartLoop {
+                    label_index: f.read_u16_be()?,
+                })
+            },
+            segment_commands::WAIT => Ok(Segment::Wait),
+            segment_commands::END_LOOP => {
+                Ok(Segment::EndLoop {
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            segment_commands::UNKNOWN_6 => {
+                Ok(Segment::Unknown6 {
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            segment_commands::UNKNOWN_7 => {
+                Ok(Segment::Unknown7 {
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            _ => Err(Error::UnknownSegmentCommand(data)),
         }
     }
 }

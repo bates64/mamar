@@ -330,19 +330,39 @@ impl Voice {
 
 impl Segment {
     pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
-        f.write_u8(self.flags())?;
-
         match self {
-            Segment::Tracks { track_list, .. } => {
-                f.write_u8(0)?;
-
+            Segment::Subseg { track_list } => {
+                f.write_u16_be((segment_commands::SUBSEG >> 4) as u16)?;
                 let tracks_pos = f.pos()?;
                 f.write_u16_be(0)?;
 
                 Ok(Some((tracks_pos, *track_list)))
             }
-            Segment::Unknown { flags: _, data } => {
-                f.write_all(data)?;
+            Segment::Wait => {
+                f.write_u16_be((segment_commands::WAIT >> 4) as u16)?;
+                f.write_u16_be(0)?;
+                Ok(None)
+            }
+            Segment::StartLoop { label_index } => {
+                f.write_u16_be((segment_commands::START_LOOP >> 4) as u16)?;
+                f.write_u16_be(*label_index)?;
+                Ok(None)
+            }
+            Segment::EndLoop { label_index, iter_count } => {
+                f.write_u16_be((segment_commands::END_LOOP >> 4) as u16)?;
+                f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
+                Ok(None)
+            }
+            Segment::Unknown6 { label_index, iter_count } => {
+                f.write_u16_be((segment_commands::UNKNOWN_6 >> 4) as u16)?;
+                f.seek(SeekFrom::Current(-2))?;
+                f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
+                Ok(None)
+            }
+            Segment::Unknown7 { label_index, iter_count } => {
+                f.write_u16_be((segment_commands::UNKNOWN_7 >> 4) as u16)?;
+                f.seek(SeekFrom::Current(-2))?;
+                f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
         }

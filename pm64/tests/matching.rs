@@ -35,7 +35,7 @@ macro_rules! test_matching {
             if encoded != original {
                 log::error!("non-matching!! D:");
 
-                println!("original tracks allocation:");
+                /*println!("original tracks allocation:");
                 for (seg_no, seg) in bgm.variations.iter().enumerate() {
                     if let Some(seg) = seg {
                         for (subseg_no, subseg) in seg.segments.iter().enumerate() {
@@ -74,7 +74,7 @@ macro_rules! test_matching {
                             }
                         }
                     }
-                }
+                }*/
 
                 // Output `encoded` to a file for debugging...
                 let nonmatching_bin = concat!(stringify!($song), ".nonmatching.bin");
@@ -308,14 +308,14 @@ fn shared_subsegment_tracks_ptr() {
     let original = include_bytes!("bin/Fuzzy_s_Took_My_Shell_12.bin");
     let bgm = Bgm::decode(&mut Cursor::new(original)).expect("decode error");
 
-    let tracks_0_2 = if let Segment::Tracks { ref track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[2]
+    let tracks_0_2 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[2]
     {
         track_list
     } else {
         panic!();
     };
 
-    let tracks_1_1 = if let Segment::Tracks { ref track_list, .. } = bgm.variations[1].as_ref().unwrap().segments[1]
+    let tracks_1_1 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[1].as_ref().unwrap().segments[1]
     {
         track_list
     } else {
