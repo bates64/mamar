@@ -2,7 +2,7 @@
 #include "audio.h"
 #include "gcc/memory.h"
 
-s32 MAMAR_bgm[0x20000];
+u8 MAMAR_bgm[0x20000];
 s32 MAMAR_bgm_size;
 s32 MAMAR_bk_files[3];
 s32 MAMAR_song_id;
@@ -52,7 +52,23 @@ AuResult MAMAR_au_load_song_files(u32 songID, BGMHeader* bgmFile, BGMPlayer* pla
     }
 
     if (MAMAR_bgm_size > 0) {
-        au_copy_bytes(MAMAR_bgm, bgmFile, MAMAR_bgm_size);
+        // Detect endianness of file
+        s32 be = MAMAR_bgm[0] == 'B' && MAMAR_bgm[1] == 'G' && MAMAR_bgm[2] == 'M' && MAMAR_bgm[3] == ' ';
+        s32 le = MAMAR_bgm[0] == ' ' && MAMAR_bgm[1] == 'M' && MAMAR_bgm[2] == 'G' && MAMAR_bgm[3] == 'B';
+
+        if (be) {
+            au_copy_bytes(MAMAR_bgm, bgmFile, MAMAR_bgm_size);
+        } else if (le) {
+            u8* dest = (u8*)bgmFile;
+            u8* src = MAMAR_bgm;
+
+            for (i = 0; i < MAMAR_bgm_size; i += 4) {
+                dest[i + 0] = src[i + 3];
+                dest[i + 1] = src[i + 2];
+                dest[i + 2] = src[i + 1];
+                dest[i + 3] = src[i + 0];
+            }
+        }
 
         // If the "BGM " signature is invalid, play an error song
         if (bgmFile->signature != 0x42474D20) {

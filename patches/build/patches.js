@@ -19,24 +19,24 @@ module.exports.RAM_PATCH_state_step_title_screen = new Uint32Array([
     0x27bdffe0, // addiu sp,sp,-32
     0x0000202d, // 0x202d
     0x24020008, // li v0,8
-    0x3c058048, // lui a1,0x8048
-    0x8ca50260, // lw a1,608(a1)
-    0x3c068048, // lui a2,0x8048
-    0x8cc60264, // lw a2,612(a2)
+    0x3c058042, // lui a1,0x8042
+    0x8ca50360, // lw a1,864(a1)
+    0x3c068042, // lui a2,0x8042
+    0x8cc60364, // lw a2,868(a2)
     0x0080382d, // 0x80382d
     0xafbf0018, // sw ra,24(sp)
     0x0c052a46, // jal 8014a918 <bgm_set_song>
     0xafa20010, // sw v0,16(sp)
-    0x3c048048, // lui a0,0x8048
-    0x8c840268, // lw a0,616(a0)
+    0x3c048042, // lui a0,0x8042
+    0x8c840368, // lw a0,872(a0)
     0x0c051cda, // jal 80147368 <play_ambient_sounds>
     0x0000282d, // 0x282d
     0x3c02800a, // lui v0,0x800a
     0x8c42a664, // lw v0,-22940(v0)
     0x8fbf0018, // lw ra,24(sp)
     0x8c4200b0, // lw v0,176(v0)
-    0x3c018048, // lui at,0x8048
-    0xac22026c, // sw v0,620(at)
+    0x3c018042, // lui at,0x8042
+    0xac22036c, // sw v0,876(at)
     0x03e00008, // jr ra
     0x27bd0020, // addiu sp,sp,32
 ])
@@ -52,48 +52,110 @@ module.exports.RAM_MAMAR_au_load_song_files = new Uint32Array([
     0x0080b02d, // 0x80b02d
     0xafb3002c, // sw s3,44(sp)
     0x00a0982d, // 0xa0982d
-    0xafb40030, // sw s4,48(sp)
-    0x00c0a02d, // 0xc0a02d
-    0xafb10024, // sw s1,36(sp)
-    0x3c11800a, // lui s1,0x800a
-    0x8e31a5c0, // lw s1,-23104(s1)
+    0xafb50034, // sw s5,52(sp)
+    0x00c0a82d, // 0xc0a82d
+    0xafb20028, // sw s2,40(sp)
+    0x3c12800a, // lui s2,0x800a
+    0x8e52a5c0, // lw s2,-23104(s2)
     0x24050010, // li a1,16
     0xafbf003c, // sw ra,60(sp)
-    0xafb50034, // sw s5,52(sp)
-    0xafb20028, // sw s2,40(sp)
+    0xafb40030, // sw s4,48(sp)
+    0xafb10024, // sw s1,36(sp)
     0xafb00020, // sw s0,32(sp)
-    0x8e22002c, // lw v0,44(s1)
+    0x8e42002c, // lw v0,44(s2)
     0x001618c0, // sll v1,s6,0x3
     0x00431021, // addu v0,v0,v1
     0x94440000, // lhu a0,0(v0)
     0x0c01511f, // jal 8005447c <au_fetch_SBN_file>
     0x03a53021, // addu a2,sp,a1
-    0x14400041, // bnez v0,804001e8 <MAMAR_au_load_song_files+0x15c>
+    0x1440007f, // bnez v0,804002e0 <MAMAR_au_load_song_files+0x254>
     0x00000000, // nop
     0x0c0136ca, // jal 8004db28 <func_8004DB28>
-    0x0280202d, // 0x280202d
-    0x1440003d, // bnez v0,804001e8 <MAMAR_au_load_song_files+0x15c>
+    0x02a0202d, // 0x2a0202d
+    0x1440007b, // bnez v0,804002e0 <MAMAR_au_load_song_files+0x254>
     0x240200c9, // li v0,201
-    0x3c068048, // lui a2,0x8048
-    0x8cc60250, // lw a2,592(a2)
-    0x18c00011, // blez a2,80400148 <MAMAR_au_load_song_files+0xbc>
-    0x3c0200ff, // lui v0,0xff
+    0x3c028042, // lui v0,0x8042
+    0x8c420350, // lw v0,848(v0)
+    0x1840004e, // blez v0,8040023c <MAMAR_au_load_song_files+0x1b0>
+    0x24020042, // li v0,66
     0x3c048040, // lui a0,0x8040
-    0x24840250, // addiu a0,a0,592
+    0x24840350, // addiu a0,a0,848
+    0x90830000, // lbu v1,0(a0)
+    0x1462000e, // bne v1,v0,80400150 <MAMAR_au_load_song_files+0xc4>
+    0x0000302d, // 0x302d
+    0x90830001, // lbu v1,1(a0)
+    0x24020047, // li v0,71
+    0x14620009, // bne v1,v0,8040014c <MAMAR_au_load_song_files+0xc0>
+    0x2402004d, // li v0,77
+    0x90830002, // lbu v1,2(a0)
+    0x14620006, // bne v1,v0,8040014c <MAMAR_au_load_song_files+0xc0>
+    0x00000000, // nop
+    0x90820003, // lbu v0,3(a0)
+    0x38420020, // xori v0,v0,0x20
+    0x2c460001, // sltiu a2,v0,1
+    0x3c048040, // lui a0,0x8040
+    0x24840350, // addiu a0,a0,848
+    0x90830000, // lbu v1,0(a0)
+    0x24020020, // li v0,32
+    0x1462000b, // bne v1,v0,80400184 <MAMAR_au_load_song_files+0xf8>
+    0x0000282d, // 0x282d
+    0x90830001, // lbu v1,1(a0)
+    0x2402004d, // li v0,77
+    0x14620007, // bne v1,v0,80400184 <MAMAR_au_load_song_files+0xf8>
+    0x24020047, // li v0,71
+    0x90830002, // lbu v1,2(a0)
+    0x14620004, // bne v1,v0,80400184 <MAMAR_au_load_song_files+0xf8>
+    0x00000000, // nop
+    0x90820003, // lbu v0,3(a0)
+    0x38420042, // xori v0,v0,0x42
+    0x2c450001, // sltiu a1,v0,1
+    0x10c00009, // beqz a2,804001ac <MAMAR_au_load_song_files+0x120>
+    0x00000000, // nop
+    0x3c048040, // lui a0,0x8040
+    0x24840350, // addiu a0,a0,848
+    0x3c068042, // lui a2,0x8042
+    0x8cc60350, // lw a2,848(a2)
     0x0c0153d2, // jal 80054f48 <au_copy_bytes>
     0x0260282d, // 0x260282d
+    0x08100084, // j 80400210 <MAMAR_au_load_song_files+0x184>
+    0x3c034247, // lui v1,0x4247
+    0x10a00017, // beqz a1,8040020c <MAMAR_au_load_song_files+0x180>
+    0x0000802d, // 0x802d
+    0x3c028042, // lui v0,0x8042
+    0x8c420350, // lw v0,848(v0)
+    0x3c068040, // lui a2,0x8040
+    0x24c60350, // addiu a2,a2,848
+    0x18400011, // blez v0,8040020c <MAMAR_au_load_song_files+0x180>
+    0x0260282d, // 0x260282d
+    0x02062021, // addu a0,s0,a2
+    0x90820003, // lbu v0,3(a0)
+    0x00b01821, // addu v1,a1,s0
+    0xa0620000, // sb v0,0(v1)
+    0x90820002, // lbu v0,2(a0)
+    0xa0620001, // sb v0,1(v1)
+    0x90820001, // lbu v0,1(a0)
+    0xa0620002, // sb v0,2(v1)
+    0x90820000, // lbu v0,0(a0)
+    0xa0620003, // sb v0,3(v1)
+    0x3c028042, // lui v0,0x8042
+    0x8c420350, // lw v0,848(v0)
+    0x26100004, // addiu s0,s0,4
+    0x0202102a, // slt v0,s0,v0
+    0x1440fff2, // bnez v0,804001d0 <MAMAR_au_load_song_files+0x144>
+    0x02062021, // addu a0,s0,a2
     0x3c034247, // lui v1,0x4247
     0x8e620000, // lw v0,0(s3)
     0x34634d20, // ori v1,v1,0x4d20
-    0x1043000e, // beq v0,v1,80400160 <MAMAR_au_load_song_files+0xd4>
+    0x1043000f, // beq v0,v1,80400258 <MAMAR_au_load_song_files+0x1cc>
     0x2404004c, // li a0,76
-    0x3c018048, // lui at,0x8048
-    0xac200250, // sw zero,592(at)
+    0x3c018042, // lui at,0x8042
+    0xac200350, // sw zero,848(at)
     0x0260282d, // 0x260282d
     0x0c100023, // jal 8040008c <MAMAR_au_load_song_files>
-    0x0280302d, // 0x280302d
-    0x0810007a, // j 804001e8 <MAMAR_au_load_song_files+0x15c>
+    0x02a0302d, // 0x2a0302d
+    0x081000b8, // j 804002e0 <MAMAR_au_load_song_files+0x254>
     0x00000000, // nop
+    0x3c0200ff, // lui v0,0xff
     0x3442ffff, // ori v0,v0,0xffff
     0x0260282d, // 0x260282d
     0x8fa60014, // lw a2,20(sp)
@@ -101,38 +163,38 @@ module.exports.RAM_MAMAR_au_load_song_files = new Uint32Array([
     0x0c015380, // jal 80054e00 <au_read_rom>
     0x00c23024, // and a2,a2,v0
     0x0000802d, // 0x802d
-    0x3c1200ff, // lui s2,0xff
-    0x3652ffff, // ori s2,s2,0xffff
-    0x24150030, // li s5,48
+    0x3c1100ff, // lui s1,0xff
+    0x3631ffff, // ori s1,s1,0xffff
+    0x24140030, // li s4,48
     0x00101080, // sll v0,s0,0x2
-    0x3c018048, // lui at,0x8048
+    0x3c018042, // lui at,0x8042
     0x00220821, // addu at,at,v0
-    0x94220256, // lhu v0,598(at)
-    0x50400012, // beqzl v0,804001cc <MAMAR_au_load_song_files+0x140>
+    0x94220356, // lhu v0,854(at)
+    0x50400012, // beqzl v0,804002c4 <MAMAR_au_load_song_files+0x238>
     0x26100001, // addiu s0,s0,1
-    0x8e240020, // lw a0,32(s1)
+    0x8e440020, // lw a0,32(s2)
     0x000210c0, // sll v0,v0,0x3
     0x00822021, // addu a0,a0,v0
     0x8c820000, // lw v0,0(a0)
-    0x8e23001c, // lw v1,28(s1)
-    0x00521024, // and v0,v0,s2
+    0x8e43001c, // lw v1,28(s2)
+    0x00511024, // and v0,v0,s1
     0x00431821, // addu v1,v0,v1
     0xafa30018, // sw v1,24(sp)
     0x8c820004, // lw v0,4(a0)
     0xafa2001c, // sw v0,28(sp)
     0x00021602, // srl v0,v0,0x18
-    0x54550005, // bnel v0,s5,804001cc <MAMAR_au_load_song_files+0x140>
+    0x54540005, // bnel v0,s4,804002c4 <MAMAR_au_load_song_files+0x238>
     0x26100001, // addiu s0,s0,1
     0x0060202d, // 0x60202d
     0x0c015313, // jal 80054c4c <snd_load_BK>
     0x0200282d, // 0x200282d
     0x26100001, // addiu s0,s0,1
     0x2a020003, // slti v0,s0,3
-    0x1440ffe8, // bnez v0,80400174 <MAMAR_au_load_song_files+0xe8>
+    0x1440ffe8, // bnez v0,8040026c <MAMAR_au_load_song_files+0x1e0>
     0x00101080, // sll v0,s0,0x2
-    0xae960028, // sw s6,40(s4)
-    0xae930064, // sw s3,100(s4)
-    0xae800024, // sw zero,36(s4)
+    0xaeb60028, // sw s6,40(s5)
+    0xaeb30064, // sw s3,100(s5)
+    0xaea00024, // sw zero,36(s5)
     0x8e620008, // lw v0,8(s3)
     0x8fbf003c, // lw ra,60(sp)
     0x8fb60038, // lw s6,56(sp)
@@ -154,7 +216,6 @@ module.exports.RAM_PATCH_au_load_song_files = new Uint32Array([
     0x8fbf0010, // lw ra,16(sp)
     0x03e00008, // jr ra
     0x27bd0018, // addiu sp,sp,24
-    0x00000000, // nop
 ])
 
 module.exports.ASM_arn_07_FlyingAI_JumpInit = 0x8024152c
@@ -1410,7 +1471,7 @@ module.exports.ASM_b_area_jan_jan_03_afterBattle_80228370 = 0x80228370
 module.exports.ASM_nuAuDmaMesgQ = 0x800a3640
 module.exports.ASM_dro_01_EVS_Quizmo_OtherCamScript = 0x802454f8
 module.exports.ASM_vtx_C26390 = 0x80205450
-module.exports.ASM_MAMAR_song_id = 0x80480260
+module.exports.ASM_MAMAR_song_id = 0x80420360
 module.exports.ASM_D_80159AD8 = 0x80159ad8
 module.exports.ASM_flo_12_interact_80241C8C = 0x80241c8c
 module.exports.ASM_flo_12_npcGroup_802425D8 = 0x802425d8
@@ -5046,7 +5107,7 @@ module.exports.ASM_b_area_kmr_part_3_egg_jr_troopa_idleAnimations_80224380 = 0x8
 module.exports.ASM_battle_item_fire_flower_func_802A1378_716FD8 = 0x802a1378
 module.exports.ASM_dgb_12_StashVars = 0x80240000
 module.exports.ASM_D_E0076ED0 = 0xe0076ed0
-module.exports.ASM_MAMAR_ambient_sounds = 0x80480268
+module.exports.ASM_MAMAR_ambient_sounds = 0x80420368
 module.exports.ASM_spr_get_cached_quad = 0x802dbd8c
 module.exports.ASM_mim_01_PiranhaPlantAI_13 = 0x80241b08
 module.exports.ASM_battle_item_dusty_hammer_displayList = 0x802a1a60
@@ -5739,7 +5800,7 @@ module.exports.ASM_jan_08_UpdateTexturePanSmooth = 0x80240000
 module.exports.ASM_gSpeakingActorPrintIsDone = 0x8029fa68
 module.exports.ASM_D_80150F88 = 0x80150f88
 module.exports.ASM_func_80242858_9C7C38 = 0x80242858
-module.exports.ASM_PATCH_au_load_song_files = 0x80400210
+module.exports.ASM_PATCH_au_load_song_files = 0x80400308
 module.exports.ASM_HES_AimMarkerH = 0x80293144
 module.exports.ASM_kpa_111_ProjectileHitbox_31 = 0x802405a4
 module.exports.ASM_D_802EB068 = 0x802eb068
@@ -10127,7 +10188,7 @@ module.exports.ASM_dro_01_Quizmo_RenderInit = 0x802417d0
 module.exports.ASM_b_area_kgr_formationTable = 0x8021d5fc
 module.exports.ASM_func_80240260_D9B150 = 0x80240260
 module.exports.ASM_D_8009BA84 = 0x8009ba84
-module.exports.ASM_MAMAR_bk_files = 0x80480254
+module.exports.ASM_MAMAR_bk_files = 0x80420354
 module.exports.ASM_func_80242898_DF9298 = 0x80242898
 module.exports.ASM_func_80057874 = 0x80057874
 module.exports.ASM_IdleFlyToGoal = 0x8027bbb8
@@ -12561,7 +12622,7 @@ module.exports.ASM_trd_08_EVS_FireBar_Defeated = 0x80240f2c
 module.exports.ASM_flo_16_802451C4 = 0x802451c4
 module.exports.ASM_D_09003370 = 0x09003370
 module.exports.ASM_IES_Unused_08F = 0x8008bec4
-module.exports.ASM_MAMAR_bgm_size = 0x80480250
+module.exports.ASM_MAMAR_bgm_size = 0x80420350
 module.exports.ASM_func_800EFD08 = 0x800efd08
 module.exports.ASM_vtx_C27180 = 0x80206240
 module.exports.ASM_vtx_C23480 = 0x80202540
@@ -15622,7 +15683,7 @@ module.exports.ASM_D_80241D38_ADCBD8 = 0x80241d38
 module.exports.ASM_HES_Item_DriedShroom_disabled = 0x80086888
 module.exports.ASM_b_area_sam_frost_piranha_idleAnimations = 0x8022aab0
 module.exports.ASM_kzn_17_TackleAI_Main = 0x80242048
-module.exports.ASM_MAMAR_out_masterTempo = 0x8048026c
+module.exports.ASM_MAMAR_out_masterTempo = 0x8042036c
 module.exports.ASM_D_80249C3C = 0x80249c3c
 module.exports.ASM_flo_10_UpdateTexturePanStepped = 0x802402bc
 module.exports.ASM_send_mesg = 0x8006af7c
@@ -17275,7 +17336,7 @@ module.exports.ASM_b_area_pra3_white_clubba_idle = 0x8022b2dc
 module.exports.ASM_b_area_jan_medi_guy_statusTable_8021F8F0 = 0x802225b0
 module.exports.ASM_iwa_01_CleftAI_RevUp = 0x80242958
 module.exports.ASM_sbk_02_GetItemName = 0x80240af8
-module.exports.ASM_MAMAR_bgm = 0x80400250
+module.exports.ASM_MAMAR_bgm = 0x80400350
 module.exports.ASM_func_80240564_DE5C14 = 0x80240564
 module.exports.ASM_dgb_01_D_802539A0_C11220 = 0x802539a0
 module.exports.ASM_omo_09_RangedAttackAI_Main = 0x8024324c
@@ -23660,7 +23721,7 @@ module.exports.ASM_ui_battle_status_dizzy_0_pal = 0x80102160
 module.exports.ASM_b_area_pra3_duplighost_defenseTable = 0x80219f74
 module.exports.ASM_b_area_omo2_2_stilt_guy_GetSelectedMoveID = 0x80231000
 module.exports.ASM_D_80242410 = 0x80242410
-module.exports.ASM_MAMAR_song_variation = 0x80480264
+module.exports.ASM_MAMAR_song_variation = 0x80420364
 module.exports.ASM_SetIdleGoal = 0x8026a62c
 module.exports.ASM_b_area_jan2_jan_04_afterBattle_8021F4E0 = 0x8021f4e0
 module.exports.ASM_func_802189FC_5CF08C = 0x802189fc

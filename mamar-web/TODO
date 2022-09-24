@@ -1,1 +1,2 @@
-* Find a way of directly accessing memory in mupen64plus-web, perhaps with a func that returns a pointer to the memory buffer -> Uint8Array (https://emscripten.org/docs/porting/connecting_cpp_and_javascript/embind.html#memory-views)
+* Rename segment->variation
+* Rename subsegment->segment (? check audio.h)
