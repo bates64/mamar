@@ -216,9 +216,9 @@ impl Bgm {
 
         if voices_offset != 0 {
             f.seek(SeekFrom::Start(voices_offset))?;
-            bgm.voices = (0..voices_count)
+            bgm.instruments = (0..voices_count)
                 .into_iter()
-                .map(|_| Voice::decode(f))
+                .map(|_| Instrument::decode(f))
                 .collect::<Result<_, _>>()?;
         };
 
@@ -597,16 +597,16 @@ impl Drum {
             volume: f.read_u8()?,
             pan: f.read_i8()?,
             reverb: f.read_u8()?,
-            unk_07: f.read_u8()?,
-            unk_08: f.read_u8()?,
-            unk_09: f.read_u8()?,
-            unk_0a: f.read_u8()?,
-            unk_0b: f.read_u8()?,
+            rand_tune: f.read_u8()?,
+            rand_volume: f.read_u8()?,
+            rand_pan: f.read_u8()?,
+            rand_reverb: f.read_u8()?,
+            pad_0b: f.read_u8()?,
         })
     }
 }
 
-impl Voice {
+impl Instrument {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
@@ -617,7 +617,7 @@ impl Voice {
             reverb: f.read_u8()?,
             coarse_tune: f.read_u8()?,
             fine_tune: f.read_u8()?,
-            unk_07: f.read_u8()?,
+            pad_07: f.read_u8()?,
         })
     }
 }

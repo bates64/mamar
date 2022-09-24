@@ -97,7 +97,7 @@ impl Bgm {
             f.write_u16_be(0)?;
             pos
         };
-        f.write_u16_be(self.voices.len() as u16)?;
+        f.write_u16_be(self.instruments.len() as u16)?;
 
         debug_assert_eq!(f.pos()?, 0x24); // End of header struct
 
@@ -112,11 +112,11 @@ impl Bgm {
         }
 
         // Write voices
-        if !self.voices.is_empty() {
+        if !self.instruments.is_empty() {
             f.align(4)?;
             let pos = (f.pos()? >> 2) as u16;
             f.write_u16_be_at(pos, voices_offset)?;
-            for voice in self.voices.iter() {
+            for voice in self.instruments.iter() {
                 voice.encode(f)?;
             }
         }
@@ -305,16 +305,16 @@ impl Drum {
         f.write_u8(self.volume)?;
         f.write_i8(self.pan)?;
         f.write_u8(self.reverb)?;
-        f.write_u8(self.unk_07)?;
-        f.write_u8(self.unk_08)?;
-        f.write_u8(self.unk_09)?;
-        f.write_u8(self.unk_0a)?;
-        f.write_u8(self.unk_0b)?;
+        f.write_u8(self.rand_tune)?;
+        f.write_u8(self.rand_volume)?;
+        f.write_u8(self.rand_pan)?;
+        f.write_u8(self.rand_reverb)?;
+        f.write_u8(self.pad_0b)?;
         Ok(())
     }
 }
 
-impl Voice {
+impl Instrument {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         f.write_u8(self.bank)?;
         f.write_u8(self.patch)?;
@@ -323,7 +323,7 @@ impl Voice {
         f.write_u8(self.reverb)?;
         f.write_u8(self.coarse_tune)?;
         f.write_u8(self.fine_tune)?;
-        f.write_u8(self.unk_07)?;
+        f.write_u8(self.pad_07)?;
         Ok(())
     }
 }

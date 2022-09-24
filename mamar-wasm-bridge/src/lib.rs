@@ -71,6 +71,6 @@ pub fn sbn_decode(rom: &[u8]) -> JsValue {
 pub fn bgm_add_voice(bgm: &JsValue) -> JsValue {
     let mut bgm: Bgm = from_js(bgm);
     log::info!("bgm_add_voice {:?}", bgm);
-    bgm.voices.push(Voice::default());
+    bgm.instruments.push(Instrument::default());
     to_js(&bgm)
 }

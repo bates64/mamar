@@ -35,7 +35,7 @@ pub struct Bgm {
     pub variations: [Option<Variation>; 4],
 
     pub drums: Vec<Drum>,
-    pub voices: Vec<Voice>,
+    pub instruments: Vec<Instrument>,
 
     pub track_lists: HashMap<TrackListId, TrackList>,
 
@@ -182,25 +182,19 @@ pub struct Drum {
     pub pan: i8,
 
     pub reverb: u8,
+    pub rand_tune: u8,
+    pub rand_volume: u8,
+    pub rand_pan: u8,
+    pub rand_reverb: u8,
 
     #[serde(skip_serializing_if="is_default")]
-    pub unk_07: u8,
-
-    // The following are possibly just padding, or they just have unused uses. Needs testing
-    #[serde(skip_serializing_if="is_default")]
-    pub unk_08: u8, // Unused; zero in all original songs
-    #[serde(skip_serializing_if="is_default")]
-    pub unk_09: u8, // Unused
-    #[serde(skip_serializing_if="is_default")]
-    pub unk_0a: u8, // Unused
-    #[serde(skip_serializing_if="is_default")]
-    pub unk_0b: u8, // Unused
+    pub pad_0b: u8,
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
-pub struct Voice {
+pub struct Instrument {
     /// Upper nibble = bank. (0..=6 are valid?)
     /// Lower nibble = staccatoness mod 3 (0 = sustain, 3 = staccato).
     pub bank: u8,
@@ -219,7 +213,7 @@ pub struct Voice {
     pub fine_tune: u8,
 
     #[serde(skip_serializing_if="is_default")]
-    pub unk_07: u8,
+    pub pad_07: u8,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
