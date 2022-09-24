@@ -1,10 +1,11 @@
 import Refresh from "@spectrum-icons/workflow/Refresh"
 import * as pm64 from "pm64-typegen"
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, CSSProperties } from "react"
 
-import styles from "./SegmentsMap.module.scss"
+import styles from "./VariationsMap.module.scss"
 
 import { useBgm, useSegment } from "../store"
+import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 const SEGMENT_WIDTH_PX = 180
 const LOOP_HEIGHT_PX = 24
@@ -148,6 +149,7 @@ function Segment({ segmentId, variationIndex }: {
     segmentId: number
     variationIndex: number
 }) {
+    const selection = useSelection()
     const [bgm] = useBgm()
     const segments = bgm?.variations[variationIndex]?.segments
     const segment = segments?.find?.(s => s.id === segmentId)
@@ -191,23 +193,39 @@ function Segment({ segmentId, variationIndex }: {
             />
         } else {
             label = "Orphaned EndLoop"
-            classNames.push(styles.invalidLoopSegment)
+            classNames.push(styles.red)
         }
     }
 
     if (segment.type === "Subseg") {
         const trackList = bgm.trackLists[segment.trackList]
         label = trackList.pos ? `Tracks 0x${trackList.pos.toString(16)}` : `Tracks ${segment.id}`
+        classNames.push(styles.blue)
     }
 
-    return <li tabIndex={0} className={classNames.join(" ")}>
-        <div tabIndex={0} className={styles.segmentName}>
+    if (selection.isSelected(segment.id)) {
+        classNames.push(styles.selected)
+    }
+
+    return <li
+        tabIndex={0}
+        className={classNames.join(" ")}
+        onClick={evt => {
+            if (evt.shiftKey) {
+                selection.multiSelect(segment.id)
+            } else {
+                selection.select(segment.id)
+            }
+            evt.stopPropagation()
+        }}
+    >
+        <div className={styles.segmentName}>
             {label}
         </div>
     </li>
 }
 
-export function Variation({ index }: {
+function Variation({ index }: {
     index: number
 }) {
     const [bgm] = useBgm()
@@ -236,10 +254,27 @@ export function Variation({ index }: {
     </li>
 }
 
-export default function VariationsMap() {
+function VariationsMapInner() {
     const [bgm] = useBgm()
+    const selection = useSelection()
 
-    return <ol className={styles.container}>
-        {bgm?.variations.map((_, i) => <Variation key={i} index={i} />)}
+    return <ol
+        className={styles.container}
+        style={{ "--segment-width": `${SEGMENT_WIDTH_PX}px` } as CSSProperties}
+        onClick={() => {
+            selection.clear()
+        }}
+    >
+
+        {bgm?.variations.map((_, i) => <Variation
+            key={i}
+            index={i}
+        />)}
     </ol>
+}
+
+export default function VariationsMap() {
+    return <SelectionProvider>
+        <VariationsMapInner />
+    </SelectionProvider>
 }
