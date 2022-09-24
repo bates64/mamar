@@ -4,3 +4,8 @@ declare module "jsx:*.svg" {
     const SVGComponent: ComponentType<SVGProps<SVGSVGElement>>
     export default SVGComponent
 }
+
+declare module "*.module.scss" {
+    const styles: { [key: string]: string }
+    export default styles
+}

@@ -18,6 +18,8 @@ use typescript_type_def::TypeDef;
 mod cmd;
 pub use cmd::*;
 
+use crate::id::Id;
+
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &str = "BGM ";
 
@@ -111,21 +113,26 @@ pub struct Variation {
 pub enum Segment {
     #[serde(rename_all = "camelCase")]
     Subseg {
+        id: Id,
         track_list: TrackListId,
     },
     StartLoop {
+        id: Id,
         label_index: u16,
     },
-    Wait,
+    Wait { id: Id },
     EndLoop {
+        id: Id,
         label_index: u8,
         iter_count: u8,
     },
     Unknown6 {
+        id: Id,
         label_index: u8,
         iter_count: u8,
     },
     Unknown7 {
+        id: Id,
         label_index: u8,
         iter_count: u8,
     },

@@ -1,6 +1,6 @@
 import { FileWithHandle } from "browser-fs-access"
 import { new_bgm, bgm_add_voice, bgm_decode } from "mamar-wasm-bridge"
-import { Bgm } from "pm64-typegen"
+import { Bgm, Variation, Segment } from "pm64-typegen"
 import { createContainer } from "react-tracked"
 import useUndoable from "use-undoable"
 
@@ -10,15 +10,120 @@ function generateId() {
 
 //
 
+export type SegmentAction = {
+    type: "set_loop_iter_count"
+    iter_count: number
+}
+
+export function segmentReducer(segment: Segment, action: SegmentAction): Segment {
+    switch (action.type) {
+    case "set_loop_iter_count":
+        if (segment.type === "EndLoop") {
+            return {
+                ...segment,
+                iter_count: action.iter_count,
+            }
+        } else {
+            console.warn("Tried to set loop iter count on non-end loop segment")
+            return segment
+        }
+    }
+}
+
+export const useSegment = (id?: number, variationIndex?: number, docId?: string): [Segment | undefined, (action: SegmentAction) => void] => {
+    const [variation, dispatch] = useVariation(variationIndex, docId)
+    return [
+        variation?.segments.find(s => s.id === id),
+        action => {
+            if (id) {
+                dispatch({
+                    type: "segment",
+                    id,
+                    action,
+                })
+            }
+        },
+    ]
+}
+
+//
+
+export type VariationAction = {
+    type: "segment"
+    id: number
+    action: SegmentAction
+}
+
+export function variationReducer(variation: Variation, action: VariationAction): Variation {
+    switch (action.type) {
+    case "segment":
+        return {
+            ...variation,
+            segments: variation.segments.map(segment => {
+                if (segment.id === action.id) {
+                    return segmentReducer(segment, action.action)
+                } else {
+                    return segment
+                }
+            }),
+        }
+    }
+}
+
+export const useVariation = (index?: number, docId?: string): [Variation | undefined, (action: VariationAction) => void] => {
+    const [bgm, dispatch] = useBgm(docId)
+    return [
+        bgm?.variations[index as number] ?? undefined,
+        action => {
+            if (typeof index === "number") {
+                dispatch({
+                    type: "variation",
+                    index,
+                    action,
+                })
+            }
+        },
+    ]
+}
+
+//
+
 export type BgmAction = {
+    type: "variation"
+    index: number
+    action: VariationAction
+} | {
     type: "add_voice"
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
     switch (action.type) {
-    case "add_voice":
+    case "variation": {
+        const applyVariation = (index: number) => {
+            const variation = bgm.variations[index]
+            if (index === action.index && variation) {
+                return variationReducer(variation, action.action)
+            } else {
+                return variation
+            }
+        }
+        return {
+            ...bgm,
+            variations: [
+                applyVariation(0),
+                applyVariation(1),
+                applyVariation(2),
+                applyVariation(3),
+            ],
+        }
+    } case "add_voice":
         return bgm_add_voice(bgm)
     }
+}
+
+export const useBgm = (docId?: string): [Bgm | undefined, (action: BgmAction) => void] => {
+    const [doc, dispatch] = useDoc(docId)
+    return [doc?.bgm, action => dispatch({ type: "bgm", action })]
 }
 
 //
@@ -29,6 +134,7 @@ export interface Doc {
     file?: FileWithHandle
     name: string
     isSaved: boolean
+    selectedVariationIndex: number
 }
 
 export type DocAction = {
@@ -36,6 +142,9 @@ export type DocAction = {
     action: BgmAction
 } | {
     type: "mark_saved"
+} | {
+    type: "select_variation"
+    index: number
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -50,6 +159,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             isSaved: true,
+        }
+    case "select_variation":
+        return {
+            ...state,
+            selectedVariationIndex: action.index,
         }
     }
 }
@@ -100,6 +214,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             file: action.file,
             name: action.name || action.file?.name || "New song",
             isSaved: true,
+            selectedVariationIndex: 0,
         }
         return {
             ...root,
@@ -154,6 +269,18 @@ export function openData(data: Uint8Array, name?: string): RootAction {
     }
 }
 
+export const useDoc = (id?: string): [Doc | undefined, (action: DocAction) => void] => {
+    const [root, dispatch] = useRoot()
+    const trueId = id ?? root.activeDocId
+    const doc = trueId ? root.docs[trueId] : undefined
+    const docDispatch = (action: DocAction) => {
+        if (trueId) {
+            dispatch({ type: "doc", id: trueId, action })
+        }
+    }
+    return [doc, docDispatch]
+}
+
 //
 
 interface Dispatch {
@@ -167,9 +294,24 @@ interface Dispatch {
 function shouldActionCommitToHistory(action: RootAction): boolean {
     switch (action.type) {
     case "doc":
-        return true
-    default:
-        return false
+        switch (action.action.type) {
+        case "bgm":
+            return true
+        }
+    }
+    return false
+}
+
+interface Action {
+    type: string
+    action?: Action
+}
+
+function joinActionTypes(action: Action): string {
+    if (action.action) {
+        return `${action.type}/${joinActionTypes(action.action)}`
+    } else {
+        return action.type
     }
 }
 
@@ -185,7 +327,7 @@ const {
     })
 
     const dispatch: Dispatch = action => {
-        console.info("dispatch", action)
+        console.info("dispatch", joinActionTypes(action), action)
         setState(
             prevState => {
                 const newState = rootReducer(prevState, action)
@@ -207,20 +349,3 @@ const {
 export const RootProvider = Provider
 
 export const useRoot: () => [Root, Dispatch] = useTracked as any
-
-export const useDoc = (id?: string): [Doc | undefined, (action: DocAction) => void] => {
-    const [root, dispatch] = useRoot()
-    const trueId = id ?? root.activeDocId
-    const doc = trueId ? root.docs[trueId] : undefined
-    const docDispatch = (action: DocAction) => {
-        if (trueId) {
-            dispatch({ type: "doc", id: trueId, action })
-        }
-    }
-    return [doc, docDispatch]
-}
-
-export const useBgm = (id?: string): [Bgm | undefined, (action: BgmAction) => void] => {
-    const [doc, dispatch] = useDoc(id)
-    return [doc?.bgm, action => dispatch({ type: "bgm", action })]
-}

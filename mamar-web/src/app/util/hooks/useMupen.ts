@@ -33,6 +33,7 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
         case State.MOUNTING:
             // Load the emulator
             state.current = State.LOADING
+            let module: any
             createMupen64PlusWeb({
                 canvas: document.getElementById("canvas") as HTMLCanvasElement,
                 romData,
@@ -56,12 +57,17 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
                         setError(errorMessage)
                     }
                 },
+                // @ts-ignore
+                preRun: [m => {
+                    module = m
+                }],
             }).then(async mupen => {
                 if (mupen) {
                     await mupen.start()
                     state.current = State.STARTED
                     document.body.appendChild(stats.dom)
                     setMupen(mupen)
+                    module.JSEvents.removeAllEventListeners()
                 }
             }).catch(error => {
                 // XXX: mupen64plus-web never rejects, it just calls setErrorStatus
@@ -91,6 +97,8 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             break
         }
     }, [mupen, romData])
+
+    window.MUPEN = mupen
 
     if (error) {
         throw error

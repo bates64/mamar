@@ -478,10 +478,10 @@ pub enum Command {
     /// Right = (+/-)127.
     SubTrackPan { value: i8 },
 
-    SubTrackReverb(u8),
+    SubTrackReverb { value: u8 },
 
     /// Sets the volume for this track only. Resets at the end of the [super::Segment].
-    SegTrackVolume(u8),
+    SegTrackVolume { value: u8 },
 
     SubTrackCoarseTune { value: u8 },
 
@@ -528,7 +528,10 @@ pub enum Command {
     },
 
     /// Jumps to the start label and executes until the end label is found.
-    Detour(CommandRange),
+    Detour {
+        start_label: MarkerId,
+        end_label: MarkerId, // Must come after
+    },
 
     UnkCmdFF {
         unk_00: u8,
@@ -538,7 +541,7 @@ pub enum Command {
 
     /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this
     /// abstraction rather than [CommandSeq] indices because they stay stable during mutation.
-    Marker(MarkerId),
+    Marker { label: MarkerId },
 }
 
 use Command::Delay;
@@ -669,10 +672,3 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 }
 
 pub type MarkerId = String;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandRange {
-    pub(crate) start: MarkerId,
-    pub(crate) end: MarkerId, // Must come after `start`
-}

@@ -10,10 +10,10 @@ use crate::rw::*;
 
 #[derive(Debug)]
 pub enum Error {
-    MissingStartMarker(CommandRange),
-    MissingEndMarker(CommandRange),
-    UnorderedMarkers(CommandRange),
-    EndMarkerTooFarAway(CommandRange),
+    MissingStartMarker(MarkerId),
+    MissingEndMarker(MarkerId),
+    UnorderedMarkers(MarkerId),
+    EndMarkerTooFarAway(MarkerId),
     TooBig,
     Io(io::Error),
 }
@@ -27,15 +27,15 @@ impl From<io::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::MissingStartMarker(range) => write!(f, "Missing start marker for range {:?}", range),
-            Error::MissingEndMarker(range) => write!(f, "Missing end marker for range {:?}", range),
-            Error::UnorderedMarkers(range) => {
-                write!(f, "Start marker comes after end marker in range '{:?}'", range)
+            Error::MissingStartMarker(id) => write!(f, "Cannot find start marker {:?}", id),
+            Error::MissingEndMarker(id) => write!(f, "Cannot find end marker {:?}", id),
+            Error::UnorderedMarkers(id) => {
+                write!(f, "Start marker comes after end marker {:?}", id)
             }
-            Error::EndMarkerTooFarAway(range) => write!(
+            Error::EndMarkerTooFarAway(id) => write!(
                 f,
-                "End marker is too far away from start marker in range {:?}",
-                range,
+                "End marker '{:?}' is too far away from start marker",
+                id,
             ),
             Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
@@ -331,35 +331,35 @@ impl Instrument {
 impl Segment {
     pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
         match self {
-            Segment::Subseg { track_list } => {
+            Segment::Subseg { track_list, .. } => {
                 f.write_u16_be((segment_commands::SUBSEG >> 4) as u16)?;
                 let tracks_pos = f.pos()?;
                 f.write_u16_be(0)?;
 
                 Ok(Some((tracks_pos, *track_list)))
             }
-            Segment::Wait => {
+            Segment::Wait { .. } => {
                 f.write_u16_be((segment_commands::WAIT >> 4) as u16)?;
                 f.write_u16_be(0)?;
                 Ok(None)
             }
-            Segment::StartLoop { label_index } => {
+            Segment::StartLoop { label_index, .. } => {
                 f.write_u16_be((segment_commands::START_LOOP >> 4) as u16)?;
                 f.write_u16_be(*label_index)?;
                 Ok(None)
             }
-            Segment::EndLoop { label_index, iter_count } => {
+            Segment::EndLoop { label_index, iter_count, .. } => {
                 f.write_u16_be((segment_commands::END_LOOP >> 4) as u16)?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown6 { label_index, iter_count } => {
+            Segment::Unknown6 { label_index, iter_count, .. } => {
                 f.write_u16_be((segment_commands::UNKNOWN_6 >> 4) as u16)?;
                 f.seek(SeekFrom::Current(-2))?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown7 { label_index, iter_count } => {
+            Segment::Unknown7 { label_index, iter_count, .. } => {
                 f.write_u16_be((segment_commands::UNKNOWN_7 >> 4) as u16)?;
                 f.seek(SeekFrom::Current(-2))?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
@@ -372,7 +372,7 @@ impl Segment {
 impl CommandSeq {
     pub fn encode<W: Write + Seek>(&self, f: &mut W, is_silent: bool) -> Result<(), Error> {
         let mut marker_to_offset = HashMap::new();
-        let mut todo_subroutines = Vec::new();
+        let mut todo_detours = Vec::new();
 
         for Event { command, .. } in self.iter() {
             match command {
@@ -462,11 +462,11 @@ impl CommandSeq {
                     f.write_u8(0xEA)?;
                     f.write_i8(*a)?;
                 }
-                Command::SubTrackReverb(a) => {
+                Command::SubTrackReverb { value: a } => {
                     f.write_u8(0xEB)?;
                     f.write_u8(*a)?;
                 }
-                Command::SegTrackVolume(a) => {
+                Command::SegTrackVolume { value: a } => {
                     f.write_u8(0xEC)?;
                     f.write_u8(*a)?;
                 }
@@ -500,11 +500,11 @@ impl CommandSeq {
                     f.write_u8(0xF7)?;
                     f.write_u8(*a)?;
                 }
-                Command::Detour(range) => {
+                Command::Detour { start_label, end_label } => {
                     f.write_u8(0xFE)?;
 
                     let offset = f.pos()?;
-                    todo_subroutines.push((offset, range));
+                    todo_detours.push((offset, start_label, end_label));
 
                     // These will be overwritten later
                     f.write_u16_be(0)?;
@@ -512,7 +512,7 @@ impl CommandSeq {
                 }
 
                 // Markers aren't actually written to the data - we just need to record their file offset for later use.
-                Command::Marker(marker) => {
+                Command::Marker { label: marker } => {
                     let offset = f.pos()?;
                     marker_to_offset.insert(marker, offset);
                 }
@@ -558,28 +558,28 @@ impl CommandSeq {
 
         // Update the start/length of any subroutine commands. We have to do this after everything else, because
         // subroutines are able to reference markers that come after the subroutine jump itself.
-        for (abs_subroutine_pos, range) in todo_subroutines.into_iter() {
+        for (abs_subroutine_pos, start, end) in todo_detours.into_iter() {
             // Try to get the file offset of `range.start`. If it is a dropped Weak<_> or we didn't see the Marker in
             // the loop above, raise an error.
             let start_offset = *marker_to_offset
-                .get(&range.start)
-                .ok_or_else(|| Error::MissingStartMarker(range.clone()))? as u16;
+                .get(&start)
+                .ok_or_else(|| Error::MissingStartMarker(start.clone()))? as u16;
 
             // Ditto for `range.end`.
             let end_offset = *marker_to_offset
-                .get(&range.end)
-                .ok_or_else(|| Error::MissingEndMarker(range.clone()))? as u16;
+                .get(&end)
+                .ok_or_else(|| Error::MissingEndMarker(end.clone()))? as u16;
 
             // Calculate the length (delta between start_offset and end_offset). If this underflows, raise an error
             // [rather than panicking on debug / wrapping on release], because that would mean end_offset >
             // start_offset.
             let length = end_offset
                 .checked_sub(start_offset)
-                .ok_or_else(|| Error::UnorderedMarkers(range.clone()))?;
+                .ok_or_else(|| Error::UnorderedMarkers(end.clone()))?;
 
             // Convert the length to a u8 if possible.
             if length > u8::MAX as u16 {
-                return Err(Error::EndMarkerTooFarAway(range.clone()));
+                return Err(Error::EndMarkerTooFarAway(end.clone()));
             }
             let length = length as u8;
 

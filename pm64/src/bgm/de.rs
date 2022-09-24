@@ -7,6 +7,7 @@ use std::mem::MaybeUninit;
 use log::{debug, warn};
 
 use super::*;
+use crate::id::gen_id;
 use crate::rw::*;
 
 #[derive(Debug)]
@@ -290,29 +291,33 @@ impl Segment {
                     }
                 };
 
-                Ok(Segment::Subseg { track_list })
+                Ok(Segment::Subseg { id: gen_id(), track_list })
             }
             segment_commands::START_LOOP => {
                 f.seek(SeekFrom::Current(-2))?;
                 Ok(Segment::StartLoop {
+                    id: gen_id(),
                     label_index: f.read_u16_be()?,
                 })
             },
-            segment_commands::WAIT => Ok(Segment::Wait),
+            segment_commands::WAIT => Ok(Segment::Wait { id: gen_id() }),
             segment_commands::END_LOOP => {
                 Ok(Segment::EndLoop {
+                    id: gen_id(),
                     label_index: (data & 0x1F) as u8, // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_6 => {
                 Ok(Segment::Unknown6 {
+                    id: gen_id(),
                     label_index: (data & 0x1F) as u8, // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_7 => {
                 Ok(Segment::Unknown7 {
+                    id: gen_id(),
                     label_index: (data & 0x1F) as u8, // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
@@ -450,8 +455,8 @@ impl CommandSeq {
                 },
                 0xE9 => Command::SubTrackVolume { value: f.read_u8()? },
                 0xEA => Command::SubTrackPan { value: f.read_i8()? },
-                0xEB => Command::SubTrackReverb(f.read_u8()?),
-                0xEC => Command::SegTrackVolume(f.read_u8()?),
+                0xEB => Command::SubTrackReverb { value: f.read_u8()? },
+                0xEC => Command::SegTrackVolume { value: f.read_u8()? },
                 0xED => Command::SubTrackCoarseTune { value: f.read_u8()? },
                 0xEE => Command::SubTrackFineTune { value: f.read_u8()? },
                 0xEF => Command::SegTrackTune {
@@ -483,10 +488,10 @@ impl CommandSeq {
                     let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
 
-                    Command::Detour(CommandRange {
-                        start: commands.upsert_marker(start_offset),
-                        end: commands.upsert_marker(end_offset),
-                    })
+                    Command::Detour {
+                        start_label: commands.upsert_marker(start_offset),
+                        end_label: commands.upsert_marker(end_offset),
+                    }
                 }
                 0xFF => Command::UnkCmdFF { unk_00: f.read_u8()?, unk_01: f.read_u8()?, unk_02: f.read_u8()? },
 
@@ -542,11 +547,11 @@ impl OffsetEventMap {
             Entry::Vacant(entry) => {
                 // Insert the new marker here.
                 let id: MarkerId = format!("Offset {:#X}", offset);
-                entry.insert(Command::Marker(id.clone()).into());
+                entry.insert(Command::Marker { label: id.clone() }.into());
                 id
             }
             Entry::Occupied(entry) => match entry.get() {
-                Event { command: Command::Marker(id), .. } => id.clone(),
+                Event { command: Command::Marker { label }, .. } => label.clone(),
                 other_command => panic!(
                     "non-marker command {:?} found in label range (shifted_offset = {:#X})",
                     other_command, shifted_offset,
@@ -664,27 +669,27 @@ mod test {
         let start_labels: Vec<&MarkerId> = seq
             .at_time(0)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker(_), .. }))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
             .map(|cmd| match cmd {
-                Event { command: Command::Marker(id), .. } => id,
+                Event { command: Command::Marker { label }, .. } => label,
                 _ => unreachable!(),
             })
             .collect();
         let end_labels: Vec<&MarkerId> = seq
             .at_time(11)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker(_), .. }))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
             .map(|cmd| match cmd {
-                Event { command: Command::Marker(id), .. } => id,
+                Event { command: Command::Marker { label }, .. } => label,
                 _ => unreachable!(),
             })
             .collect();
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Detour(_), .. }))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Detour { .. }, .. }))
             .map(|cmd| match cmd {
-                Event { command: Command::Detour(CommandRange { start, end, .. }), .. } => (start, end),
+                Event { command: Command::Detour { start_label, end_label, .. }, .. } => (start_label, end_label),
                 _ => unreachable!(),
             })
             .collect();
