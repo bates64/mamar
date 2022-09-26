@@ -11,6 +11,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+
+    user-select: none;
+
+    --segment-width: 0; // set by js
+    --segment-height: var(--spectrum-global-dimension-size-1200);
 }
 
 .variation {
@@ -56,7 +61,7 @@
     flex-shrink: 0;
 
     width: var(--segment-width);
-    height: var(--spectrum-global-dimension-size-1200);
+    height: var(--segment-height);
 
     --color-800: var(--spectrum-global-color-gray-800);
     --color-500: var(--spectrum-global-color-gray-500);
@@ -169,6 +174,10 @@
         }
     }
 
+    &.dragging {
+        color: var(--spectrum-global-color-gray-900);
+    }
+
     .loopSvg {
         width: 100%;
         height: 100%;
@@ -179,4 +188,14 @@
             stroke-width: 1px;
         }
     }
+}
+
+.loopDragColumn {
+    position: absolute;
+    width: 8px;
+    transform: translateX(-50%);
+
+    height: var(--segment-height);
+
+    cursor: col-resize;
 }

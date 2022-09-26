@@ -1,14 +1,16 @@
 import Refresh from "@spectrum-icons/workflow/Refresh"
 import * as pm64 from "pm64-typegen"
-import { useRef, useEffect, useState, CSSProperties } from "react"
+import { useRef, useEffect, useState, CSSProperties, useId, KeyboardEvent, useCallback } from "react"
 
 import styles from "./VariationsMap.module.scss"
 
-import { useBgm, useSegment } from "../store"
+import { useBgm, useSegment, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 const SEGMENT_WIDTH_PX = 180
 const LOOP_HEIGHT_PX = 24
+
+// TODO: pass variationIndex around with context via state.ts
 
 function getXPosOfSegment(segment: pm64.Segment, segments: pm64.Segment[]) {
     let x = 0
@@ -24,6 +26,140 @@ function getXPosOfSegment(segment: pm64.Segment, segments: pm64.Segment[]) {
     }
 
     return x
+}
+
+function alignXPos(x: number) {
+    return Math.round(x / SEGMENT_WIDTH_PX) * SEGMENT_WIDTH_PX
+}
+
+function LoopDragColumn({ x, otherX, variationIndex, segmentId }: {
+    x: number
+    otherX: number
+    variationIndex: number
+    segmentId: number
+}) {
+    const [segment] = useSegment(segmentId, variationIndex)
+    const [variation, dispatch] = useVariation(variationIndex)
+
+    if (segment?.type !== "StartLoop" && segment?.type !== "EndLoop") {
+        throw new Error("Invalid segment type for DraggableLoopColumn")
+    }
+
+    if (!variation) {
+        throw new Error("Variation not found")
+    }
+
+    const [dragging, setDragging] = useState(false)
+    const [dragX, setDragX] = useState(0)
+    const ref = useRef<HTMLDivElement>(null)
+
+    const commitDataRef = useRef<{ toIndex: number, segmentId: number }>({ toIndex: 0, segmentId: 0 })
+    commitDataRef.current.segmentId = segmentId
+    const commit = useCallback(() => {
+        dispatch({
+            type: "move_segment",
+            id: commitDataRef.current.segmentId,
+            toIndex: commitDataRef.current.toIndex,
+        })
+    }, [dispatch, commitDataRef])
+
+    const xRef = useRef(x)
+    xRef.current = x
+    useEffect(() => {
+        if (dragging) {
+            setDragX(xRef.current)
+
+            const mouseMove = (evt: MouseEvent) => {
+                setDragX(dragX => dragX + evt.movementX)
+            }
+
+            const mouseUp = () => {
+                commit()
+                setDragging(false)
+            }
+
+            document.addEventListener("mousemove", mouseMove)
+            document.addEventListener("mouseup", mouseUp)
+
+            return () => {
+                document.removeEventListener("mousemove", mouseMove)
+                document.removeEventListener("mouseup", mouseUp)
+            }
+        }
+    }, [commit, dragging, xRef])
+
+    const maxX = getXPosOfSegment(variation.segments[variation.segments.length - 1], variation.segments) + SEGMENT_WIDTH_PX
+    const minX = getXPosOfSegment(variation.segments[0], variation.segments)
+    const x2 = alignXPos(Math.min(Math.max(minX, dragX), maxX))
+
+    commitDataRef.current.toIndex = Math.round(x2 / SEGMENT_WIDTH_PX)
+
+    const label = (segment.type === "StartLoop" ? "Start" : "End")
+        + " of Loop " + segment.label_index
+
+    return <>
+        <div
+            ref={ref}
+            aria-label={label}
+            tabIndex={0}
+            className={styles.loopDragColumn}
+            style={{
+                left: `${x}px`,
+            }}
+            onFocus={() => setDragging(true)}
+            onBlur={() => {
+                commit()
+                setDragging(false)
+            }}
+            onMouseDown={() => setDragging(true)}
+            onKeyDown={(evt: KeyboardEvent) => {
+                if (evt.key === "Left") {
+                    setDragX(dragX => dragX - SEGMENT_WIDTH_PX)
+                } else if (evt.key === "Right") {
+                    setDragX(dragX => dragX + SEGMENT_WIDTH_PX)
+                }
+            }}
+        />
+        {dragging && <LoopOverlayGhost x1={otherX} x2={x2} labelIndex={segment.label_index} />}
+    </>
+}
+
+// TODO: don't use this, set state so the real overlay applies the positions & .dragging
+function LoopOverlayGhost({ x1, x2, labelIndex }: {
+    x1: number
+    x2: number
+    labelIndex: number
+}) {
+    const x = Math.min(x1, x2)
+    const width = Math.abs(x2 - x1)
+
+    if (width === 0) {
+        return <></>
+    }
+
+    const middle = width / 2
+    const spaceForLabel = 12
+
+    return <div
+        aria-hidden={true}
+        className={styles.loop}
+        style={{
+            top: (LOOP_HEIGHT_PX * labelIndex) + "px",
+            left: x + "px",
+            width: width + "px",
+        }}
+    >
+        <div className={`${styles.loopIterCount} ${styles.dragging}`}>
+            <Refresh />
+        </div>
+        <svg className={styles.loopSvg}>
+            <line x1={0} y1={LOOP_HEIGHT_PX / 2} x2={middle - spaceForLabel} y2={LOOP_HEIGHT_PX / 2} />
+            <line x1={middle + spaceForLabel} y1={LOOP_HEIGHT_PX / 2} x2={width} y2={LOOP_HEIGHT_PX / 2} />
+
+            <line x1={0} y1={LOOP_HEIGHT_PX / 2} x2={0} y2={LOOP_HEIGHT_PX} />
+            <line x1={width} y1={LOOP_HEIGHT_PX / 2} x2={width} y2={LOOP_HEIGHT_PX} />
+        </svg>
+    </div>
 }
 
 function LoopOverlay({ variationIndex, startLoopId, endLoopId, x, width }: {
@@ -169,25 +305,38 @@ function Segment({ segmentId, variationIndex }: {
             const endLoopX = getXPosOfSegment(endLoop, segments)
             const width = endLoopX - startLoopX
 
-            return <LoopOverlay
-                variationIndex={variationIndex}
-                startLoopId={segment.id}
-                endLoopId={endLoop.id}
-                x={startLoopX}
-                width={width}
-            />
+            return <>
+                <LoopDragColumn
+                    x={startLoopX}
+                    otherX={endLoopX}
+                    variationIndex={variationIndex}
+                    segmentId={segment.id}
+                />
+                <LoopOverlay
+                    variationIndex={variationIndex}
+                    startLoopId={segment.id}
+                    endLoopId={endLoop.id}
+                    x={startLoopX}
+                    width={width}
+                />
+            </>
         } else {
             label = "Orphaned StartLoop"
-            classNames.push(styles.invalidLoopSegment)
+            classNames.push(styles.red)
         }
     } else if (segment.type === "EndLoop") {
         // Find StartLoop
         const startLoop = segments.find(s => s.type === "EndLoop" && s.label_index === segment.label_index)
 
         if (startLoop) {
-            return <li
-                tabIndex={0}
-                aria-label={`End loop ${segment.label_index}`}
+            const startLoopX = getXPosOfSegment(startLoop, segments)
+            const endLoopX = getXPosOfSegment(segment, segments)
+
+            return <LoopDragColumn
+                x={endLoopX}
+                otherX={startLoopX}
+                variationIndex={variationIndex}
+                segmentId={segment.id}
             />
         } else {
             label = "Orphaned EndLoop"
@@ -229,12 +378,13 @@ function Segment({ segmentId, variationIndex }: {
 function Variation({ index }: {
     index: number
 }) {
+    const id = useId()
     const [bgm] = useBgm()
     const segments = bgm?.variations[index]?.segments ?? []
     const loopCount = segments.filter(s => s.type === "EndLoop").length
 
     return <div className={styles.variation}>
-        <div className={styles.variationName}>
+        <div className={styles.variationName} id={id}>
             Variation {index}
         </div>
 
@@ -242,7 +392,7 @@ function Variation({ index }: {
             <div
                 role="row"
                 tabIndex={0}
-                aria-label="Segments"
+                aria-labelledby={id}
                 className={styles.segmentsList}
                 style={{ paddingTop: (loopCount * LOOP_HEIGHT_PX) + "px" }}
             >
@@ -262,13 +412,13 @@ function VariationsMapInner() {
 
     return <div
         role="grid"
+        aria-label="Variation map"
         className={styles.container}
         style={{ "--segment-width": `${SEGMENT_WIDTH_PX}px` } as CSSProperties}
         onClick={() => {
             selection.clear()
         }}
     >
-
         {bgm?.variations.map((_, i) => <Variation
             key={i}
             index={i}
