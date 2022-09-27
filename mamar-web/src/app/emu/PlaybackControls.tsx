@@ -6,7 +6,8 @@ import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
 import { useEffect, useRef, useState } from "react"
 
-import { useBgm } from "../store"
+import VariationPicker from "../doc/VariationPicker"
+import { useDoc } from "../store"
 import useMupen from "../util/hooks/useMupen"
 import useRomData from "../util/hooks/useRomData"
 
@@ -78,7 +79,11 @@ function writePatches(mupen: EmulatorControls) {
 
 let tickTock = false
 
-function writeBgm(mupen: EmulatorControls, bgm: Bgm) {
+function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
+    if (variation < 0 || variation >= bgm.variations.length) {
+        return
+    }
+
     const bgmBin: Uint8Array | string = bgm_encode(bgm)
 
     if (bgmBin instanceof Uint8Array) {
@@ -93,7 +98,7 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm) {
         dram.writeU32(patches.RAM_MAMAR_bgm_size, bgmBin.length)
         dram.writeU32(patches.RAM_MAMAR_bk_files, new Uint32Array([0, 0, 0]))
         dram.writeU32(patches.RAM_MAMAR_song_id, tickTock ? 0 : 1)
-        dram.writeU32(patches.RAM_MAMAR_song_variation, 0)
+        dram.writeU32(patches.RAM_MAMAR_song_variation, variation)
         dram.writeU32(patches.RAM_MAMAR_ambient_sounds, 6) // AMBIENT_SILENCE
 
         tickTock = !tickTock
@@ -103,7 +108,9 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm) {
 }
 
 export default function PlaybackControls() {
-    const [bgm] = useBgm()
+    const [doc] = useDoc()
+    const bgm = doc?.bgm ?? null
+    const activeVariation = doc?.activeVariation ?? -1
     const [isPlaying, setIsPlaying] = useState(false)
     const romData = useRomData()
     const bpmRef = useRef<HTMLSpanElement | null>(null)
@@ -154,11 +161,11 @@ export default function PlaybackControls() {
     }, [])
 
     useEffect(() => {
-        if (!mupen || !bgm)
+        if (!mupen || !bgm || activeVariation < 0)
             return
 
-        writeBgm(mupen, bgm)
-    }, [mupen, bgm])
+        writeBgm(mupen, bgm, activeVariation)
+    }, [mupen, bgm, activeVariation])
 
     if (!bgm) {
         return <View />
@@ -167,13 +174,14 @@ export default function PlaybackControls() {
     return <View paddingX="size-200" paddingY="size-50">
         <Flex alignItems="center" justifyContent="space-between" gap="size-200">
             <Flex gap="size-50">
+                <VariationPicker />
                 <ActionButton
                     onPress={async () => {
                         if (mupen) {
                             const wasPlaying = isPlaying
                             await mupen.pause()
                             writePatches(mupen)
-                            writeBgm(mupen, bgm)
+                            writeBgm(mupen, bgm, activeVariation)
                             if (wasPlaying)
                                 await mupen.resume()
                         }
@@ -181,14 +189,14 @@ export default function PlaybackControls() {
                 >
                     {"Compile"}
                 </ActionButton>
-
                 <ToggleButton
                     aria-label="Toggle playback"
                     UNSAFE_className="PlaybackControls_play"
                     isEmphasized
                     isSelected={isPlaying}
                     onChange={(p: boolean) => {
-                        setIsPlaying(p)
+                        if (activeVariation >= 0)
+                            setIsPlaying(p)
                     }}
                 >
                     <Play />

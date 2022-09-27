@@ -11,6 +11,7 @@ export interface Doc {
     name: string
     isSaved: boolean
     activeTrackListId: number
+    activeVariation: number
 }
 
 export type DocAction = {
@@ -23,6 +24,9 @@ export type DocAction = {
     trackListId: number
 } | {
     type: "close_track_list"
+} | {
+    type: "set_variation"
+    index: number
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -47,6 +51,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeTrackListId: -1,
+        }
+    case "set_variation":
+        return {
+            ...state,
+            activeVariation: action.index,
         }
     }
 }

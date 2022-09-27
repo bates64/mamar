@@ -1,5 +1,4 @@
 * Port over all features from previous version to mamar-web
-    * Choose variation to play
     * Modify segment order & add new ones
     * Modify track settings (instrument, volume, pan, etc.)
 * Live highlight currently-playing segment/command

@@ -28,7 +28,9 @@ export default function ActiveDoc() {
         return <WelcomeScreen />
     }
 
-    if (doc.activeTrackListId === -1) {
+    if (doc.activeVariation < 0) {
+        return <View />
+    } else if (doc.activeTrackListId === -1) {
         return <VariationsMap />
     } else {
         return <View padding="size-100" height="100%" overflow="hidden">
