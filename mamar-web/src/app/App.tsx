@@ -2,7 +2,7 @@ import { Provider as SpectrumProvider, defaultTheme, Grid, View } from "@adobe/r
 
 import Header from "./header/Header"
 import Main from "./Main"
-import { RootProvider } from "./store"
+import { RootProvider } from "./store/dispatch"
 import { RomDataProvider } from "./util/hooks/useRomData"
 
 export default function App() {

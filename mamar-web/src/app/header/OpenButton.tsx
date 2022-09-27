@@ -2,7 +2,8 @@ import { ActionButton, AlertDialog, DialogContainer } from "@adobe/react-spectru
 import { fileOpen } from "browser-fs-access"
 import { useState } from "react"
 
-import { openFile, useRoot } from "../store"
+import { useRoot } from "../store"
+import { openFile } from "../store/root"
 
 export default function OpenButton() {
     const [, dispatch] = useRoot()

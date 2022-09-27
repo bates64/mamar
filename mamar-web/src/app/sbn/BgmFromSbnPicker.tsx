@@ -5,7 +5,8 @@ import { useMemo, useState } from "react"
 import { names } from "./songNames.json"
 import useDecodedSbn from "./useDecodedSbn"
 
-import { openData, useRoot } from "../store"
+import { useRoot } from "../store"
+import { openData } from "../store/root"
 import useRomData from "../util/hooks/useRomData"
 
 import "./BgmFromSbnPicker.scss"
