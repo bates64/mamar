@@ -3,8 +3,8 @@ import { createContext, useState, useContext, ReactNode } from "react"
 interface Selection {
     selected: number[]
     clear(): void
-    select(id: number): void
-    multiSelect(id: number): void
+    select(...id: number[]): void
+    multiSelect(id: number): void // toggle
     isSelected(id: number): boolean
 }
 
@@ -18,8 +18,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         clear() {
             setSelected([])
         },
-        select(id: number) {
-            return setSelected([id])
+        select(...id: number[]) {
+            return setSelected(id)
         },
         multiSelect(id: number) {
             setSelected(prev => [...prev, id])

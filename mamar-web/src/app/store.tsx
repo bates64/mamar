@@ -184,6 +184,7 @@ export interface Doc {
     file?: FileWithHandle
     name: string
     isSaved: boolean
+    activeTrackListId: number
 }
 
 export type DocAction = {
@@ -191,6 +192,11 @@ export type DocAction = {
     action: BgmAction
 } | {
     type: "mark_saved"
+} | {
+    type: "open_track_list"
+    trackListId: number
+} | {
+    type: "close_track_list"
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -205,6 +211,16 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             isSaved: true,
+        }
+    case "open_track_list":
+        return {
+            ...state,
+            activeTrackListId: action.trackListId,
+        }
+    case "close_track_list":
+        return {
+            ...state,
+            activeTrackListId: -1,
         }
     }
 }
@@ -255,6 +271,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             file: action.file,
             name: action.name || action.file?.name || "New song",
             isSaved: true,
+            activeTrackListId: -1,
         }
         return {
             ...root,

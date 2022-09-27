@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, CSSProperties, useId, KeyboardEvent, useCa
 
 import styles from "./VariationsMap.module.scss"
 
-import { useBgm, useSegment, useVariation } from "../store"
+import { useBgm, useDoc, useSegment, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 const SEGMENT_WIDTH_PX = 180
@@ -284,6 +284,7 @@ function Segment({ segmentId, variationIndex }: {
     variationIndex: number
 }) {
     const selection = useSelection()
+    const [, dispatch] = useDoc()
     const [bgm] = useBgm()
     const segments = bgm?.variations[variationIndex]?.segments
     const segment = segments?.find?.(s => s.id === segmentId)
@@ -367,6 +368,16 @@ function Segment({ segmentId, variationIndex }: {
                 selection.select(segment.id)
             }
             evt.stopPropagation()
+        }}
+        onDoubleClick={evt => {
+            if (segment.type === "Subseg") {
+                dispatch({
+                    type: "open_track_list",
+                    trackListId: segment.trackList,
+                })
+                evt.stopPropagation()
+                evt.preventDefault()
+            }
         }}
     >
         <div className={styles.segmentName}>
