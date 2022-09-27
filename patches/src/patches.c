@@ -2,6 +2,9 @@
 #include "audio.h"
 #include "gcc/memory.h"
 
+// inverse of AU_FILE_RELATIVE; returns offset from start of file
+#define MAMAR_RELATIVE_OFFSET(base, addr) ((void*)((s32)(addr) - (s32)(base)))
+
 u8 MAMAR_bgm[0x20000];
 s32 MAMAR_bgm_size;
 s32 MAMAR_bk_files[3];
@@ -10,6 +13,8 @@ s32 MAMAR_song_variation;
 s32 MAMAR_ambient_sounds;
 
 s32 MAMAR_out_masterTempo;
+s32 MAMAR_out_segmentReadPos;
+s32 MAMAR_out_trackReadPos[16];
 
 void PATCH_state_step_logos(void) {
     set_game_mode(GAME_MODE_TITLE_SCREEN);
@@ -17,10 +22,20 @@ void PATCH_state_step_logos(void) {
 }
 
 void PATCH_state_step_title_screen(void) {
+    s32 i;
+
     bgm_set_song(0, MAMAR_song_id, MAMAR_song_variation, 0, 8);
     play_ambient_sounds(MAMAR_ambient_sounds, 0);
 
     MAMAR_out_masterTempo = gBGMPlayerA->masterTempo;
+    MAMAR_out_segmentReadPos = MAMAR_RELATIVE_OFFSET(gBGMPlayerA->bgmFile, gBGMPlayerA->segmentReadPos);
+    for (i = 0; i < 16; i++) {
+        if (gBGMPlayerA->tracks[i].bgmReadPos != NULL) {
+            MAMAR_out_trackReadPos[i] = MAMAR_RELATIVE_OFFSET(gBGMPlayerA->bgmFile, gBGMPlayerA->tracks[i].bgmReadPos);
+        } else {
+            MAMAR_out_trackReadPos[i] = 0;
+        }
+    }
 }
 
 void PATCH_appendGfx_title_screen(void) {

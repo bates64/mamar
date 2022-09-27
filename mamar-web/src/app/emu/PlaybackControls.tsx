@@ -107,6 +107,7 @@ export default function PlaybackControls() {
     const [isPlaying, setIsPlaying] = useState(false)
     const romData = useRomData()
     const bpmRef = useRef<HTMLSpanElement | null>(null)
+    const readPosRef = useRef<HTMLSpanElement | null>(null)
     const mupen = useMupen(bgm ? romData : undefined, () => {
         if (!mupen || !bgm)
             return
@@ -116,6 +117,16 @@ export default function PlaybackControls() {
         if (bpmRef.current) {
             const bpm = ram.readU32(patches.RAM_MAMAR_out_masterTempo) / 100
             bpmRef.current.innerText = `${bpm} BPM`
+        }
+
+        if (readPosRef.current) {
+            const readPos = ram.readU32(patches.RAM_MAMAR_out_segmentReadPos)
+            readPosRef.current.innerText = `0x${readPos.toString(16)}:`
+
+            for (let i = 0; i < 16; i++) {
+                const readPos = ram.readU32(patches.RAM_MAMAR_out_trackReadPos + i * 4)
+                readPosRef.current.innerText += ` ${readPos.toString(16)}`
+            }
         }
     })
 
@@ -183,8 +194,10 @@ export default function PlaybackControls() {
                     <Play />
                 </ToggleButton>
             </Flex>
-
-            <span ref={bpmRef}></span>
+            <Flex gap="size-100">
+                <span ref={bpmRef}></span>
+                <span ref={readPosRef}></span>
+            </Flex>
         </Flex>
     </View>
 }

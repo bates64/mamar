@@ -11022,6 +11022,7 @@ export const RAM_dup_kkj_16_UnkModelMatrixFunc2: number
 export const RAM_D_80097DE8: number
 export const RAM_crash_screen_sleep: number
 export const RAM_b_area_trd_part_1_formation_00: number
+export const RAM_MAMAR_out_segmentReadPos: number
 export const RAM_HES_Item_POWBlock_disabled: number
 export const RAM_DoDizzyAttack: number
 export const RAM_partner_buff_render: number
@@ -27005,6 +27006,7 @@ export const RAM_HES_Item_HPDrain_disabled: number
 export const RAM_sam_06_ToadHouse_PutPartnerAway: number
 export const RAM_func_80240F14_B21454: number
 export const RAM_D_801516FC: number
+export const RAM_MAMAR_out_trackReadPos: number
 export const RAM_gHudElementCacheTablePaletteWorld: number
 export const RAM_jan_02_Quizmo_StageEffect: number
 export const RAM_D_80250360_C0DBE0: number
