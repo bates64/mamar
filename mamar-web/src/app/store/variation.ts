@@ -1,6 +1,7 @@
 import { Segment, Variation } from "pm64-typegen"
 
 import { useBgm } from "./bgm"
+import { useDoc } from "./doc"
 import { SegmentAction, segmentReducer } from "./segment"
 
 export type VariationAction = {
@@ -76,7 +77,13 @@ export function variationReducer(variation: Variation, action: VariationAction):
 }
 
 export const useVariation = (index?: number, docId?: string): [Variation | undefined, (action: VariationAction) => void] => {
+    const [doc] = useDoc()
     const [bgm, dispatch] = useBgm(docId)
+
+    if (typeof index === "undefined") {
+        index = doc?.activeVariation
+    }
+
     return [
         bgm?.variations[index as number] ?? undefined,
         action => {

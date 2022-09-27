@@ -1,6 +1,10 @@
 .trackList {
     user-select: none;
     overflow: overlay;
+
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 1em;
 }
 
 .track {

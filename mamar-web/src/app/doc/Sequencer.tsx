@@ -79,9 +79,7 @@ function TrackList({ trackList }: { trackList: pm64.TrackList }) {
             selection.clear()
         }}
     >
-        <Grid columns="repeat(16, 1fr)" gap="size-100">
-            {trackList.tracks.map((track, i) => <Track key={i} idx={i} track={track} />)}
-        </Grid>
+        {trackList.tracks.map((track, i) => <Track key={i} idx={i} track={track} />)}
     </div>
 }
 
@@ -128,7 +126,7 @@ export default function Sequencer({ trackListId }: Props) {
     }
 
     return <SelectionProvider>
-        <Grid rows="auto 1fr" gap="size-100">
+        <Grid rows="auto 1fr" gap="size-100" UNSAFE_style={{ overflow: "hidden" }}>
             <SelectedCommandView trackList={trackList} />
             <TrackList trackList={trackList} />
         </Grid>

@@ -7,6 +7,7 @@
 .DocTabs_main_content {
     @include index.faded-dot-background(300px);
     border-top: 1px solid var(--grey-2);
+    overflow: overlay;
 }
 
 .DocTab {

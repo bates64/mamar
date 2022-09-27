@@ -1,8 +1,8 @@
-import { ActionButton, Grid, View } from "@adobe/react-spectrum"
+import { Grid, View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 
+import SegmentMap from "./SegmentMap"
 import Sequencer from "./Sequencer"
-import VariationsMap from "./VariationsMap"
 
 import { useDoc } from "../store"
 import WelcomeScreen from "../WelcomeScreen"
@@ -30,22 +30,14 @@ export default function ActiveDoc() {
 
     if (doc.activeVariation < 0) {
         return <View />
-    } else if (doc.activeTrackListId === -1) {
-        return <VariationsMap />
     } else {
-        return <View padding="size-100" height="100%" overflow="hidden">
-            <Grid rows="1fr auto" gap="size-100">
-                <View>
-                    <ActionButton onPress={() => {
-                        dispatch({
-                            type: "close_track_list",
-                        })
-                    }}>
-                        Close sequencer
-                    </ActionButton>
-                </View>
-                <Sequencer trackListId={doc.activeTrackListId} />
-            </Grid>
-        </View>
+        return <Grid rows="50% 50%" height="100%" UNSAFE_style={{ overflow: "hidden" }}>
+            <View overflow="overlay">
+                <SegmentMap />
+            </View>
+            <View overflow="overlay" borderTopColor="gray-300" borderTopWidth="thin">
+                {doc.activeTrackListId >= 0 && <Sequencer trackListId={doc.activeTrackListId} />}
+            </View>
+        </Grid>
     }
 }
