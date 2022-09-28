@@ -1,6 +1,6 @@
 import produce from "immer"
 import { bgm_add_voice } from "mamar-wasm-bridge"
-import { Bgm } from "pm64-typegen"
+import { Bgm, Event } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -18,6 +18,11 @@ export type BgmAction = {
     track: number
     oldIndex: number
     newIndex: number
+} | {
+    type: "update_track_command"
+    trackList: number
+    track: number
+    command: Event
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -46,6 +51,15 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return produce(bgm, draft => {
             const { commands } = draft.trackLists[action.trackList].tracks[action.track]
             commands.vec = arrayMove(commands.vec, action.oldIndex, action.newIndex)
+        })
+    case "update_track_command":
+        return produce(bgm, draft => {
+            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
+            for (let i = 0; i < commands.vec.length; i++) {
+                if (commands.vec[i].id === action.command.id) {
+                    commands.vec[i] = action.command
+                }
+            }
         })
     }
 }

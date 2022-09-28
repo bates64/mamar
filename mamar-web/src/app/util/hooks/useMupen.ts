@@ -12,8 +12,8 @@ enum State {
 
 const stats = new Stats()
 stats.showPanel(0)
-stats.dom.style.top = "auto"
-stats.dom.style.bottom = "0"
+stats.dom.style.left = "auto"
+stats.dom.style.right = "0"
 
 export default function useMupen(romData: ArrayBuffer | undefined, vi: () => void): EmulatorControls | undefined {
     const [mupen, setMupen] = useState<EmulatorControls>()
