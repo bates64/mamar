@@ -7,7 +7,7 @@ import { useRoot } from "./dispatch"
 export type PanelContent = {
     type: "not_open"
 } | {
-    type: "sequencer"
+    type: "tracker"
     trackList: number
     track: number
 }

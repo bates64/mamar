@@ -47,7 +47,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 dispatch({
                     type: "set_panel_content",
                     panelContent: {
-                        type: "sequencer",
+                        type: "tracker",
                         trackList: trackListIndex,
                         track: trackIndex,
                     },

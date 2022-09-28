@@ -3,7 +3,7 @@ import * as pm64 from "pm64-typegen"
 import { ReactNode } from "react"
 import { List } from "react-movable"
 
-import styles from "./Sequencer.module.scss"
+import styles from "./Tracker.module.scss"
 
 import { useBgm } from "../store"
 
@@ -48,7 +48,7 @@ export interface Props {
     trackIndex: number
 }
 
-export default function Sequencer({ trackListId, trackIndex }: Props) {
+export default function Tracker({ trackListId, trackIndex }: Props) {
     const [bgm, dispatch] = useBgm()
     const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
 

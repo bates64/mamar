@@ -1,5 +1,5 @@
 * Make SegmentMap accessible, allow selection/deletion/creation
-* Sequencer:
+* Tracker:
     * Show only track selected, not all tracks in segment
     * Make sure is accessible
     * Add, move, select, delete commands etc.
@@ -11,4 +11,4 @@
     * Needs bgm_encode to return some json with info of what was written where
 * Implement solo/mute live via emu - remove from pm64::bgm::Track
 * CI & release
-* canvas/pixijs-based piano roll to replace sequencer for some users
+* canvas/pixijs-based piano roll to replace tracker for some users
