@@ -4,14 +4,22 @@ import { Bgm } from "pm64-typegen"
 import { BgmAction, bgmReducer } from "./bgm"
 import { useRoot } from "./dispatch"
 
+export type PanelContent = {
+    type: "not_open"
+} | {
+    type: "sequencer"
+    trackList: number
+    track: number
+}
+
 export interface Doc {
     id: string
     bgm: Bgm
     file?: FileWithHandle
     name: string
     isSaved: boolean
-    activeTrackListId: number
     activeVariation: number
+    panelContent: PanelContent
 }
 
 export type DocAction = {
@@ -20,10 +28,8 @@ export type DocAction = {
 } | {
     type: "mark_saved"
 } | {
-    type: "open_track_list"
-    trackListId: number
-} | {
-    type: "close_track_list"
+    type: "set_panel_content"
+    panelContent: PanelContent
 } | {
     type: "set_variation"
     index: number
@@ -42,15 +48,10 @@ export function docReducer(state: Doc, action: DocAction): Doc {
             ...state,
             isSaved: true,
         }
-    case "open_track_list":
+    case "set_panel_content":
         return {
             ...state,
-            activeTrackListId: action.trackListId,
-        }
-    case "close_track_list":
-        return {
-            ...state,
-            activeTrackListId: -1,
+            panelContent: action.panelContent,
         }
     case "set_variation":
         return {

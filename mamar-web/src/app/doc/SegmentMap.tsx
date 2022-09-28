@@ -45,8 +45,12 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
             className={styles.pianoRollThumbnail}
             onDoubleClick={evt => {
                 dispatch({
-                    type: "open_track_list",
-                    trackListId: trackListIndex,
+                    type: "set_panel_content",
+                    panelContent: {
+                        type: "sequencer",
+                        trackList: trackListIndex,
+                        track: trackIndex,
+                    },
                 })
                 evt.stopPropagation()
                 evt.preventDefault()

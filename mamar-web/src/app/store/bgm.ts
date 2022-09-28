@@ -1,5 +1,7 @@
+import produce from "immer"
 import { bgm_add_voice } from "mamar-wasm-bridge"
 import { Bgm } from "pm64-typegen"
+import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
 import { VariationAction, variationReducer } from "./variation"
@@ -10,6 +12,12 @@ export type BgmAction = {
     action: VariationAction
 } | {
     type: "add_voice"
+} | {
+    type: "move_track_command"
+    trackList: number
+    track: number
+    oldIndex: number
+    newIndex: number
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -34,6 +42,11 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         }
     } case "add_voice":
         return bgm_add_voice(bgm)
+    case "move_track_command":
+        return produce(bgm, draft => {
+            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
+            commands.vec = arrayMove(commands.vec, action.oldIndex, action.newIndex)
+        })
     }
 }
 

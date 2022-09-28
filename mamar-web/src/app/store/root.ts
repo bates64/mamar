@@ -52,8 +52,10 @@ export function rootReducer(root: Root, action: RootAction): Root {
             file: action.file,
             name: action.name || action.file?.name || "New song",
             isSaved: true,
-            activeTrackListId: -1,
             activeVariation: -1,
+            panelContent: {
+                type: "not_open",
+            },
         }
         return {
             ...root,

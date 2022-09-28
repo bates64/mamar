@@ -8,7 +8,7 @@ import { useDoc } from "../store"
 import WelcomeScreen from "../WelcomeScreen"
 
 export default function ActiveDoc() {
-    const [doc, dispatch] = useDoc()
+    const [doc] = useDoc()
 
     const title = doc ? (doc.isSaved ? doc.name : `${doc.name} (unsaved)`) : "Mamar"
     useEffect(() => {
@@ -36,7 +36,7 @@ export default function ActiveDoc() {
                 <SegmentMap />
             </View>
             <View overflow="overlay" borderTopColor="gray-300" borderTopWidth="thin">
-                {doc.activeTrackListId >= 0 && <Sequencer trackListId={doc.activeTrackListId} />}
+                {doc.panelContent.type === "sequencer" && <Sequencer trackListId={doc.panelContent.trackList} trackIndex={doc.panelContent.track} />}
             </View>
         </Grid>
     }
