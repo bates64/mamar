@@ -52,7 +52,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             file: action.file,
             name: action.name || action.file?.name || "New song",
             isSaved: true,
-            activeVariation: -1,
+            activeVariation: 0,
             panelContent: {
                 type: "not_open",
             },

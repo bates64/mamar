@@ -18,5 +18,9 @@
 
     &:hover {
         text-decoration: underline;
+
+        svg {
+            fill: currentColor;
+        }
     }
 }

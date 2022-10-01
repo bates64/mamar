@@ -1,17 +1,17 @@
-import { ActionButton, Flex, ToggleButton, View } from "@adobe/react-spectrum"
-import Play from "@spectrum-icons/workflow/Play"
+import { ActionButton, ToggleButton, View } from "@adobe/react-spectrum"
 import { bgm_encode } from "mamar-wasm-bridge"
 import { EmulatorControls } from "mupen64plus-web"
 import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
 import { useEffect, useRef, useState } from "react"
+import { Play, SkipBack } from "react-feather"
 
-import VariationPicker from "../doc/VariationPicker"
+import styles from "./PlaybackControls.module.scss"
+
 import { useDoc } from "../store"
 import useMupen from "../util/hooks/useMupen"
 import useRomData from "../util/hooks/useRomData"
-
-import "./PlaybackControls.scss"
+import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 class DramView {
     u8: Uint8Array
@@ -108,13 +108,13 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
 }
 
 export default function PlaybackControls() {
-    const [doc] = useDoc()
+    const [doc, dispatch] = useDoc()
     const bgm = doc?.bgm ?? null
     const activeVariation = doc?.activeVariation ?? -1
     const [isPlaying, setIsPlaying] = useState(false)
     const romData = useRomData()
     const bpmRef = useRef<HTMLSpanElement | null>(null)
-    const readPosRef = useRef<HTMLSpanElement | null>(null)
+    // const readPosRef = useRef<HTMLSpanElement | null>(null)
     const mupen = useMupen(bgm ? romData : undefined, () => {
         if (!mupen || !bgm)
             return
@@ -123,18 +123,18 @@ export default function PlaybackControls() {
 
         if (bpmRef.current) {
             const bpm = ram.readU32(patches.RAM_MAMAR_out_masterTempo) / 100
-            bpmRef.current.innerText = `${bpm} BPM`
+            bpmRef.current.innerText = bpm.toString()
         }
 
-        if (readPosRef.current) {
-            const readPos = ram.readU32(patches.RAM_MAMAR_out_segmentReadPos)
-            readPosRef.current.innerText = `0x${readPos.toString(16)}:`
+        // if (readPosRef.current) {
+        //     const readPos = ram.readU32(patches.RAM_MAMAR_out_segmentReadPos)
+        //     readPosRef.current.innerText = `0x${readPos.toString(16)}:`
 
-            for (let i = 0; i < 16; i++) {
-                const readPos = ram.readU32(patches.RAM_MAMAR_out_trackReadPos + i * 4)
-                readPosRef.current.innerText += ` ${readPos.toString(16)}`
-            }
-        }
+        //     for (let i = 0; i < 16; i++) {
+        //         const readPos = ram.readU32(patches.RAM_MAMAR_out_trackReadPos + i * 4)
+        //         readPosRef.current.innerText += ` ${readPos.toString(16)}`
+        //     }
+        // }
     })
 
     useEffect(() => {
@@ -154,6 +154,7 @@ export default function PlaybackControls() {
             if (event.key === " ") {
                 setIsPlaying(p => !p)
                 event.preventDefault()
+                event.stopPropagation()
             }
         }
         document.addEventListener("keydown", onKeydown)
@@ -171,41 +172,51 @@ export default function PlaybackControls() {
         return <View />
     }
 
-    return <View paddingX="size-200" paddingY="size-50">
-        <Flex alignItems="center" justifyContent="space-between" gap="size-200">
-            <Flex gap="size-50">
-                <VariationPicker />
-                <ActionButton
-                    onPress={async () => {
-                        if (mupen) {
-                            const wasPlaying = isPlaying
-                            await mupen.pause()
-                            writePatches(mupen)
-                            writeBgm(mupen, bgm, activeVariation)
-                            if (wasPlaying)
-                                await mupen.resume()
-                        }
+    return <View paddingX="size-200" paddingY="size-50" UNSAFE_className={styles.container}>
+        <div className={styles.actions}>
+            <ActionButton
+                onPress={async () => {
+                    if (mupen) {
+                        const wasPlaying = isPlaying
+                        await mupen.pause()
+                        writePatches(mupen)
+                        writeBgm(mupen, bgm, activeVariation)
+                        if (wasPlaying)
+                            await mupen.resume()
+                    }
+                }}
+            >
+                <SkipBack />
+            </ActionButton>
+            <ToggleButton
+                aria-label="Toggle playback"
+                UNSAFE_className={styles.play}
+                isEmphasized
+                isSelected={isPlaying}
+                onChange={(p: boolean) => {
+                    if (activeVariation >= 0)
+                        setIsPlaying(p)
+                }}
+            >
+                <Play />
+            </ToggleButton>
+        </div>
+        <div className={styles.position}>
+            <div className={styles.field}>
+                <span className={styles.fieldName}>Tempo</span>
+                <span className={styles.tempo} ref={bpmRef}>0</span>
+            </div>
+            <div className={styles.field}>
+                <span className={styles.fieldName}>Variation</span>
+                <VerticalDragNumberInput
+                    value={doc?.activeVariation ?? 0}
+                    minValue={0}
+                    maxValue={bgm.variations.length - 1}
+                    onChange={index => {
+                        dispatch({ type: "set_variation", index })
                     }}
-                >
-                    {"Compile"}
-                </ActionButton>
-                <ToggleButton
-                    aria-label="Toggle playback"
-                    UNSAFE_className="PlaybackControls_play"
-                    isEmphasized
-                    isSelected={isPlaying}
-                    onChange={(p: boolean) => {
-                        if (activeVariation >= 0)
-                            setIsPlaying(p)
-                    }}
-                >
-                    <Play />
-                </ToggleButton>
-            </Flex>
-            <Flex gap="size-100">
-                <span ref={bpmRef}></span>
-                <span ref={readPosRef}></span>
-            </Flex>
-        </Flex>
+                />
+            </div>
+        </div>
     </View>
 }

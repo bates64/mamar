@@ -1,0 +1,83 @@
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+
+    user-select: none;
+}
+
+.actions {
+    border-radius: 6px;
+
+    &:hover {
+        background: var(--spectrum-global-color-gray-100);
+    }
+
+    button {
+        border: 0;
+        border-radius: inherit;
+
+        color: var(--spectrum-global-color-gray-700) !important;
+        background: transparent !important;
+
+        padding: 0 0.6em;
+
+        transition: none;
+
+        svg {
+            width: 1.5em;
+            fill: currentColor;
+        }
+
+        &:active {
+            background: var(--spectrum-global-color-gray-200);
+        }
+
+        &.play {
+            padding-left: 0.7em;
+
+            &[aria-pressed="true"] {
+                color: #fff !important;
+                background-color: #43883b !important;
+                border-color: #43883b !important;
+            }
+        }
+
+    }
+}
+
+.position {
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--spectrum-global-color-gray-200);
+
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+
+    .field {
+        display: flex;
+        flex-direction: column-reverse;
+
+        text-align: center;
+        font-size: 18px;
+        font-weight: 500;
+
+        color: var(--spectrum-global-color-gray-900);
+        background: var(--spectrum-global-color-gray-100);
+
+        padding: 2px 14px;
+
+        .fieldName {
+            color: var(--spectrum-global-color-gray-700);
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+    }
+}
+
+// tempo changes so we want a fixed width
+.tempo {
+    min-width: 3em;
+}
