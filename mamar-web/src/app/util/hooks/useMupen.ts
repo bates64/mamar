@@ -69,7 +69,8 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
                 if (mupen) {
                     await mupen.start()
                     state.current = State.STARTED
-                    document.body.appendChild(stats.dom)
+                    if (stats)
+                        document.body.appendChild(stats.dom)
                     setMupen(mupen)
                     module.JSEvents.removeAllEventListeners()
                 }
@@ -101,8 +102,6 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             break
         }
     }, [mupen, romData])
-
-    window.MUPEN = mupen
 
     if (error) {
         throw error
