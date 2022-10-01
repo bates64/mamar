@@ -10,10 +10,14 @@ enum State {
     RELOADING,
 }
 
-const stats = new Stats()
-stats.showPanel(0)
-stats.dom.style.left = "auto"
-stats.dom.style.right = "0"
+let stats: Stats | null = null
+
+if (process.env.NODE_ENV !== "production") {
+    stats = new Stats()
+    stats.showPanel(0)
+    stats.dom.style.left = "auto"
+    stats.dom.style.right = "0"
+}
 
 export default function useMupen(romData: ArrayBuffer | undefined, vi: () => void): EmulatorControls | undefined {
     const [mupen, setMupen] = useState<EmulatorControls>()
@@ -37,9 +41,9 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             createMupen64PlusWeb({
                 canvas: document.getElementById("canvas") as HTMLCanvasElement,
                 romData,
-                beginStats: () => stats.begin(),
+                beginStats: () => stats?.begin?.(),
                 endStats: () => {
-                    stats.end()
+                    stats?.end?.()
                     viRef.current()
                 },
                 coreConfig: {
