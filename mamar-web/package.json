@@ -25,6 +25,7 @@
     "react": "^18.2.0",
     "react-aria": "^3.19.0",
     "react-dom": "^18.2.0",
+    "react-feather": "^2.0.10",
     "react-movable": "^3.0.4",
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",

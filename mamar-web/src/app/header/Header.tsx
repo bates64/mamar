@@ -1,6 +1,7 @@
 import { Flex, Grid, Heading, View } from "@adobe/react-spectrum"
 
 import BgmActionGroup from "./BgmActionGroup"
+import SponsorButton from "./SponsorButton"
 
 import PlaybackControls from "../emu/PlaybackControls"
 
@@ -16,6 +17,7 @@ export default function Header() {
             <Grid
                 columns={["1fr", "auto"]}
                 rows={["auto"]}
+                alignItems="center"
             >
                 <Flex
                     height="size-500"
@@ -29,6 +31,7 @@ export default function Header() {
                     </Heading>
                     <BgmActionGroup />
                 </Flex>
+                <SponsorButton />
             </Grid>
         </View>
         <PlaybackControls />
