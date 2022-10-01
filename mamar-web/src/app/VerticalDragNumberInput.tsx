@@ -19,7 +19,7 @@ export default function VerticalDragNumberInput({ value, minValue, maxValue, onC
     useEffect(() => {
         const onUpdate = (evt: MouseEvent) => {
             if (startVal) {
-                const delta = Math.floor((evt.clientY - startVal) / 25)
+                const delta = Math.floor((evt.clientY - startVal) / 25) * -1
 
                 const newValue = snapshot + delta
                 if (newValue >= minValue && newValue <= maxValue && newValue !== valueRef.current) {

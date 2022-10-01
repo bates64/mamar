@@ -99,12 +99,16 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
         dram.writeU32(patches.RAM_MAMAR_bk_files, new Uint32Array([0, 0, 0]))
         dram.writeU32(patches.RAM_MAMAR_song_id, tickTock ? 0 : 1)
         dram.writeU32(patches.RAM_MAMAR_song_variation, variation)
-        dram.writeU32(patches.RAM_MAMAR_ambient_sounds, 6) // AMBIENT_SILENCE
 
         tickTock = !tickTock
     } else {
         throw new Error(bgmBin)
     }
+}
+
+function writeAmbientSound(mupen: EmulatorControls, ambientSound: number) {
+    const dram = new DramView(mupen)
+    dram.writeU32(patches.RAM_MAMAR_ambient_sounds, ambientSound)
 }
 
 export default function PlaybackControls() {
@@ -113,6 +117,7 @@ export default function PlaybackControls() {
     const activeVariation = doc?.activeVariation ?? -1
     const [isPlaying, setIsPlaying] = useState(false)
     const romData = useRomData()
+    const [ambientSound, setAmbientSound] = useState(6) // AMBIENT_SILENCE
     const bpmRef = useRef<HTMLSpanElement | null>(null)
     // const readPosRef = useRef<HTMLSpanElement | null>(null)
     const mupen = useMupen(bgm ? romData : undefined, () => {
@@ -168,6 +173,13 @@ export default function PlaybackControls() {
         writeBgm(mupen, bgm, activeVariation)
     }, [mupen, bgm, activeVariation])
 
+    useEffect(() => {
+        if (!mupen)
+            return
+
+        writeAmbientSound(mupen, ambientSound)
+    }, [mupen, ambientSound])
+
     if (!bgm) {
         return <View />
     }
@@ -215,6 +227,15 @@ export default function PlaybackControls() {
                     onChange={index => {
                         dispatch({ type: "set_variation", index })
                     }}
+                />
+            </div>
+            <div className={styles.field}>
+                <span className={styles.fieldName}>Ambient SFX</span>
+                <VerticalDragNumberInput
+                    value={ambientSound}
+                    minValue={0}
+                    maxValue={16}
+                    onChange={setAmbientSound}
                 />
             </div>
         </div>
