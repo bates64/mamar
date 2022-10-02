@@ -69,7 +69,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 [styles.hasInterestingParentTrack]: track.parentTrackIdx !== 0,
                 [styles.selected]: isSelected,
             })}
-            onDoubleClick={handlePress}
+            onClick={handlePress}
             onKeyDown={evt => {
                 if (evt.key === "Enter" || evt.key === " ") {
                     handlePress(evt)
