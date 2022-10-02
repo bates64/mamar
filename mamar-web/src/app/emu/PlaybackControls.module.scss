@@ -31,7 +31,7 @@
         }
 
         &:active {
-            background: var(--spectrum-global-color-gray-200);
+            background: var(--spectrum-global-color-gray-200) !important;
         }
 
         &.play {
