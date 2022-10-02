@@ -14,10 +14,9 @@ export function RomDataConsumer() {
             areas={[
                 "header",
                 "content",
-                "footer",
             ]}
             columns={["1fr"]}
-            rows={["auto", "1fr", "22px"]}
+            rows={["auto", "1fr"]}
             height="100vh"
         >
             <View gridArea="header">
@@ -25,8 +24,6 @@ export function RomDataConsumer() {
             </View>
             <View gridArea="content" overflow="auto">
                 <Main />
-            </View>
-            <View gridArea="footer" backgroundColor="gray-50" borderColor="gray-200" borderTopWidth={1}>
             </View>
         </Grid>
     </MupenProvider>

@@ -2,7 +2,7 @@ import { Grid, View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 
 import SegmentMap from "./SegmentMap"
-import Tracker from "./Tracker"
+import SubsegDetails from "./SubsegDetails"
 
 import { useDoc } from "../store"
 import WelcomeScreen from "../WelcomeScreen"
@@ -31,13 +31,13 @@ export default function ActiveDoc() {
     if (doc.activeVariation < 0) {
         return <View />
     } else {
-        return <Grid rows="50% 50%" height="100%" UNSAFE_style={{ overflow: "hidden" }}>
+        return <Grid rows={doc.panelContent.type === "not_open" ? "100%" : "50% 50%"} height="100%" UNSAFE_style={{ overflow: "hidden" }}>
             <View overflow="overlay">
                 <SegmentMap />
             </View>
-            <View overflow="overlay" borderTopColor="gray-300" borderTopWidth="thin">
-                {doc.panelContent.type === "tracker" && <Tracker trackListId={doc.panelContent.trackList} trackIndex={doc.panelContent.track} />}
-            </View>
+            {doc.panelContent.type !== "not_open" && <View overflow="hidden" borderTopColor="gray-300" borderTopWidth="thin">
+                {doc.panelContent.type === "tracker" && <SubsegDetails trackListId={doc.panelContent.trackList} trackIndex={doc.panelContent.track} />}
+            </View>}
         </Grid>
     }
 }

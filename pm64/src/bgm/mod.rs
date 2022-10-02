@@ -163,7 +163,10 @@ pub struct TrackList {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
-    pub flags: u16,
+    pub is_disabled: bool,
+    pub polyphonic_idx: u8,
+    pub is_drum_track: bool,
+    pub parent_track_idx: u8,
     pub commands: CommandSeq,
 }
 
@@ -223,35 +226,16 @@ pub struct Unknown {
     pub data: Vec<u8>,
 }
 
-impl Track {
-    pub fn get_flag(&self, flag: u16) -> bool {
-        (self.flags & flag) != 0
-    }
-
-    pub fn set_flag(&mut self, flag: u16, enable: bool) {
-        if enable {
-            self.flags |= flag;
-        } else {
-            self.flags &= !flag;
-        }
-    }
-}
-
 impl Default for Track {
     fn default() -> Self {
         Track {
-            flags: 0x0000,
+            is_disabled: false,
+            polyphonic_idx: 0,
+            is_drum_track: false,
+            parent_track_idx: 0,
             commands: CommandSeq::default(),
         }
     }
-}
-
-pub mod track_flags {
-    pub const DRUM_TRACK: u16  = 0x0080;
-    pub const LOW_PITCH: u16   = 0x1000; // May be wrong
-    pub const POLYPHONY_1: u16 = 0x2000;
-    pub const POLYPHONY_2: u16 = 0x4000;
-    pub const POLYPHONY_3: u16 = 0x8000;
 }
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {

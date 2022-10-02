@@ -223,14 +223,18 @@ impl Bgm {
 
                     // Write flags
                     let mut todo_commands = Vec::new();
-                    for Track { flags, commands, .. } in track_list.tracks.iter() {
+                    for Track { is_disabled, polyphonic_idx, is_drum_track, parent_track_idx, commands, .. } in track_list.tracks.iter() {
                         if !commands.is_empty() {
                             // Need to write command data after the track
                             todo_commands.push((f.pos()?, commands));
                         }
                         f.write_u16_be(0)?; // Replaced later if !null
 
-                        f.write_u16_be(*flags)?;
+                        let flags = (*is_disabled as u16) << 8
+                            | (*polyphonic_idx as u16) << 0xD
+                            | if *is_drum_track { 0x0080 } else { 0 }
+                            | (*parent_track_idx as u16) << 9;
+                        f.write_u16_be(flags)?;
                     }
 
                     // Write command sequences

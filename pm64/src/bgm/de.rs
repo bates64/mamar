@@ -332,8 +332,16 @@ impl Track {
         let commands_offset = f.read_u16_be()?;
         let flags = f.read_u16_be()?;
 
+        let is_disabled = (flags & 0x0100) != 0;
+        let polyphonic_idx = ((flags & (0x7 << 0xD)) >> 0xD) as u8;
+        let is_drum_track = (flags & 0x0080) != 0;
+        let parent_track_idx = ((flags & (0xF << 9)) >> 9) as u8;
+
         Ok(Self {
-            flags,
+            is_disabled,
+            polyphonic_idx,
+            is_drum_track,
+            parent_track_idx,
             commands: if commands_offset == 0 {
                 CommandSeq::with_capacity(0)
             } else {

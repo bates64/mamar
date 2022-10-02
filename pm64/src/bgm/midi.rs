@@ -106,7 +106,10 @@ fn midi_track_to_bgm_track(
         None => Default::default(),
         Some(events) => {
             let mut track = Track {
-                flags: track_flags::POLYPHONY_1, // Sounds better with more polyphony, but can cause crashes
+                is_disabled: false,
+                polyphonic_idx: 0,
+                is_drum_track: false,
+                parent_track_idx: 0,
                 commands: CommandSeq::new(),
             };
 
@@ -314,25 +317,14 @@ fn midi_track_to_bgm_track(
                                     // Poly[phonic] mode on/off
                                     126 => {
                                         if value == 0 {
-                                            // Off
-                                            track.flags &= !(
-                                                track_flags::POLYPHONY_1 |
-                                                track_flags::POLYPHONY_2 |
-                                                track_flags::POLYPHONY_3);
+                                            track.polyphonic_idx = 0;
                                         } else {
-                                            // On
-                                            track.flags |=
-                                                track_flags::POLYPHONY_1 |
-                                                track_flags::POLYPHONY_2 |
-                                                track_flags::POLYPHONY_3;
+                                            track.polyphonic_idx = 1;
                                         }
                                     }
                                     // Poly[phonic] mode on
                                     127 => {
-                                        track.flags |=
-                                            track_flags::POLYPHONY_1 |
-                                            track_flags::POLYPHONY_2 |
-                                            track_flags::POLYPHONY_3;
+                                        track.polyphonic_idx = 2;
                                     }
                                     _ => {}
                                 }
@@ -402,7 +394,7 @@ fn midi_track_to_bgm_track(
             let name_lower = format!("{:?} {:?}", track_name, instrument_name).to_lowercase();
             if (name_lower.contains("drum") && !name_lower.contains("steel")) | name_lower.contains("percussion") {
                 // TODO: insert voice instead of drum
-                track.flags = track_flags::DRUM_TRACK;
+                track.is_drum_track = true;
             }
 
             track

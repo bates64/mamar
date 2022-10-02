@@ -1,4 +1,6 @@
+import classNames from "classnames"
 import { Segment } from "pm64-typegen"
+import { useId } from "react"
 
 import styles from "./SegmentMap.module.scss"
 
@@ -35,29 +37,46 @@ function getLoops(segments: Segment[]): Loop[] {
 }
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
-    const [, dispatch] = useDoc()
+    const [doc, dispatch] = useDoc()
     const [bgm] = useBgm()
     const track = bgm?.trackLists[trackListIndex]?.tracks[trackIndex]
+    const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
+    const nameId = useId()
 
     if (!track || track.commands.vec.length === 0) {
         return <></>
     } else {
+        const handlePress = (evt: any) => {
+            dispatch({
+                type: "set_panel_content",
+                panelContent: isSelected ? { type: "not_open" } : {
+                    type: "tracker",
+                    trackList: trackListIndex,
+                    track: trackIndex,
+                },
+            })
+            evt.stopPropagation()
+            evt.preventDefault()
+        }
+
         return <div
-            className={styles.pianoRollThumbnail}
-            onDoubleClick={evt => {
-                dispatch({
-                    type: "set_panel_content",
-                    panelContent: {
-                        type: "tracker",
-                        trackList: trackListIndex,
-                        track: trackIndex,
-                    },
-                })
-                evt.stopPropagation()
-                evt.preventDefault()
+            tabIndex={0}
+            aria-labelledby={nameId}
+            className={classNames({
+                [styles.pianoRollThumbnail]: true,
+                [styles.drumRegion]: track.isDrumTrack,
+                [styles.disabledRegion]: track.isDisabled,
+                [styles.hasInterestingParentTrack]: track.parentTrackIdx !== 0,
+                [styles.selected]: isSelected,
+            })}
+            onDoubleClick={handlePress}
+            onKeyDown={evt => {
+                if (evt.key === "Enter" || evt.key === " ") {
+                    handlePress(evt)
+                }
             }}
         >
-            Flags: {track.flags.toString(16)}
+            <div id={nameId} className={styles.segmentName}>Region {trackListIndex}.{trackIndex}</div>
         </div>
     }
 }

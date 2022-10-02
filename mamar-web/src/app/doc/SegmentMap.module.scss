@@ -52,10 +52,6 @@ td.loop {
 }
 
 .pianoRollThumbnail {
-    /*--color-800: var(--spectrum-global-color-gray-800);
-    --color-500: var(--spectrum-global-color-gray-500);
-    --color-400: var(--spectrum-global-color-gray-400);
-    --color-200: var(--spectrum-global-color-gray-200);*/
     --color-800: #ffffffaa;
     --color-500: var(--spectrum-global-color-blue-500);
     --color-400: var(--spectrum-global-color-blue-400);
@@ -65,9 +61,17 @@ td.loop {
     background: linear-gradient(var(--color-500) 0%, var(--color-400) 100%);
     color: #ffffffee;
     border-radius: 6px;
+    overflow: hidden;
 
-    padding: 8px 12px;
     height: $trackHeight;
+
+    &:focus-visible {
+        outline: 3px solid var(--spectrum-global-color-yellow-500);
+    }
+
+    .segmentName {
+        padding: 6px 10px;
+    }
 
     &.selected {
         border-color: var(--color-800);
@@ -76,5 +80,22 @@ td.loop {
             color: var(--color-200);
             background: var(--color-800);
         }
+    }
+
+    &.hasInterestingParentTrack {
+        --color-500: var(--spectrum-global-color-indigo-500);
+        --color-400: var(--spectrum-global-color-indigo-400);
+    }
+
+    &.drumRegion {
+        --color-500: var(--spectrum-global-color-seafoam-500);
+        --color-400: var(--spectrum-global-color-seafoam-400);
+    }
+
+    &.disabledRegion {
+        --color-800: var(--spectrum-global-color-gray-800);
+        --color-500: var(--spectrum-global-color-gray-500);
+        --color-400: var(--spectrum-global-color-gray-400);
+        --color-200: var(--spectrum-global-color-gray-200);
     }
 }

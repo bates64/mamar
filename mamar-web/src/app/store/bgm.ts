@@ -23,6 +23,14 @@ export type BgmAction = {
     trackList: number
     track: number
     command: Event
+} | {
+    type: "modify_track_settings"
+    trackList: number
+    track: number
+    isDisabled?: boolean
+    polyphonicIdx?: number
+    isDrumTrack?: boolean
+    parentTrackIdx?: number
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -59,6 +67,22 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                 if (commands.vec[i].id === action.command.id) {
                     commands.vec[i] = action.command
                 }
+            }
+        })
+    case "modify_track_settings":
+        return produce(bgm, draft => {
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            if (action.isDisabled !== undefined) {
+                track.isDisabled = action.isDisabled
+            }
+            if (action.polyphonicIdx !== undefined) {
+                track.polyphonicIdx = action.polyphonicIdx
+            }
+            if (action.isDrumTrack !== undefined) {
+                track.isDrumTrack = action.isDrumTrack
+            }
+            if (action.parentTrackIdx !== undefined) {
+                track.parentTrackIdx = action.parentTrackIdx
             }
         })
     }
