@@ -1,6 +1,6 @@
+* Fix bgm useEffect in PlaybackControls; doesn't trigger when changing bgm
 * Make SegmentMap accessible, allow selection/deletion/creation
 * Tracker:
-    * Show only track selected, not all tracks in segment
     * Make sure is accessible
     * Add, move, select, delete commands etc.
     * Allow configuration of all command types
@@ -9,6 +9,5 @@
     * Modify track settings (instrument, volume, pan, etc.)
 * Live highlight currently-playing segment/command
     * Needs bgm_encode to return some json with info of what was written where
-* Implement solo/mute live via emu - remove from pm64::bgm::Track
 * CI & release
 * canvas/pixijs-based piano roll to replace tracker for some users

@@ -33,19 +33,18 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
         }
 
         switch (state.current) {
-        case State.MOUNTING:
+        case State.MOUNTING: {
             // Load the emulator
             state.current = State.LOADING
             let module: any
+            let emu: EmulatorControls
             createMupen64PlusWeb({
                 canvas: document.getElementById("canvas") as HTMLCanvasElement,
                 romData,
                 beginStats: () => {},
                 endStats: () => {
-                    if (emu) {
-                        for (const cb of viRef.current) {
-                            cb(emu)
-                        }
+                    for (const cb of viRef.current) {
+                        cb(emu)
                     }
                 },
                 coreConfig: {
@@ -67,11 +66,12 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
                 preRun: [m => {
                     module = m
                 }],
-            }).then(async mupen => {
-                if (mupen) {
-                    await mupen.start()
+            }).then(async _emu => {
+                emu = _emu
+                if (emu) {
+                    await emu.start()
                     state.current = State.STARTED
-                    setEmu(mupen)
+                    setEmu(emu)
                     module.JSEvents.removeAllEventListeners()
                 }
             }).catch(error => {
@@ -79,7 +79,7 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
                 setError(error)
             })
             break
-        case State.STARTED:
+        } case State.STARTED:
             state.current = State.READY
             break
         case State.READY:

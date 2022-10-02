@@ -13,8 +13,8 @@ import DramView from "../util/DramView"
 import useMupen from "../util/hooks/useMupen"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
-function writePatches(mupen: EmulatorControls) {
-    const dram = new DramView(mupen)
+function writePatches(emu: EmulatorControls) {
+    const dram = new DramView(emu)
 
     dram.writeU32(patches.RAM_state_step_logos, patches.ASM_PATCH_state_step_logos)
     dram.writeU32(patches.RAM_PATCH_state_step_logos, patches.ASM_PATCH_state_step_logos)
@@ -33,7 +33,7 @@ function writePatches(mupen: EmulatorControls) {
 
 let tickTock = false
 
-function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
+function writeBgm(emu: EmulatorControls, bgm: Bgm, variation: number) {
     if (variation < 0 || variation >= bgm.variations.length) {
         return
     }
@@ -41,7 +41,7 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
     const bgmBin: Uint8Array | string = bgm_encode(bgm)
 
     if (bgmBin instanceof Uint8Array) {
-        const dram = new DramView(mupen)
+        const dram = new DramView(emu)
 
         if (bgmBin.length > 0x20000) {
             throw new Error(`Encoded BGM too large, ${bgmBin.length} > 0x20000 bytes`)
@@ -60,8 +60,8 @@ function writeBgm(mupen: EmulatorControls, bgm: Bgm, variation: number) {
     }
 }
 
-function writeAmbientSound(mupen: EmulatorControls, ambientSound: number) {
-    const dram = new DramView(mupen)
+function writeAmbientSound(emu: EmulatorControls, ambientSound: number) {
+    const dram = new DramView(emu)
     dram.writeU32(patches.RAM_MAMAR_ambient_sounds, ambientSound)
 }
 
@@ -73,8 +73,8 @@ export default function PlaybackControls() {
     const [ambientSound, setAmbientSound] = useState(6) // AMBIENT_SILENCE
     const bpmRef = useRef<HTMLSpanElement | null>(null)
     // const readPosRef = useRef<HTMLSpanElement | null>(null)
-    const { emu: mupen } = useMupen(useCallback((mupen: EmulatorControls) => {
-        const ram = new DramView(mupen)
+    const { emu } = useMupen(useCallback((emu: EmulatorControls) => {
+        const ram = new DramView(emu)
 
         if (bpmRef.current) {
             const bpm = ram.readU32(patches.RAM_MAMAR_out_masterTempo) / 100
@@ -90,19 +90,16 @@ export default function PlaybackControls() {
         //         readPosRef.current.innerText += ` ${readPos.toString(16)}`
         //     }
         // }
-    }, []))
+    }, [bpmRef]))
 
     useEffect(() => {
-        if (!mupen)
-            return
-
         if (isPlaying) {
-            writePatches(mupen)
-            mupen.resume()
+            writePatches(emu)
+            emu.resume()
         } else {
-            mupen.pause()
+            emu.pause()
         }
-    }, [mupen, isPlaying])
+    }, [emu, isPlaying])
 
     useEffect(() => {
         const onKeydown = (event: KeyboardEvent) => {
@@ -117,18 +114,16 @@ export default function PlaybackControls() {
     }, [])
 
     useEffect(() => {
-        if (!mupen || !bgm || activeVariation < 0)
+        console.log("bgm change")
+        if (!bgm || activeVariation < 0)
             return
 
-        writeBgm(mupen, bgm, activeVariation)
-    }, [mupen, bgm, activeVariation])
+        writeBgm(emu, bgm, activeVariation)
+    }, [emu, bgm, activeVariation])
 
     useEffect(() => {
-        if (!mupen)
-            return
-
-        writeAmbientSound(mupen, ambientSound)
-    }, [mupen, ambientSound])
+        writeAmbientSound(emu, ambientSound)
+    }, [emu, ambientSound])
 
     if (!bgm) {
         return <View />
@@ -138,13 +133,13 @@ export default function PlaybackControls() {
         <div className={styles.actions}>
             <ActionButton
                 onPress={async () => {
-                    if (mupen) {
+                    if (emu) {
                         const wasPlaying = isPlaying
-                        await mupen.pause()
-                        writePatches(mupen)
-                        writeBgm(mupen, bgm, activeVariation)
+                        await emu.pause()
+                        writePatches(emu)
+                        writeBgm(emu, bgm, activeVariation)
                         if (wasPlaying)
-                            await mupen.resume()
+                            await emu.resume()
                     }
                 }}
             >
@@ -166,7 +161,7 @@ export default function PlaybackControls() {
         <div className={styles.position}>
             <div className={styles.field}>
                 <span className={styles.fieldName}>Tempo</span>
-                <span className={styles.tempo} ref={bpmRef}>0</span>
+                <span className={styles.tempo} ref={bpmRef}>-</span>
             </div>
             <div className={styles.field}>
                 <span className={styles.fieldName}>Variation</span>
