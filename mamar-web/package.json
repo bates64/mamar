@@ -29,7 +29,6 @@
     "react-movable": "^3.0.4",
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",
-    "stats.js": "^0.17.0",
     "use-undoable": "^3.3.11"
   },
   "devDependencies": {

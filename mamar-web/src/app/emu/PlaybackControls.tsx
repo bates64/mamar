@@ -3,14 +3,13 @@ import { bgm_encode } from "mamar-wasm-bridge"
 import { EmulatorControls } from "mupen64plus-web"
 import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Play, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
 
 import { useDoc } from "../store"
 import useMupen from "../util/hooks/useMupen"
-import useRomData from "../util/hooks/useRomData"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 class DramView {
@@ -116,14 +115,10 @@ export default function PlaybackControls() {
     const bgm = doc?.bgm ?? null
     const activeVariation = doc?.activeVariation ?? -1
     const [isPlaying, setIsPlaying] = useState(false)
-    const romData = useRomData()
     const [ambientSound, setAmbientSound] = useState(6) // AMBIENT_SILENCE
     const bpmRef = useRef<HTMLSpanElement | null>(null)
     // const readPosRef = useRef<HTMLSpanElement | null>(null)
-    const mupen = useMupen(bgm ? romData : undefined, () => {
-        if (!mupen || !bgm)
-            return
-
+    const { emu: mupen } = useMupen(useCallback((mupen: EmulatorControls) => {
         const ram = new DramView(mupen)
 
         if (bpmRef.current) {
@@ -140,7 +135,7 @@ export default function PlaybackControls() {
         //         readPosRef.current.innerText += ` ${readPos.toString(16)}`
         //     }
         // }
-    })
+    }, []))
 
     useEffect(() => {
         if (!mupen)

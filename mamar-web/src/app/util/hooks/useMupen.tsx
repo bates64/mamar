@@ -1,6 +1,7 @@
 import createMupen64PlusWeb, { EmulatorControls } from "mupen64plus-web"
-import { useEffect, useRef, useState } from "react"
-import Stats from "stats.js"
+import { useEffect, useRef, useState, useContext, createContext, ReactNode, MutableRefObject } from "react"
+
+import { loading } from "../.."
 
 enum State {
     MOUNTING,
@@ -10,26 +11,24 @@ enum State {
     RELOADING,
 }
 
-let stats: Stats | null = null
+type ViFn = (emu: EmulatorControls) => void
 
-if (process.env.NODE_ENV !== "production") {
-    stats = new Stats()
-    stats.showPanel(0)
-    stats.dom.style.left = "auto"
-    stats.dom.style.right = "0"
+interface Context {
+    emu: EmulatorControls
+    viRef: MutableRefObject<ViFn[]>
 }
 
-export default function useMupen(romData: ArrayBuffer | undefined, vi: () => void): EmulatorControls | undefined {
-    const [mupen, setMupen] = useState<EmulatorControls>()
+const mupenCtx = createContext<Context | null>(null)
+
+export function MupenProvider({ romData, children }: { romData: ArrayBuffer, children: ReactNode }) {
+    const [emu, setEmu] = useState<EmulatorControls>()
     const [error, setError] = useState<any>()
     const state = useRef(State.MOUNTING)
-
-    const viRef = useRef(vi)
-    viRef.current = vi
+    const viRef = useRef<ViFn[]>([])
 
     useEffect(() => {
         if (!romData) {
-            mupen?.pause?.()
+            emu?.pause?.()
             return
         }
 
@@ -41,10 +40,13 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             createMupen64PlusWeb({
                 canvas: document.getElementById("canvas") as HTMLCanvasElement,
                 romData,
-                beginStats: () => stats?.begin?.(),
+                beginStats: () => {},
                 endStats: () => {
-                    stats?.end?.()
-                    viRef.current()
+                    if (emu) {
+                        for (const cb of viRef.current) {
+                            cb(emu)
+                        }
+                    }
                 },
                 coreConfig: {
                     emuMode: 0,
@@ -69,9 +71,7 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
                 if (mupen) {
                     await mupen.start()
                     state.current = State.STARTED
-                    if (stats)
-                        document.body.appendChild(stats.dom)
-                    setMupen(mupen)
+                    setEmu(mupen)
                     module.JSEvents.removeAllEventListeners()
                 }
             }).catch(error => {
@@ -83,15 +83,15 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             state.current = State.READY
             break
         case State.READY:
-            if (!mupen)
+            if (!emu)
                 break
             console.log("reloading ROM")
             state.current = State.RELOADING
 
             // Emulator must be running to reload rom
-            mupen.resume()
+            emu.resume()
                 .then(() => new Promise(r => setTimeout(r, 100)))
-                .then(() => mupen.reloadRom(romData))
+                .then(() => emu.reloadRom(romData))
                 .finally(() => {
                     console.log("rom reload complete")
                     state.current = State.READY
@@ -101,11 +101,38 @@ export default function useMupen(romData: ArrayBuffer | undefined, vi: () => voi
             console.warn("ignoring ROM reload, already reloading")
             break
         }
-    }, [mupen, romData])
+    }, [emu, romData])
 
     if (error) {
         throw error
     }
 
-    return mupen
+    if (!emu) {
+        return loading
+    }
+
+    return <mupenCtx.Provider value={{ emu, viRef }}>
+        {children}
+    </mupenCtx.Provider>
+}
+
+export default function useMupen(vi?: ViFn): Context {
+    const ctx = useContext(mupenCtx)
+
+    if (!ctx) {
+        throw new Error("useMupen must be used within a MupenProvider")
+    }
+
+    useEffect(() => {
+        if (!vi)
+            return
+
+        ctx.viRef.current.push(vi)
+
+        return () => {
+            ctx.viRef.current = ctx.viRef.current.filter(cb => cb !== vi)
+        }
+    }, [ctx, vi])
+
+    return ctx
 }

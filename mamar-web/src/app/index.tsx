@@ -7,7 +7,7 @@ import App from "./App"
 const rootEl = document.getElementById("root") as HTMLElement
 const root = ReactDOM.createRoot(rootEl)
 
-const loading = <div dangerouslySetInnerHTML={{ __html: rootEl.innerHTML }} />
+export const loading = <div dangerouslySetInnerHTML={{ __html: rootEl.innerHTML }} />
 
 class ErrorBoundary extends React.Component {
     state: { error: any } = { error: null }
