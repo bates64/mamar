@@ -1,5 +1,6 @@
 #include "common.h"
 #include "audio.h"
+#include "audio/private.h"
 #include "gcc/memory.h"
 
 // inverse of AU_FILE_RELATIVE; returns offset from start of file
@@ -11,6 +12,7 @@ s32 MAMAR_bk_files[3];
 s32 MAMAR_song_id;
 s32 MAMAR_song_variation;
 s32 MAMAR_ambient_sounds;
+s32 MAMAR_trackMute[16]; // 0 = no mute, 1 = mute, 2 = solo
 
 s32 MAMAR_out_masterTempo;
 s32 MAMAR_out_segmentReadPos;
@@ -34,6 +36,32 @@ void PATCH_state_step_title_screen(void) {
             MAMAR_out_trackReadPos[i] = MAMAR_RELATIVE_OFFSET(gBGMPlayerA->bgmFile, gBGMPlayerA->tracks[i].bgmReadPos);
         } else {
             MAMAR_out_trackReadPos[i] = 0;
+        }
+    }
+
+    // MAMAR_trackMute
+    {
+        s32 isAnySolo = 0;
+
+        for (i = 0; i < 16; i++) {
+            if (MAMAR_trackMute[i] == 2) {
+                isAnySolo = 1;
+                break;
+            }
+        }
+
+        for (i = 0; i < 16; i++) {
+            s32 volume = 0;
+
+            if (MAMAR_trackMute[i] == 2) {
+                volume = 100;
+            } else if (MAMAR_trackMute[i] == 1 || isAnySolo) {
+                volume = 0;
+            } else {
+                volume = 100;
+            }
+
+            func_80050888(gBGMPlayerA, &gBGMPlayerA->tracks[i], volume, 0);
         }
     }
 }

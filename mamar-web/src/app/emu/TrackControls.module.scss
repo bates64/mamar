@@ -1,0 +1,33 @@
+.controls {
+    display: inline-block;
+
+    border: 1px solid var(--spectrum-global-color-gray-200);
+    border-radius: 6px;
+
+    button {
+        --spectrum-actionbutton-border-size: 0;
+        --spectrum-actionbutton-min-width: 1.7em;
+        --spectrum-actionbutton-height: 1.5em;
+        --spectrum-actionbutton-text-color: var(--spectrum-global-color-gray-700);
+    }
+}
+
+.mute {
+    --spectrum-actionbutton-background-color-selected: var(--spectrum-global-color-blue-400);
+    --spectrum-actionbutton-background-color-selected-hover: var(--spectrum-global-color-blue-400);
+    --spectrum-actionbutton-text-color-selected: white;
+
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.solo {
+    --spectrum-actionbutton-background-color-selected: var(--spectrum-global-color-orange-400);
+    --spectrum-actionbutton-background-color-selected-hover: var(--spectrum-global-color-orange-400);
+    --spectrum-actionbutton-text-color-selected: white;
+
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+
+    border-left: 1px solid var(--spectrum-global-color-gray-200) !important;
+}

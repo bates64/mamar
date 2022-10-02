@@ -165,12 +165,6 @@ pub struct TrackList {
 pub struct Track {
     pub flags: u16,
     pub commands: CommandSeq,
-
-    #[serde(skip_serializing_if="is_default")]
-    pub mute: bool,
-
-    #[serde(skip_serializing_if="is_default")]
-    pub solo: bool,
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -247,8 +241,6 @@ impl Default for Track {
     fn default() -> Self {
         Track {
             flags: 0x0000,
-            mute: false,
-            solo: false,
             commands: CommandSeq::default(),
         }
     }
@@ -264,14 +256,4 @@ pub mod track_flags {
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
-}
-
-impl TrackList {
-    pub fn silence_skip(&mut self) {
-        for track in &mut self.tracks {
-            track.mute = true;
-            track.solo = false;
-            track.commands.zero_all_delays();
-        }
-    }
 }

@@ -2,6 +2,7 @@ import { Segment } from "pm64-typegen"
 
 import styles from "./SegmentMap.module.scss"
 
+import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
@@ -90,7 +91,8 @@ function Container() {
             })}
             {tracks.map(i => <tr key={i} className={styles.track}>
                 <td className={styles.trackHead}>
-                    Track {i + 1}
+                    <div className={styles.trackName}>Track {i + 1}</div>
+                    <TrackControls trackIndex={i} />
                 </td>
                 {variation.segments.map(segment => {
                     if (segment.type === "Subseg") {

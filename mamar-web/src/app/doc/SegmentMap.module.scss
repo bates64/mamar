@@ -1,4 +1,4 @@
-$trackHeight: 60px;
+$trackHeight: 70px;
 
 .table {
     border-collapse: collapse;
@@ -30,10 +30,17 @@ $trackHeight: 60px;
     }
 }
 
-.trackHead {
-    text-align: center;
-    width: 7em;
+td.trackHead {
+    width: 8em;
     border-right: 1px solid var(--spectrum-global-color-gray-100);
+
+    padding: 8px;
+    height: 100%;
+
+    .trackName {
+        color: var(--spectrum-global-color-gray-900);
+        margin-bottom: 4px;
+    }
 }
 
 td.loop {

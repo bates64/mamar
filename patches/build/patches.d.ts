@@ -17054,6 +17054,7 @@ export const RAM_gHudElementCacheBufferBattle: number
 export const RAM_D_80150F98: number
 export const RAM_MakeItemEntity: number
 export const RAM_D_8024E9D8_C0C258: number
+export const RAM_MAMAR_trackMute: number
 export const RAM_b_area_sam_duplighost_kooper_defenseTable: number
 export const RAM_pause_items_draw_contents: number
 export const RAM_nok_14_ParatroopaAI_Reset: number
