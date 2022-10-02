@@ -32,9 +32,17 @@ pub fn new_bgm() -> JsValue {
 #[wasm_bindgen]
 pub fn bgm_decode(data: &[u8]) -> JsValue {
     let mut f = Cursor::new(data);
-    match Bgm::decode(&mut f) {
-        Ok(bgm) => to_js(&bgm),
-        Err(e) => to_js(&e.to_string()),
+
+    if pm64::bgm::midi::is_midi(&mut f).unwrap_or(false) {
+        match pm64::bgm::midi::to_bgm(data) {
+            Ok(bgm) => to_js(&bgm),
+            Err(e) => to_js(&e.to_string()),
+        }
+    } else {
+        match Bgm::decode(&mut f) {
+            Ok(bgm) => to_js(&bgm),
+            Err(e) => to_js(&e.to_string()),
+        }
     }
 }
 

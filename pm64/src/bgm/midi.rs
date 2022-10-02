@@ -5,6 +5,7 @@ use std::io::SeekFrom;
 use midly::{MetaMessage, Smf};
 
 use crate::bgm::*;
+use crate::id::gen_id;
 use crate::rw::*;
 
 pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
@@ -54,43 +55,33 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     log::debug!("song length: {} ticks (48 ticks/beat)", total_song_length);
 
     let track_list = TrackList {
-        name: "Imported from MIDI".to_owned(),
         pos: None,
         tracks: [
-            midi_track_to_bgm_track(smf.tracks.get(0), total_song_length, 0, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(1), total_song_length, 1, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(2), total_song_length, 2, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(3), total_song_length, 3, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(4), total_song_length, 4, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(5), total_song_length, 5, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(6), total_song_length, 6, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(7), total_song_length, 7, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(8), total_song_length, 8, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(9), total_song_length, 9, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(10), total_song_length, 10, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(11), total_song_length, 11, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(12), total_song_length, 12, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(13), total_song_length, 13, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(14), total_song_length, 14, time_divisor, &mut bgm.voices),
-            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length, 15, time_divisor, &mut bgm.voices),
+            midi_track_to_bgm_track(smf.tracks.get(0), total_song_length, 0, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(1), total_song_length, 1, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(2), total_song_length, 2, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(3), total_song_length, 3, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(4), total_song_length, 4, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(5), total_song_length, 5, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(6), total_song_length, 6, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(7), total_song_length, 7, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(8), total_song_length, 8, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(9), total_song_length, 9, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(10), total_song_length, 10, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(11), total_song_length, 11, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(12), total_song_length, 12, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(13), total_song_length, 13, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(14), total_song_length, 14, time_divisor, &mut bgm.instruments),
+            midi_track_to_bgm_track(smf.tracks.get(15), total_song_length, 15, time_divisor, &mut bgm.instruments),
         ],
     };
     let track_list_id = bgm.add_track_list(track_list);
 
-    let (_, segment) = bgm.add_segment().unwrap();
-    segment.subsegments = vec![
-        Subsegment::Unknown { // loop start
-            flags: 0x30,
-            data: [0, 0, 0],
-        },
-        Subsegment::Tracks {
-            flags: 0x10,
-            track_list: track_list_id,
-        },
-        Subsegment::Unknown { // loop end
-            flags: 0x50,
-            data: [0, 0, 0],
-        },
+    let (_, variation) = bgm.add_variation().unwrap();
+    variation.segments = vec![
+        Segment::StartLoop { id: gen_id(), label_index: 0 },
+        Segment::Subseg { id: gen_id(), track_list: track_list_id },
+        Segment::EndLoop { id: gen_id(), label_index: 0, iter_count: 0 },
     ];
 
     Ok(bgm)
@@ -101,7 +92,7 @@ fn midi_track_to_bgm_track(
     total_song_length: usize,
     track_number: usize,
     time_divisor: f32,
-    voices: &mut Vec<Voice>,
+    instruments: &mut Vec<Instrument>,
 ) -> Track {
     use midly::{MidiMessage, TrackEventKind};
 
@@ -112,27 +103,15 @@ fn midi_track_to_bgm_track(
     }
 
     match events {
-        None => Track {
-            name: String::from("Empty track"),
-            ..Default::default()
-        },
+        None => Default::default(),
         Some(events) => {
             let mut track = Track {
-                name: if track_number == 0 {
-                    String::from("Master")
-                } else {
-                    format!("Track {}", track_number)
-                },
-
                 flags: track_flags::POLYPHONY_1, // Sounds better with more polyphony, but can cause crashes
-
                 commands: CommandSeq::new(),
-                mute: false,
-                solo: false,
             };
 
-            let voice_idx = voices.len();
-            voices.push(Voice {
+            let voice_idx = instruments.len();
+            instruments.push(Instrument {
                 bank: 0x30,
                 pan: 64,
                 patch: 1,
@@ -225,12 +204,12 @@ fn midi_track_to_bgm_track(
                             MidiMessage::Aftertouch { key: _, vel } | MidiMessage::ChannelAftertouch { vel } => {
                                 track.commands.insert(
                                     convert_time(time, time_divisor),
-                                    Command::SubTrackVolume(vel.as_int()),
+                                    Command::SubTrackVolume { value: vel.as_int() },
                                 );
                             }
                             MidiMessage::ProgramChange { program } => {
                                 if !set_bank_patch {
-                                    voices[voice_idx].patch = program.as_int();
+                                    instruments[voice_idx].patch = program.as_int();
                                     set_bank_patch = true;
                                 } else {
                                     track.commands.insert(
@@ -258,27 +237,26 @@ fn midi_track_to_bgm_track(
                                         track.commands.insert(
                                             convert_time(time, time_divisor),
                                             Command::TrackTremolo {
-                                                // XXX: These values are total guesses. Investigate!
                                                 amount: 8,
                                                 speed: value,
-                                                unknown: 8,
+                                                time: 8,
                                             },
                                         );
                                     }
                                     // Channel Volume
                                     7 | 39 => track.commands.insert(
                                         convert_time(time, time_divisor),
-                                        Command::SubTrackVolume(value),
+                                        Command::SubTrackVolume { value }
                                     ),
                                     // Pan
                                     10 | 42 | 8 | 40 => track.commands.insert(
                                         convert_time(time, time_divisor),
-                                        Command::SubTrackPan(value as i8),
+                                        Command::SubTrackPan { value: value as i8 }
                                     ),
                                     // Effect control 1
                                     12 | 44 => track.commands.insert(
                                         convert_time(time, time_divisor),
-                                        Command::SubTrackReverb(value),
+                                        Command::SubTrackReverb { value }
                                     ),
                                     // Damper pedal on/off (sustain)
                                     64 => {
@@ -293,8 +271,8 @@ fn midi_track_to_bgm_track(
                                         track.commands.insert(
                                             convert_time(time, time_divisor),
                                             Command::TrackOverridePatch {
-                                                bank: voices[voice_idx].bank & 0xF0 | sustain,
-                                                patch: voices[voice_idx].bank,
+                                                bank: instruments[voice_idx].bank & 0xF0 | sustain,
+                                                patch: instruments[voice_idx].bank,
                                             },
                                         );
                                     }
@@ -316,8 +294,8 @@ fn midi_track_to_bgm_track(
                                         track.commands.insert(
                                             convert_time(time, time_divisor),
                                             Command::TrackOverridePatch {
-                                                bank: voices[voice_idx].bank & 0xF0 | sustain,
-                                                patch: voices[voice_idx].bank,
+                                                bank: instruments[voice_idx].bank & 0xF0 | sustain,
+                                                patch: instruments[voice_idx].bank,
                                             },
                                         );
                                     }
@@ -366,7 +344,7 @@ fn midi_track_to_bgm_track(
                         let beats_per_minute = (60_000_000.0 / microseconds_per_beat).round() as u16;
                         track.commands.insert(
                             convert_time(time, time_divisor),
-                            Command::MasterTempo(beats_per_minute),
+                            Command::MasterTempo { value: beats_per_minute }
                         );
                         log::debug!("bpm: {}", beats_per_minute);
                     } else {
@@ -383,7 +361,7 @@ fn midi_track_to_bgm_track(
                         if let Ok(s) = String::from_utf8(s.to_owned()) {
                             track.commands.insert(
                                 convert_time(time, time_divisor),
-                                Command::Marker(s),
+                                Command::Marker { label: s }
                             );
                         }
                     }
@@ -397,9 +375,9 @@ fn midi_track_to_bgm_track(
 
             if track_number == 0 {
                 track.commands.insert_many(0, vec![
-                    Command::MasterTempo(120),
-                    Command::MasterVolume(100),
-                    Command::MasterEffect(0, 1),
+                    Command::MasterTempo { value: 120 },
+                    Command::MasterVolume { value: 100 },
+                    Command::MasterEffect { index: 0, value: 1 },
                 ]);
             }
 
@@ -412,26 +390,16 @@ fn midi_track_to_bgm_track(
             if track_number != 0 {
                 // Required else the game crashes D:
                 track.commands.insert_many(0, vec![
-                    Command::SubTrackReverb(0),
-                    Command::SubTrackVolume(100),
-                    Command::SubTrackPan(64),
-                    Command::TrackVoice(voice_idx as u8)
+                    Command::SubTrackReverb { value: 0 },
+                    Command::SubTrackVolume { value: 100 },
+                    Command::SubTrackPan { value: 64 },
+                    Command::SetTrackVoice { index: voice_idx as u8 }
                 ]);
-            }
-
-            if let Some(s) = track_name {
-                if !s.is_empty() {
-                    track.name = s;
-                }
-            } else if let Some(s) = instrument_name {
-                if !s.is_empty() {
-                    track.name = s;
-                }
             }
 
             // There's not a very good way to detect MIDI drum tracks, so we'll just make a best guess by seeing if the
             // designated track title contains 'drums' or 'percussion' (excluding 'steel drums').
-            let name_lower = track.name.to_lowercase();
+            let name_lower = format!("{:?} {:?}", track_name, instrument_name).to_lowercase();
             if (name_lower.contains("drum") && !name_lower.contains("steel")) | name_lower.contains("percussion") {
                 // TODO: insert voice instead of drum
                 track.flags = track_flags::DRUM_TRACK;
