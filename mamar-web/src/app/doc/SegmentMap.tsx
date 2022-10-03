@@ -89,6 +89,7 @@ function Container() {
     const loops = getLoops(variation?.segments ?? [])
 
     return <table
+        aria-label="Segments"
         className={styles.table}
         onClick={() => {
             selection.clear()
@@ -101,14 +102,14 @@ function Container() {
                 if (endSeg.type !== "EndLoop")
                     throw new Error("Expected EndLoop")
 
-                return <tr>
+                return <tr aria-label={`Loop ${endSeg.label_index} gutter`}>
                     <td colSpan={start + 1} />
                     <td colSpan={end - start + 1} className={styles.loop}>
                         Loop {endSeg.iter_count !== 0 && `${endSeg.iter_count}x`}
                     </td>
                 </tr>
             })}
-            {tracks.map(i => <tr key={i} className={styles.track}>
+            {tracks.map(i => <tr key={i} className={styles.track} aria-label={`Track ${i+1}`}>
                 <td className={styles.trackHead}>
                     <div className={styles.trackName}>Track {i + 1}</div>
                     <TrackControls trackIndex={i} />

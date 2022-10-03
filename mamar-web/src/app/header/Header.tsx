@@ -12,6 +12,7 @@ const logo = new URL("../../mamar-flat.svg", import.meta.url).href
 export default function Header() {
     return <header className="Header">
         <View
+            elementType="nav"
             paddingX="size-150"
         >
             <Grid

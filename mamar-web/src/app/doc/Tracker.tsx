@@ -87,8 +87,8 @@ function CommandList({ commands, onMove, onChange }: {
         onChange={({ oldIndex, newIndex }) => {
             onMove(oldIndex, newIndex)
         }}
-        renderList={({ children, props }) => <div {...props}>{children}</div>}
-        renderItem={({ value, props, index, isDragged }) => <div
+        renderList={({ children, props }) => <ol className={styles.list} aria-label="Commands" {...props}>{children}</ol>}
+        renderItem={({ value, props, index, isDragged }) => <li
             key={value.id}
             className={classNames({
                 [styles.item]: true,
@@ -98,7 +98,7 @@ function CommandList({ commands, onMove, onChange }: {
             {...props}
         >
             <Command command={value} onChange={onChange} />
-        </div>}
+        </li>}
         removableByMove={true}
         transitionDuration={200}
     />

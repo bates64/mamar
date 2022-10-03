@@ -7,9 +7,10 @@ export interface Props {
     minValue: number
     maxValue: number
     onChange: (value: number) => void
+    id?: string
 }
 
-export default function VerticalDragNumberInput({ value, minValue, maxValue, onChange }: Props) {
+export default function VerticalDragNumberInput({ value, minValue, maxValue, onChange, id }: Props) {
     const [snapshot, setSnapshot] = useState(value)
     const [startVal, setStartVal] = useState(0)
 
@@ -41,6 +42,7 @@ export default function VerticalDragNumberInput({ value, minValue, maxValue, onC
     }, [startVal, onChange, snapshot, minValue, maxValue])
 
     return <input
+        id={id}
         type="number"
         className={styles.input}
         value={value}

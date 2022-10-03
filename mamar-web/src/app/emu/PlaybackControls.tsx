@@ -3,7 +3,7 @@ import { bgm_encode } from "mamar-wasm-bridge"
 import { EmulatorControls } from "mupen64plus-web"
 import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { Play, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
@@ -125,13 +125,17 @@ export default function PlaybackControls() {
         writeAmbientSound(emu, ambientSound)
     }, [emu, ambientSound])
 
+    const variationId = useId()
+    const ambientSoundId = useId()
+
     if (!bgm) {
         return <View />
     }
 
     return <View paddingX="size-200" paddingY="size-50" UNSAFE_className={styles.container}>
-        <div className={styles.actions}>
+        <div className={styles.actions} role="group" aria-label="Playback actions">
             <ActionButton
+                aria-label="Restart"
                 onPress={async () => {
                     if (emu) {
                         const wasPlaying = isPlaying
@@ -146,7 +150,7 @@ export default function PlaybackControls() {
                 <SkipBack />
             </ActionButton>
             <ToggleButton
-                aria-label="Toggle playback"
+                aria-label="Play/pause"
                 UNSAFE_className={styles.play}
                 isEmphasized
                 isSelected={isPlaying}
@@ -158,14 +162,15 @@ export default function PlaybackControls() {
                 <Play />
             </ToggleButton>
         </div>
-        <div className={styles.position}>
-            <div className={styles.field}>
-                <span className={styles.fieldName}>Tempo</span>
+        <div className={styles.position} role="group" aria-label="Playback status">
+            <div className={styles.field} tabIndex={0} aria-live="polite">
+                <label className={styles.fieldName}>Tempo</label>
                 <span className={styles.tempo} ref={bpmRef}>-</span>
             </div>
             <div className={styles.field}>
-                <span className={styles.fieldName}>Variation</span>
+                <label htmlFor={variationId} className={styles.fieldName}>Variation</label>
                 <VerticalDragNumberInput
+                    id={variationId}
                     value={doc?.activeVariation ?? 0}
                     minValue={0}
                     maxValue={bgm.variations.length - 1}
@@ -175,8 +180,9 @@ export default function PlaybackControls() {
                 />
             </div>
             <div className={styles.field}>
-                <span className={styles.fieldName}>Ambient SFX</span>
+                <label htmlFor={ambientSoundId} className={styles.fieldName}>Ambient SFX</label>
                 <VerticalDragNumberInput
+                    id={ambientSoundId}
                     value={ambientSound}
                     minValue={0}
                     maxValue={16}

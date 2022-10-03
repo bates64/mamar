@@ -35,7 +35,7 @@ export default function ActiveDoc() {
             <View overflow="overlay">
                 <SegmentMap />
             </View>
-            {doc.panelContent.type !== "not_open" && <View overflow="hidden" borderTopColor="gray-300" borderTopWidth="thin">
+            {doc.panelContent.type !== "not_open" && <View elementType="aside" overflow="hidden" borderTopColor="gray-300" borderTopWidth="thin">
                 {doc.panelContent.type === "tracker" && <SubsegDetails trackListId={doc.panelContent.trackList} trackIndex={doc.panelContent.track} />}
             </View>}
         </Grid>
