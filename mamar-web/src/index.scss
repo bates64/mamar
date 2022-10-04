@@ -112,8 +112,8 @@ html, .App {
 
 @mixin faded-dot-background($height) {
     background: linear-gradient(180deg,transparent 0, var(--grey-0) $height),
-        fixed 0 0 /20px 20px radial-gradient(var(--grey-1) 1px,transparent 0),
-        fixed 10px 10px / 20px 20px radial-gradient(var(--grey-1) 1px,transparent 0),
+        fixed 0 0 /20px 20px radial-gradient(var(--grey-2) 1px,transparent 0),
+        fixed 10px 10px / 20px 20px radial-gradient(var(--grey-2) 1px,transparent 0),
         var(--grey-0);
 }
 
