@@ -92,6 +92,9 @@ export default function PlaybackControls() {
         // }
     }, [bpmRef]))
 
+    // Access the entire bgm object so useDoc tracks any change to it
+    JSON.stringify(bgm)
+
     useEffect(() => {
         if (isPlaying) {
             writePatches(emu)

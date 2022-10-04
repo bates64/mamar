@@ -1,4 +1,3 @@
-* Fix bgm useEffect in PlaybackControls; doesn't trigger when changing bgm
 * Make SegmentMap accessible, allow selection/deletion/creation
 * Tracker:
     * Make sure is accessible
