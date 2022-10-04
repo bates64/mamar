@@ -8,7 +8,7 @@
   "scripts": {
     "start": "parcel src/index.html src/app/index.html",
     "prestart": "sed -i 's/typeof process/\"undefined\"/g' ../node_modules/mupen64plus-web/bin/web/index.*.js && rm -rf ../.parcel-cache",
-    "build": "parcel build src/index.html src/app/index.html"
+    "build": "yarn run prestart && parcel build src/index.html src/app/index.html"
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
