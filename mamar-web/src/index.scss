@@ -36,7 +36,6 @@
 
 html {
     font-family: system-ui;
-    font-size: 14px;
 }
 
 body {
@@ -282,7 +281,7 @@ html, .App {
         border-color: rgb(172, 83, 114);
 
         &:hover {
-            background: var(--pink);
+            background: mix(#ea7aa1, #000, 90%);
         }
     }
 
