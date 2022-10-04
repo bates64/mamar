@@ -36,6 +36,7 @@
 
 html {
     font-family: system-ui;
+    font-size: 14px;
 }
 
 body {
@@ -207,6 +208,16 @@ html, .App {
         font-size: 2.1em;
     }
 
+    @media (max-width: 600px) {
+        .hero-logo {
+            font-size: 12vw;
+        }
+
+        .hero-description {
+            font-size: 24px;
+        }
+    }
+
     a {
         color: inherit;
     }
@@ -232,15 +243,20 @@ html, .App {
         padding: 1em;
         margin: 0 auto;
 
-        max-width: 52ch;
+        max-width: 36em;
 
-        p {
-            text-align: justify;
-        }
+        p, ul, hr {
+            margin-inline: auto;
+            max-width: 30em;
 
-        p, ul {
             font-size: 16px;
             line-height: 1.6;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid var(--grey-2);
+            margin-block: 2em;
         }
 
         small {
@@ -264,7 +280,9 @@ html, .App {
         border-radius: 4px;
 
         text-decoration: none;
+        text-align: center;
         font-weight: 600;
+        user-select: none;
 
         &:hover {
             background: var(--grey-1);
@@ -293,5 +311,9 @@ html, .App {
         display: flex;
         align-items: center;
         gap: 1em;
+    }
+
+    .center {
+        text-align: center;
     }
 }
