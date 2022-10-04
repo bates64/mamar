@@ -7,8 +7,7 @@
     "patches"
   ],
   "scripts": {
-    "preinstall": "cd mamar-wasm-bridge && wasm-pack build -t web && cd ../pm64-typegen && cargo run",
-    "build": "cd ../mamar-web && yarn build"
+    "preinstall": "cd mamar-wasm-bridge && wasm-pack build -t web && cd ../pm64-typegen && cargo run"
   },
   "multipleStaticFileCopier": [
     {
