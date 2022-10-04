@@ -3,6 +3,7 @@ Run: `yarn build`
 # Working on `mupen64plus-web`
 
 - In [mupen64plus-web](https://github.com/nanaian/mupen64plus-web):
+    - Switch the Mamar branch: `git checkout mamar`
     - Run `yarn link`
     - Setup emscripten 3.1.8 (alex: run `emsdk_env`)
     - Compile mupen64plus-web: `make -j config=release`
