@@ -83,7 +83,7 @@ body {
     }
 
     p {
-        max-width: 52ch;
+        max-width: 60ch;
         width: calc(100vw - 1em);
 
         a:any-link {
@@ -232,7 +232,11 @@ html, .App {
         padding: 1em;
         margin: 0 auto;
 
-        max-width: 60ch;
+        max-width: 52ch;
+
+        p {
+            text-align: justify;
+        }
 
         p, ul {
             font-size: 16px;
