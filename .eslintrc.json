@@ -1,0 +1,71 @@
+{
+    "extends": [
+        "react-app"
+    ],
+    "plugins": [
+        "@typescript-eslint",
+        "import"
+    ],
+    "rules": {
+        "semi": ["error", "never", { "beforeStatementContinuationChars": "always" }],
+        "indent": ["error", 4],
+        "quotes": ["error", "double"],
+        "quote-props": ["error", "consistent"],
+        "brace-style": "off",
+        "@typescript-eslint/brace-style": ["error"],
+        "object-curly-spacing": ["error", "always"],
+        "array-bracket-spacing": ["error", "never"],
+        "no-else-return": "off",
+        "no-trailing-spaces": "error",
+        "no-multi-spaces": "error",
+        "no-multiple-empty-lines": ["error", { "max": 1, "maxBOF": 0, "maxEOF": 0 }],
+        "comma-dangle": "off",
+        "@typescript-eslint/comma-dangle": ["error", "always-multiline"],
+        "comma-spacing": "off",
+        "@typescript-eslint/comma-spacing": ["error"],
+        "prefer-const": ["warn", { "destructuring": "all" }],
+        "arrow-parens": ["error", "as-needed"],
+        "no-confusing-arrow": ["error", { "allowParens": true }],
+        "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+        "no-extra-semi": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-extra-semi": ["error"],
+        "no-empty-function": "off",
+        "@typescript-eslint/no-empty-function": "off",
+        "no-unused-expressions": "off",
+        "@typescript-eslint/no-unused-expressions": ["warn"],
+        "@typescript-eslint/ban-ts-comment": "off",
+        "keyword-spacing": "off",
+        "@typescript-eslint/keyword-spacing": ["error"],
+        "@typescript-eslint/member-delimiter-style": ["error", {
+            "multiline": {
+                "delimiter": "none",
+                "requireLast": true
+            },
+            "singleline": {
+                "delimiter": "comma",
+                "requireLast": false
+            },
+            "multilineDetection": "brackets"
+        }],
+
+        "import/newline-after-import": "error",
+        "import/no-duplicates": "error",
+        "import/order": [
+            "error",
+            {
+                "groups": ["builtin", "external", "internal", "sibling", "index", "object"],
+                "newlines-between": "always",
+                "pathGroups": [
+                    {
+                        "pattern": "react|react-dom",
+                        "group": "builtin",
+                        "position": "before"
+                    }
+                ],
+                "pathGroupsExcludedImportTypes": ["react"],
+                "alphabetize": { "order": "asc", "caseInsensitive": true }
+            }
+        ]
+    }
+}

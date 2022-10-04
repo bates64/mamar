@@ -1,0 +1,294 @@
+:root {
+    --grey-9: #efefef;
+    --grey-8: #c8c8c8;
+    --grey-7: #a2a2a2;
+    --grey-6: #7c7c7c;
+    --grey-5: #5c5c5c;
+    --grey-4: #494949;
+    --grey-3: #393939;
+    --grey-2: #2c2c2c;
+    --grey-1: #1e1e1e;
+    --grey-0: #111111;
+    --grey-0-alpha-50: #11111180;
+
+    // Invert grey scale for light mode
+    @media (prefers-color-scheme: light) {
+        --grey-9: #080808;
+        --grey-8: #1e1e1e;
+        --grey-7: #2c2c2c;
+        --grey-6: #393939;
+        --grey-5: #494949;
+        --grey-4: #5c5c5c;
+        --grey-3: #7c7c7c;
+        --grey-2: #a2a2a2;
+        --grey-1: #c8c8c8;
+        --grey-0: #ffffff;
+        --grey-0-alpha-50: #ffffff80;
+    }
+
+    --yellow: #ffc639;
+    --pink: #ea7aa1;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-family: system-ui;
+    font-size: 14px;
+}
+
+body {
+    color: var(--grey-9);
+    background: var(--grey-0);
+
+    margin: 0;
+    padding: 0;
+}
+
+.no-scroll {
+    overflow: hidden;
+}
+
+::selection {
+    color: #000;
+    background: var(--yellow);
+}
+
+.icon {
+    display: inline-block;
+
+    width: 1.25em;
+    height: 1.25em;
+
+    vertical-align: top;
+}
+
+// Used for app-wide loading and error states
+.initial-load-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    height: 100vh;
+
+    h1 {
+        font-weight: 500;
+
+        img {
+            filter: grayscale(1);
+        }
+    }
+
+    p {
+        max-width: 60ch;
+        width: calc(100vw - 1em);
+
+        a:any-link {
+            color: var(--yellow);
+        }
+    }
+
+    .error-details {
+        color: var(--grey-6);
+        text-align: left;
+        font-family: monospace;
+    }
+}
+
+#canvas {
+    display: none;
+}
+
+.flex-grow {
+    flex-grow: 1;
+}
+
+html, .App {
+    background: var(--grey-0);
+}
+
+@mixin faded-dot-background($height) {
+    background: linear-gradient(180deg,transparent 0, var(--grey-0) $height),
+        fixed 0 0 /20px 20px radial-gradient(var(--grey-1) 1px,transparent 0),
+        fixed 10px 10px / 20px 20px radial-gradient(var(--grey-1) 1px,transparent 0),
+        var(--grey-0);
+}
+
+.initial-load-container,
+#splash-page {
+    @include faded-dot-background(600px);
+}
+
+#splash-page {
+    header {
+        $buttonHeight: 2.5em;
+
+        padding: 0.5em 1em;
+        height: calc($buttonHeight + 1em);
+
+        background: var(--grey-0-alpha-50);
+        backdrop-filter: blur(10px);
+
+        border-bottom: 1px solid var(--grey-2);
+
+        position: sticky;
+        top: 0;
+        width: 100%;
+
+        h1 {
+            margin: 0;
+            padding: 0;
+
+            font-size: 1.25em;
+            font-weight: 400;
+
+            display: inline-block;
+            line-height: calc($buttonHeight / 1.3);
+        }
+
+        .author {
+            margin: 0 0.5em;
+
+            color: var(--grey-8);
+
+            a {
+                color: var(--grey-9);
+
+                text-decoration: none;
+                border-bottom: 1.5px solid currentColor;
+            }
+        }
+
+        .right {
+            float: right;
+
+            display: flex;
+            align-items: center;
+            gap: 1em;
+
+            height: $buttonHeight;
+        }
+
+        .button {
+            height: $buttonHeight;
+            text-decoration: none;
+        }
+    }
+
+    .hero {
+        text-align: center;
+
+        padding: 6em 2em;
+    }
+
+    .hero-logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25em;
+
+        font-size: 5em;
+        font-weight: 500;
+        letter-spacing: -1px;
+        color: var(--yellow);
+
+        margin: 0;
+        padding: 0;
+
+        img {
+            width: 1.5em;
+            height: 1.5em;
+        }
+    }
+
+    .hero-description {
+        font-size: 2.1em;
+    }
+
+    a {
+        color: inherit;
+    }
+
+    .link,
+    p a {
+        display: inline-block;
+
+        color: inherit;
+
+        font-weight: 500;
+
+        &:hover {
+            color: var(--yellow);
+        }
+
+        &:active {
+            transform: translateY(1px);
+        }
+    }
+
+    main {
+        padding: 1em;
+        margin: 0 auto;
+
+        max-width: 60ch;
+
+        p, ul {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        small {
+            color: var(--grey-8);
+        }
+
+        section:not(:first-child) {
+            margin: 4em 0;
+        }
+    }
+
+    .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 0.5em 1.25em;
+
+        border: 1px solid var(--grey-3);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+
+        text-decoration: none;
+        font-weight: 600;
+
+        &:hover {
+            background: var(--grey-1);
+        }
+
+        &:active {
+            transform: translateY(1px);
+        }
+    }
+
+    .big {
+        padding: 0.75em 2em;
+    }
+
+    .cta {
+        color: #000;
+        background: var(--pink);
+        border-color: rgb(172, 83, 114);
+
+        &:hover {
+            background: var(--pink);
+        }
+    }
+
+    .buttons {
+        display: flex;
+        align-items: center;
+        gap: 1em;
+    }
+}

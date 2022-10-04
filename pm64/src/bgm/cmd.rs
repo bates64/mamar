@@ -3,6 +3,9 @@ use std::iter;
 use std::ops::Range;
 
 use serde_derive::{Serialize, Deserialize};
+use typescript_type_def::TypeDef;
+
+use crate::id::{Id, gen_id};
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -13,16 +16,7 @@ use serde_derive::{Serialize, Deserialize};
 /// operations are done in relative-time. This is defined as the number of ticks since the undefined start time of this
 /// [CommandSeq].
 ///
-/// Relative-time changes only when you insert a [Delay]:
-/// ```
-/// use pm64::bgm::{CommandSeq, Command};
-///
-/// let mut sequence = CommandSeq::new();
-///
-/// sequence.push(Command::MasterTempo(120)); // Executed at relative-time 0
-/// sequence.push(Command::Delay(50));           // Executed at relative-time 0
-/// sequence.push(Command::MasterTempo(80));  // Executed at relative-time 50
-/// ```
+/// Relative-time changes only when you insert a [Delay]..
 ///
 /// ## Time efficiency
 ///
@@ -38,15 +32,14 @@ use serde_derive::{Serialize, Deserialize};
 /// that this collection is not equivalent to [Vec] - in many ways it acts more like a
 /// [HashMap](std::collections::HashMap) (i.e. a dictionary) with relative-time keys and [Command] values (for
 /// example, you cannot lookup by vector index, because ordering is undefined between [Delay] partitions).
-#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
 pub struct CommandSeq {
     /// List of [Command]s in time order. Sets of [Command]s at the same time value have undefined ordering, so this
     /// is not a public field. Similarly, [CommandSeq] does not [Deref](std::ops::Deref) to the [Vec] it wraps
     /// (which is as close as Rust gets to OOP-style inheritance).
     /// However, a number of [Vec] operations _are_ safe to provide; these are wrapped in the `impl CommandSeq`, such
     /// as [CommandSeq::len].
-    vec: Vec<Command>,
+    vec: Vec<Event>,
     /* TODO: consider implementing this optimisation because get/insert are hot */
     /*
     /// Lookup table (time -> vec index of first command with that time) for avoiding linear searches.
@@ -69,79 +62,12 @@ impl CommandSeq {
     /// sequence consistent. Has the side-effect of combining an adjacient Delay sequence, similar to that of
     /// [`shrink`](CommandSeq::shrink).
     ///
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::from(vec![
-    ///     Command::Delay(10),
-    ///     Command::Delay(10),
-    ///     Command::Delay(10),
-    /// ]);
-    ///
-    /// sequence.insert(15, Command::MasterTempo(120));
-    ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
-    ///     Command::Delay(10),
-    ///
-    ///     Command::Delay(5),         // Inserted automatically to reach t = 15
-    ///     Command::MasterTempo(120),
-    ///
-    ///     Command::Delay(15),        // [Delay(10), Delay(10)] combined and adjusted
-    /// ]));
-    /// ```
-    ///
-    /// A delay will also be inserted after the subsequence where required:
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::from(vec![
-    ///     Command::Delay(40),
-    ///     Command::MasterTempo(140),
-    /// ]);
-    ///
-    /// sequence.insert(10, Command::MasterTempo(120));
-    ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
-    ///     Command::Delay(10),
-    ///     Command::MasterTempo(120),
-    ///     Command::Delay(30),
-    ///     Command::MasterTempo(140),
-    /// ]));
-    /// ```
-    /// With delays after the insertion point combined into one:
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::from(vec![
-    ///     Command::Delay(0xFF),
-    ///     Command::Delay(0xFF),
-    ///     Command::Delay(0xFF),
-    /// ]);
-    ///
-    /// sequence.insert(0x100, Command::MasterTempo(120));
-    ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
-    ///     Command::Delay(0xFF),
-    ///     Command::Delay(0x1),
-    ///     Command::MasterTempo(120),
-    ///     Command::Delay(0xFF + 0xFE), // Combined into a single delay
-    /// ]));
-    /// ```
+    /// A delay will also be inserted after the subsequence where required,
+    /// with delays after the insertion point combined into one.
     ///
     /// The command is inserted at the **start** of the subequence at `time`. That means that insertion at the same time
     /// in series will result in a backwards result. Most of the time this does not matter, but it might be a source
-    /// of playback issues in specific circumstances:
-    ///
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::new();
-    ///
-    /// sequence.insert(10, Command::MasterTempo(60));  // (1)
-    /// sequence.insert(10, Command::MasterTempo(120)); // (2)
-    ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
-    ///     Command::Delay(10),        // Inserted during (1)
-    ///     Command::MasterTempo(120), // (2)
-    ///     Command::MasterTempo(60),  // (1) - Oh no! This overrides (2)!
-    /// ]));
-    /// ```
+    /// of playback issues in specific circumstances.
     ///
     /// In cases such as the above example, you can use [`insert_many(time)`](CommandSeq::insert_many) to insert a
     /// subsequence whilst preserving its order.
@@ -153,25 +79,10 @@ impl CommandSeq {
     /// [Delays](Delay) are adjusted and inserted in order to maintain the time values of commands before and after in
     /// the sequence.
     ///
-    /// The order of the inserted subsequence is maintained:
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::new();
-    ///
-    /// sequence.insert_many(10, vec![
-    ///     Command::MasterTempo(120),
-    ///     Command::MasterTempo(60),
-    /// ]);
-    ///
-    /// assert_eq!(sequence, CommandSeq::from(vec![
-    ///     Command::Delay(10),
-    ///     Command::MasterTempo(120),
-    ///     Command::MasterTempo(60),
-    /// ]));
-    /// ```
+    /// The order of the inserted subsequence is maintained.
     ///
     /// Has the side-effect of combining delays to the immediate right of the inserted subsequence.
-    pub fn insert_many<C: Into<Command>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
+    pub fn insert_many<C: Into<Event>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
         // Turn subsequence members into Commands if they are not already (C: Into<Command>)
         let subsequence = subsequence.into_iter().map(|cmd| cmd.into());
 
@@ -190,7 +101,7 @@ impl CommandSeq {
 
                 let mut old_delay_range = index..index;
                 let mut delta_time: usize = 0;
-                while let Some(Delay(t)) = self.vec.get(old_delay_range.end) {
+                while let Some(Event { command: Delay { value: t }, .. }) = self.vec.get(old_delay_range.end) {
                     old_delay_range.end += 1;
                     delta_time += *t as usize;
                 }
@@ -201,9 +112,9 @@ impl CommandSeq {
                     (before_time, after_time)
                 };
 
-                fn delay(time: usize) -> Box<dyn Iterator<Item = Command>> {
+                fn delay(time: usize) -> Box<dyn Iterator<Item = Event>> {
                     if time > 0 {
-                        Box::new(iter::once(Command::Delay(time)))
+                        Box::new(iter::once(Command::Delay { value: time }.into()))
                     } else {
                         Box::new(iter::empty())
                     }
@@ -220,27 +131,7 @@ impl CommandSeq {
     }
 
     /// Returns the commands occurring at the given time, including the terminating Delay command if there is one.
-    /// ```
-    /// # use pm64::bgm::*;
-    ///
-    /// let mut sequence = CommandSeq::from(vec![
-    ///     Command::MasterTempo(60),
-    ///     Command::Delay(30),
-    ///     Command::MasterTempo(120),
-    ///     Command::Delay(10),
-    ///     Command::MasterTempo(80),
-    /// ]);
-    ///
-    /// assert_eq!(sequence.at_time(0),  vec![&Command::MasterTempo(60), &Command::Delay(30)]);
-    /// assert_eq!(sequence.at_time(15).len(), 0); // No commands at time = 15
-    /// assert_eq!(sequence.at_time(30), vec![&Command::MasterTempo(120), &Command::Delay(10)]);
-    /// assert_eq!(sequence.at_time(40), vec![&Command::MasterTempo(80)]); // No Delay, because this is the tail
-    ///
-    /// sequence.insert(15, Command::MasterTempo(50));
-    /// assert_eq!(sequence.at_time(0),  vec![&Command::MasterTempo(60), &Command::Delay(15)]);
-    /// assert_eq!(sequence.at_time(15), vec![&Command::MasterTempo(50), &Command::Delay(15)]);
-    /// ```
-    pub fn at_time(&self, wanted_time: usize) -> Vec<&Command> {
+    pub fn at_time(&self, wanted_time: usize) -> Vec<&Event> {
         self.iter_time_groups()
             .find(|&(time, _)| time == wanted_time)
             .map_or(Vec::new(), |(_, subseq)| subseq)
@@ -249,7 +140,7 @@ impl CommandSeq {
     // TODO: remove
 
     /// Iterates over the commands in this sequence in time-order.
-    pub fn iter(&self) -> std::slice::Iter<'_, Command> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Event> {
         self.vec.iter()
     }
 
@@ -271,28 +162,11 @@ impl CommandSeq {
     /// Returns the relative-time after the last [Command]. Does not account for any final command which extends the
     /// *playback* time (not the relative-time), that is, [Command::Note] (use [CommandSeq::playback_time] to find
     /// this value).
-    ///
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let mut sequence = CommandSeq::new();
-    /// assert_eq!(sequence.len_time(), 0);
-    ///
-    /// sequence.push(Command::Delay(10));
-    /// assert_eq!(sequence.len_time(), 10);
-    ///
-    /// sequence.push(Command::Delay(10));
-    /// sequence.push(Command::Delay(10));
-    /// assert_eq!(sequence.len_time(), 30);
-    ///
-    /// // Wouldn't make sense to do this in practice, but it is valid.
-    /// sequence.push(Command::Delay(0));
-    /// assert_eq!(sequence.len_time(), 30);
-    /// ```
     pub fn len_time(&self) -> usize {
         let mut time = 0;
 
         for command in self.vec.iter() {
-            if let Command::Delay(delta_time) = command {
+            if let Event { command: Delay { value: delta_time }, .. } = command {
                 time += *delta_time as usize;
             }
         }
@@ -303,22 +177,10 @@ impl CommandSeq {
     /// Calculates the time it takes for this [CommandSeq] to finish in terms of audio playback (i.e. when all
     /// notes have stopped).
     ///
-    /// Equivalent to [CommandSeq::len_time] for a sequence with no [Command::Note]s:
-    /// ```
-    /// # use pm64::bgm::*;
-    /// let seq = CommandSeq::from(vec![Command::Delay(1000)]);
-    /// assert_eq!(seq.playback_time(), 1000);
-    /// assert_eq!(seq.len_time(), 1000);
-    /// ```
-    ///
-    /// An empty sequence has a playback time of zero:
-    /// ```
-    /// # use pm64::bgm::*;
-    /// assert_eq!(CommandSeq::new().playback_time(), 0);
-    /// ```
+    /// Equivalent to [CommandSeq::len_time] for a sequence with no [Command::Note]s.
     pub fn playback_time(&self) -> usize {
-        self.iter_time().last().map_or(0, |(time, command)| match *command {
-            Command::Delay(delta) => time + delta as usize,
+        self.iter_time().last().map_or(0, |(time, event)| match event.command {
+            Command::Delay { value: delta } => time + delta as usize,
             Command::Note { length, .. } => time + length as usize,
             _ => time,
         })
@@ -340,7 +202,7 @@ impl CommandSeq {
     }
 
     /// Appends the given [Command] to the end of the sequence.
-    pub fn push<C: Into<Command>>(&mut self, command: C) {
+    pub fn push<C: Into<Event>>(&mut self, command: C) {
         self.vec.push(command.into())
     }
 
@@ -350,14 +212,14 @@ impl CommandSeq {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0] == Command::End)
+        self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0].command == Command::End)
     }
 
     pub fn pitch_range(&self) -> Range<u8> {
         let mut range = 0..0;
 
         for cmd in self.iter() {
-            if let Command::Note { pitch, .. } = cmd {
+            if let Event { command: Command::Note { pitch, .. }, .. } = cmd {
                 let pitch = *pitch;
 
                 if pitch < range.start {
@@ -374,13 +236,13 @@ impl CommandSeq {
     }
 
     pub fn clear_command(&mut self, idx: usize) {
-        self.vec[idx] = Command::Delay(0);
+        self.vec[idx] = Command::Delay { value: 0 }.into();
     }
 
     pub fn zero_all_delays(&mut self) {
         for cmd in &mut self.vec {
-            if let Command::Delay(_) = cmd {
-                *cmd = Command::Delay(0);
+            if let Event { command: Command::Delay { value: _ }, .. } = cmd {
+                *cmd = Command::Delay { value: 0 }.into();
             }
         }
     }
@@ -465,7 +327,7 @@ impl CommandSeq {
         let mut current_time = 0;
 
         for (index, command) in self.vec.iter().enumerate() {
-            if let Command::Delay(delta_time) = command {
+            if let Event { command: Delay { value: delta_time }, .. } = command {
                 let time_at_index = current_time;
 
                 // Advance past this Delay.
@@ -514,27 +376,22 @@ impl CommandSeq {
         // TODO: Attempt cache update
     }
     */
-}
 
-impl From<Vec<Command>> for CommandSeq {
-    /// ```
-    /// # use pm64::bgm::*;
-    /// assert_eq!({
-    ///     CommandSeq::from(vec![Command::Delay(10)])
-    /// }, {
-    ///     // Construct manually
-    ///     let mut sequence = CommandSeq::new();
-    ///     sequence.push(Command::Delay(10));
-    ///     sequence
-    /// });
-    /// ```
-    fn from(vec: Vec<Command>) -> Self {
-        Self { vec }
+    pub fn to_command_vec(self) -> Vec<Command> {
+        self.vec.into_iter().map(|e| e.command).collect()
     }
 }
 
-impl iter::FromIterator<Command> for CommandSeq {
-    fn from_iter<T: IntoIterator<Item = Command>>(iter: T) -> Self {
+impl<C: Into<Event>> From<Vec<C>> for CommandSeq {
+    fn from(vec: Vec<C>) -> Self {
+        let mut new = Self::new();
+        new.insert_many(0, vec);
+        new
+    }
+}
+
+impl iter::FromIterator<Event> for CommandSeq {
+    fn from_iter<T: IntoIterator<Item = Event>>(iter: T) -> Self {
         Self {
             vec: iter.into_iter().collect(),
         }
@@ -551,41 +408,49 @@ enum DelayLookup {
     Missing { index: usize, time_at_index: usize },
 }
 
-/// A Command (or in MIDI terms, an event) describes operations performed at a particular time and on a particular track
-/// during playback, like playing a note or changing the track instrument. CommandSeq are independent of (and therefore
-/// do not know of) any likely - but not required - parent structs (such as [CommandSeq] and its parent
-/// [Track](crate::Track)) and by extension any properties known only by them, such as the command's absolute and
-/// relative time positioning.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
+#[serde(rename_all = "camelCase")]
+pub struct Event {
+    pub id: Id,
+    #[serde(flatten)]
+    pub command: Command,
+}
+
+/// See audio.h union SeqArgs
+/// TODO: rename to use "Variant" and "Seg" prefixes rather than "Seg" and "Sub"; same in audio.h
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
+#[serde(tag = "type")]
 pub enum Command {
+    /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
+    /// via a [`Detour`](Command::Detour).
+    End,
+
     /// Sleeps for however many ticks before continuing playback on this track.
-    Delay(usize),
+    Delay { value: usize },
 
-    /// Plays a note or drum sound. Non-blocking(?), i.e. does **not** act like a [`Delay(length)`](Command::Delay) and
-    /// only continue execution once the note has finished playing.
+    /// Plays a note or drum sound.
     Note {
-        // TODO: make Pitch type
         pitch: u8,
-
-        // TODO: determine bounds etc and use newtype
         velocity: u8,
-
-        // TODO: determine max value (it's not u16::MAX)
-        // I think it's 0xD3FF? TODO use newtype
         length: u16,
     },
 
     /// Sets the beats-per-minute of the composition.
-    MasterTempo(u16),
+    MasterTempo { value: u16 },
+
+    /// Sets the composition volume.
+    MasterVolume { value: u8 },
+
+    /// Sets the composition transpose value.
+    MasterPitchShift { cent: u8 },
+
+    UnkCmdE3 { bank: u8 },
 
     /// Fades the tempo to `bpm` across `time` ticks.
     MasterTempoFade {
         time: u16,
-        bpm: u16,
+        value: u16,
     },
-
-    /// Sets the composition volume.
-    MasterVolume(u8),
 
     /// Fades the volume to `volume` across `time` ticks.
     MasterVolumeFade {
@@ -593,23 +458,10 @@ pub enum Command {
         volume: u8,
     },
 
-    /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
-    SubTrackVolume(u8),
-
-    /// Sets the volume for this track only. Resets at the end of the [super::Segment].
-    SegTrackVolume(u8),
-
-    // TODO: figure out whether Seg or Sub
-    TrackVolumeFade {
-        time: u16,
-        volume: u8,
-    },
-
-    /// Sets the composition transpose value. It is currently unknown exactly how this adjusts pitch.
-    MasterTranspose(i8),
-
     /// Applies the given effect to the entire composition.
-    MasterEffect(u8, u8), // TODO: enum for field
+    MasterEffect { index: u8, value: u8 },
+
+    // command E7 unused
 
     /// Sets the bank/patch of this track, overriding its [super::Voice].
     TrackOverridePatch {
@@ -617,16 +469,23 @@ pub enum Command {
         patch: u8,
     },
 
+    /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
+    SubTrackVolume { value: u8 },
+
     /// Left = (+/-)0.
     /// Middle = (+/-)64.
     /// Right = (+/-)127.
-    SubTrackPan(i8),
+    SubTrackPan { value: i8 },
 
-    SubTrackReverb(u8),
-    SubTrackReverbType(u8), // TODO: enum for field
+    SubTrackReverb { value: u8 },
 
-    SubTrackCoarseTune(u8),
-    SubTrackFineTune(u8),
+    /// Sets the volume for this track only. Resets at the end of the [super::Segment].
+    SegTrackVolume { value: u8 },
+
+    SubTrackCoarseTune { value: u8 },
+
+    SubTrackFineTune { value: u8 },
+
     SegTrackTune {
         coarse: u8,
         fine: u8,
@@ -636,30 +495,52 @@ pub enum Command {
     TrackTremolo {
         amount: u8,
         speed: u8,
-        unknown: u8,
+        time: u8,
     },
 
-    // XXX: Angry_Bowser_67 doesn't have any TrackTremolo but does have TrackTremoloStop.
-    // It may reset SubTrackVolume also?
+    TrackTremoloSpeed { value: u8 },
+
+    TrackTremoloTime { time: u8 },
+
     TrackTremoloStop,
 
-    // TODO: figure out whether Seg or Sub
-    /// Sets the track's voice. Field is an index into [super::Bgm::voices].
-    TrackVoice(u8),
+    UnkCmdF4 { pan0: u8, pan1: u8 },
+
+    SetTrackVoice { index: u8 },
+
+    TrackVolumeFade {
+        time: u16,
+        value: u8,
+    },
+
+    SubTrackReverbType { index: u8 },
+
+    // commands F8-FB unused
+
+    Jump {
+        unk_00: u16,
+        unk_02: u8,
+    },
+
+    EventTrigger {
+        event_info: u32,
+    },
+
+    /// Jumps to the start label and executes until the end label is found.
+    Detour {
+        start_label: MarkerId,
+        end_label: MarkerId, // Must come after
+    },
+
+    UnkCmdFF {
+        unk_00: u8,
+        unk_01: u8,
+        unk_02: u8,
+    },
 
     /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this
     /// abstraction rather than [CommandSeq] indices because they stay stable during mutation.
-    Marker(MarkerId),
-
-    /// Jumps to the start label and executes until the end label is found.
-    Subroutine(CommandRange),
-
-    /// An unknown/unimplemented command.
-    Unknown(Vec<u8>),
-
-    /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
-    /// via a [`Subroutine`](Command::Subroutine) jump.
-    End,
+    Marker { label: MarkerId },
 }
 
 use Command::Delay;
@@ -669,7 +550,7 @@ pub const DELAY_MAX: u8 = 0x78;
 impl Default for Command {
     /// Returns a no-op command. Cannot be encoded.
     fn default() -> Self {
-        Delay(0)
+        Delay { value: 0 }
     }
 }
 
@@ -717,21 +598,30 @@ impl Command {
 }
 */
 
+impl Into<Event> for Command {
+    fn into(self) -> Event {
+        Event {
+            id: gen_id(),
+            command: self,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TimeIter<'a> {
-    seq: std::slice::Iter<'a, Command>,
+    seq: std::slice::Iter<'a, Event>,
     current_time: usize,
 }
 
 impl<'a> Iterator for TimeIter<'a> {
-    type Item = (usize, &'a Command);
+    type Item = (usize, &'a Event);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.seq.next() {
             Some(command) => {
                 let ret = (self.current_time, command);
 
-                if let Delay(delta_time) = command {
+                if let Event { command: Delay { value: delta_time }, .. } = command {
                     self.current_time += *delta_time as usize;
                 }
 
@@ -747,7 +637,7 @@ pub struct TimeGroupIter<'a> {
 }
 
 impl<'a> Iterator for TimeGroupIter<'a> {
-    type Item = (usize, Vec<&'a Command>);
+    type Item = (usize, Vec<&'a Event>);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.seq.next() {
@@ -781,11 +671,3 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 }
 
 pub type MarkerId = String;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CommandRange {
-    pub name: String,
-
-    pub(crate) start: MarkerId,
-    pub(crate) end: MarkerId, // Must come after `start`
-}

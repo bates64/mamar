@@ -1,0 +1,11 @@
+.Header {
+    h1 {
+        margin: 0;
+
+        &, img {
+            width: 24px;
+            height: 24px;
+            vertical-align: top;
+        }
+    }
+}

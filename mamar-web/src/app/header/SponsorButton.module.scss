@@ -1,0 +1,26 @@
+.button {
+    color: var(--pink);
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 6px;
+
+    font-weight: 500;
+    text-decoration: none;
+
+    user-select: none;
+
+    &:active {
+        transform: translateY(1px);
+    }
+
+    &:hover {
+        text-decoration: underline;
+
+        svg {
+            fill: currentColor;
+        }
+    }
+}

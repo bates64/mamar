@@ -1,0 +1,12 @@
+{
+  "name": "patches",
+  "version": "0.1.0",
+  "private": true,
+  "main": "build/patches.js",
+  "module": "build/patches.mjs",
+  "types": "build/patches.d.ts",
+  "scripts": {
+    "build": "python3 build.py",
+    "build-papermario": "cd papermario && ./install.sh && ./configure us && ninja"
+  }
+}

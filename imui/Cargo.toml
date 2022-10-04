@@ -1,9 +1,0 @@
-[package]
-name = "imui"
-version = "0.1.0"
-authors = ["Alex Bates <hi@imalex.xyz>"]
-edition = "2018"
-
-[dependencies]
-euclid = "0.22"
-enumflags2 = "0.7"

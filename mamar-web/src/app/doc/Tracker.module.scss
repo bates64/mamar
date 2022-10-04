@@ -1,0 +1,30 @@
+.list, .list > li {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.command {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    align-items: center;
+    gap: 2em;
+
+    padding: 0 6px;
+
+    height: 32px;
+}
+
+.item {
+    background-color: var(--spectrum-global-color-gray-75);
+
+    &.isDragged {
+        .command > *:not(:first-child) {
+            display: none;
+        }
+    }
+
+    &.even {
+        background-color: var(--spectrum-global-color-gray-100);
+    }
+}

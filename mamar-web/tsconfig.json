@@ -1,0 +1,13 @@
+{
+    "include": ["src/**/*"],
+    "compilerOptions": {
+        "target": "es2021",
+        "strict": true,
+        "isolatedModules": true,
+        "jsx": "preserve",
+        "moduleResolution": "node",
+        "module": "ES2020",
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true
+    },
+}

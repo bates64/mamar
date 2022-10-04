@@ -7,13 +7,16 @@ use std::mem::MaybeUninit;
 use log::{debug, warn};
 
 use super::*;
+use crate::id::gen_id;
 use crate::rw::*;
 
 #[derive(Debug)]
 pub enum Error {
     InvalidMagic,
     SizeMismatch { true_size: u32, internal_size: u32 },
-    InvalidNumSegments(u8),
+    InvalidNumVariations(u8),
+    UnknownSegmentCommand(u32),
+    UnknownSeqCommand(u8),
     Io(io::Error),
 }
 
@@ -35,11 +38,13 @@ impl fmt::Display for Error {
                 "The file says it is {}B, but it is actually {}B",
                 internal_size, true_size
             ),
-            Error::InvalidNumSegments(num_segments) => write!(
+            Error::InvalidNumVariations(num_segments) => write!(
                 f,
-                "Exactly 4 segment slots are supported, but this file has {}",
+                "Exactly 4 variations are supported, but this file has {}",
                 num_segments
             ),
+            Error::UnknownSegmentCommand(cmd) => write!(f, "Unknown segment command: {:#X}", cmd),
+            Error::UnknownSeqCommand(cmd) => write!(f, "Unknown sequence command: {:#X}", cmd),
             Error::Io(source) => {
                 if let io::ErrorKind::UnexpectedEof = source.kind() {
                     write!(f, "Unexpected end-of-file")
@@ -133,16 +138,16 @@ impl Bgm {
         f.read_padding(4)?;
 
         debug_assert!(f.pos()? == 0x10);
-        let num_segments = f.read_u8()?;
-        if num_segments != 4 {
-            return Err(Error::InvalidNumSegments(num_segments));
+        let num_variations = f.read_u8()?;
+        if num_variations != 4 {
+            return Err(Error::InvalidNumVariations(num_variations));
         }
 
         debug_assert!(f.pos()? == 0x11);
         f.read_padding(3)?;
 
         debug_assert!(f.pos()? == 0x14);
-        let segment_offsets: Vec<u16> = (0..4)
+        let variation_offsets: Vec<u16> = (0..4)
             .into_iter()
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
             .collect::<Result<_, _>>()?; // We need to obtain all offsets before seeking to any
@@ -167,9 +172,9 @@ impl Bgm {
             _ => vec![],
         };
 
-        bgm.segments = segment_offsets
+        bgm.variations = variation_offsets
             .iter()
-            .map(|&pos| -> Result<Option<Segment>, Error> {
+            .map(|&pos| -> Result<Option<Variation>, Error> {
                 if pos == 0 {
                     // Null (no segments)
                     Ok(None)
@@ -190,16 +195,15 @@ impl Bgm {
                         f.seek(SeekFrom::Current(-4))?;
                         word != 0
                     } {
-                        subsegments.push(Subsegment::decode(f, &mut bgm, pos, &mut furthest_read_pos)?);
+                        subsegments.push(Segment::decode(f, &mut bgm, pos, &mut furthest_read_pos)?);
 
                         i += 1;
                     }
 
                     debug!("segment end {:#X}", f.pos()?);
 
-                    Ok(Some(Segment {
-                        name: format!("Variation {:#06X}", pos),
-                        subsegments,
+                    Ok(Some(Variation {
+                        segments: subsegments,
                     }))
                 }
             })
@@ -215,9 +219,9 @@ impl Bgm {
 
         if voices_offset != 0 {
             f.seek(SeekFrom::Start(voices_offset))?;
-            bgm.voices = (0..voices_count)
+            bgm.instruments = (0..voices_count)
                 .into_iter()
-                .map(|_| Voice::decode(f))
+                .map(|_| Instrument::decode(f))
                 .collect::<Result<_, _>>()?;
         };
 
@@ -233,65 +237,92 @@ impl Bgm {
     }
 }
 
-impl Subsegment {
+impl Segment {
     fn decode<R: Read + Seek>(
         f: &mut R,
         bgm: &mut Bgm,
         start: u64,
         furthest_read_pos: &mut u64,
     ) -> Result<Self, Error> {
+        // Equivalent engine func: au_bgm_player_read_segment
+
         debug!("subsegment {:#X}", f.pos()?);
-        let flags = f.read_u8()?;
+        let data = f.read_u32_be()?;
+        match data >> 12 {
+            segment_commands::END => unreachable!("END should be handled by the caller"),
+            segment_commands::SUBSEG => {
+                f.seek(SeekFrom::Current(-2))?;
+                let offset = (f.read_u16_be()? as u64) << 2;
+                let track_list_pos = start + offset;
+                debug!("tracks start = {:#X} (offset = {:#X})", track_list_pos, offset);
 
-        if flags & 0x70 == 0x10 {
-            f.read_padding(1)?;
+                // If we've decoded the track list at `track_list_pos` already, reference that.
+                // Otherwise, decode the track there and add it to `bgm.track_lists`.
+                let track_list = match bgm.find_track_list_with_pos(track_list_pos) {
+                    Some(id) => id,
+                    None => {
+                        let mut tracks: [MaybeUninit<Track>; 16] = unsafe {
+                            // SAFETY: this is an array of uninitialised elements, so the array overall does not require
+                            // initialisation.
+                            MaybeUninit::uninit().assume_init()
+                        };
 
-            let offset = (f.read_u16_be()? as u64) << 2;
-            let track_list_pos = start + offset;
-            debug!("tracks start = {:#X} (offset = {:#X})", track_list_pos, offset);
+                        for (track_no, track) in tracks.iter_mut().enumerate() {
+                            let track_no = track_no as u64;
 
-            // If we've decoded the track list at `track_list_pos` already, reference that.
-            // Otherwise, decode the track there and add it to `bgm.track_lists`.
-            let track_list = match bgm.find_track_list_with_pos(track_list_pos) {
-                Some(id) => id,
-                None => {
-                    let mut tracks: [MaybeUninit<Track>; 16] = unsafe {
-                        // SAFETY: this is an array of uninitialised elements, so the array overall does not require
-                        // initialisation.
-                        MaybeUninit::uninit().assume_init()
-                    };
+                            f.seek(SeekFrom::Start(track_list_pos + track_no * 4))?;
+                            *track = MaybeUninit::new(Track::decode(f, track_list_pos)?);
 
-                    for (track_no, track) in tracks.iter_mut().enumerate() {
-                        let track_no = track_no as u64;
-
-                        f.seek(SeekFrom::Start(track_list_pos + track_no * 4))?;
-                        *track = MaybeUninit::new(Track::decode(f, track_list_pos)?);
-
-                        let pos = f.pos()?;
-                        if pos > *furthest_read_pos {
-                            *furthest_read_pos = pos;
+                            let pos = f.pos()?;
+                            if pos > *furthest_read_pos {
+                                *furthest_read_pos = pos;
+                            }
                         }
+
+                        bgm.add_track_list(TrackList {
+                            pos: Some(track_list_pos),
+                            tracks: unsafe { // TODO: tbh just make this a vec, modding is a thing
+                                // SAFETY: the for loop above has initialised the array. This is also how the std
+                                // documentation suggests initialising an array element-by-element:
+                                // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
+                                std::mem::transmute(tracks)
+                            },
+                        })
                     }
+                };
 
-                    bgm.add_track_list(TrackList {
-                        name: format!("Section {:#06X}", track_list_pos),
-                        pos: Some(track_list_pos),
-                        tracks: unsafe {
-                            // SAFETY: the for loop above has initialised the array. This is also how the std
-                            // documentation suggests initialising an array element-by-element:
-                            // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
-                            std::mem::transmute(tracks)
-                        },
-                    })
-                }
-            };
-
-            Ok(Subsegment::Tracks { flags, track_list })
-        } else {
-            let mut data = [0; 3];
-            f.read_exact(&mut data)?;
-
-            Ok(Subsegment::Unknown { flags, data })
+                Ok(Segment::Subseg { id: gen_id(), track_list })
+            }
+            segment_commands::START_LOOP => {
+                f.seek(SeekFrom::Current(-2))?;
+                Ok(Segment::StartLoop {
+                    id: gen_id(),
+                    label_index: f.read_u16_be()?,
+                })
+            },
+            segment_commands::WAIT => Ok(Segment::Wait { id: gen_id() }),
+            segment_commands::END_LOOP => {
+                Ok(Segment::EndLoop {
+                    id: gen_id(),
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            segment_commands::UNKNOWN_6 => {
+                Ok(Segment::Unknown6 {
+                    id: gen_id(),
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            segment_commands::UNKNOWN_7 => {
+                Ok(Segment::Unknown7 {
+                    id: gen_id(),
+                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
+                })
+            }
+            _ => Err(Error::UnknownSegmentCommand(data)),
         }
     }
 }
@@ -301,13 +332,16 @@ impl Track {
         let commands_offset = f.read_u16_be()?;
         let flags = f.read_u16_be()?;
 
+        let is_disabled = (flags & 0x0100) != 0;
+        let polyphonic_idx = ((flags & (0x7 << 0xD)) >> 0xD) as u8;
+        let is_drum_track = (flags & 0x0080) != 0;
+        let parent_track_idx = ((flags & (0xF << 9)) >> 9) as u8;
+
         Ok(Self {
-            name: if commands_offset == 0 {
-                String::from("Empty track")
-            } else {
-                format!("Track {:#06X}", commands_offset)
-            },
-            flags,
+            is_disabled,
+            polyphonic_idx,
+            is_drum_track,
+            parent_track_idx,
             commands: if commands_offset == 0 {
                 CommandSeq::with_capacity(0)
             } else {
@@ -320,8 +354,6 @@ impl Track {
 
                 seq
             },
-            mute: false,
-            solo: false,
         })
     }
 }
@@ -332,7 +364,7 @@ impl CommandSeq {
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
         // CommandSeq by performing an in-order traversal.
-        let mut commands = OffsetCommandMap::new();
+        let mut commands = OffsetEventMap::new();
 
         let mut seen_terminator = false;
 
@@ -366,7 +398,7 @@ impl CommandSeq {
                 }
 
                 // Delay
-                0x01..=0x77 => Command::Delay(cmd_byte as usize),
+                0x01..=0x77 => Command::Delay { value: cmd_byte as usize },
 
                 // Long delay
                 0x78..=0x7F => {
@@ -376,7 +408,7 @@ impl CommandSeq {
                     let num_256s = (cmd_byte - 0x78) as usize;
                     let extend = f.read_u8()? as usize;
 
-                    Command::Delay(0x78 + num_256s * 256 + extend)
+                    Command::Delay { value: 0x78 + num_256s * 256 + extend }
 
                     // This logic taken from N64MidiTool
                     //Command::Delay(0x78 + (cmd_byte as usize) + ((f.read_u8()? & 7) as usize) << 8)
@@ -409,30 +441,30 @@ impl CommandSeq {
                     }
                 }
 
-                0xE0 => Command::MasterTempo(f.read_u16_be()?),
-                0xE1 => Command::MasterVolume(f.read_u8()?),
-                0xE2 => Command::MasterTranspose(f.read_i8()?),
-                0xE3 => Command::Unknown(vec![0xE3, f.read_u8()?]),
+                0xE0 => Command::MasterTempo { value: f.read_u16_be()? },
+                0xE1 => Command::MasterVolume { value: f.read_u8()? },
+                0xE2 => Command::MasterPitchShift { cent: f.read_u8()? },
+                0xE3 => Command::UnkCmdE3 { bank: f.read_u8()? },
                 0xE4 => Command::MasterTempoFade {
                     time: f.read_u16_be()?,
-                    bpm: f.read_u16_be()?,
+                    value: f.read_u16_be()?,
                 },
                 0xE5 => Command::MasterVolumeFade {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
-                0xE6 => Command::MasterEffect(f.read_u8()?, f.read_u8()?),
-                0xE7 => Command::Unknown(vec![0xE7]),
+                0xE6 => Command::MasterEffect { index: f.read_u8()?, value: f.read_u8()? },
+                // command 0xE7 unused
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,
                     patch: f.read_u8()?,
                 },
-                0xE9 => Command::SubTrackVolume(f.read_u8()?),
-                0xEA => Command::SubTrackPan(f.read_i8()?),
-                0xEB => Command::SubTrackReverb(f.read_u8()?),
-                0xEC => Command::SegTrackVolume(f.read_u8()?),
-                0xED => Command::SubTrackCoarseTune(f.read_u8()?),
-                0xEE => Command::SubTrackFineTune(f.read_u8()?),
+                0xE9 => Command::SubTrackVolume { value: f.read_u8()? },
+                0xEA => Command::SubTrackPan { value: f.read_i8()? },
+                0xEB => Command::SubTrackReverb { value: f.read_u8()? },
+                0xEC => Command::SegTrackVolume { value: f.read_u8()? },
+                0xED => Command::SubTrackCoarseTune { value: f.read_u8()? },
+                0xEE => Command::SubTrackFineTune { value: f.read_u8()? },
                 0xEF => Command::SegTrackTune {
                     coarse: f.read_u8()?,
                     fine: f.read_u8()?,
@@ -440,57 +472,48 @@ impl CommandSeq {
                 0xF0 => Command::TrackTremolo {
                     amount: f.read_u8()?,
                     speed: f.read_u8()?,
-                    unknown: f.read_u8()?,
+                    time: f.read_u8()?,
                 },
-                0xF1 => Command::Unknown(vec![0xF1, f.read_u8()?]),
-                0xF2 => Command::Unknown(vec![0xF2, f.read_u8()?]),
+                0xF1 => Command::TrackTremoloSpeed { value: f.read_u8()? },
+                0xF2 => Command::TrackTremoloTime { time: f.read_u8()? },
                 0xF3 => Command::TrackTremoloStop,
-                0xF4 => Command::Unknown(vec![0xF4, f.read_u8()?, f.read_u8()?]),
-                0xF5 => Command::TrackVoice(f.read_u8()?),
+                0xF4 => Command::UnkCmdF4 { pan0: f.read_u8()?, pan1: f.read_u8()? },
+                0xF5 => Command::SetTrackVoice { index: f.read_u8()? },
                 0xF6 => Command::TrackVolumeFade {
                     time: f.read_u16_be()?,
-                    volume: f.read_u8()?,
+                    value: f.read_u8()?,
                 },
-                0xF7 => Command::SubTrackReverbType(f.read_u8()?),
-                0xF8 => Command::Unknown(vec![0xF8]),
-                0xF9 => Command::Unknown(vec![0xF9]),
-                0xFA => Command::Unknown(vec![0xFA]),
-                0xFB => Command::Unknown(vec![0xFB]),
-                /*
-                0xFC => {
-                    let _set_pos = f.read_u16_be()?;
-                    let _count = f.read_u8()?;
-
-                    // TODO Jump random
-                    todo!("Jump random");
-                }
-                */
-                0xFD => Command::Unknown(vec![0xFD, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xF7 => Command::SubTrackReverbType { index: f.read_u8()? },
+                // commands 0xF8-FB unused
+                0xFC => Command::Jump {
+                    unk_00: f.read_u16_be()?, // TODO: this is an offset, go there!!
+                    unk_02: f.read_u8()?,
+                },
+                0xFD => Command::EventTrigger { event_info: f.read_u32_be()? },
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
 
-                    //debug!("subroutine @ {:#X} (start = {:#X}; end = {:#X})", cmd_offset, start_offset, end_offset);
-
-                    Command::Subroutine(CommandRange {
-                        name: format!("Subroutine {:#X}", cmd_offset),
-                        start: commands.upsert_marker(start_offset),
-                        end: commands.upsert_marker(end_offset),
-                    })
+                    Command::Detour {
+                        start_label: commands.upsert_marker(start_offset),
+                        end_label: commands.upsert_marker(end_offset),
+                    }
                 }
-                0xFF => Command::Unknown(vec![0xFF, f.read_u8()?, f.read_u8()?, f.read_u8()?]),
+                0xFF => Command::UnkCmdFF { unk_00: f.read_u8()?, unk_01: f.read_u8()?, unk_02: f.read_u8()? },
 
-                _ => Command::Unknown(vec![cmd_byte]),
+                _ => {
+                    return Err(Error::UnknownSeqCommand(cmd_byte))
+                }
             };
 
-            commands.insert(cmd_offset, command);
+            commands.insert(cmd_offset, command.into());
         }
 
         let size = f.pos()? as usize - start;
         //debug!("end commandseq {:#X}", f.pos()?);
 
         // Explode if there are no commands (must be markers) past the end of the file
-        for (offset, command) in commands.0.split_off(&OffsetCommandMap::atob(size)).into_iter() {
+        for (offset, command) in commands.0.split_off(&OffsetEventMap::atob(size)).into_iter() {
             panic!("command after end of parsed sequence {:?} @ {:#X}", command, offset);
         }
 
@@ -500,9 +523,9 @@ impl CommandSeq {
 
 /// Temporary struct for [CommandSeq::decode].
 #[derive(Debug)]
-struct OffsetCommandMap(pub(self) BTreeMap<usize, Command>);
+struct OffsetEventMap(pub(self) BTreeMap<usize, Event>);
 
-impl OffsetCommandMap {
+impl OffsetEventMap {
     pub fn new() -> Self {
         Self(BTreeMap::new())
     }
@@ -518,7 +541,7 @@ impl OffsetCommandMap {
         key / 2
     }
 
-    pub fn insert(&mut self, offset: usize, command: Command) {
+    pub fn insert(&mut self, offset: usize, command: Event) {
         self.0.insert(Self::atob(offset), command);
     }
 
@@ -530,11 +553,11 @@ impl OffsetCommandMap {
             Entry::Vacant(entry) => {
                 // Insert the new marker here.
                 let id: MarkerId = format!("Offset {:#X}", offset);
-                entry.insert(Command::Marker(id.clone()));
+                entry.insert(Command::Marker { label: id.clone() }.into());
                 id
             }
             Entry::Occupied(entry) => match entry.get() {
-                Command::Marker(id) => id.clone(),
+                Event { command: Command::Marker { label }, .. } => label.clone(),
                 other_command => panic!(
                     "non-marker command {:?} found in label range (shifted_offset = {:#X})",
                     other_command, shifted_offset,
@@ -552,8 +575,8 @@ impl OffsetCommandMap {
     }
 }
 
-impl From<OffsetCommandMap> for CommandSeq {
-    fn from(map: OffsetCommandMap) -> CommandSeq {
+impl From<OffsetEventMap> for CommandSeq {
+    fn from(map: OffsetEventMap) -> CommandSeq {
         map.0.into_iter().map(|(_, cmd)| cmd).collect()
     }
 }
@@ -578,16 +601,16 @@ impl Drum {
             volume: f.read_u8()?,
             pan: f.read_i8()?,
             reverb: f.read_u8()?,
-            unk_07: f.read_u8()?,
-            unk_08: f.read_u8()?,
-            unk_09: f.read_u8()?,
-            unk_0a: f.read_u8()?,
-            unk_0b: f.read_u8()?,
+            rand_tune: f.read_u8()?,
+            rand_volume: f.read_u8()?,
+            rand_pan: f.read_u8()?,
+            rand_reverb: f.read_u8()?,
+            pad_0b: f.read_u8()?,
         })
     }
 }
 
-impl Voice {
+impl Instrument {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
@@ -598,7 +621,7 @@ impl Voice {
             reverb: f.read_u8()?,
             coarse_tune: f.read_u8()?,
             fine_tune: f.read_u8()?,
-            unk_07: f.read_u8()?,
+            pad_07: f.read_u8()?,
         })
     }
 }
@@ -652,27 +675,27 @@ mod test {
         let start_labels: Vec<&MarkerId> = seq
             .at_time(0)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
             .map(|cmd| match cmd {
-                Command::Marker(id) => id,
+                Event { command: Command::Marker { label }, .. } => label,
                 _ => unreachable!(),
             })
             .collect();
         let end_labels: Vec<&MarkerId> = seq
             .at_time(11)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Marker(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
             .map(|cmd| match cmd {
-                Command::Marker(id) => id,
+                Event { command: Command::Marker { label }, .. } => label,
                 _ => unreachable!(),
             })
             .collect();
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Command::Subroutine(_)))
+            .take_while(|cmd| matches!(cmd, Event { command: Command::Detour { .. }, .. }))
             .map(|cmd| match cmd {
-                Command::Subroutine(CommandRange { start, end, .. }) => (start, end),
+                Event { command: Command::Detour { start_label, end_label, .. }, .. } => (start_label, end_label),
                 _ => unreachable!(),
             })
             .collect();

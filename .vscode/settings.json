@@ -2,9 +2,21 @@
     "files.exclude": {
         "target": true,
         "Cargo.lock": true,
+        ".parcel-cache": true,
     },
     "editor.rulers": [120],
     "files.associations": {
         "*.mamar": "ron",
     },
+
+    "eslint.format.enable": true,
+    "[typescript]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+        "editor.formatOnSave": true,
+    },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+        "editor.formatOnSave": true,
+    },
+    "clang-tidy.blacklist": ["*"]
 }

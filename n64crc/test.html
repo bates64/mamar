@@ -1,0 +1,30 @@
+<!doctype html>
+
+<input type="file" id="file" />
+
+<script type="module">
+    import n64crc from "./build/n64crc.mjs"
+
+    n64crc().then(n64crc => {
+        console.log(n64crc)
+
+        const _print = n64crc.cwrap("print", null, ["array"])
+        const print = (arr) => {
+            if (arr.length < 0x00101000) {
+                throw new Error("array too small")
+            }
+
+            _print(arr)
+        }
+
+        document.getElementById("file").addEventListener("change", e => {
+            const file = e.target.files[0]
+            const reader = new FileReader()
+            reader.onload = e => {
+                const data = e.target.result.slice(0, 0x00101000)
+                print(new Uint8Array(data))
+            }
+            reader.readAsArrayBuffer(file)
+        })
+    })
+</script>
