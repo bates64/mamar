@@ -1,8 +1,8 @@
-use serde::{Serialize, Deserialize};
-use wasm_bindgen::prelude::*;
 use pm64::bgm::*;
 use pm64::sbn::Sbn;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
+use wasm_bindgen::prelude::*;
 
 fn to_js<T: Serialize + for<'a> Deserialize<'a>>(t: &T) -> JsValue {
     #[allow(deprecated)]
@@ -55,7 +55,7 @@ pub fn bgm_encode(bgm: &JsValue) -> JsValue {
                 arr.set_index(i as u32, v);
             }
             arr.into()
-        },
+        }
         Err(e) => e.to_string().into(),
     }
 }

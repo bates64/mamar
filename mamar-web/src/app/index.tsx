@@ -45,5 +45,5 @@ WasmBridge.default().then(() => {
 })
 
 if (process.env.NODE_ENV !== "production") {
-    import("@axe-core/react").then(axe => axe(React, ReactDOM, 1000))
+    import("@axe-core/react").then((axe: any) => axe(React, ReactDOM, 1000))
 }
