@@ -6,13 +6,12 @@
 
 Paper Mario music editor.
 
-[Website](https://mamar.nanaian.town)
+[Website](https://mamar.nanaian.town) - [Open in your browser](https://mamar.nanaian.town/app) - [Changelog](/changelog.md)
 
-[Open in your browser](https://mamar.nanaian.town/app)
+---
 
-[Changelog](/changelog.md)
-
-# Architecture
+Architecture
+============
 
 Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, [C patches](/patches) over [the Paper Mario decompilation](https://github.com/pmret/papermario), and [a custom build of mupen64plus-web](https://github.com/nanaian/mupen64plus-web/tree/mamar). The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
 
@@ -20,7 +19,8 @@ Why are some parts Rust? Mamar used to be a desktop application written entirely
 
 This is a monorepo with a number of modules in it. Following is a more detailed look at each module.
 
-## `mamar-web`
+`mamar-web`
+-----------
 
 This is the React frontend writen with strict-mode TypeScript. Styles are written in SCSS, with components using [CSS modules](https://github.com/css-modules/css-modules) for local scoping. The bundler is [Parcel 2](https://parceljs.org/). There is also a landing page that briefly explains what Mamar is, whilst the app itself lives at `/app`.
 
@@ -34,31 +34,37 @@ There aren't any tests. This would be good to add in the future to prevent regre
 
 Generally the only browsers we care about are Chrome and Firefox on desktop. I would like to support other engines and mobile devices however WebAssembly speed is really not there yet so there isn't much point.
 
-## `pm64`
+`pm64`
+------
 
 This is a Rust crate that provides encoding and decoding of Paper Mario's audio file formats, BGM (background music) and SBN (soundbank). BGM is for songs, while SBN is an archive format that holds all the rest of the audio files. There are other file types I'd like to support editing of in the future, specifically, BK (bank) and MSEQ (music sequence). BK holds actual sound samples, while MSEQ is similar to BGM but for the 'ambient sounds' in the game and - I think - sound effects. See [audio.h](https://github.com/pmret/papermario/blob/master/src/audio.h) for more info on these formats.
 
 **Architecture invariant:** `pm64` doesn't know about the filesystem, and doesn't know about the web; it's just a library for working with Paper Mario data. (The idea is to eventualy publish this crate to crates.io - if you are interested in using `pm64` in a different project, let me know and I can publish it!)
 
-## `mamar-wasm-bridge`
+`mamar-wasm-bridge`
+-------------------
 
 This is some fairly trivial glue code that enables interesting parts of the `pm64` crate to be used by `mamar-web`. It uses [wasm-pack](https://rustwasm.github.io/wasm-pack/) for building, which is not part of the standard Rust toolchain.
 
-## `pm64-typegen`
+`pm64-typegen`
+--------------
 
 `mamar-wasm-bridge` exported functions take and return the `any` type, but we can do more. This module provides TypeScript types for the main structs of the `pm64` crate, so that functions like `bgm_encode` can have their return values typed as `Bgm` which brings a better developer experience!
 
-## `n64crc`
+`n64crc`
+--------
 
 This is an emscripten port of n64sums, a tool for calculating the CRC checksum of N64 ROMs. It's unused currently but I'm keeping it around in case I need it in the future, for example for a 'save SBN to ROM' feature.
 
-## `patches`
+`patches`
+---------
 
 This module contains C functions that are compiled and linked with the Paper Mario decompilation, then the resulting binary for each function is converted to JS by a Python script. Also, RAM addresses for symbols from decomp are converted into JS too. The output is left in the repo because building requires the decomp toolchain, which can be a pain to set up.
 
 This module is then used in `mamar-web`, functions in the emulator's console memory are overwritten with the custom code. Functions that compile to a bigger blob than the original are not patched, instead the original code is replaced with a stub that immediately calls a custom function placed in `0x8040000` memory space, which goes unused by the game. Data is also placed here, but it is not initialized because that would require more complex objdump parsing in the Python script.
 
-# Building
+Building
+========
 
 You'll need:
 
@@ -75,7 +81,8 @@ Output is at `mamar-web/dist`.
 
 For developing, `yarn start` in `mamar-web` will start a dev server at `localhost:1234`. This server supports hot-reloading but beware of editing code that talks to the emulator as it is quite likely that you will experience crashes or other weirdness - reload the page to fix this.
 
-## Working on `mupen64plus-web`
+Working on `mupen64plus-web`
+----------------------------
 
 - In [mupen64plus-web](https://github.com/nanaian/mupen64plus-web):
     1. Switch the Mamar branch: `git checkout mamar`
@@ -86,7 +93,8 @@ For developing, `yarn start` in `mamar-web` will start a dev server at `localhos
     1. Run: `yarn link mupen64plus-web`
     2. Restart the dev server in `mamar-web`; you may need to clear the cache (`rm -rf .parcel-cache`)
 
-# Deployment
+Deployment
+==========
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnanaian%2Fmamar%2Ftree%2Fmain%2Fmamar-web&project-name=mamar)
 
@@ -95,6 +103,7 @@ To release a new version:
 2. Update the changelog
 3. Push with tag
 
-# License
+License
+=======
 
-Mamar is licensed under the [BSD Zero Clause License](https://opensource.org/licenses/0BSD). This is a very permissive license, and you can do whatever you want with the code. If you do use Mamar in a mod or other project, I'd appreciate a mention somewhere, but it's not required.
+Mamar is licensed under the [BSD Zero Clause License](https://opensource.org/licenses/0BSD). This is a very permissive license, and you can do whatever you want with the code. If you do use Mamar to make a mod or other project, I'd appreciate a mention somewhere, but it's not required.
