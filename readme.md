@@ -39,6 +39,8 @@ Generally the only browsers we care about are Chrome and Firefox on desktop. I w
 
 This is a Rust crate that provides encoding and decoding of Paper Mario's audio file formats, BGM (background music) and SBN (soundbank). BGM is for songs, while SBN is an archive format that holds all the rest of the audio files. There are other file types I'd like to support editing of in the future, specifically, BK (bank) and MSEQ (music sequence). BK holds actual sound samples, while MSEQ is similar to BGM but for the 'ambient sounds' in the game and - I think - sound effects. See [audio.h](https://github.com/pmret/papermario/blob/master/src/audio.h) for more info on these formats.
 
+There are many doctests and unit tests in this crate. You can run them with `cargo test` after splitting a ROM with `python3 pm64/tests/bin/extract.py`.
+
 **Architecture invariant:** `pm64` doesn't know about the filesystem, and doesn't know about the web; it's just a library for working with Paper Mario data. (The idea is to eventualy publish this crate to crates.io - if you are interested in using `pm64` in a different project, let me know and I can publish it!)
 
 `mamar-wasm-bridge`
