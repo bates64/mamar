@@ -38,8 +38,11 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-        components: clippy rustfmt
+        components: clippy, rustfmt
         override: true
+    - uses: actions-rs/cargo@v1
+      with:
+        command: check
     - uses: jetli/wasm-pack-action@v0.3.0
     - run: yarn install
     - run: yarn run lint
