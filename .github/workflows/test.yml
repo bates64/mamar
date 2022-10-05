@@ -2,9 +2,7 @@ name: Test
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,7 +10,6 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
@@ -34,3 +31,18 @@ jobs:
       with:
         command: test
         args: --verbose --no-fail-fast
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        components: clippy
+        override: true
+    - run: yarn install
+    - run: yarn run lint
+    - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features

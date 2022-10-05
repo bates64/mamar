@@ -7,7 +7,8 @@
   "private": true,
   "scripts": {
     "start": "parcel src/index.html src/app/index.html",
-    "build": "parcel build src/index.html src/app/index.html"
+    "build": "parcel build src/index.html src/app/index.html",
+    "lint": "yarn run tsc --noEmit && yarn run eslint ."
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
