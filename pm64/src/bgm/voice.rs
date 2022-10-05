@@ -136,7 +136,7 @@ lazy_static! {
         m.insert("Electric Piano 6", (3, 0x78));
         m.insert("Music Box 3", (3, 0x79));
         m.insert("Vibraphone 6", (3, 0x7A));
-        m.insert("Celesta", (3, 0x7B));
+        m.insert("Celesta 3", (3, 0x7B));
         m.insert("Plucked Electric Bass", (3, 0x7C));
         m.insert("Whistle", (3, 0x7D));
         m.insert("Harmonized Synth Voice 1", (3, 0x7E));
