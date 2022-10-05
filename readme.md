@@ -103,6 +103,11 @@ To release a new version:
 2. Update the changelog
 3. Push with tag
 
+Contributing
+============
+
+If you interested in contributing to Mamar, great! Check out the [open issues](https://github.com/nanaian/mamar/issues) for something to do. If you have any questions, feel free to ask in [the `#papermario` channel](https://discord.gg/qWSxcTjktv). I'm also happy to help out people who are new to React or Rust but still want to contribute.
+
 License
 =======
 
