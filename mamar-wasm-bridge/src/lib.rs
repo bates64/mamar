@@ -14,9 +14,6 @@ fn from_js<T: Serialize + for<'a> Deserialize<'a>>(value: &JsValue) -> T {
     JsValue::into_serde(value).unwrap()
 }
 
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 #[wasm_bindgen]
 pub fn init_logging() {
     console_error_panic_hook::set_once();
