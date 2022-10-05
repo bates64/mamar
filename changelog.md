@@ -1,3 +1,15 @@
+## 1.0.0
+
+- Completely rewritten GUI
+- Moved to a web app rather than a desktop app
+- Added a landing page: https://mamar.nanaian.town
+- Added support for opening BGM files from an original game ROM without needing to extract them yourself
+- Added a tracker for editing commands in tracks
+- Made mute/solo feature realtime rather than require restarting the song
+- Added realtime tempo display
+- Added a selector to preview ambient sound effects (such as the monkey sounds used in Jade Jungle) alongside the song
+- Removed support for `.ron` files. Use 0.10.0 to convert them to `.bgm` and then 1.0.0 can open them.
+
 ## 0.10.0
 
 - Added tabs to switch variation
