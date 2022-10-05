@@ -24,13 +24,13 @@ export default function PaperMarioRomInput({ onChange }: Props) {
         <Divider />
         <Content>
             <Text>
-                Mamar requires a clean Paper Mario (US) ROM.<br />
+                Mamar requires a clean Paper Mario (US) ROM in z64 format.<br />
                 Please select a ROM file to continue.
             </Text>
             <Flex marginTop="size-200" width="100%" height="size-400" alignItems="center">
                 <input
                     autoFocus
-                    aria-label="Paper Mario ROM"
+                    aria-label="Upload Paper Mario ROM file"
                     type="file"
                     accept=".z64"
                     onChange={async evt => {
