@@ -96,8 +96,6 @@ Working on `mupen64plus-web`
 Deployment
 ==========
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnanaian%2Fmamar%2Ftree%2Fmain%2Fmamar-web&project-name=mamar)
-
 To release a new version:
 1. Bump the version in `mamar-web`'s `package.json`
 2. Update the changelog
