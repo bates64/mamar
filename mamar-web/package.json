@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
+    "@react-hook/resize-observer": "^1.2.6",
     "@spectrum-icons/workflow": "^4.0.2",
     "@types/stats.js": "^0.17.0",
     "browser-fs-access": "^0.31.0",
@@ -42,7 +43,9 @@
     "@parcel/transformer-svg-react": "^2.7.0",
     "@types/node": "^18.7.18",
     "@types/react": "^18.0.20",
+    "@types/react-beautiful-dnd": "^13.1.2",
     "@types/react-dom": "^18.0.6",
+    "@types/react-window": "^1.8.5",
     "eslint": "^8.23.1",
     "eslint-config-react-app": "^7.0.1",
     "parcel": "^2.7.0",

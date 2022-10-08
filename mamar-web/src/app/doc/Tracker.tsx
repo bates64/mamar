@@ -1,12 +1,23 @@
 import { Grid, NumberField, TextField } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import * as pm64 from "pm64-typegen"
-import { ReactNode } from "react"
-import { List } from "react-movable"
+import { ReactNode, useState, memo, CSSProperties } from "react"
+import {
+    Droppable,
+    Draggable,
+    DragDropContext,
+    type DroppableProvided,
+    type DraggableProvided,
+    type DraggableStateSnapshot,
+    type DraggableRubric,
+    type DropResult,
+} from "react-beautiful-dnd"
+import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
 import { useBgm } from "../store"
+import { useSize } from "../util/hooks/useSize"
 
 const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -24,11 +35,13 @@ function noteNameToPitch(noteName: string) {
     return noteIndex + octave * 12 + 104
 }
 
-function Command({ command, onChange }: { command: pm64.Event, onChange: (command: pm64.Event) => void }) {
+const Command = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {
+    const command = commands[index]
+
     let inner: ReactNode
+    /*
     if (command.type === "Note") {
         inner = <>
-            {/* FIXME */}
             <TextField
                 label="Note"
                 labelPosition="side"
@@ -67,41 +80,76 @@ function Command({ command, onChange }: { command: pm64.Event, onChange: (comman
                 isQuiet
             />
         </>
-    }
+    }*/
 
-    return <div
-        className={styles.command}
-    >
-        {command.type}
-        {inner}
-    </div>
-}
+    /*<QuoteItem
+        provided={provided}
+        quote={quote}
+        isDragging={snapshot.isDragging}
+        isGroupedOver={Boolean(snapshot.combineTargetFor)}
+        style={{ margin: 0, ...style }}
+        index={index}
+    />*/
 
-function CommandList({ commands, onMove, onChange }: {
+    return <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
+        {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+            <div
+                className={styles.command}
+                style={style}
+            >
+                {command.type}
+                {inner}
+            </div>
+        )}
+    </Draggable>
+}, areEqual)
+
+function CommandList({ commands, height, onMove, onChange }: {
     commands: pm64.Event[]
+    height: number
     onMove: (from: number, to: number) => void
     onChange: (command: pm64.Event) => void
 }) {
-    return <List
-        values={commands}
-        onChange={({ oldIndex, newIndex }) => {
-            onMove(oldIndex, newIndex)
-        }}
-        renderList={({ children, props }) => <ol className={styles.list} aria-label="Commands" {...props}>{children}</ol>}
-        renderItem={({ value, props, index, isDragged }) => <li
-            key={value.id}
-            className={classNames({
-                [styles.item]: true,
-                [styles.even]: ((index ?? 0) % 2) === 0,
-                [styles.isDragged]: isDragged,
-            })}
-            {...props}
+    function onDragEnd(result: DropResult) {
+        if (!result.destination) {
+            // TODO: delete?
+            return
+        }
+        if (result.source.index === result.destination.index) {
+            return
+        }
+
+        onMove(result.source.index, result.destination.index)
+    }
+
+    return <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable
+            droppableId="droppable"
+            mode="virtual"
+            renderClone={(
+                provided: DraggableProvided,
+                snapshot: DraggableStateSnapshot,
+                rubric: DraggableRubric,
+            ) => (
+                <div>
+                    TODO
+                </div>
+            )}
         >
-            <Command command={value} onChange={onChange} />
-        </li>}
-        removableByMove={true}
-        transitionDuration={200}
-    />
+            {(droppableProvided: DroppableProvided) => (
+                <FixedSizeList
+                    width={800}
+                    height={height}
+                    itemData={commands}
+                    itemCount={commands.length}
+                    itemSize={32}
+                    outerRef={droppableProvided.innerRef}
+                >
+                    {Command}
+                </FixedSizeList>
+            )}
+        </Droppable>
+    </DragDropContext>
 }
 
 export interface Props {
@@ -112,13 +160,15 @@ export interface Props {
 export default function Tracker({ trackListId, trackIndex }: Props) {
     const [bgm, dispatch] = useBgm()
     const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
+    const container = useSize<HTMLDivElement>()
 
     if (!track) {
         return <div>Track not found</div>
     }
 
-    return <Grid rows="auto 1fr" gap="size-100" UNSAFE_style={{ overflow: "hidden" }}>
+    return <div ref={container.ref} className={styles.container}>
         <CommandList
+            height={container.height ?? 100}
             commands={track.commands.vec}
             onMove={(oldIndex, newIndex) => {
                 dispatch({
@@ -138,5 +188,5 @@ export default function Tracker({ trackListId, trackIndex }: Props) {
                 })
             }}
         />
-    </Grid>
+    </div>
 }
