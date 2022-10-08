@@ -26,7 +26,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
         <View padding="size-200" borderEndColor="gray-200" borderEndWidth="thin">
             <h3 id={hid}>Region {trackListId}.{trackIndex}</h3>
             <Form minWidth="size-2000" aria-labelledby={hid}>
-                <Switch isSelected={track.isDisabled} onChange={isDisabled => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled })}>Disable</Switch>
+                <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
                 <NumberField
                     label="Polyhony"
