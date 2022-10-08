@@ -2,10 +2,10 @@ use std::hash::Hash;
 use std::iter;
 use std::ops::Range;
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
-use crate::id::{Id, gen_id};
+use crate::id::{gen_id, Id};
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -101,7 +101,11 @@ impl CommandSeq {
 
                 let mut old_delay_range = index..index;
                 let mut delta_time: usize = 0;
-                while let Some(Event { command: Delay { value: t }, .. }) = self.vec.get(old_delay_range.end) {
+                while let Some(Event {
+                    command: Delay { value: t },
+                    ..
+                }) = self.vec.get(old_delay_range.end)
+                {
                     old_delay_range.end += 1;
                     delta_time += *t as usize;
                 }
@@ -166,7 +170,11 @@ impl CommandSeq {
         let mut time = 0;
 
         for command in self.vec.iter() {
-            if let Event { command: Delay { value: delta_time }, .. } = command {
+            if let Event {
+                command: Delay { value: delta_time },
+                ..
+            } = command
+            {
                 time += *delta_time as usize;
             }
         }
@@ -219,7 +227,11 @@ impl CommandSeq {
         let mut range = 0..0;
 
         for cmd in self.iter() {
-            if let Event { command: Command::Note { pitch, .. }, .. } = cmd {
+            if let Event {
+                command: Command::Note { pitch, .. },
+                ..
+            } = cmd
+            {
                 let pitch = *pitch;
 
                 if pitch < range.start {
@@ -241,7 +253,11 @@ impl CommandSeq {
 
     pub fn zero_all_delays(&mut self) {
         for cmd in &mut self.vec {
-            if let Event { command: Command::Delay { value: _ }, .. } = cmd {
+            if let Event {
+                command: Command::Delay { value: _ },
+                ..
+            } = cmd
+            {
                 *cmd = Command::Delay { value: 0 }.into();
             }
         }
@@ -327,7 +343,11 @@ impl CommandSeq {
         let mut current_time = 0;
 
         for (index, command) in self.vec.iter().enumerate() {
-            if let Event { command: Delay { value: delta_time }, .. } = command {
+            if let Event {
+                command: Delay { value: delta_time },
+                ..
+            } = command
+            {
                 let time_at_index = current_time;
 
                 // Advance past this Delay.
@@ -426,7 +446,9 @@ pub enum Command {
     End,
 
     /// Sleeps for however many ticks before continuing playback on this track.
-    Delay { value: usize },
+    Delay {
+        value: usize,
+    },
 
     /// Plays a note or drum sound.
     Note {
@@ -436,15 +458,23 @@ pub enum Command {
     },
 
     /// Sets the beats-per-minute of the composition.
-    MasterTempo { value: u16 },
+    MasterTempo {
+        value: u16,
+    },
 
     /// Sets the composition volume.
-    MasterVolume { value: u8 },
+    MasterVolume {
+        value: u8,
+    },
 
     /// Sets the composition transpose value.
-    MasterPitchShift { cent: u8 },
+    MasterPitchShift {
+        cent: u8,
+    },
 
-    UnkCmdE3 { bank: u8 },
+    UnkCmdE3 {
+        bank: u8,
+    },
 
     /// Fades the tempo to `bpm` across `time` ticks.
     MasterTempoFade {
@@ -459,10 +489,12 @@ pub enum Command {
     },
 
     /// Applies the given effect to the entire composition.
-    MasterEffect { index: u8, value: u8 },
+    MasterEffect {
+        index: u8,
+        value: u8,
+    },
 
     // command E7 unused
-
     /// Sets the bank/patch of this track, overriding its [super::Voice].
     TrackOverridePatch {
         bank: u8,
@@ -470,21 +502,33 @@ pub enum Command {
     },
 
     /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
-    SubTrackVolume { value: u8 },
+    SubTrackVolume {
+        value: u8,
+    },
 
     /// Left = (+/-)0.
     /// Middle = (+/-)64.
     /// Right = (+/-)127.
-    SubTrackPan { value: i8 },
+    SubTrackPan {
+        value: i8,
+    },
 
-    SubTrackReverb { value: u8 },
+    SubTrackReverb {
+        value: u8,
+    },
 
     /// Sets the volume for this track only. Resets at the end of the [super::Segment].
-    SegTrackVolume { value: u8 },
+    SegTrackVolume {
+        value: u8,
+    },
 
-    SubTrackCoarseTune { value: u8 },
+    SubTrackCoarseTune {
+        value: u8,
+    },
 
-    SubTrackFineTune { value: u8 },
+    SubTrackFineTune {
+        value: u8,
+    },
 
     SegTrackTune {
         coarse: u8,
@@ -498,25 +542,35 @@ pub enum Command {
         time: u8,
     },
 
-    TrackTremoloSpeed { value: u8 },
+    TrackTremoloSpeed {
+        value: u8,
+    },
 
-    TrackTremoloTime { time: u8 },
+    TrackTremoloTime {
+        time: u8,
+    },
 
     TrackTremoloStop,
 
-    UnkCmdF4 { pan0: u8, pan1: u8 },
+    UnkCmdF4 {
+        pan0: u8,
+        pan1: u8,
+    },
 
-    SetTrackVoice { index: u8 },
+    SetTrackVoice {
+        index: u8,
+    },
 
     TrackVolumeFade {
         time: u16,
         value: u8,
     },
 
-    SubTrackReverbType { index: u8 },
+    SubTrackReverbType {
+        index: u8,
+    },
 
     // commands F8-FB unused
-
     Jump {
         unk_00: u16,
         unk_02: u8,
@@ -540,7 +594,9 @@ pub enum Command {
 
     /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this
     /// abstraction rather than [CommandSeq] indices because they stay stable during mutation.
-    Marker { label: MarkerId },
+    Marker {
+        label: MarkerId,
+    },
 }
 
 use Command::Delay;
@@ -598,12 +654,9 @@ impl Command {
 }
 */
 
-impl Into<Event> for Command {
-    fn into(self) -> Event {
-        Event {
-            id: gen_id(),
-            command: self,
-        }
+impl From<Command> for Event {
+    fn from(command: Command) -> Event {
+        Event { id: gen_id(), command }
     }
 }
 
@@ -621,7 +674,11 @@ impl<'a> Iterator for TimeIter<'a> {
             Some(command) => {
                 let ret = (self.current_time, command);
 
-                if let Event { command: Delay { value: delta_time }, .. } = command {
+                if let Event {
+                    command: Delay { value: delta_time },
+                    ..
+                } = command
+                {
                     self.current_time += *delta_time as usize;
                 }
 

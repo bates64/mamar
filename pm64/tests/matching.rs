@@ -308,15 +308,13 @@ fn shared_subsegment_tracks_ptr() {
     let original = include_bytes!("bin/Fuzzy_s_Took_My_Shell_12.bin");
     let bgm = Bgm::decode(&mut Cursor::new(original)).expect("decode error");
 
-    let tracks_0_2 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[2]
-    {
+    let tracks_0_2 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[2] {
         track_list
     } else {
         panic!();
     };
 
-    let tracks_1_1 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[1].as_ref().unwrap().segments[1]
-    {
+    let tracks_1_1 = if let Segment::Subseg { ref track_list, .. } = bgm.variations[1].as_ref().unwrap().segments[1] {
         track_list
     } else {
         panic!();

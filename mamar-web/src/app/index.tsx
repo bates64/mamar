@@ -2,6 +2,7 @@ import * as WasmBridge from "mamar-wasm-bridge"
 import * as React from "react"
 import * as ReactDOM from "react-dom/client"
 
+import report from "./analytics"
 import App from "./App"
 
 const rootEl = document.getElementById("root") as HTMLElement
@@ -39,11 +40,13 @@ class ErrorBoundary extends React.Component {
     }
 }
 
+report()
+
 WasmBridge.default().then(() => {
     WasmBridge.init_logging()
     root.render(<ErrorBoundary />)
 })
 
 if (process.env.NODE_ENV !== "production") {
-    import("@axe-core/react").then(axe => axe(React, ReactDOM, 1000))
+    import("@axe-core/react").then((axe: any) => axe(React, ReactDOM, 1000))
 }

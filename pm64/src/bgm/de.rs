@@ -202,9 +202,7 @@ impl Bgm {
 
                     debug!("segment end {:#X}", f.pos()?);
 
-                    Ok(Some(Variation {
-                        segments: subsegments,
-                    }))
+                    Ok(Some(Variation { segments: subsegments }))
                 }
             })
             .collect_array_pedantic()?;
@@ -281,7 +279,8 @@ impl Segment {
 
                         bgm.add_track_list(TrackList {
                             pos: Some(track_list_pos),
-                            tracks: unsafe { // TODO: tbh just make this a vec, modding is a thing
+                            tracks: unsafe {
+                                // TODO: tbh just make this a vec, modding is a thing
                                 // SAFETY: the for loop above has initialised the array. This is also how the std
                                 // documentation suggests initialising an array element-by-element:
                                 // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
@@ -291,7 +290,10 @@ impl Segment {
                     }
                 };
 
-                Ok(Segment::Subseg { id: gen_id(), track_list })
+                Ok(Segment::Subseg {
+                    id: gen_id(),
+                    track_list,
+                })
             }
             segment_commands::START_LOOP => {
                 f.seek(SeekFrom::Current(-2))?;
@@ -299,26 +301,26 @@ impl Segment {
                     id: gen_id(),
                     label_index: f.read_u16_be()?,
                 })
-            },
+            }
             segment_commands::WAIT => Ok(Segment::Wait { id: gen_id() }),
             segment_commands::END_LOOP => {
                 Ok(Segment::EndLoop {
                     id: gen_id(),
-                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_6 => {
                 Ok(Segment::Unknown6 {
                     id: gen_id(),
-                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_7 => {
                 Ok(Segment::Unknown7 {
                     id: gen_id(),
-                    label_index: (data & 0x1F) as u8, // bits 0-4
+                    label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
@@ -374,12 +376,10 @@ impl CommandSeq {
             if seen_terminator {
                 // TEMP: for matching. This should really look at the BGM index and not run for all files...
                 // There's probably some command that I don't yet know about that points to this data.
-                match f.pos()? {
-                    0x38EB => {
-                        commands.upsert_marker(0x39EB - start);
-                    } // 0x64 Bowser's Castle
-                    _ => {}
-                };
+                if f.pos()? == 0x38EB {
+                    // 0x64 Bowser's Castle
+                    commands.upsert_marker(0x39EB - start);
+                }
 
                 // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
                 // keep reading until every marker has been passed.
@@ -398,7 +398,9 @@ impl CommandSeq {
                 }
 
                 // Delay
-                0x01..=0x77 => Command::Delay { value: cmd_byte as usize },
+                0x01..=0x77 => Command::Delay {
+                    value: cmd_byte as usize,
+                },
 
                 // Long delay
                 0x78..=0x7F => {
@@ -408,7 +410,9 @@ impl CommandSeq {
                     let num_256s = (cmd_byte - 0x78) as usize;
                     let extend = f.read_u8()? as usize;
 
-                    Command::Delay { value: 0x78 + num_256s * 256 + extend }
+                    Command::Delay {
+                        value: 0x78 + num_256s * 256 + extend,
+                    }
 
                     // This logic taken from N64MidiTool
                     //Command::Delay(0x78 + (cmd_byte as usize) + ((f.read_u8()? & 7) as usize) << 8)
@@ -441,7 +445,9 @@ impl CommandSeq {
                     }
                 }
 
-                0xE0 => Command::MasterTempo { value: f.read_u16_be()? },
+                0xE0 => Command::MasterTempo {
+                    value: f.read_u16_be()?,
+                },
                 0xE1 => Command::MasterVolume { value: f.read_u8()? },
                 0xE2 => Command::MasterPitchShift { cent: f.read_u8()? },
                 0xE3 => Command::UnkCmdE3 { bank: f.read_u8()? },
@@ -453,7 +459,10 @@ impl CommandSeq {
                     time: f.read_u16_be()?,
                     volume: f.read_u8()?,
                 },
-                0xE6 => Command::MasterEffect { index: f.read_u8()?, value: f.read_u8()? },
+                0xE6 => Command::MasterEffect {
+                    index: f.read_u8()?,
+                    value: f.read_u8()?,
+                },
                 // command 0xE7 unused
                 0xE8 => Command::TrackOverridePatch {
                     bank: f.read_u8()?,
@@ -477,7 +486,10 @@ impl CommandSeq {
                 0xF1 => Command::TrackTremoloSpeed { value: f.read_u8()? },
                 0xF2 => Command::TrackTremoloTime { time: f.read_u8()? },
                 0xF3 => Command::TrackTremoloStop,
-                0xF4 => Command::UnkCmdF4 { pan0: f.read_u8()?, pan1: f.read_u8()? },
+                0xF4 => Command::UnkCmdF4 {
+                    pan0: f.read_u8()?,
+                    pan1: f.read_u8()?,
+                },
                 0xF5 => Command::SetTrackVoice { index: f.read_u8()? },
                 0xF6 => Command::TrackVolumeFade {
                     time: f.read_u16_be()?,
@@ -489,7 +501,9 @@ impl CommandSeq {
                     unk_00: f.read_u16_be()?, // TODO: this is an offset, go there!!
                     unk_02: f.read_u8()?,
                 },
-                0xFD => Command::EventTrigger { event_info: f.read_u32_be()? },
+                0xFD => Command::EventTrigger {
+                    event_info: f.read_u32_be()?,
+                },
                 0xFE => {
                     let start_offset = f.read_u16_be()? as usize - start;
                     let end_offset = start_offset + (f.read_u8()? as usize);
@@ -499,11 +513,13 @@ impl CommandSeq {
                         end_label: commands.upsert_marker(end_offset),
                     }
                 }
-                0xFF => Command::UnkCmdFF { unk_00: f.read_u8()?, unk_01: f.read_u8()?, unk_02: f.read_u8()? },
+                0xFF => Command::UnkCmdFF {
+                    unk_00: f.read_u8()?,
+                    unk_01: f.read_u8()?,
+                    unk_02: f.read_u8()?,
+                },
 
-                _ => {
-                    return Err(Error::UnknownSeqCommand(cmd_byte))
-                }
+                _ => return Err(Error::UnknownSeqCommand(cmd_byte)),
             };
 
             commands.insert(cmd_offset, command.into());
@@ -557,7 +573,10 @@ impl OffsetEventMap {
                 id
             }
             Entry::Occupied(entry) => match entry.get() {
-                Event { command: Command::Marker { label }, .. } => label.clone(),
+                Event {
+                    command: Command::Marker { label },
+                    ..
+                } => label.clone(),
                 other_command => panic!(
                     "non-marker command {:?} found in label range (shifted_offset = {:#X})",
                     other_command, shifted_offset,
@@ -675,27 +694,62 @@ mod test {
         let start_labels: Vec<&MarkerId> = seq
             .at_time(0)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
+            .take_while(|cmd| {
+                matches!(
+                    cmd,
+                    Event {
+                        command: Command::Marker { .. },
+                        ..
+                    }
+                )
+            })
             .map(|cmd| match cmd {
-                Event { command: Command::Marker { label }, .. } => label,
+                Event {
+                    command: Command::Marker { label },
+                    ..
+                } => label,
                 _ => unreachable!(),
             })
             .collect();
         let end_labels: Vec<&MarkerId> = seq
             .at_time(11)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Marker { .. }, .. }))
+            .take_while(|cmd| {
+                matches!(
+                    cmd,
+                    Event {
+                        command: Command::Marker { .. },
+                        ..
+                    }
+                )
+            })
             .map(|cmd| match cmd {
-                Event { command: Command::Marker { label }, .. } => label,
+                Event {
+                    command: Command::Marker { label },
+                    ..
+                } => label,
                 _ => unreachable!(),
             })
             .collect();
         let subroutine_labels: Vec<(&MarkerId, &MarkerId)> = seq
             .at_time(10)
             .into_iter()
-            .take_while(|cmd| matches!(cmd, Event { command: Command::Detour { .. }, .. }))
+            .take_while(|cmd| {
+                matches!(
+                    cmd,
+                    Event {
+                        command: Command::Detour { .. },
+                        ..
+                    }
+                )
+            })
             .map(|cmd| match cmd {
-                Event { command: Command::Detour { start_label, end_label, .. }, .. } => (start_label, end_label),
+                Event {
+                    command: Command::Detour {
+                        start_label, end_label, ..
+                    },
+                    ..
+                } => (start_label, end_label),
                 _ => unreachable!(),
             })
             .collect();

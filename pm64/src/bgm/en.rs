@@ -32,11 +32,7 @@ impl fmt::Display for Error {
             Error::UnorderedMarkers(id) => {
                 write!(f, "Start marker comes after end marker {:?}", id)
             }
-            Error::EndMarkerTooFarAway(id) => write!(
-                f,
-                "End marker '{:?}' is too far away from start marker",
-                id,
-            ),
+            Error::EndMarkerTooFarAway(id) => write!(f, "End marker '{:?}' is too far away from start marker", id,),
             Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
         }
@@ -72,7 +68,7 @@ impl Bgm {
         };
 
         debug_assert_eq!(f.pos()?, 0x08);
-        f.write_all(&self.name.as_bytes())?;
+        f.write_all(self.name.as_bytes())?;
         f.seek(SeekFrom::Start(0x0C))?;
 
         f.write_all(&[0, 0, 0, 0, self.variations.len() as u8, 0, 0, 0])?;
@@ -223,7 +219,15 @@ impl Bgm {
 
                     // Write flags
                     let mut todo_commands = Vec::new();
-                    for Track { is_disabled, polyphonic_idx, is_drum_track, parent_track_idx, commands, .. } in track_list.tracks.iter() {
+                    for Track {
+                        is_disabled,
+                        polyphonic_idx,
+                        is_drum_track,
+                        parent_track_idx,
+                        commands,
+                        ..
+                    } in track_list.tracks.iter()
+                    {
                         if !commands.is_empty() {
                             // Need to write command data after the track
                             todo_commands.push((f.pos()?, commands));
@@ -322,7 +326,7 @@ impl Instrument {
 }
 
 impl Segment {
-    pub fn encode<'a, W: Write + Seek>(&'a self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
+    pub fn encode<W: Write + Seek>(&self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
         match self {
             Segment::Subseg { track_list, .. } => {
                 f.write_u16_be((segment_commands::SUBSEG >> 4) as u16)?;
@@ -341,18 +345,30 @@ impl Segment {
                 f.write_u16_be(*label_index)?;
                 Ok(None)
             }
-            Segment::EndLoop { label_index, iter_count, .. } => {
+            Segment::EndLoop {
+                label_index,
+                iter_count,
+                ..
+            } => {
                 f.write_u16_be((segment_commands::END_LOOP >> 4) as u16)?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown6 { label_index, iter_count, .. } => {
+            Segment::Unknown6 {
+                label_index,
+                iter_count,
+                ..
+            } => {
                 f.write_u16_be((segment_commands::UNKNOWN_6 >> 4) as u16)?;
                 f.seek(SeekFrom::Current(-2))?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown7 { label_index, iter_count, .. } => {
+            Segment::Unknown7 {
+                label_index,
+                iter_count,
+                ..
+            } => {
                 f.write_u16_be((segment_commands::UNKNOWN_7 >> 4) as u16)?;
                 f.seek(SeekFrom::Current(-2))?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
@@ -473,7 +489,11 @@ impl CommandSeq {
                     f.write_u8(*coarse)?;
                     f.write_u8(*fine)?;
                 }
-                Command::TrackTremolo { amount, speed, time: unknown } => {
+                Command::TrackTremolo {
+                    amount,
+                    speed,
+                    time: unknown,
+                } => {
                     f.write_all(&[0xF0, *amount, *speed, *unknown])?;
                 }
                 Command::TrackTremoloStop => f.write_u8(0xF3)?,

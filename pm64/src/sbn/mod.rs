@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
 use crate::bgm::{self, Bgm};
@@ -18,7 +18,7 @@ pub struct Sbn {
     pub songs: Vec<Song>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq,  Serialize, Deserialize, TypeDef)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 pub struct File {
     pub name: String,
     pub data: Vec<u8>,

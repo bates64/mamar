@@ -1,0 +1,6 @@
+target
+patches/papermario
+patches/patches.*
+!patches/patches.js
+!patches/patches.mjs
+!patches/patches.d.ts

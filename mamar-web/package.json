@@ -7,7 +7,8 @@
   "private": true,
   "scripts": {
     "start": "parcel src/index.html src/app/index.html",
-    "build": "parcel build src/index.html src/app/index.html"
+    "build": "parcel build src/index.html src/app/index.html",
+    "lint": "yarn run tsc --noEmit && yarn run eslint ."
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
@@ -30,7 +31,8 @@
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",
     "react-window": "^1.8.7",
-    "use-undoable": "^3.3.11"
+    "use-undoable": "^3.3.11",
+    "web-vitals": "^3.0.3"
   },
   "devDependencies": {
     "@axe-core/react": "^4.4.4",

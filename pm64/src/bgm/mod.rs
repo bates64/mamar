@@ -9,10 +9,10 @@ pub mod de;
 #[cfg(feature = "midly")]
 pub mod midi;
 
-use std::ops::Range;
 use std::collections::HashMap;
+use std::ops::Range;
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
 mod cmd;
@@ -28,7 +28,7 @@ pub type FilePos = u64;
 
 pub type TrackListId = u64;
 
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, TypeDef)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Bgm {
@@ -61,10 +61,8 @@ impl Bgm {
     }
 
     pub fn add_variation(&mut self) -> Result<(usize, &mut Variation), NoSpace> {
-        let empty_seg: Option<(usize, &mut Option<Variation>)> = self.variations
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| s.is_none());
+        let empty_seg: Option<(usize, &mut Option<Variation>)> =
+            self.variations.iter_mut().enumerate().find(|(_, s)| s.is_none());
 
         match empty_seg {
             None => Err(NoSpace),
@@ -120,7 +118,9 @@ pub enum Segment {
         id: Id,
         label_index: u16,
     },
-    Wait { id: Id },
+    Wait {
+        id: Id,
+    },
     EndLoop {
         id: Id,
         label_index: u8,
@@ -139,13 +139,13 @@ pub enum Segment {
 }
 
 mod segment_commands {
-    pub const END: u32          = 0;
-    pub const SUBSEG: u32       = 1 << 16;
-    pub const START_LOOP: u32   = 3 << 16;
-    pub const WAIT: u32         = 4 << 16;
-    pub const END_LOOP: u32     = 5 << 16;
-    pub const UNKNOWN_6: u32    = 6 << 16;
-    pub const UNKNOWN_7: u32    = 7 << 16;
+    pub const END: u32 = 0;
+    pub const SUBSEG: u32 = 1 << 16;
+    pub const START_LOOP: u32 = 3 << 16;
+    pub const WAIT: u32 = 4 << 16;
+    pub const END_LOOP: u32 = 5 << 16;
+    pub const UNKNOWN_6: u32 = 6 << 16;
+    pub const UNKNOWN_7: u32 = 7 << 16;
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -153,13 +153,13 @@ mod segment_commands {
 #[serde(rename_all = "camelCase")]
 pub struct TrackList {
     /// Encode/decode file position.
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pos: Option<FilePos>,
 
     pub tracks: [Track; 16],
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
+#[derive(Clone, PartialEq, Eq, Default, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
@@ -191,7 +191,7 @@ pub struct Drum {
     pub rand_pan: u8,
     pub rand_reverb: u8,
 
-    #[serde(skip_serializing_if="is_default")]
+    #[serde(skip_serializing_if = "is_default")]
     pub pad_0b: u8,
 }
 
@@ -216,7 +216,7 @@ pub struct Instrument {
     pub coarse_tune: u8,
     pub fine_tune: u8,
 
-    #[serde(skip_serializing_if="is_default")]
+    #[serde(skip_serializing_if = "is_default")]
     pub pad_07: u8,
 }
 
@@ -224,18 +224,6 @@ pub struct Instrument {
 pub struct Unknown {
     pub range: Range<u64>,
     pub data: Vec<u8>,
-}
-
-impl Default for Track {
-    fn default() -> Self {
-        Track {
-            is_disabled: false,
-            polyphonic_idx: 0,
-            is_drum_track: false,
-            parent_track_idx: 0,
-            commands: CommandSeq::default(),
-        }
-    }
 }
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
