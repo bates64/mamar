@@ -35,7 +35,7 @@
 }
 
 html {
-    font-family: system-ui;
+    font-family: SF Pro, system-ui, sans-serif;
     font-size: 14px;
 }
 
@@ -125,9 +125,9 @@ html, .App {
 
 #splash-page {
     header {
-        $buttonHeight: 2.5em;
+        $buttonHeight: 2.25em;
 
-        padding: 0.5em 1em;
+        padding: 0.3em 1em;
         height: calc($buttonHeight + 1em);
 
         background: var(--grey-0-alpha-50);
@@ -138,6 +138,7 @@ html, .App {
         position: sticky;
         top: 0;
         width: 100%;
+        height: 40px;
 
         h1 {
             margin: 0;
@@ -148,6 +149,10 @@ html, .App {
 
             display: inline-block;
             line-height: calc($buttonHeight / 1.3);
+
+            .icon {
+                vertical-align: sub
+            }
         }
 
         .author {
@@ -186,26 +191,15 @@ html, .App {
     }
 
     .hero-logo {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25em;
-
-        font-size: 5em;
-        font-weight: 500;
-        letter-spacing: -1px;
-        color: var(--yellow);
-
         margin: 0;
         padding: 0;
 
-        img {
-            width: 1.5em;
-            height: 1.5em;
-        }
+        width: 24em;
     }
 
     .hero-description {
         font-size: 2.1em;
+        font-family: SF Pro Rounded;
     }
 
     @media (max-width: 600px) {
