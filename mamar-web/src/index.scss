@@ -195,18 +195,15 @@ html, .App {
         padding: 0;
 
         width: 24em;
+        max-width: 100%;
     }
 
     .hero-description {
         font-size: 2.1em;
-        font-family: SF Pro Rounded;
+        font-family: SF Pro Rounded, system-ui, sans-serif;
     }
 
     @media (max-width: 600px) {
-        .hero-logo {
-            font-size: 12vw;
-        }
-
         .hero-description {
             font-size: 24px;
         }
