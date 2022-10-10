@@ -49,6 +49,7 @@ function Command({ command }:{ command: pm64.Event }) {
     const { trackListId, trackIndex } = useContext(trackListCtx)!
     const mutate = (partial: Partial<pm64.Event>) => {
         // TODO: debounce
+
         dispatch({
             type: "update_track_command",
             trackList: trackListId,
@@ -136,7 +137,7 @@ const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], i
                 ref={provided.innerRef}
                 {...provided.draggableProps}
                 {...provided.dragHandleProps}
-                style={{ ...style, ...provided.draggableProps.style }}
+                style={{ ...style, ...provided.draggableProps.style, width: "auto" }}
             >
                 <Command command={command} />
             </li>
@@ -195,7 +196,7 @@ function CommandList({ height }: {
                     height={height}
                     itemData={commands}
                     itemCount={commands.length}
-                    itemSize={31}
+                    itemSize={24}
                     outerRef={provided.innerRef}
                     innerElementType="ul"
                 >

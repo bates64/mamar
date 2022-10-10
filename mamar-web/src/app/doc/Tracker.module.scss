@@ -10,29 +10,33 @@
 }
 
 .command {
+    // Note: can't use --spectrum vars here as dragging brings them out of the Spectrum Provider
+
     display: inline-block;
 
-    padding: 3px 8px;
+    padding: 1px 6px;
 
-    color: var(--spectrum-global-color-gray-900);
-    background: var(--spectrum-global-color-gray-400);
+    color: #efefef;
+    background: rgb(99, 99, 99);
     border: 1px solid #00000020;
     border-radius: 4px;
 
+    font-size: 12px;
     font-weight: 500;
 
     &.orange {
-        background: var(--spectrum-global-color-orange-400);
+        background: #e68619;
     }
 
     &.purple {
-        background: var(--spectrum-global-color-purple-400);
+        background: #9256d9;
     }
 }
 
 .inputBox {
-    color: white;
+    color: #fff;
     border-radius: 99px;
     border: 1px solid #00000020;
+    background: #00000020;
     padding: 2px;
 }
