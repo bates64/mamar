@@ -1,5 +1,6 @@
+import classNames from "classnames"
 import * as pm64 from "pm64-typegen"
-import { ReactNode, memo, CSSProperties } from "react"
+import { ReactNode, CSSProperties, createContext, useContext } from "react"
 import {
     Droppable,
     Draggable,
@@ -10,12 +11,16 @@ import {
     type DraggableRubric,
     type DropResult,
 } from "react-beautiful-dnd"
+import { memo } from "react-tracked"
 import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
 import { useBgm } from "../store"
 import { useSize } from "../util/hooks/useSize"
+import VerticalDragNumberInput from "../VerticalDragNumberInput"
+
+const trackListCtx = createContext<null | { trackListId: number, trackIndex: number }>(null)
 
 const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -33,7 +38,25 @@ function noteNameToPitch(noteName: string) {
     return noteIndex + octave * 12 + 104
 }
 
+function InputBox({ children }: { children: ReactNode }) {
+    return <span className={styles.inputBox}>
+        {children}
+    </span>
+}
+
 function Command({ command }:{ command: pm64.Event }) {
+    const [bgm, dispatch] = useBgm()
+    const { trackListId, trackIndex } = useContext(trackListCtx)!
+    const mutate = (partial: Partial<pm64.Event>) => {
+        // TODO: debounce
+        dispatch({
+            type: "update_track_command",
+            trackList: trackListId,
+            track: trackIndex,
+            command: { ...command, ...partial } as pm64.Event,
+        })
+    }
+
     let inner: ReactNode
     /*
     if (command.type === "Note") {
@@ -87,6 +110,17 @@ function Command({ command }:{ command: pm64.Event }) {
         index={index}
 />*/
 
+    if (command.type === "Delay") {
+        return <div className={classNames(styles.command, styles.orange)}>
+            wait <InputBox><VerticalDragNumberInput value={command.value} minValue={1} maxValue={999} onChange={value => mutate({ value })} /></InputBox> ticks
+        </div>
+    } else if (command.type === "Note") {
+        return <div className={classNames(styles.command, styles.purple)}>
+            play note <InputBox><input type="number" value={command.pitch} onChange={evt => mutate({ pitch: +evt.target.value })} /></InputBox>
+            for <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={value => mutate({ length: value })} /></InputBox> ticks
+        </div>
+    }
+
     return <div>
         {command.type}
         {inner}
@@ -97,7 +131,7 @@ const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], i
     const command = commands[index]
 
     return <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
-        {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+        {(provided: DraggableProvided, _snapshot: DraggableStateSnapshot) => (
             <li
                 ref={provided.innerRef}
                 {...provided.draggableProps}
@@ -110,12 +144,14 @@ const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], i
     </Draggable>
 }, areEqual)
 
-function CommandList({ commands, height, onMove, onChange }: {
-    commands: pm64.Event[]
+function CommandList({ height }: {
     height: number
-    onMove: (from: number, to: number) => void
-    onChange: (command: pm64.Event) => void
 }) {
+    const [bgm, dispatch] = useBgm()
+    const { trackListId, trackIndex } = useContext(trackListCtx)!
+    const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
+    const commands = track?.commands?.vec ?? []
+
     function onDragEnd(result: DropResult) {
         if (!result.destination) {
             // TODO: delete?
@@ -125,7 +161,13 @@ function CommandList({ commands, height, onMove, onChange }: {
             return
         }
 
-        onMove(result.source.index, result.destination.index)
+        dispatch({
+            type: "move_track_command",
+            trackList: trackListId,
+            track: trackIndex,
+            oldIndex: result.source.index,
+            newIndex: result.destination.index,
+        })
     }
 
     return <DragDropContext onDragEnd={onDragEnd}>
@@ -153,7 +195,7 @@ function CommandList({ commands, height, onMove, onChange }: {
                     height={height}
                     itemData={commands}
                     itemCount={commands.length}
-                    itemSize={32}
+                    itemSize={31}
                     outerRef={provided.innerRef}
                     innerElementType="ul"
                 >
@@ -170,38 +212,13 @@ export interface Props {
 }
 
 export default function Tracker({ trackListId, trackIndex }: Props) {
-    const [bgm, dispatch] = useBgm()
-    const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
     const container = useSize<HTMLDivElement>()
 
-    if (!track) {
-        return <div>Track not found</div>
-    }
-
-    // Mark as read
-    JSON.stringify(track.commands.vec)
-
     return <div ref={container.ref} className={styles.container}>
-        <CommandList
-            height={container.height ?? 100}
-            commands={track.commands.vec}
-            onMove={(oldIndex, newIndex) => {
-                dispatch({
-                    type: "move_track_command",
-                    trackList: trackListId,
-                    track: trackIndex,
-                    oldIndex,
-                    newIndex,
-                })
-            }}
-            onChange={command => {
-                dispatch({
-                    type: "update_track_command",
-                    trackList: trackListId,
-                    track: trackIndex,
-                    command,
-                })
-            }}
-        />
+        <trackListCtx.Provider value={{ trackListId, trackIndex }}>
+            <CommandList
+                height={container.height ?? 100}
+            />
+        </trackListCtx.Provider>
     </div>
 }

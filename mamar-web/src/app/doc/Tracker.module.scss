@@ -10,26 +10,29 @@
 }
 
 .command {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    align-items: center;
-    gap: 2em;
+    display: inline-block;
 
-    padding: 0 6px;
+    padding: 3px 8px;
 
-    height: 32px;
+    color: var(--spectrum-global-color-gray-900);
+    background: var(--spectrum-global-color-gray-400);
+    border: 1px solid #00000020;
+    border-radius: 4px;
+
+    font-weight: 500;
+
+    &.orange {
+        background: var(--spectrum-global-color-orange-400);
+    }
+
+    &.purple {
+        background: var(--spectrum-global-color-purple-400);
+    }
 }
 
-.item {
-    background-color: var(--spectrum-global-color-gray-75);
-
-    &.isDragged {
-        .command > *:not(:first-child) {
-            display: none;
-        }
-    }
-
-    &.even {
-        background-color: var(--spectrum-global-color-gray-100);
-    }
+.inputBox {
+    color: white;
+    border-radius: 99px;
+    border: 1px solid #00000020;
+    padding: 2px;
 }
