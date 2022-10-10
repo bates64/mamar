@@ -47,7 +47,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                 />
             </Form>
         </View>
-        <View overflow="overlay">
+        <View overflow="hidden">
             <Tracker trackListId={trackListId} trackIndex={trackIndex} />
         </View>
     </Grid>

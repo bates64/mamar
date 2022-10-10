@@ -1,7 +1,5 @@
-import { Grid, NumberField, TextField } from "@adobe/react-spectrum"
-import classNames from "classnames"
 import * as pm64 from "pm64-typegen"
-import { ReactNode, useState, memo, CSSProperties } from "react"
+import { ReactNode, memo, CSSProperties } from "react"
 import {
     Droppable,
     Draggable,
@@ -35,9 +33,7 @@ function noteNameToPitch(noteName: string) {
     return noteIndex + octave * 12 + 104
 }
 
-const Command = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {
-    const command = commands[index]
-
+function Command({ command }:{ command: pm64.Event }) {
     let inner: ReactNode
     /*
     if (command.type === "Note") {
@@ -89,17 +85,27 @@ const Command = memo(({ data: commands, index, style }: { data: pm64.Event[], in
         isGroupedOver={Boolean(snapshot.combineTargetFor)}
         style={{ margin: 0, ...style }}
         index={index}
-    />*/
+/>*/
+
+    return <div>
+        {command.type}
+        {inner}
+    </div>
+}
+
+const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {
+    const command = commands[index]
 
     return <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
         {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-            <div
-                className={styles.command}
-                style={style}
+            <li
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+                style={{ ...style, ...provided.draggableProps.style }}
             >
-                {command.type}
-                {inner}
-            </div>
+                <Command command={command} />
+            </li>
         )}
     </Draggable>
 }, areEqual)
@@ -131,21 +137,27 @@ function CommandList({ commands, height, onMove, onChange }: {
                 snapshot: DraggableStateSnapshot,
                 rubric: DraggableRubric,
             ) => (
-                <div>
-                    TODO
+                <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                >
+                    <Command command={commands[rubric.source.index]} />
                 </div>
             )}
         >
-            {(droppableProvided: DroppableProvided) => (
+            {(provided: DroppableProvided) => (
                 <FixedSizeList
+                    {...provided.droppableProps}
                     width={800}
                     height={height}
                     itemData={commands}
                     itemCount={commands.length}
                     itemSize={32}
-                    outerRef={droppableProvided.innerRef}
+                    outerRef={provided.innerRef}
+                    innerElementType="ul"
                 >
-                    {Command}
+                    {ListItem}
                 </FixedSizeList>
             )}
         </Droppable>
@@ -165,6 +177,9 @@ export default function Tracker({ trackListId, trackIndex }: Props) {
     if (!track) {
         return <div>Track not found</div>
     }
+
+    // Mark as read
+    JSON.stringify(track.commands.vec)
 
     return <div ref={container.ref} className={styles.container}>
         <CommandList
