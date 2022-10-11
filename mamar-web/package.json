@@ -29,7 +29,8 @@
     "react-movable": "^3.0.4",
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",
-    "use-undoable": "^3.3.11"
+    "use-undoable": "^3.3.11",
+    "web-vitals": "^3.0.3"
   },
   "devDependencies": {
     "@axe-core/react": "^4.4.4",

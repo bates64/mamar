@@ -2,6 +2,7 @@ import * as WasmBridge from "mamar-wasm-bridge"
 import * as React from "react"
 import * as ReactDOM from "react-dom/client"
 
+import report from "./analytics"
 import App from "./App"
 
 const rootEl = document.getElementById("root") as HTMLElement
@@ -38,6 +39,8 @@ class ErrorBoundary extends React.Component {
         </React.Suspense>
     }
 }
+
+report()
 
 WasmBridge.default().then(() => {
     WasmBridge.init_logging()

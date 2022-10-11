@@ -4,18 +4,20 @@
         <meta charset="utf-8" />
 
         <title>Paper Mario music editor - Mamar</title>
-        <meta name="description" content="Mamar is an open-source desktop and web app for listening to and composing music for Paper Mario on Nintendo 64." />
+        <meta name="description" content="Digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64" />
+        <meta property="twitter:card" content="social-banner.png" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#ea7aa1" />
         <meta name="darkreader-lock" />
 
         <link rel="stylesheet" href="index.scss" />
-        <link rel="icon" href="mamar-flat.svg" />
+        <link rel="icon" href="logo.svg" />
     </head>
     <body id="splash-page">
         <header>
             <h1>
+                <img src="logo.svg" alt="" class="icon" />
                 Mamar
             </h1>
             <span class="author">
@@ -31,10 +33,7 @@
             </div>
         </header>
         <div class="hero">
-            <div class="hero-logo">
-                <img src="mamar-flat.svg" />
-                Mamar
-            </div>
+            <img class="hero-logo" src="logotype.svg" alt="Mamar" />
             <p class="hero-description">
                 paper mario music editor
             </p>
@@ -42,9 +41,9 @@
         <main>
             <section>
                 <p class="center">
-                    Mamar is a digital audio workstation that lets you compose music for Paper Mario on Nintendo 64.
+                    Mamar is a digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64.
                     &nbsp;
-                    Included is an audio-only emulator to provide identical playback capabilities to the game.
+                    Included is an emulator which provides identical playback capabilities to the game.
                 </p>
                 <hr />
                 <p>
@@ -55,7 +54,7 @@
                         Create songs from scratch
                     </li>
                     <li>
-                        Open and save <code>.bgm</code> files
+                        Save and open <code>.bgm</code> files
                     </li>
                     <li>
                         Convert <code>.midi</code> files to <code>.bgm</code>
@@ -85,5 +84,10 @@
                 </p>
             </section>
         </main>
+
+        <script type="module">
+            import report from "./app/analytics"
+            report()
+        </script>
     </body>
 </html>
