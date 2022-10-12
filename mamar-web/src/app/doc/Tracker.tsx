@@ -197,6 +197,7 @@ function CommandList({ height }: {
                     itemData={commands}
                     itemCount={commands.length}
                     itemSize={24}
+                    overscanCount={10}
                     outerRef={provided.innerRef}
                     innerElementType="ul"
                 >
