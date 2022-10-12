@@ -16,27 +16,12 @@ import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
+import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
 import { useSize } from "../util/hooks/useSize"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 const trackListCtx = createContext<null | { trackListId: number, trackIndex: number }>(null)
-
-const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-
-function pitchToNoteName(pitch: number) {
-    pitch = pitch - 104
-    const octave = Math.floor(pitch / 12)
-    const note = notes[pitch % 12]
-    return `${note}${octave}`
-}
-
-function noteNameToPitch(noteName: string) {
-    const note = noteName[0]
-    const octave = parseInt(noteName[1])
-    const noteIndex = notes.indexOf(note)
-    return noteIndex + octave * 12 + 104
-}
 
 function InputBox({ children }: { children: ReactNode }) {
     return <span className={styles.inputBox}>
@@ -117,8 +102,9 @@ function Command({ command }:{ command: pm64.Event }) {
         </div>
     } else if (command.type === "Note") {
         return <div className={classNames(styles.command, styles.purple)}>
-            play note <InputBox><input type="number" value={command.pitch} onChange={evt => mutate({ pitch: +evt.target.value })} /></InputBox>
-            for <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={value => mutate({ length: value })} /></InputBox> ticks
+            play note <InputBox><NoteInput pitch={command.pitch} onChange={pitch => mutate({ pitch })} /></InputBox>
+            at volume <InputBox><VerticalDragNumberInput value={command.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ velocity })} /></InputBox>
+            for <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ length })} /></InputBox> ticks
         </div>
     }
 

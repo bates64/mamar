@@ -45,7 +45,7 @@ export default function VerticalDragNumberInput({ value, minValue, maxValue, onC
 
     useEffect(() => {
         if (ref.current)
-            ref.current.style.width = `${ref.current.value.length + 1}ch`
+            ref.current.style.width = `${value.toString().length + 1}ch`
     }, [ref, value])
 
     return <input
