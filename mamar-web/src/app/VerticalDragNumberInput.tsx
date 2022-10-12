@@ -14,6 +14,8 @@ export default function VerticalDragNumberInput({ value, minValue, maxValue, onC
     const [snapshot, setSnapshot] = useState(value)
     const [startVal, setStartVal] = useState(0)
 
+    const ref = useRef<HTMLInputElement>(null)
+
     const valueRef = useRef(value)
     valueRef.current = value
 
@@ -41,7 +43,13 @@ export default function VerticalDragNumberInput({ value, minValue, maxValue, onC
         }
     }, [startVal, onChange, snapshot, minValue, maxValue])
 
+    useEffect(() => {
+        if (ref.current)
+            ref.current.style.width = `${ref.current.value.length + 1}ch`
+    }, [ref, value])
+
     return <input
+        ref={ref}
         id={id}
         type="number"
         className={styles.input}
