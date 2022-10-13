@@ -12,10 +12,21 @@ function pitchToNoteName(pitch: number) {
 }
 
 function noteNameToPitch(noteName: string) {
-    const note = noteName[0]
-    const octave = parseInt(noteName[1])
-    const noteIndex = notes.indexOf(note)
-    return noteIndex + octave * 12 + 104
+    const re = /([A-G])(#|b)?(\d+)/
+    const match = noteName.match(re)
+    if (!match) {
+        throw new Error(`Invalid note name: ${noteName}`)
+    }
+    const [, note, sharp, octave] = match
+    let noteIndex = notes.indexOf(note + (sharp === "#" ? "#" : ""))
+    if (sharp === "b") {
+        noteIndex--
+    }
+    if (noteIndex >= 0) {
+        return noteIndex + parseInt(octave) * 12 + 104
+    } else {
+        throw new Error(`Invalid note name: ${noteName}`)
+    }
 }
 
 export interface Props {
