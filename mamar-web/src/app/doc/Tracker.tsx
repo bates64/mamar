@@ -98,13 +98,19 @@ function Command({ command }:{ command: pm64.Event }) {
 
     if (command.type === "Delay") {
         return <div className={classNames(styles.command, styles.orange)}>
-            wait <InputBox><VerticalDragNumberInput value={command.value} minValue={1} maxValue={999} onChange={value => mutate({ value })} /></InputBox> ticks
+            wait
+            <InputBox><VerticalDragNumberInput value={command.value} minValue={1} maxValue={999} onChange={value => mutate({ value })} /></InputBox>
+            ticks
         </div>
     } else if (command.type === "Note") {
         return <div className={classNames(styles.command, styles.purple)}>
-            play note <InputBox><NoteInput pitch={command.pitch} onChange={pitch => mutate({ pitch })} /></InputBox>
-            at volume <InputBox><VerticalDragNumberInput value={command.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ velocity })} /></InputBox>
-            for <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ length })} /></InputBox> ticks
+            play note
+            <InputBox><NoteInput pitch={command.pitch} onChange={pitch => mutate({ pitch })} /></InputBox>
+            at volume
+            <InputBox><VerticalDragNumberInput value={command.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ velocity })} /></InputBox>
+            for
+            <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ length })} /></InputBox>
+            ticks
         </div>
     }
 
