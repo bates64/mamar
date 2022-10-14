@@ -90,14 +90,14 @@ lazy_static! {
         m.insert("Steel Drum 1", (3, 0x4A));
         m.insert("Steel Drum 2", (3, 0x4B));
         m.insert("Steel Drum 3", (3, 0x4C));
-        m.insert("Percussive(?) Organ", (3, 0x4D));
+        m.insert("Percussive Organ 1", (3, 0x4D));
         m.insert("Drawbar Organ 1", (3, 0x4E));
         m.insert("Drawbar Organ 2", (3, 0x4F));
         m.insert("Muted Trumpet 1", (3, 0x50));
         m.insert("Muted Trumpet 2", (3, 0x51));
         m.insert("Guitar Harmonics 1", (3, 0x52));
         m.insert("Guitar Harmonics 2", (3, 0x53));
-        m.insert("Percussive Organ", (3, 0x54));
+        m.insert("Percussive Organ 2", (3, 0x54));
         m.insert("Sitar 1", (3, 0x55));
         m.insert("Bari Sax 1", (3, 0x56));
         m.insert("Bari Sax 2", (3, 0x57));
@@ -119,8 +119,8 @@ lazy_static! {
         m.insert("Sitar 3", (3, 0x67));
         m.insert("Synth Bass 2", (3, 0x68));
         m.insert("Synth Bass 3", (3, 0x69));
-        m.insert("Synth Brass 1", (3, 0x6A));
-        m.insert("Synth Brass 2", (3, 0x6B));
+        m.insert("Synth Brass 3", (3, 0x6A));
+        m.insert("Synth Brass 4", (3, 0x6B));
         m.insert("Whistle 1", (3, 0x6C));
         m.insert("Whistle 2", (3, 0x6D));
         m.insert("Blown Bottle 1", (3, 0x6E));
@@ -138,7 +138,7 @@ lazy_static! {
         m.insert("Vibraphone 6", (3, 0x7A));
         m.insert("Celesta 3", (3, 0x7B));
         m.insert("Plucked Electric Bass", (3, 0x7C));
-        m.insert("Whistle", (3, 0x7D));
+        m.insert("Whistle 3", (3, 0x7D));
         m.insert("Harmonized Synth Voice 1", (3, 0x7E));
         m.insert("Harmonized Synth Voice 2", (3, 0x7F));
         m.insert("Glockenspiel 1", (3, 0x80));
@@ -148,7 +148,7 @@ lazy_static! {
         m.insert("Beep", (3, 0x84));
         m.insert("Clean Beep", (3, 0x85));
         m.insert("Sitar 4", (3, 0x86));
-        m.insert("Kalimba", (3, 0x87));
+        m.insert("Kalimba 2", (3, 0x87));
         m.insert("Orchestra Hit", (3, 0x88));
         m.insert("Accordion 1", (3, 0x89));
         m.insert("Accordion 2", (3, 0x8A));
