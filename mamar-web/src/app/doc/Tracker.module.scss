@@ -16,13 +16,13 @@
 
     padding: 1px 6px;
 
-    color: #efefef;
+    color: #ffffffcc;
     background: rgb(99, 99, 99);
     border: 1px solid #00000020;
     border-radius: 4px;
 
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 600;
 
     &.control {
         background: #e68619;
@@ -46,10 +46,14 @@
 }
 
 .inputBox {
-    color: #fff;
+    color: #ffffffdd;
     border-radius: 99px;
     border: 1px solid #00000020;
     background: #00000020;
     padding: 2px;
     margin: 0 4px;
+
+    &:focus {
+        color: #00000088;
+    }
 }
