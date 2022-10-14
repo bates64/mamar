@@ -24,12 +24,24 @@
     font-size: 12px;
     font-weight: 500;
 
-    &.orange {
+    &.control {
         background: #e68619;
     }
 
-    &.purple {
+    &.playback {
         background: #9256d9;
+    }
+
+    &.master {
+        background: #00a9e0;
+    }
+
+    &.track {
+        background: #b93ea6;
+    }
+
+    &.seg {
+        background: #22833f;
     }
 }
 
