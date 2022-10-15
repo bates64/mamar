@@ -1,107 +1,583 @@
-import { Grid, NumberField, TextField } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import * as pm64 from "pm64-typegen"
-import { ReactNode } from "react"
-import { List } from "react-movable"
+import { ReactNode, CSSProperties, createContext, useContext } from "react"
+import {
+    Droppable,
+    Draggable,
+    type DroppableProvided,
+    type DraggableProvided,
+    type DraggableStateSnapshot,
+    type DraggableRubric,
+} from "react-beautiful-dnd"
+import { memo } from "react-tracked"
+import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
+import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
+import StringInput from "../StringInput"
+import { useSize } from "../util/hooks/useSize"
+import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
-const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+const trackListCtx = createContext<null | { trackListId: number, trackIndex: number }>(null)
 
-function pitchToNoteName(pitch: number) {
-    pitch = pitch - 104
-    const octave = Math.floor(pitch / 12)
-    const note = notes[pitch % 12]
-    return `${note}${octave}`
+const PADDING = 16
+
+function InputBox({ children }: { children: ReactNode }) {
+    return <span className={styles.inputBox}>
+        {children}
+    </span>
 }
 
-function noteNameToPitch(noteName: string) {
-    const note = noteName[0]
-    const octave = parseInt(noteName[1])
-    const noteIndex = notes.indexOf(note)
-    return noteIndex + octave * 12 + 104
-}
+function Command({ command }:{ command: pm64.Event }) {
+    const [, dispatch] = useBgm()
+    const { trackListId, trackIndex } = useContext(trackListCtx)!
+    const mutate = (partial: Partial<pm64.Event>) => {
+        // TODO: debounce trailing
 
-function Command({ command, onChange }: { command: pm64.Event, onChange: (command: pm64.Event) => void }) {
-    let inner: ReactNode
-    if (command.type === "Note") {
-        inner = <>
-            {/* FIXME */}
-            <TextField
-                label="Note"
-                labelPosition="side"
-                value={pitchToNoteName(command.pitch)}
-                onChange={note => onChange({ ...command, pitch: noteNameToPitch(note) })}
-                isQuiet
-            />
-            <NumberField
-                label="Length"
-                labelPosition="side"
-                value={command.length}
-                minValue={0}
-                step={1}
-                onChange={length => onChange({ ...command, length })}
-                isQuiet
-            />
-            <NumberField
-                label="Velocity"
-                labelPosition="side"
-                value={command.velocity}
-                minValue={0}
-                step={1}
-                onChange={velocity => onChange({ ...command, velocity })}
-                isQuiet
-            />
-        </>
-    } else if (command.type === "Delay") {
-        inner = <>
-            <NumberField
-                label="Length"
-                labelPosition="side"
-                value={command.value}
-                minValue={0}
-                step={1}
-                onChange={value => onChange({ ...command, value })}
-                isQuiet
-            />
-        </>
+        dispatch({
+            type: "update_track_command",
+            trackList: trackListId,
+            track: trackIndex,
+            command: { ...command, ...partial } as pm64.Event,
+        })
     }
 
-    return <div
-        className={styles.command}
-    >
-        {command.type}
-        {inner}
-    </div>
+    if (command.type === "End") {
+        return <div className={classNames(styles.command)}>
+            end region
+        </div>
+    } else if (command.type === "Delay") {
+        return <div className={classNames(styles.command, styles.control)}>
+            wait
+            <InputBox><VerticalDragNumberInput value={command.value} minValue={1} maxValue={999} onChange={value => mutate({ value })} /></InputBox>
+            ticks
+        </div>
+    } else if (command.type === "Note") {
+        return <div className={classNames(styles.command, styles.playback)}>
+            play note
+            <InputBox><NoteInput pitch={command.pitch} onChange={pitch => mutate({ pitch })} /></InputBox>
+            at volume
+            <InputBox><VerticalDragNumberInput value={command.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ velocity })} /></InputBox>
+            for
+            <InputBox><VerticalDragNumberInput value={command.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ length })} /></InputBox>
+            ticks
+        </div>
+    } else if (command.type === "MasterTempo") {
+        return <div className={classNames(styles.command, styles.master)}>
+            set tempo to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFFFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "MasterVolume"){
+        return <div className={classNames(styles.command, styles.master)}>
+            set master volume to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "MasterPitchShift") {
+        return <div className={classNames(styles.command, styles.master)}>
+            pitch shift master
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.cent}
+                    minValue={0}
+                    maxValue={0xff}
+                    onChange={cent => mutate({ cent })}
+                />
+            </InputBox>
+            cents
+        </div>
+    } else if (command.type === "UnkCmdE3") {
+        return <div className={classNames(styles.command, styles.master)}>
+            unk command E3 bank
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.bank}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={bank => mutate({ bank })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "MasterTempoFade") {
+        return <div className={classNames(styles.command, styles.master)}>
+            fade tempo to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFFFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+            over
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.time}
+                    minValue={0}
+                    maxValue={0xFFFF}
+                    onChange={time => mutate({ time })}
+                />
+            </InputBox>
+            ticks
+        </div>
+    } else if (command.type === "MasterVolumeFade") {
+        return <div className={classNames(styles.command, styles.master)}>
+            fade master volume to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.volume}
+                    minValue={0}
+                    maxValue={0xFFFF}
+                    onChange={volume => mutate({ volume })}
+                />
+            </InputBox>
+            over
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.time}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={time => mutate({ time })}
+                />
+            </InputBox>
+            ticks
+        </div>
+    } else if (command.type === "MasterEffect") {
+        // TODO: effect combobox
+        return <div className={classNames(styles.command, styles.master)}>
+            use room effect
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.index}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={index => mutate({ index })}
+                />
+            </InputBox>
+            value
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "TrackOverridePatch") {
+        return <div className={classNames(styles.command, styles.track)}>
+            override instrument bank
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.bank}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={bank => mutate({ bank })}
+                />
+            </InputBox>
+            patch
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.patch}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={patch => mutate({ patch })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SubTrackVolume") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set region volume to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SubTrackPan") {
+        // TODO: bespoke input for pan value
+        return <div className={classNames(styles.command, styles.track)}>
+            set region pan to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SubTrackReverb") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set region reverb to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SegTrackVolume") {
+        return <div className={classNames(styles.command, styles.seg)}>
+            set volume to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SubTrackCoarseTune") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set region coarse tune to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SubTrackFineTune") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set region fine tune to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "SegTrackTune") {
+        return <div className={classNames(styles.command, styles.seg)}>
+            set course tune to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.coarse}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={coarse => mutate({ coarse })}
+                />
+            </InputBox>
+            and fine tune to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.fine}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={fine => mutate({ fine })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "TrackTremolo") {
+        return <div className={classNames(styles.command, styles.track)}>
+            tremolo for
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.time}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={time => mutate({ time })}
+                />
+            </InputBox>
+            ticks at speed
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.speed}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={speed => mutate({ speed })}
+                />
+            </InputBox>
+            with
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.amount}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={amount => mutate({ amount })}
+                />
+            </InputBox>
+            wobble
+        </div>
+    } else if (command.type === "TrackTremoloSpeed") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set tremolo speed to
+            <VerticalDragNumberInput
+                value={command.value}
+                minValue={0}
+                maxValue={0xFF}
+                onChange={value => mutate({ value })}
+            />
+        </div>
+    } else if (command.type === "TrackTremoloTime") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set tremolo duration to
+            <VerticalDragNumberInput
+                value={command.time}
+                minValue={0}
+                maxValue={0xFF}
+                onChange={time => mutate({ time })}
+            />
+        </div>
+    } else if (command.type === "TrackTremoloStop") {
+        return <div className={classNames(styles.command, styles.track)}>
+            stop tremolo
+        </div>
+    } else if (command.type === "UnkCmdF4") {
+        return <div className={styles.command}>
+            unknown command F4
+        </div>
+    } else if (command.type === "SetTrackVoice") {
+        // TODO: bespoke ui
+        return <div className={classNames(styles.command, styles.track)}>
+            set track instrument
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.index}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={index => mutate({ index })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "TrackVolumeFade") {
+        return <div className={classNames(styles.command, styles.track)}>
+            fade track volume to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ value })}
+                />
+            </InputBox>
+            over
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.time}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={time => mutate({ time })}
+                />
+            </InputBox>
+            ticks
+        </div>
+    } else if (command.type === "SubTrackReverbType") {
+        return <div className={classNames(styles.command, styles.track)}>
+            set region reverb type to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.index}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={index => mutate({ index })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "Jump") {
+        return <div className={classNames(styles.command, styles.track)}>
+            jump
+            {!(command.unk_00 === 0 && command.unk_02 === 0) ? <>
+                <InputBox>
+                    <VerticalDragNumberInput
+                        value={command.unk_00}
+                        minValue={0}
+                        maxValue={0xFF}
+                        onChange={unk_00 => mutate({ unk_00 })}
+                    />
+                </InputBox>
+                <InputBox>
+                    <VerticalDragNumberInput
+                        value={command.unk_02}
+                        minValue={0}
+                        maxValue={0xFF}
+                        onChange={unk_02 => mutate({ unk_02 })}
+                    />
+                </InputBox>
+            </> : null}
+        </div>
+    } else if (command.type === "EventTrigger") {
+        return <div className={classNames(styles.command, styles.track)}>
+            trigger event
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.event_info}
+                    minValue={0}
+                    maxValue={0xFFFFFFFF}
+                    onChange={event_info => mutate({ event_info })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "Detour") {
+        // TODO: draggable jump arrow block like human resource machine
+        return <div className={classNames(styles.command, styles.track)}>
+            detour
+            <InputBox>
+                <StringInput
+                    value={command.start_label}
+                    onChange={start_label => mutate({ start_label })}
+                />
+            </InputBox>
+            to
+            <InputBox>
+                <StringInput
+                    value={command.end_label}
+                    onChange={end_label => mutate({ end_label })}
+                />
+            </InputBox>
+        </div>
+    } else if (command.type === "UnkCmdFF") {
+        return <div className={styles.command}>
+            unknown command FF
+            0
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.unk_00}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={unk_00 => mutate({ unk_00 })}
+                />
+            </InputBox>
+            1
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.unk_01}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={unk_01 => mutate({ unk_01 })}
+                />
+            </InputBox>
+            2
+            <VerticalDragNumberInput
+                value={command.unk_02}
+                minValue={0}
+                maxValue={0xFF}
+                onChange={unk_02 => mutate({ unk_02 })}
+            />
+        </div>
+    } else if (command.type === "Marker") {
+        return <div className={styles.command}>
+            jump target "
+            <InputBox>
+                <StringInput
+                    value={command.label}
+                    onChange={label => mutate({ label })}
+                />
+            </InputBox>
+            "
+        </div>
+    } else {
+        // This is unreachable (typeof command.type = never) but just in case...
+        return <div className={styles.command}>
+            unknown command
+        </div>
+    }
 }
 
-function CommandList({ commands, onMove, onChange }: {
-    commands: pm64.Event[]
-    onMove: (from: number, to: number) => void
-    onChange: (command: pm64.Event) => void
-}) {
-    return <List
-        values={commands}
-        onChange={({ oldIndex, newIndex }) => {
-            onMove(oldIndex, newIndex)
-        }}
-        renderList={({ children, props }) => <ol className={styles.list} aria-label="Commands" {...props}>{children}</ol>}
-        renderItem={({ value, props, index, isDragged }) => <li
-            key={value.id}
-            className={classNames({
-                [styles.item]: true,
-                [styles.even]: ((index ?? 0) % 2) === 0,
-                [styles.isDragged]: isDragged,
-            })}
-            {...props}
+const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {
+    const command = commands[index]
+    const lineNumberLength = commands.length.toString().length
+
+    return <>
+        <div
+            className={styles.lineNumber}
+            style={{
+                width: lineNumberLength + "ch",
+                left: Number(style.left) + PADDING,
+                top: Number(style.top) + PADDING,
+            }}
         >
-            <Command command={value} onChange={onChange} />
-        </li>}
-        removableByMove={true}
-        transitionDuration={200}
-    />
+            {(index + 1).toString().padStart(lineNumberLength, " ")}
+        </div>
+        <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
+            {(provided: DraggableProvided, _snapshot: DraggableStateSnapshot) => (
+                <li
+                    ref={provided.innerRef}
+                    {...provided.dragHandleProps}
+                    {...provided.draggableProps}
+                    style={{
+                        ...style,
+                        ...provided.draggableProps.style,
+                        width: "auto",
+                        left: "calc(" + Number(style.left) + PADDING + "px + " + lineNumberLength + "ch + 8px)",
+                        top: Number(style.top) + PADDING,
+                    }}
+                >
+                    <Command command={command} />
+                </li>
+            )}
+        </Draggable>
+    </>
+}, areEqual)
+
+function CommandList({ height }: {
+    height: number
+}) {
+    const [bgm] = useBgm()
+    const { trackListId, trackIndex } = useContext(trackListCtx)!
+    const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
+    const commands = track?.commands?.vec ?? []
+
+    return <Droppable
+        droppableId="droppable"
+        mode="virtual"
+        renderClone={(
+            provided: DraggableProvided,
+            snapshot: DraggableStateSnapshot,
+            rubric: DraggableRubric,
+        ) => (
+            <div
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+            >
+                <Command command={commands[rubric.source.index]} />
+            </div>
+        )}
+    >
+        {(provided: DroppableProvided) => (
+            <FixedSizeList
+                {...provided.droppableProps}
+                width={800}
+                height={height}
+                itemData={commands}
+                itemCount={commands.length}
+                itemSize={30}
+                overscanCount={10}
+                outerRef={provided.innerRef}
+                innerElementType="ol"
+                style={{ padding: PADDING }}
+            >
+                {ListItem}
+            </FixedSizeList>
+        )}
+    </Droppable>
 }
 
 export interface Props {
@@ -110,33 +586,13 @@ export interface Props {
 }
 
 export default function Tracker({ trackListId, trackIndex }: Props) {
-    const [bgm, dispatch] = useBgm()
-    const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
+    const container = useSize<HTMLDivElement>()
 
-    if (!track) {
-        return <div>Track not found</div>
-    }
-
-    return <Grid rows="auto 1fr" gap="size-100" UNSAFE_style={{ overflow: "hidden" }}>
-        <CommandList
-            commands={track.commands.vec}
-            onMove={(oldIndex, newIndex) => {
-                dispatch({
-                    type: "move_track_command",
-                    trackList: trackListId,
-                    track: trackIndex,
-                    oldIndex,
-                    newIndex,
-                })
-            }}
-            onChange={command => {
-                dispatch({
-                    type: "update_track_command",
-                    trackList: trackListId,
-                    track: trackIndex,
-                    command,
-                })
-            }}
-        />
-    </Grid>
+    return <div ref={container.ref} className={styles.container}>
+        <trackListCtx.Provider value={{ trackListId, trackIndex }}>
+            <CommandList
+                height={container.height ?? 100}
+            />
+        </trackListCtx.Provider>
+    </div>
 }

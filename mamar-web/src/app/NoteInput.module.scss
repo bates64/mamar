@@ -1,0 +1,15 @@
+.input {
+    color: inherit;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    text-align: center;
+
+    cursor: text;
+
+    &:active,
+    &:focus {
+        color: #fff;
+        outline: none;
+    }
+}
