@@ -5,11 +5,11 @@
     font: inherit;
     text-align: center;
 
-    cursor: row-resize;
+    cursor: text;
 
     &:active,
     &:focus {
-        color: var(--yellow);
+        color: #fff;
         outline: none;
     }
 }

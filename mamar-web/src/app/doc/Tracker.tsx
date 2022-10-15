@@ -577,7 +577,6 @@ function CommandList({ height }: {
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className={styles.dragging}
                 >
                     <Command command={commands[rubric.source.index]} />
                 </div>
@@ -590,10 +589,10 @@ function CommandList({ height }: {
                     height={height}
                     itemData={commands}
                     itemCount={commands.length}
-                    itemSize={27}
+                    itemSize={30}
                     overscanCount={10}
                     outerRef={provided.innerRef}
-                    innerElementType="ul"
+                    innerElementType="ol"
                     style={{ padding: PADDING }}
                 >
                     {ListItem}

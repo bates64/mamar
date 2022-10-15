@@ -9,7 +9,7 @@
 
     &:active,
     &:focus {
-        color: var(--yellow);
+        color: var(--spectrum-global-color-gray-900, #fff);
         outline: none;
     }
 

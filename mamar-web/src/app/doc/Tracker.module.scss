@@ -1,8 +1,11 @@
+$row-height: 27px;
+
 .container {
     height: 100%;
     overflow: overlay;
 
     background: var(--spectrum-global-color-gray-300);
+    box-shadow: inset 0 0 16px var(--spectrum-global-color-gray-200);
 
     ul, li {
         list-style: none;
@@ -15,12 +18,12 @@
     display: inline-block;
     position: absolute;
 
-    height: 27px;
-    line-height: 27px;
+    height: $row-height;
+    line-height: $row-height;
 
     text-align: center;
     color: var(--spectrum-global-color-gray-500);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     user-select: none;
 }
@@ -30,14 +33,14 @@
 
     display: inline-block;
 
-    padding: 1px 6px;
-    height: 27px;
-    line-height: 22px;
+    padding: 2px 6px;
+    height: $row-height;
+    line-height: 17px;
 
     color: #ffffffcc;
     background: rgb(99, 99, 99);
-    border: 1px solid #00000020;
-    border-radius: 6px;
+    border: 2px solid #ffffff20;
+    border-radius: 4px;
 
     font-size: 14px;
     font-weight: 600;
@@ -63,21 +66,21 @@
     &.seg {
         background: #22833f;
     }
-
-    .dragging & {
-        transform: scale(1.1);
-    }
 }
 
 .inputBox {
     color: #ffffffdd;
-    border-radius: 5px;
+    border-radius: 3px;
     border: 1px solid #00000020;
     background: #00000020;
-    padding: 1px 0;
-    margin: 0 4px;
+    padding: 0;
+    margin: 0 6px;
 
     &:focus {
         color: #00000088;
+    }
+
+    &:has(input[type=number]) {
+        border-radius: 99px;
     }
 }
