@@ -14,6 +14,7 @@ import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
+import InstrumentInput from "../InstrumentInput"
 import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
 import StringInput from "../StringInput"
@@ -275,7 +276,7 @@ function Command({ command }:{ command: pm64.Event }) {
         </div>
     } else if (command.type === "SegTrackTune") {
         return <div className={classNames(styles.command, styles.seg)}>
-            set course tune to
+            set coarse tune to
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.coarse}
@@ -354,14 +355,11 @@ function Command({ command }:{ command: pm64.Event }) {
             unknown command F4
         </div>
     } else if (command.type === "SetTrackVoice") {
-        // TODO: bespoke ui
         return <div className={classNames(styles.command, styles.track)}>
-            set track instrument
+            use instrument
             <InputBox>
-                <VerticalDragNumberInput
-                    value={command.index}
-                    minValue={0}
-                    maxValue={0xFF}
+                <InstrumentInput
+                    index={command.index}
                     onChange={index => mutate({ index })}
                 />
             </InputBox>

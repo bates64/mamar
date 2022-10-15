@@ -1,6 +1,6 @@
 import produce from "immer"
 import { bgm_add_voice } from "mamar-wasm-bridge"
-import { Bgm, Event } from "pm64-typegen"
+import { Bgm, Event, Instrument } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -36,6 +36,10 @@ export type BgmAction = {
     polyphonicIdx?: number
     isDrumTrack?: boolean
     parentTrackIdx?: number
+} | {
+    type: "update_instrument"
+    index: number
+    partial: Partial<Instrument>
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -94,6 +98,11 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             if (action.parentTrackIdx !== undefined) {
                 track.parentTrackIdx = action.parentTrackIdx
             }
+        })
+    case "update_instrument":
+        return produce(bgm, draft => {
+            const instrument = draft.instruments[action.index]
+            Object.assign(instrument, action.partial)
         })
     }
 }
