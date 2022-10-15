@@ -21,7 +21,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     }
 
     return <Grid
-        columns="1fr auto"
+        columns="auto 1fr"
         height="100%"
     >
         <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
