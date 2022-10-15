@@ -24,7 +24,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
         columns="1fr auto"
         height="100%"
     >
-        <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin">
+        <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
             <h3 id={hid} className={styles.regionName}>Region {trackListId}.{trackIndex}</h3>
             <Form minWidth="size-2000" aria-labelledby={hid}>
                 <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>

@@ -4,12 +4,10 @@ import { ReactNode, CSSProperties, createContext, useContext } from "react"
 import {
     Droppable,
     Draggable,
-    DragDropContext,
     type DroppableProvided,
     type DraggableProvided,
     type DraggableStateSnapshot,
     type DraggableRubric,
-    type DropResult,
 } from "react-beautiful-dnd"
 import { memo } from "react-tracked"
 import { FixedSizeList, areEqual } from "react-window"
@@ -541,65 +539,45 @@ const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], i
 function CommandList({ height }: {
     height: number
 }) {
-    const [bgm, dispatch] = useBgm()
+    const [bgm] = useBgm()
     const { trackListId, trackIndex } = useContext(trackListCtx)!
     const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
     const commands = track?.commands?.vec ?? []
 
-    function onDragEnd(result: DropResult) {
-        if (!result.destination) {
-            // TODO: delete?
-            return
-        }
-        if (result.source.index === result.destination.index) {
-            return
-        }
-
-        dispatch({
-            type: "move_track_command",
-            trackList: trackListId,
-            track: trackIndex,
-            oldIndex: result.source.index,
-            newIndex: result.destination.index,
-        })
-    }
-
-    return <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable
-            droppableId="droppable"
-            mode="virtual"
-            renderClone={(
-                provided: DraggableProvided,
-                snapshot: DraggableStateSnapshot,
-                rubric: DraggableRubric,
-            ) => (
-                <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                >
-                    <Command command={commands[rubric.source.index]} />
-                </div>
-            )}
-        >
-            {(provided: DroppableProvided) => (
-                <FixedSizeList
-                    {...provided.droppableProps}
-                    width={800}
-                    height={height}
-                    itemData={commands}
-                    itemCount={commands.length}
-                    itemSize={30}
-                    overscanCount={10}
-                    outerRef={provided.innerRef}
-                    innerElementType="ol"
-                    style={{ padding: PADDING }}
-                >
-                    {ListItem}
-                </FixedSizeList>
-            )}
-        </Droppable>
-    </DragDropContext>
+    return <Droppable
+        droppableId="droppable"
+        mode="virtual"
+        renderClone={(
+            provided: DraggableProvided,
+            snapshot: DraggableStateSnapshot,
+            rubric: DraggableRubric,
+        ) => (
+            <div
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+            >
+                <Command command={commands[rubric.source.index]} />
+            </div>
+        )}
+    >
+        {(provided: DroppableProvided) => (
+            <FixedSizeList
+                {...provided.droppableProps}
+                width={800}
+                height={height}
+                itemData={commands}
+                itemCount={commands.length}
+                itemSize={30}
+                overscanCount={10}
+                outerRef={provided.innerRef}
+                innerElementType="ol"
+                style={{ padding: PADDING }}
+            >
+                {ListItem}
+            </FixedSizeList>
+        )}
+    </Droppable>
 }
 
 export interface Props {
