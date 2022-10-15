@@ -24,6 +24,11 @@ export type BgmAction = {
     track: number
     command: Event
 } | {
+    type: "delete_track_command"
+    trackList: number
+    track: number
+    index: number
+} | {
     type: "modify_track_settings"
     trackList: number
     track: number
@@ -68,6 +73,11 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                     commands.vec[i] = action.command
                 }
             }
+        })
+    case "delete_track_command":
+        return produce(bgm, draft => {
+            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
+            commands.vec.splice(action.index, 1)
         })
     case "modify_track_settings":
         return produce(bgm, draft => {

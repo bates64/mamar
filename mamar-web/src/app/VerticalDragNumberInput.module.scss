@@ -3,25 +3,25 @@
     background: transparent;
     border: 0;
     font: inherit;
-    text-align: inherit;
+    text-align: center;
 
     cursor: row-resize;
 
-    &:active {
-        color: var(--yellow);
+    &:active,
+    &:focus {
+        color: var(--spectrum-global-color-gray-900, #fff);
+        outline: none;
     }
 
-    &:not(:focus-visible) {
-        // Hide spinner arrows
-        appearance: textfield;
-        &::-webkit-outer-spin-button,
-        &::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
+    // Hide spinner arrows
+    appearance: textfield;
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
 }
 
-body:has(.input:active) {
-    cursor: row-resize;
+body:has(.input:active) * {
+    cursor: row-resize !important;
 }

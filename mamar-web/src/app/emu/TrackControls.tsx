@@ -1,4 +1,4 @@
-import { ToggleButton } from "@adobe/react-spectrum"
+import { ToggleButton, Tooltip, TooltipTrigger } from "@adobe/react-spectrum"
 import { RAM_MAMAR_trackMute } from "patches"
 import { useEffect, useState } from "react"
 import { VolumeX, Headphones } from "react-feather"
@@ -19,27 +19,33 @@ export default function TrackControls({ trackIndex }: { trackIndex: number }) {
     }, [emu, isMute, isSolo, trackIndex])
 
     return <div className={styles.controls}>
-        <ToggleButton
-            UNSAFE_className={styles.mute}
-            aria-label="Toggle mute"
-            isSelected={isMute}
-            onChange={setIsMute}
-        >
-            <VolumeX size={16} />
-        </ToggleButton>
-        <ToggleButton
-            UNSAFE_className={styles.solo}
-            aria-label="Toggle solo"
-            isSelected={isSolo}
-            onChange={solo => {
-                if (solo && isMute) {
-                    setIsMute(false)
-                }
+        <TooltipTrigger>
+            <ToggleButton
+                UNSAFE_className={styles.mute}
+                aria-label="Toggle mute"
+                isSelected={isMute}
+                onChange={setIsMute}
+            >
+                <VolumeX size={16} />
+            </ToggleButton>
+            <Tooltip>Toggle mute</Tooltip>
+        </TooltipTrigger>
+        <TooltipTrigger>
+            <ToggleButton
+                UNSAFE_className={styles.solo}
+                aria-label="Toggle solo"
+                isSelected={isSolo}
+                onChange={solo => {
+                    if (solo && isMute) {
+                        setIsMute(false)
+                    }
 
-                setIsSolo(solo)
-            }}
-        >
-            <Headphones size={16} />
-        </ToggleButton>
+                    setIsSolo(solo)
+                }}
+            >
+                <Headphones size={16} />
+            </ToggleButton>
+            <Tooltip>Toggle solo (if a track is soloed, only it will play)</Tooltip>
+        </TooltipTrigger>
     </div>
 }

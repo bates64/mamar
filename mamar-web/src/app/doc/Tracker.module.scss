@@ -1,30 +1,86 @@
-.list, .list > li {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+$row-height: 27px;
+
+.container {
+    height: 100%;
+    overflow: overlay;
+
+    background: var(--spectrum-global-color-gray-300);
+    box-shadow: inset 0 0 16px var(--spectrum-global-color-gray-200);
+
+    ul, li {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+}
+
+.lineNumber {
+    display: inline-block;
+    position: absolute;
+
+    height: $row-height;
+    line-height: $row-height;
+
+    text-align: center;
+    color: var(--spectrum-global-color-gray-500);
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
 }
 
 .command {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    align-items: center;
-    gap: 2em;
+    // Note: can't use --spectrum vars here as dragging brings them out of the Spectrum Provider
 
-    padding: 0 6px;
+    display: inline-block;
 
-    height: 32px;
-}
+    padding: 2px 6px;
+    height: $row-height;
+    line-height: 17px;
 
-.item {
-    background-color: var(--spectrum-global-color-gray-75);
+    color: #ffffffcc;
+    background: rgb(99, 99, 99);
+    border: 2px solid #ffffff20;
+    border-radius: 4px;
 
-    &.isDragged {
-        .command > *:not(:first-child) {
-            display: none;
-        }
+    font-size: 14px;
+    font-weight: 600;
+
+    box-shadow: 0 1px 2px 0 #00000040;
+
+    &.control {
+        background: #e68619;
     }
 
-    &.even {
-        background-color: var(--spectrum-global-color-gray-100);
+    &.playback {
+        background: #9256d9;
+    }
+
+    &.master {
+        background: #00a9e0;
+    }
+
+    &.track {
+        background: #b93ea6;
+    }
+
+    &.seg {
+        background: #22833f;
+    }
+}
+
+.inputBox {
+    color: #ffffffdd;
+    border-radius: 3px;
+    border: 1px solid #00000020;
+    background: #00000020;
+    padding: 0;
+    margin: 0 6px;
+
+    &:focus {
+        color: #00000088;
+    }
+
+    &:has(input[type=number]) {
+        border-radius: 99px;
     }
 }

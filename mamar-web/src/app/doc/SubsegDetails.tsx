@@ -1,6 +1,7 @@
 import { Grid, View, Form, Switch, NumberField } from "@adobe/react-spectrum"
 import { useId } from "react"
 
+import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
@@ -20,11 +21,11 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     }
 
     return <Grid
-        columns="1fr auto"
+        columns="auto 1fr"
         height="100%"
     >
-        <View padding="size-200" borderEndColor="gray-200" borderEndWidth="thin">
-            <h3 id={hid}>Region {trackListId}.{trackIndex}</h3>
+        <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
+            <h3 id={hid} className={styles.regionName}>Region {trackListId}.{trackIndex}</h3>
             <Form minWidth="size-2000" aria-labelledby={hid}>
                 <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
@@ -46,7 +47,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                 />
             </Form>
         </View>
-        <View overflow="overlay">
+        <View overflow="hidden">
             <Tracker trackListId={trackListId} trackIndex={trackIndex} />
         </View>
     </Grid>
