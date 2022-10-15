@@ -24,6 +24,8 @@ import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 const trackListCtx = createContext<null | { trackListId: number, trackIndex: number }>(null)
 
+const PADDING = 16
+
 function InputBox({ children }: { children: ReactNode }) {
     return <span className={styles.inputBox}>
         {children}
@@ -492,26 +494,48 @@ function Command({ command }:{ command: pm64.Event }) {
             </InputBox>
             "
         </div>
+    } else {
+        // This is unreachable (typeof command.type = never) but just in case...
+        return <div className={styles.command}>
+            unknown command
+        </div>
     }
-
-    throw new Error(`Unknown command type ${command.type}`)
 }
 
 const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {
     const command = commands[index]
+    const lineNumberLength = commands.length.toString().length
 
-    return <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
-        {(provided: DraggableProvided, _snapshot: DraggableStateSnapshot) => (
-            <li
-                ref={provided.innerRef}
-                {...provided.draggableProps}
-                {...provided.dragHandleProps}
-                style={{ ...style, ...provided.draggableProps.style, width: "auto" }}
-            >
-                <Command command={command} />
-            </li>
-        )}
-    </Draggable>
+    return <>
+        <div
+            className={styles.lineNumber}
+            style={{
+                width: lineNumberLength + "ch",
+                left: Number(style.left) + PADDING,
+                top: Number(style.top) + PADDING,
+            }}
+        >
+            {(index + 1).toString().padStart(lineNumberLength, " ")}
+        </div>
+        <Draggable draggableId={command.id.toString()} index={index} key={command.id}>
+            {(provided: DraggableProvided, _snapshot: DraggableStateSnapshot) => (
+                <li
+                    ref={provided.innerRef}
+                    {...provided.dragHandleProps}
+                    {...provided.draggableProps}
+                    style={{
+                        ...style,
+                        ...provided.draggableProps.style,
+                        width: "auto",
+                        left: "calc(" + Number(style.left) + PADDING + "px + " + lineNumberLength + "ch + 8px)",
+                        top: Number(style.top) + PADDING,
+                    }}
+                >
+                    <Command command={command} />
+                </li>
+            )}
+        </Draggable>
+    </>
 }, areEqual)
 
 function CommandList({ height }: {
@@ -553,6 +577,7 @@ function CommandList({ height }: {
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
+                    className={styles.dragging}
                 >
                     <Command command={commands[rubric.source.index]} />
                 </div>
@@ -569,6 +594,7 @@ function CommandList({ height }: {
                     overscanCount={10}
                     outerRef={provided.innerRef}
                     innerElementType="ul"
+                    style={{ padding: PADDING }}
                 >
                     {ListItem}
                 </FixedSizeList>

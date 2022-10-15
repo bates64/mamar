@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 
-import styles from "./VerticalDragNumberInput.module.scss"
+import styles from "./StringInput.module.scss"
 
 export interface Props {
     value: string
