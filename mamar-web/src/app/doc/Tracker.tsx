@@ -536,7 +536,8 @@ const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], i
     </>
 }, areEqual)
 
-function CommandList({ height }: {
+function CommandList({ width, height }: {
+    width: number
     height: number
 }) {
     const [bgm] = useBgm()
@@ -564,7 +565,7 @@ function CommandList({ height }: {
         {(provided: DroppableProvided) => (
             <FixedSizeList
                 {...provided.droppableProps}
-                width={800}
+                width={width}
                 height={height}
                 itemData={commands}
                 itemCount={commands.length}
@@ -591,6 +592,7 @@ export default function Tracker({ trackListId, trackIndex }: Props) {
     return <div ref={container.ref} className={styles.container}>
         <trackListCtx.Provider value={{ trackListId, trackIndex }}>
             <CommandList
+                width={container.width ?? 100}
                 height={container.height ?? 100}
             />
         </trackListCtx.Provider>
