@@ -27,7 +27,7 @@ export default function ActiveDoc() {
     }, [title, doc])
 
     const trackListId = doc?.panelContent.type === "tracker" ? doc?.panelContent.trackList : null
-    const trackIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.trackList : null
+    const trackIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.track : null
 
     function onDragEnd(result: DropResult) {
         if (!trackListId || !trackIndex) {
