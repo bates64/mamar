@@ -1,5 +1,3 @@
-pub mod voice;
-
 /// Encoder ([Bgm] -> .bin)
 pub mod en;
 
