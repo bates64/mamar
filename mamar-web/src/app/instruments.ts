@@ -4,8 +4,6 @@ export const categories = [
         instruments: [
             { bank: 0x03, patch: 0x0E, name: "Old School Piano" },
 
-            { bank: 0x03, patch: 0x0F, name: "Bright Piano" },
-
             { bank: 0x03, patch: 0x20, name: "Electric Piano 1A" },
             { bank: 0x03, patch: 0x21, name: "Electric Piano 1B" },
             { bank: 0x03, patch: 0x22, name: "Electric Piano 2" },
