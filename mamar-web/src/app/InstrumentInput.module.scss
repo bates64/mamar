@@ -1,0 +1,9 @@
+.actionButton {
+    all: unset;
+    background: unset !important;
+    cursor: pointer;
+
+    &:hover {
+        background: #00000020 !important;
+    }
+}
