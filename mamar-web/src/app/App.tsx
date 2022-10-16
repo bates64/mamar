@@ -1,6 +1,7 @@
 import { Provider as SpectrumProvider, defaultTheme, Grid, View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 
+import PlaybackControls from "./emu/PlaybackControls"
 import Header from "./header/Header"
 import Main from "./Main"
 import { RootProvider } from "./store/dispatch"
@@ -25,6 +26,9 @@ export function RomDataConsumer() {
             <View gridArea="header">
                 <Header />
             </View>
+            <div style={{ position: "absolute", top: "12px", left: "50%", transform: "translateX(-50%)" }}>
+                <PlaybackControls />
+            </div>
             <View gridArea="content" overflow="auto">
                 <Main />
             </View>

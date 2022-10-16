@@ -48,9 +48,9 @@ export default function DocTabs() {
     const docs = Object.values(root.docs)
 
     return <Flex direction="column" width="100vw" height="100%">
-        {docs.length >= 2 && <Flex height="size-450" UNSAFE_className="DocTabs_container">
+        <Flex height="size-450" UNSAFE_className="DocTabs_container">
             {docs.map(doc => <TabButton key={doc.id} doc={doc} />)}
-        </Flex>}
+        </Flex>
         <ErrorBoundaryView flex UNSAFE_className="DocTabs_main_content">
             <ActiveDoc />
         </ErrorBoundaryView>

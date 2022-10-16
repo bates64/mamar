@@ -3,8 +3,6 @@ import { Flex, Grid, Heading, View } from "@adobe/react-spectrum"
 import BgmActionGroup from "./BgmActionGroup"
 import SponsorButton from "./SponsorButton"
 
-import PlaybackControls from "../emu/PlaybackControls"
-
 import "./Header.scss"
 
 const logo = new URL("../../logo.svg", import.meta.url).href
@@ -35,6 +33,5 @@ export default function Header() {
                 <SponsorButton />
             </Grid>
         </View>
-        <PlaybackControls />
     </header>
 }
