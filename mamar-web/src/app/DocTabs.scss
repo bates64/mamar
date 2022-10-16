@@ -1,11 +1,8 @@
-@use "../index.scss";
-
 .DocTabs_container {
     padding: 0 8px;
 }
 
 .DocTabs_main_content {
-    @include index.faded-dot-background(300px);
     border-top: 1px solid var(--grey-2);
     overflow: hidden;
 }
