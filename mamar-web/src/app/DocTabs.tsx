@@ -6,7 +6,7 @@ import ActiveDoc from "./doc/ActiveDoc"
 import ErrorBoundaryView from "./ErrorBoundaryView"
 import { Doc, useRoot } from "./store"
 
-import "./DocTabs.scss"
+import "./DocTabs.scss" // TODO: use css modules
 
 function TabButton({ doc }: { doc: Doc }) {
     const [root, dispatch] = useRoot()
@@ -48,9 +48,9 @@ export default function DocTabs() {
     const docs = Object.values(root.docs)
 
     return <Flex direction="column" width="100vw" height="100%">
-        <Flex height="size-450" UNSAFE_className="DocTabs_container">
+        {docs.length > 0 && <Flex height="size-450" UNSAFE_className="DocTabs_container">
             {docs.map(doc => <TabButton key={doc.id} doc={doc} />)}
-        </Flex>
+        </Flex>}
         <ErrorBoundaryView flex UNSAFE_className="DocTabs_main_content">
             <ActiveDoc />
         </ErrorBoundaryView>
