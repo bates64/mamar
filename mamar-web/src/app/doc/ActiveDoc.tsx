@@ -86,7 +86,14 @@ export default function ActiveDoc() {
                             <SegmentMap />
                             {provided.placeholder}
                         </View>
-                        {doc.panelContent.type !== "not_open" && <View elementType="aside" overflow="hidden" borderTopColor="gray-300" backgroundColor="gray-100" borderTopWidth="thin">
+                        {doc.panelContent.type !== "not_open" && <View
+                            elementType="aside"
+                            overflow="hidden"
+                            borderTopColor="gray-300"
+                            backgroundColor="gray-100"
+                            borderTopWidth="thin"
+                            UNSAFE_style={{ zIndex: "1" }}
+                        >
                             {doc.panelContent.type === "tracker" && <SubsegDetails trackListId={trackListId!} trackIndex={trackIndex!} />}
                         </View>}
                     </div>
