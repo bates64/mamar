@@ -1,3 +1,10 @@
+## 1.1.0
+
+- Added progressive web app support
+    - Suppporting browsers will be able to install the site as an app
+    - Mamar now works completely offline
+    - Once Mamar is installed, BGM and MIDI files can be opened directly from the file system with the OS "Open with" dialog
+
 ## 1.0.0
 
 - Completely rewritten GUI
