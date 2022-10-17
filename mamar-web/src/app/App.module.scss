@@ -1,0 +1,10 @@
+.playbackControlsContainer {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    :global(body.window-controls-overlay) & {
+        top: env(titlebar-area-height, 12px);
+    }
+}

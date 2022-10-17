@@ -1,5 +1,9 @@
 .DocTabs_container {
     padding: 0 8px;
+
+    .window-controls-overlay & {
+        margin-top: 24px;
+    }
 }
 
 .DocTabs_main_content {

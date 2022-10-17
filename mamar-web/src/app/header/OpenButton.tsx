@@ -1,13 +1,32 @@
 import { ActionButton, AlertDialog, DialogContainer } from "@adobe/react-spectrum"
 import { fileOpen } from "browser-fs-access"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { useRoot } from "../store"
-import { openFile } from "../store/root"
+import { openFile, RootAction } from "../store/root"
 
 export default function OpenButton() {
     const [, dispatch] = useRoot()
     const [loadError, setLoadError] = useState<Error | null>(null)
+
+    useEffect(() => {
+        // @ts-ignore
+        if ("launchQueue" in window && "files" in LaunchParams.prototype) {
+
+            // @ts-ignore
+            launchQueue.setConsumer(async launchParams => {
+                const actions: RootAction[] = []
+
+                for (const handle of launchParams.files) {
+                    const file = await handle.getFile()
+                    const action = await openFile(file)
+                    actions.push(action)
+                }
+
+                dispatch(...actions)
+            })
+        }
+    }, [dispatch])
 
     return <>
         <ActionButton

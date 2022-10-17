@@ -23,4 +23,8 @@
             fill: currentColor;
         }
     }
+
+    :global(body.window-controls-overlay) & {
+        display: none;
+    }
 }

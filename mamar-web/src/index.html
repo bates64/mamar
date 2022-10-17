@@ -5,7 +5,7 @@
 
         <title>Paper Mario music editor - Mamar</title>
         <meta name="description" content="Digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64" />
-        <meta property="twitter:card" content="social-banner.png" />
+        <meta name="twitter:card" content="social-banner.png" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#ea7aa1" />
@@ -86,6 +86,7 @@
         </main>
 
         <script type="module">
+            import "./service-worker-load.js"
             import report from "./app/analytics"
             report()
         </script>

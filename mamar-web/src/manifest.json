@@ -1,0 +1,31 @@
+{
+    "short_name": "Mamar",
+    "name": "Mamar",
+    "icons": [
+      {
+        "src": "./macos_icon.png",
+        "type": "image/png",
+        "sizes": "1024x1024"
+      }
+    ],
+    "id": "/app?source=pwa",
+    "start_url": "/app?source=pwa",
+    "background_color": "#111111",
+    "display": "standalone",
+    "display_override": ["window-controls-overlay"],
+    "scope": "/app",
+    "theme_color": "#ea7aa1",
+    "description": "Digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64",
+    "file_handlers": [
+        {
+            "action": "/app?source=pwa-open",
+            "accept": {
+                "audio/midi": [".midi", ".mid", ".rmi"],
+                "application/octet-stream": [".bgm", ".bin"]
+            },
+            "icons": [],
+            "launch_type": "single-client"
+        }
+    ],
+    "capture_links": "existing-client-navigate"
+}

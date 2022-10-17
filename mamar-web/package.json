@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.21.2",
+    "@parcel/service-worker": "^2.7.0",
     "@react-hook/resize-observer": "^1.2.6",
     "@spectrum-icons/workflow": "^4.0.2",
     "@types/stats.js": "^0.17.0",
@@ -38,9 +39,11 @@
   "devDependencies": {
     "@axe-core/react": "^4.4.4",
     "@parcel/optimizer-data-url": "2.7.0",
+    "@parcel/packager-raw-url": "^2.7.0",
     "@parcel/transformer-inline-string": "2.7.0",
     "@parcel/transformer-sass": "2.7.0",
     "@parcel/transformer-svg-react": "^2.7.0",
+    "@parcel/transformer-webmanifest": "^2.7.0",
     "@types/node": "^18.7.18",
     "@types/react": "^18.0.20",
     "@types/react-beautiful-dnd": "^13.1.2",
