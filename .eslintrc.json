@@ -67,5 +67,16 @@
                 "alphabetize": { "order": "asc", "caseInsensitive": true }
             }
         ]
-    }
+    },
+    "overrides": [
+        {
+            "files": ["service-worker.js"],
+            "rules": {
+                "no-restricted-globals": "off"
+            },
+            "env": {
+                "serviceworker": true
+            }
+        }
+    ]
 }
