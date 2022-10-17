@@ -1,11 +1,11 @@
 {
     "short_name": "Mamar",
-    "name": "Mamar - Paper Mario music editro",
+    "name": "Mamar",
     "icons": [
       {
-        "src": "./macos_icon_512x512.png",
+        "src": "./macos_icon.png",
         "type": "image/png",
-        "sizes": "512x512"
+        "sizes": "1024x1024"
       }
     ],
     "id": "/app?source=pwa",

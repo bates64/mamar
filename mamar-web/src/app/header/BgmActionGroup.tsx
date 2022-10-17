@@ -1,4 +1,5 @@
 import { View, ActionButton } from "@adobe/react-spectrum"
+import { CSSProperties } from "react"
 
 import OpenButton from "./OpenButton"
 
@@ -12,7 +13,11 @@ export default function BgmActionGroup() {
         isQuiet: true,
     }
 
-    return <View>
+    return <View UNSAFE_style={{
+        "position": "absolute",
+        "left": "calc(env(titlebar-area-x, 30px) + 8px)",
+        "-webkit-app-region": "no-drag",
+    } as CSSProperties}>
         <ActionButton
             onPress={() => dispatch({ type: "open_doc" })}
             {...props}

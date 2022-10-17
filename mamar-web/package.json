@@ -39,6 +39,7 @@
   "devDependencies": {
     "@axe-core/react": "^4.4.4",
     "@parcel/optimizer-data-url": "2.7.0",
+    "@parcel/packager-raw-url": "^2.7.0",
     "@parcel/transformer-inline-string": "2.7.0",
     "@parcel/transformer-sass": "2.7.0",
     "@parcel/transformer-svg-react": "^2.7.0",

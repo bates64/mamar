@@ -19,9 +19,9 @@ export default function Header() {
                 alignItems="center"
             >
                 <Flex
-                    height="size-500"
                     alignItems="center"
                     gap="size-100"
+                    UNSAFE_style={{ height: "env(titlebar-area-height, 38px)" }}
                 >
                     <Heading level={1}>
                         <a href="/">
@@ -29,6 +29,9 @@ export default function Header() {
                         </a>
                     </Heading>
                     <BgmActionGroup />
+                    <h2 aria-hidden="true">
+                        Mamar
+                    </h2>
                 </Flex>
                 <SponsorButton />
             </Grid>

@@ -1,11 +1,36 @@
 .Header {
+    -webkit-app-region: drag;
+
     h1 {
         margin: 0;
+
+        .window-controls-overlay & {
+            display: none;
+        }
 
         &, img {
             width: 24px;
             height: 24px;
             vertical-align: top;
+        }
+    }
+
+    h2 {
+        font-size: 12px;
+        font-weight: 400;
+
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+
+        color: var(--spectrum-global-color-gray-900);
+
+        user-select: none;
+
+        display: none;
+
+        .window-controls-overlay & {
+            display: block;
         }
     }
 }
