@@ -30,7 +30,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                 <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
                 <NumberField
-                    label="Polyhony"
+                    label="Polyphony"
                     value={track.polyphonicIdx}
                     minValue={0}
                     maxValue={255}
