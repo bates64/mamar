@@ -139,6 +139,7 @@ html, .App {
         top: 0;
         width: 100%;
         height: 40px;
+        z-index: 1;
 
         h1 {
             margin: 0;
@@ -187,7 +188,7 @@ html, .App {
     .hero {
         text-align: center;
 
-        padding: 6em 2em;
+        padding: 6em 2em 0 2em;
     }
 
     .hero-logo {
@@ -196,6 +197,8 @@ html, .App {
 
         width: 24em;
         max-width: 100%;
+
+        aspect-ratio: 56 / 15;
     }
 
     .hero-description {
@@ -230,7 +233,7 @@ html, .App {
         }
     }
 
-    main {
+    main, .section-container {
         padding: 1em;
         margin: 0 auto;
 
@@ -306,5 +309,34 @@ html, .App {
 
     .center {
         text-align: center;
+    }
+
+    .screenshot {
+        $width: 1115;
+        $height: 769;
+
+        display: block;
+        margin: 0 auto;
+
+        width: 100%;
+        max-width: $width;
+        aspect-ratio: #{$width} / #{$height};
+
+        background: url(screenshot.png) no-repeat top center / cover;
+
+        @media (max-width: 800px) {
+            background-size: calc($width * 0.7) calc($height * 0.7);
+
+            position: relative;
+
+            &::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                width: 100%;
+                height: 100px;
+                background: linear-gradient(transparent, var(--grey-0));
+            }
+        }
     }
 }

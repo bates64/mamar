@@ -7,7 +7,7 @@ Paper Mario music editor.
 
 [Website](https://mamar.nanaian.town) - [Open in your browser](https://mamar.nanaian.town/app) - [Changelog](/changelog.md)
 
-![Screenshot](.github/screenshot.png)
+![Screenshot](mamar-web/src/screenshot.png)
 
 ---
 
