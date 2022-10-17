@@ -42,6 +42,7 @@
     "@parcel/transformer-inline-string": "2.7.0",
     "@parcel/transformer-sass": "2.7.0",
     "@parcel/transformer-svg-react": "^2.7.0",
+    "@parcel/transformer-webmanifest": "^2.7.0",
     "@types/node": "^18.7.18",
     "@types/react": "^18.0.20",
     "@types/react-beautiful-dnd": "^13.1.2",
