@@ -1,5 +1,7 @@
 import { manifest, version } from "@parcel/service-worker"
 
+import { version as mamarVersion } from "../package.json"
+
 async function install() {
     const cache = await caches.open(version)
     await cache.addAll(Array.from(new Set(manifest)))
@@ -11,6 +13,11 @@ async function activate() {
     await Promise.all(
         keys.map(key => key !== version && caches.delete(key)),
     )
+
+    if (mamarVersion !== localStorage.MAMAR_VERSION || process.env === "development") {
+        console.log("[service worker] Clearing cache")
+        await Promise.all((await caches.keys()).map(key => caches.delete(key)))
+    }
 }
 addEventListener("activate", evt => evt.waitUntil(activate()))
 
