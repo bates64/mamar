@@ -16,7 +16,7 @@ export default function BgmActionGroup() {
     return <View UNSAFE_style={{
         "position": "absolute",
         "left": "calc(env(titlebar-area-x, 30px) + 8px)",
-        "-webkit-app-region": "no-drag",
+        "WebkitAppRegion": "no-drag",
     } as CSSProperties}>
         <ActionButton
             onPress={() => dispatch({ type: "open_doc" })}

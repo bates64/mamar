@@ -15,5 +15,17 @@
     "display_override": ["window-controls-overlay"],
     "scope": "/app",
     "theme_color": "#ea7aa1",
-    "description": "Digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64"
-  }
+    "description": "Digital audio workstation, MIDI editor, and music player for Paper Mario on Nintendo 64",
+    "file_handlers": [
+        {
+            "action": "/app?source=pwa-open",
+            "accept": {
+                "audio/midi": [".midi", ".mid", ".rmi"],
+                "application/octet-stream": [".bgm", ".bin"]
+            },
+            "icons": [],
+            "launch_type": "single-client"
+        }
+    ],
+    "capture_links": "existing-client-navigate"
+}

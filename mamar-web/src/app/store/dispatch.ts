@@ -4,7 +4,7 @@ import useUndoable from "use-undoable"
 import { Root, RootAction, rootReducer } from "./root"
 
 interface Dispatch {
-    (action: RootAction): void
+    (...actions: RootAction[]): void
     undo: () => void
     redo: () => void
     canUndo: boolean
@@ -46,16 +46,19 @@ const {
         historyLimit: 100,
     })
 
-    const dispatch: Dispatch = action => {
-        console.info("dispatch", joinActionTypes(action), action)
+    const dispatch: Dispatch = (...actions) => {
+        console.info("dispatch", actions.map(action => joinActionTypes(action)), actions)
         setState(
             prevState => {
-                const newState = rootReducer(prevState, action)
+                let newState = prevState
+                for (const action of actions) {
+                    newState = rootReducer(newState, action)
+                }
                 console.log("new state", newState)
                 return newState
             },
             undefined,
-            !shouldActionCommitToHistory(action),
+            actions.map(action => !shouldActionCommitToHistory(action)).reduce((a, b) => a && b, false),
         )
     }
     dispatch.undo = undo

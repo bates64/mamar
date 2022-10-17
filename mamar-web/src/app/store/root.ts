@@ -57,6 +57,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
                 type: "not_open",
             },
         }
+        console.warn(root)
         return {
             ...root,
             docs: {
