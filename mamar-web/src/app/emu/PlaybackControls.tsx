@@ -132,6 +132,8 @@ export default function PlaybackControls() {
     const ambientSoundId = useId()
 
     if (!bgm) {
+        if (isPlaying)
+            setIsPlaying(false)
         return <View />
     }
 
