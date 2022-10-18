@@ -7,6 +7,11 @@ import OpenButton from "./OpenButton"
 
 import { useDoc, useRoot } from "../store"
 
+function trimFileName(filename: string) {
+    const index = filename.lastIndexOf(".")
+    return index === -1 ? filename : filename.substring(0, index)
+}
+
 export default function BgmActionGroup() {
     const [, dispatch] = useRoot()
     const [doc, docDispatch] = useDoc()
@@ -25,8 +30,10 @@ export default function BgmActionGroup() {
             throw new Error(bgmBin)
         }
 
+        const filename = trimFileName(doc.name) + ".bgm"
+
         const handle = await fileSave(new Blob([bgmBin]), {
-            fileName: `${doc.name}.bgm`,
+            fileName: filename,
             extensions: [".bgm"],
         }, saveAs ? undefined : doc.fileHandle)
 
