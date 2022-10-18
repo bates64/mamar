@@ -213,7 +213,7 @@ fn midi_track_to_bgm_track(
         Some(events) => {
             let mut track = Track {
                 is_disabled: false,
-                polyphonic_idx: 0,
+                polyphonic_idx: 1,
                 is_drum_track: false,
                 parent_track_idx: 0,
                 commands: CommandSeq::new(),
