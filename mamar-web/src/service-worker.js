@@ -1,3 +1,4 @@
+/*
 import { manifest, version } from "@parcel/service-worker"
 
 import { version as mamarVersion } from "../package.json"
@@ -20,21 +21,22 @@ async function activate() {
     }
 }
 addEventListener("activate", evt => evt.waitUntil(activate()))
+*/
 
 addEventListener("fetch", evt => {
     evt.respondWith((async () => {
-        const r = await caches.match(evt.request)
+        /*const r = await caches.match(evt.request)
         if (r) {
             console.log("[service worker] Cache hit", evt.request.url)
             return r
         }
 
-        console.error("[service worker] Cache miss", evt.request.url)
+        console.error("[service worker] Cache miss", evt.request.url)*/
 
         const response = await fetch(evt.request)
-        const cache = await caches.open(version)
+        /*const cache = await caches.open(version)
         console.log(`[service worker] Caching new resource: ${evt.request.url}`)
-        cache.put(evt.request, response.clone())
+        cache.put(evt.request, response.clone())*/
         return response
     })())
 })
