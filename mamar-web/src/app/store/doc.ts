@@ -1,4 +1,3 @@
-import { FileWithHandle } from "browser-fs-access"
 import { Bgm } from "pm64-typegen"
 
 import { BgmAction, bgmReducer } from "./bgm"
@@ -15,7 +14,7 @@ export type PanelContent = {
 export interface Doc {
     id: string
     bgm: Bgm
-    file?: FileWithHandle
+    fileHandle?: FileSystemFileHandle
     name: string
     isSaved: boolean
     activeVariation: number

@@ -1,5 +1,7 @@
 import { View, ActionButton } from "@adobe/react-spectrum"
-import { CSSProperties } from "react"
+import { fileSave } from "browser-fs-access"
+import { bgm_encode } from "mamar-wasm-bridge"
+import { CSSProperties, useCallback, useEffect } from "react"
 
 import OpenButton from "./OpenButton"
 
@@ -8,6 +10,43 @@ import { useDoc, useRoot } from "../store"
 export default function BgmActionGroup() {
     const [, dispatch] = useRoot()
     const [doc, docDispatch] = useDoc()
+
+    JSON.stringify(doc?.bgm)
+
+    const save = useCallback(async (saveAs: boolean) => {
+        if (!doc) {
+            return
+        }
+
+        const bgmBin: Uint8Array | string = bgm_encode(doc.bgm)
+
+        if (typeof bgmBin === "string") {
+            // TODO: surface error in a dialog
+            throw new Error(bgmBin)
+        }
+
+        const handle = await fileSave(new Blob([bgmBin]), {
+            fileName: `${doc.name}.bgm`,
+            extensions: [".bgm"],
+        }, saveAs ? undefined : doc.fileHandle)
+
+        if (handle) {
+            doc.fileHandle = handle
+        }
+
+        docDispatch({ type: "mark_saved" })
+    }, [doc, docDispatch])
+
+    useEffect(() => {
+        const handleKeyDown = (evt: KeyboardEvent) => {
+            if (evt.ctrlKey && evt.key === "s") {
+                evt.preventDefault()
+                save(evt.shiftKey)
+            }
+        }
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [save])
 
     const props = {
         isQuiet: true,
@@ -24,11 +63,8 @@ export default function BgmActionGroup() {
         >New</ActionButton>
         <OpenButton />
         <ActionButton
-            onPress={async () => {
-                // TODO: save file
-                docDispatch({ type: "mark_saved" })
-            }}
-            isDisabled={!doc || !doc.isSaved}
+            onPress={evt => save(evt.shiftKey)}
+            isDisabled={!doc || (doc.isSaved && !!doc?.fileHandle)}
             {...props}
         >Save</ActionButton>
         <ActionButton

@@ -1,5 +1,7 @@
 ## 1.1.0
 
+- Fixed 'Save' button
+    - You can also shift-click to 'Save As'
 - Added progressive web app support
     - Suppporting browsers will be able to install the site as an app
     - Mamar now works completely offline
