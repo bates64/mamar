@@ -19,7 +19,7 @@ export const categories = [
             { bank: 0x30, patch: 0x01, name: "Marimba 2" },
             { bank: 0x30, patch: 0x02, name: "Marimba 3" },
 
-            { bank: 0x30, patch: 0x30, name: "Xylophone 1" },
+            { bank: 0x30, patch: 0x03, name: "Xylophone 1" },
             { bank: 0x30, patch: 0x04, name: "Xylophone 2" },
             { bank: 0x30, patch: 0x05, name: "Xylophone 3" },
             { bank: 0x30, patch: 0x0F, name: "Xylophone 4" },
