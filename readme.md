@@ -96,6 +96,11 @@ Working on `mupen64plus-web`
     1. Run: `yarn link mupen64plus-web`
     2. Restart the dev server in `mamar-web`; you may need to clear the cache (`rm -rf .parcel-cache`)
 
+Rebuilding `mamar-wasm-bridge` or `pm64`
+----------------------------------------
+
+In `mamar-wasm-bridge`, run `wasm-pack build -t web` to rebuild.
+
 Deployment
 ==========
 

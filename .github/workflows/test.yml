@@ -16,13 +16,10 @@ jobs:
       with:
         toolchain: stable
 
-    - name: Download baserom
-      run: curl -Lo baserom.z64 $BASEROM_URL
+    - name: Download test data
+      run: cd pm64/tests/bin && curl -Lo mamar_test_data.zip $TEST_DATA_URL && unzip mamar_test_data.zip
       env:
-        BASEROM_URL: ${{ secrets.BASEROM_URL }}
-
-    - name: Extract assets from baserom
-      run: python3 pm64/tests/bin/extract.py baserom.z64
+        TEST_DATA_URL: https://drive.google.com/uc?export=download&id=1EY_nx_6xtpApgh3qyGivgU0OcpzkKRn0
 
     - uses: Swatinem/rust-cache@v1
 
