@@ -227,6 +227,8 @@ export const categories = [
             { bank: 0x30, patch: 0xA4, name: "Reverse Cymbal" },
 
             { bank: 0x30, patch: 0xE4, name: "Woodblock" },
+
+            { bank: 0x30, patch: 0xF8, name: "Sleigh Bells" },
         ],
     },
     {
