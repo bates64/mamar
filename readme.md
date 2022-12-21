@@ -1,6 +1,6 @@
 [![Mamar](mamar-web/src/logotype.svg)](https://mamar.nanaian.town)
 
-![](https://img.shields.io/github/workflow/status/nanaian/mamar/Test/main?label=tests)
+[![](https://img.shields.io/github/actions/workflow/status/nanaian/mamar/test.yml?branch=main)](https://github.com/nanaian/mamar/actions)
 [![](https://img.shields.io/discord/279322074412089344?color=%237289DA&logo=discord&logoColor=ffffff)](https://discord.gg/qWSxcTjktv)
 
 Paper Mario music editor.
