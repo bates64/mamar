@@ -12,6 +12,14 @@ export type VariationAction = {
     type: "move_segment"
     id: number
     toIndex: number
+} | {
+    type: "add_segment"
+    id: number
+    trackList: number
+} | {
+    type: "add_loop_start"
+    id: number
+    labelIndex: number
 }
 
 export function variationReducer(variation: Variation, action: VariationAction): Variation {
@@ -72,6 +80,32 @@ export function variationReducer(variation: Variation, action: VariationAction):
             }
         } else {
             return variation
+        }
+    case "add_segment":
+        const newSeg: Segment = {
+            type: "Subseg",
+            id: action.id,
+            trackList: action.trackList,
+        }
+        return {
+            ...variation,
+            segments: [
+                ...variation.segments,
+                newSeg,
+            ],
+        }
+    case "add_loop_start":
+        const startLoopSeg: Segment = {
+            id: action.id,
+            type: "StartLoop",
+            label_index: action.labelIndex,
+        }
+        return {
+            ...variation,
+            segments: [
+                ...variation.segments,
+                startLoopSeg,
+            ],
         }
     }
 }
