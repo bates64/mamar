@@ -89,7 +89,7 @@ function useAddNewSegment() {
 
 function useAddLoopStart() {
     const [variation, dispatch] = useVariation()
-    return () => dispatch({ type: "add_loop_start", id: variation?.segments.length ?? 1, labelIndex: variation?.segments.length ?? 1 }) // new action
+    return () => dispatch({ type: "add_loop_start", id: variation?.segments.length ?? 1, iterCount: 0 }) // new action
 }
 
 function Container() {
