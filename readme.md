@@ -27,7 +27,7 @@ This is the React frontend writen with strict-mode TypeScript. Styles are writte
 
 Mamar uses [React Spectrum](https://react-spectrum.adobe.com/react-spectrum/index.html), Adobe's React component library. This means you can quickly build most views with just that and few design decisions need to be made. For more bespoke components, there's no need to fit within the Spectrum design system, so it's no issue to use the `UNSAFE_className` prop. The most important thing is that components are [accessible](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA) and keyboard-navigable. For example, the `PlaybackControls` component has styling that totally overrides Spectrum in order to completely rip off Garageband's UI. If you're thinking of contributing some feature but aren't much of a designer, feel free to focus on the functionality and I'll make it look nice!
 
-State management lives in the `mamar-web/app/store` directory. The general idea is that we have a single state object that is passed to components via React hooks. State is split into "docs" (documents, but named differently to differentiate from the global builtin `document`), each of which is an open BGM. If there are multiple docs open, the app shows tabs to switch between them. The `bgm` field of docs is (de)seraializable with the `pm64` module.
+State management lives in the `mamar-web/app/store` directory. The general idea is that we have a single state object that is passed to components via React hooks. State is split into "docs" (documents, but named differently to differentiate from the global builtin `document`), each of which is an open BGM. If there are multiple docs open, the app shows tabs to switch between them. The `bgm` field of docs is (de)serializable with the `pm64` module.
 
 For performance, [react-tracked](https://react-tracked.js.org/docs/introduction/) avoids needless rerenders by figuring out exactly which properties of the state object a component depends on. Each hook also returns a `dispatch` function to change state. This calls reducers similar to a Redux store, but we don't actually use Redux. Additionally the entire store is wrapped with [use-undoable](https://www.npmjs.com/package/use-undoable) which provides a history of state changes for undo/redo functionality. Changes to anything other than a doc's BGM does not produce a new history entry (see `shouldActionCommitToHistory`), but undoing will revert the rest of the state also - this results in the UI switching back to wherever the undoable action was performed.
 
@@ -112,7 +112,7 @@ To release a new version:
 Contributing
 ============
 
-If you interested in contributing to Mamar, great! Check out the [open issues](https://github.com/nanaian/mamar/issues) for something to do. If you have any questions, feel free to ask in [the `#papermario` channel](https://discord.gg/qWSxcTjktv). I'm also happy to help out people who are new to React or Rust but still want to contribute.
+If you interested in contributing to Mamar, great! Check out the [open issues](https://github.com/nanaian/mamar/issues) for something to do. If you have any questions, feel free to ask in [the `#mamar` channel](https://discord.gg/qWSxcTjktv). I'm also happy to help out people who are new to React or Rust but still want to contribute.
 
 License
 =======
