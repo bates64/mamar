@@ -473,7 +473,7 @@ pub enum Command {
     },
 
     UnkCmdE3 {
-        bank: u8,
+        effect_type: u8,
     },
 
     /// Fades the tempo to `bpm` across `time` ticks.
@@ -587,7 +587,17 @@ pub enum Command {
     },
 
     UnkCmdFF {
-        unk_00: u8,
+        // mode 1: sets effect idx arg1's channel delay to arg2
+        // mode 2: resets unk_174 (cmdListPress override data) for id arg1 and sets channel unk_211 (idx of override for mode 3)=arg1
+        // mode 3: pushes a cmdListPress command arg1,arg2. if arg1<40 then it looks up opcode in D_80078558
+        // mode 4: use override idx arg1
+        // mode 5: sets bgmSounds[*].unk_0 = arg1
+
+        // mode 6 is for proximity fade, e.g. the tunnel pipe in toad town
+        // mode 6 arg1==0: for all tracks, fades vol to its unk_4F or unk_50 (former if proxMixVolume==127)
+        // mode 6 arg1!=0: sets this track's unk_4F=arg1 and unk_50=arg2
+        // see also MonitorMusicProximityTrigger api func
+        unk_00: u8, // mode
         unk_01: u8,
         unk_02: u8,
     },

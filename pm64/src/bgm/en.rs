@@ -528,9 +528,9 @@ impl CommandSeq {
                 }
 
                 Command::End => f.write_u8(0)?,
-                Command::UnkCmdE3 { bank } => {
+                Command::UnkCmdE3 { effect_type } => {
                     f.write_u8(0xE3)?;
-                    f.write_u8(*bank)?;
+                    f.write_u8(*effect_type)?;
                 }
                 Command::TrackTremoloSpeed { value } => {
                     f.write_u8(0xF1)?;

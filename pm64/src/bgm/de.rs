@@ -450,7 +450,9 @@ impl CommandSeq {
                 },
                 0xE1 => Command::MasterVolume { value: f.read_u8()? },
                 0xE2 => Command::MasterPitchShift { cent: f.read_u8()? },
-                0xE3 => Command::UnkCmdE3 { bank: f.read_u8()? },
+                0xE3 => Command::UnkCmdE3 {
+                    effect_type: f.read_u8()?,
+                },
                 0xE4 => Command::MasterTempoFade {
                     time: f.read_u16_be()?,
                     value: f.read_u16_be()?,
