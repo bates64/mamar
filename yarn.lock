@@ -5942,9 +5942,9 @@ msgpackr@^1.5.4:
   optionalDependencies:
     msgpackr-extract "^2.0.2"
 
-mupen64plus-web@nanaian/mupen64plus-web#mamar:
+mupen64plus-web@bates64/mupen64plus-web#mamar:
   version "1.4.0"
-  resolved "https://codeload.github.com/nanaian/mupen64plus-web/tar.gz/eb69b65f36c9d90213a09c88f4680ab94264a1e4"
+  resolved "https://codeload.github.com/bates64/mupen64plus-web/tar.gz/eb69b65f36c9d90213a09c88f4680ab94264a1e4"
 
 natural-compare@^1.4.0:
   version "1.4.0"

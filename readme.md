@@ -1,6 +1,6 @@
 [![Mamar](mamar-web/src/logotype.svg)](https://mamar.nanaian.town)
 
-[![](https://img.shields.io/github/actions/workflow/status/nanaian/mamar/test.yml?branch=main)](https://github.com/nanaian/mamar/actions)
+[![](https://img.shields.io/github/actions/workflow/status/nanaian/mamar/test.yml?branch=main)](https://github.com/bates64/mamar/actions)
 [![](https://img.shields.io/discord/279322074412089344?color=%237289DA&logo=discord&logoColor=ffffff)](https://discord.gg/qWSxcTjktv)
 
 Paper Mario music editor.
@@ -14,7 +14,7 @@ Paper Mario music editor.
 Architecture
 ============
 
-Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, [C patches](/patches) over [the Paper Mario decompilation](https://github.com/pmret/papermario), and [a custom build of mupen64plus-web](https://github.com/nanaian/mupen64plus-web/tree/mamar). The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
+Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, [C patches](/patches) over [the Paper Mario decompilation](https://github.com/pmret/papermario), and [a custom build of mupen64plus-web](https://github.com/bates64/mupen64plus-web/tree/mamar). The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
 
 Why are some parts Rust? Mamar used to be a desktop application written entirely in Rust! It's also a more suitable language for the kind of encoding/decoding of binary data that Mamar needs to do.
 
@@ -87,7 +87,7 @@ For developing, `yarn start` in `mamar-web` will start a dev server at `localhos
 Working on `mupen64plus-web`
 ----------------------------
 
-- In [mupen64plus-web](https://github.com/nanaian/mupen64plus-web):
+- In [mupen64plus-web](https://github.com/bates64/mupen64plus-web):
     1. Switch the Mamar branch: `git checkout mamar`
     2. Run `yarn link`
     3. Setup emscripten 3.1.8
