@@ -6,6 +6,7 @@ import styles from "./SegmentMap.module.scss"
 
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
+import { variationReducer } from "../store/variation"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 interface Loop {
@@ -81,6 +82,16 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
     }
 }
 
+function useAddNewSegment() {
+    const [variation, dispatch] = useVariation()
+    return () => dispatch({ type: "add_segment", id: variation?.segments.length ?? 1, trackList: variation?.segments.length ?? 1 }) // new action
+}
+
+function useAddLoopStart() {
+    const [variation, dispatch] = useVariation()
+    return () => dispatch({ type: "add_loop_start", id: variation?.segments.length ?? 1, iterCount: 0 }) // new action
+}
+
 function Container() {
     const [variation] = useVariation()
     const selection = useSelection()
@@ -126,12 +137,18 @@ function Container() {
                     }
                 })}
             </tr>)}
+
         </tbody>}
     </table>
+
 }
 
 export default function SegmentMap() {
+    const addLoopStart = useAddLoopStart()
+    const addNewSegment = useAddNewSegment()
     return <SelectionProvider>
         <Container />
+        <button onClick={addLoopStart}>Add loop start</button>
+        <button onClick={addNewSegment}>Add new region</button>
     </SelectionProvider>
 }

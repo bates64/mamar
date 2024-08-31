@@ -1,7 +1,7 @@
 [package]
 name = "mamar-wasm-bridge"
 version = "0.1.0"
-authors = ["Alex Bates <alex@nanaian.town>"]
+authors = ["Alex Bates <alex@bates64.com>"]
 edition = "2018"
 
 [lib]

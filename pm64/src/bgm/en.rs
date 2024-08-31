@@ -280,10 +280,7 @@ impl Bgm {
 
         f.write_u32_be_at(file_size, file_size_offset)?;
 
-        // Pad to 16 alignment (not actually required - ld does this anyway - but makes testing for matches easier)
         debug!("end = {:#X}", f.pos()?);
-        f.align(16)?;
-        debug!("end (aligned) = {:#X}", f.pos()?);
 
         if f.pos()? <= 0x8A8F {
             Ok(())
