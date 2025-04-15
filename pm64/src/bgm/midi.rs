@@ -249,6 +249,14 @@ fn midi_track_to_bgm_track(
                                 if let Some(start) = started_notes.remove(&key) {
                                     let length = time - start.time;
 
+                                    if is_pitch_bent {
+                                        is_pitch_bent = false;
+                                        track.commands.insert(
+                                            convert_time(time, time_divisor),
+                                            Command::SegTrackTune { bend: 0 },
+                                        );
+                                    }
+
                                     track.commands.insert(
                                         convert_time(start.time, time_divisor),
                                         Command::Note {
@@ -258,13 +266,7 @@ fn midi_track_to_bgm_track(
                                         },
                                     );
 
-                                    if is_pitch_bent {
-                                        is_pitch_bent = false;
-                                        track.commands.insert(
-                                            convert_time(time, time_divisor),
-                                            Command::SegTrackTune { coarse: 0, fine: 0 },
-                                        );
-                                    }
+
                                 } else {
                                     log::warn!("found NoteOff {} but saw no NoteOn", key);
                                 }
@@ -293,16 +295,15 @@ fn midi_track_to_bgm_track(
                                 }
                             }
                             MidiMessage::PitchBend { bend } => {
-                                // FIXME commands should use signed types?
-                                let bend: u16 = unsafe { std::mem::transmute(bend.as_int()) }; // bleh
-                                let bend_lower = (bend & 0xFF) as u8;
-                                let bend_upper = (bend >> 8) as u8;
-
+                                let two_semitones = 100.0 * 2.0; // Default pitch bend range
+                                let bend_f32 = bend.as_f32() * two_semitones;
+                                let bend_i16 = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+                            
                                 track.commands.insert(
                                     convert_time(time, time_divisor),
                                     Command::SegTrackTune {
-                                        coarse: bend_upper,
-                                        fine: bend_lower,
+                                        // audio.h uses u16 value to hold an i16 for some reason
+                                        bend: bend_i16, // <-------------
                                     },
                                 );
                                 is_pitch_bent = true;

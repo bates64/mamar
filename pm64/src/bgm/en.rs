@@ -481,10 +481,9 @@ impl CommandSeq {
                     f.write_u8(0xEE)?;
                     f.write_u8(*a)?;
                 }
-                Command::SegTrackTune { coarse, fine } => {
+                Command::SegTrackTune { bend } => {
                     f.write_u8(0xEF)?;
-                    f.write_u8(*coarse)?;
-                    f.write_u8(*fine)?;
+                    f.write_i16_be(*bend)?;
                 }
                 Command::TrackTremolo {
                     amount,
