@@ -282,7 +282,7 @@ fn midi_track_to_bgm_track(
                                             Command::Note {
                                                 pitch: key + 104,
                                                 velocity: start.vel,
-                                                length: length as u16,
+                                                length: convert_time(length as usize, time_divisor) as u16,
                                             },
                                         );
                                     } else {
