@@ -237,8 +237,12 @@ fn midi_track_to_bgm_track(
 
             let mut is_pitch_bent = false;
 
+            let mut pitch_bend_semitone_range = 2.0; // Default pitch bend range
+            let mut pitch_range_cmd_state = 0;
+
             for event in events {
                 time += event.delta.as_int() as usize;
+
 
                 match event.kind {
                     TrackEventKind::Midi { channel: _, message } => {
@@ -295,8 +299,8 @@ fn midi_track_to_bgm_track(
                                 }
                             }
                             MidiMessage::PitchBend { bend } => {
-                                let two_semitones = 100.0 * 2.0; // Default pitch bend range
-                                let bend_f32 = bend.as_f32() * two_semitones;
+                                let pitch_bend_range = pitch_bend_semitone_range * 100.0;
+                                let bend_f32 = bend.as_f32() * pitch_bend_range;
                                 let bend_i16 = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
                             
                                 track.commands.insert(
@@ -332,6 +336,10 @@ fn midi_track_to_bgm_track(
                                 let controller = controller.as_int();
                                 let value = value.as_int(); // Note this is in the range 0..=127
 
+                                if controller != 100 && controller != 101 && controller != 6 {
+                                    pitch_range_cmd_state = 0;
+                                }
+
                                 // See page 12 of the specification:
                                 // https://www.cs.cmu.edu/~music/cmsip/readings/Standard-MIDI-file-format-updated.pdf
                                 // Or:
@@ -352,6 +360,12 @@ fn midi_track_to_bgm_track(
                                                 time: 8,
                                             },
                                         );
+                                    }
+                                    6 => {
+                                        if pitch_range_cmd_state == 2 {
+                                            pitch_bend_semitone_range = value as f32;
+                                        }
+                                        pitch_range_cmd_state = 0;
                                     }
                                     // Channel Volume
                                     7 | 39 => track
@@ -407,6 +421,21 @@ fn midi_track_to_bgm_track(
                                                 patch: instruments[voice_idx].bank,
                                             },
                                         );
+                                    }
+                                    100 => {
+                                        if pitch_range_cmd_state == 1 {
+                                            pitch_range_cmd_state = 2;
+                                        } else {
+                                            pitch_range_cmd_state = 0;
+                                        }
+
+                                    }
+                                    101 => {
+                                        if pitch_range_cmd_state == 0 {
+                                            pitch_range_cmd_state = 1;
+                                        } else {
+                                            pitch_range_cmd_state = 0;
+                                        }
                                     }
                                     // All notes off / All sound off
                                     123 | 120 => {
