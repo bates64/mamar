@@ -8,6 +8,13 @@ use crate::bgm::*;
 use crate::id::gen_id;
 use crate::rw::*;
 
+#[derive(PartialEq)]
+pub enum PitchRangeCommandState {
+    None,
+    ParameterMSBSet,
+    ParameterLSBSet,
+}
+
 pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
     let previous_pos = file.pos().unwrap_or_default();
 
@@ -238,11 +245,10 @@ fn midi_track_to_bgm_track(
             let mut is_pitch_bent = false;
 
             let mut pitch_bend_semitone_range = 2.0; // Default pitch bend range
-            let mut pitch_range_cmd_state = 0;
+            let mut pitch_range_cmd_state: PitchRangeCommandState = PitchRangeCommandState::None;
 
             for event in events {
                 time += event.delta.as_int() as usize;
-
 
                 match event.kind {
                     TrackEventKind::Midi { channel: _, message } => {
@@ -255,22 +261,27 @@ fn midi_track_to_bgm_track(
 
                                     if is_pitch_bent {
                                         is_pitch_bent = false;
-                                        track.commands.insert(
+                                        track.commands.insert_many(
                                             convert_time(time, time_divisor),
-                                            Command::SegTrackTune { bend: 0 },
+                                            vec![
+                                                Command::SegTrackTune { bend: 0 },
+                                                Command::Note {
+                                                    pitch: key + 104,
+                                                    velocity: start.vel,
+                                                    length: convert_time(length as usize, time_divisor) as u16,
+                                                },
+                                            ],
+                                        );
+                                    } else {
+                                        track.commands.insert(
+                                            convert_time(start.time, time_divisor),
+                                            Command::Note {
+                                                pitch: key + 104,
+                                                velocity: start.vel,
+                                                length: convert_time(length as usize, time_divisor) as u16,
+                                            },
                                         );
                                     }
-
-                                    track.commands.insert(
-                                        convert_time(start.time, time_divisor),
-                                        Command::Note {
-                                            pitch: key + 104,
-                                            velocity: start.vel,
-                                            length: convert_time(length as usize, time_divisor) as u16,
-                                        },
-                                    );
-
-
                                 } else {
                                     log::warn!("found NoteOff {} but saw no NoteOn", key);
                                 }
@@ -301,13 +312,12 @@ fn midi_track_to_bgm_track(
                             MidiMessage::PitchBend { bend } => {
                                 let pitch_bend_range = pitch_bend_semitone_range * 100.0;
                                 let bend_f32 = bend.as_f32() * pitch_bend_range;
-                                let bend_i16 = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
-                            
+                                let bend = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+
                                 track.commands.insert(
                                     convert_time(time, time_divisor),
                                     Command::SegTrackTune {
-                                        // audio.h uses u16 value to hold an i16 for some reason
-                                        bend: bend_i16, // <-------------
+                                        bend,
                                     },
                                 );
                                 is_pitch_bent = true;
@@ -336,10 +346,6 @@ fn midi_track_to_bgm_track(
                                 let controller = controller.as_int();
                                 let value = value.as_int(); // Note this is in the range 0..=127
 
-                                if controller != 100 && controller != 101 && controller != 6 {
-                                    pitch_range_cmd_state = 0;
-                                }
-
                                 // See page 12 of the specification:
                                 // https://www.cs.cmu.edu/~music/cmsip/readings/Standard-MIDI-file-format-updated.pdf
                                 // Or:
@@ -361,11 +367,9 @@ fn midi_track_to_bgm_track(
                                             },
                                         );
                                     }
-                                    6 => {
-                                        if pitch_range_cmd_state == 2 {
-                                            pitch_bend_semitone_range = value as f32;
-                                        }
-                                        pitch_range_cmd_state = 0;
+                                    6 if pitch_range_cmd_state == PitchRangeCommandState::ParameterLSBSet => {
+                                        pitch_bend_semitone_range = value as f32;
+                                        pitch_range_cmd_state = PitchRangeCommandState::None;
                                     }
                                     // Channel Volume
                                     7 | 39 => track
@@ -422,20 +426,11 @@ fn midi_track_to_bgm_track(
                                             },
                                         );
                                     }
-                                    100 => {
-                                        if pitch_range_cmd_state == 1 {
-                                            pitch_range_cmd_state = 2;
-                                        } else {
-                                            pitch_range_cmd_state = 0;
-                                        }
-
+                                    100 if pitch_range_cmd_state == PitchRangeCommandState::ParameterMSBSet => {
+                                        pitch_range_cmd_state = PitchRangeCommandState::ParameterLSBSet;
                                     }
-                                    101 => {
-                                        if pitch_range_cmd_state == 0 {
-                                            pitch_range_cmd_state = 1;
-                                        } else {
-                                            pitch_range_cmd_state = 0;
-                                        }
+                                    101 if pitch_range_cmd_state == PitchRangeCommandState::None => {
+                                        pitch_range_cmd_state = PitchRangeCommandState::ParameterMSBSet;
                                     }
                                     // All notes off / All sound off
                                     123 | 120 => {
@@ -463,7 +458,9 @@ fn midi_track_to_bgm_track(
                                     127 => {
                                         track.polyphonic_idx = 2;
                                     }
-                                    _ => {}
+                                    _ => {
+                                        pitch_range_cmd_state = PitchRangeCommandState::None;
+                                    }
                                 }
                             }
                         }
