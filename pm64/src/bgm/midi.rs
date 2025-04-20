@@ -245,7 +245,7 @@ fn midi_track_to_bgm_track(
             let mut is_pitch_bent = false;
 
             let mut pitch_bend_semitone_range = 2.0; // Default pitch bend range
-            let mut pitch_range_cmd_state: PitchRangeCommandState = PitchRangeCommandState::None;
+            let mut pitch_range_cmd_state = PitchRangeCommandState::None;
 
             for event in events {
                 time += event.delta.as_int() as usize;
@@ -259,28 +259,20 @@ fn midi_track_to_bgm_track(
                                 if let Some(start) = started_notes.remove(&key) {
                                     let length = time - start.time;
 
+                                    let note = Command::Note {
+                                        pitch: key + 104,
+                                        velocity: start.vel,
+                                        length: convert_time(length as usize, time_divisor) as u16,
+                                    };
+
                                     if is_pitch_bent {
                                         is_pitch_bent = false;
                                         track.commands.insert_many(
                                             convert_time(time, time_divisor),
-                                            vec![
-                                                Command::SegTrackTune { bend: 0 },
-                                                Command::Note {
-                                                    pitch: key + 104,
-                                                    velocity: start.vel,
-                                                    length: convert_time(length as usize, time_divisor) as u16,
-                                                },
-                                            ],
+                                            vec![Command::SegTrackTune { bend: 0 }, note],
                                         );
                                     } else {
-                                        track.commands.insert(
-                                            convert_time(start.time, time_divisor),
-                                            Command::Note {
-                                                pitch: key + 104,
-                                                velocity: start.vel,
-                                                length: convert_time(length as usize, time_divisor) as u16,
-                                            },
-                                        );
+                                        track.commands.insert(convert_time(start.time, time_divisor), note);
                                     }
                                 } else {
                                     log::warn!("found NoteOff {} but saw no NoteOn", key);
@@ -314,12 +306,9 @@ fn midi_track_to_bgm_track(
                                 let bend_f32 = bend.as_f32() * pitch_bend_range;
                                 let bend = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
 
-                                track.commands.insert(
-                                    convert_time(time, time_divisor),
-                                    Command::SegTrackTune {
-                                        bend,
-                                    },
-                                );
+                                track
+                                    .commands
+                                    .insert(convert_time(time, time_divisor), Command::SegTrackTune { bend });
                                 is_pitch_bent = true;
                             }
                             MidiMessage::Aftertouch { key: _, vel } | MidiMessage::ChannelAftertouch { vel } => {

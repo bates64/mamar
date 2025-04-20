@@ -476,9 +476,7 @@ impl CommandSeq {
                 0xEC => Command::SegTrackVolume { value: f.read_u8()? },
                 0xED => Command::SubTrackCoarseTune { value: f.read_u8()? },
                 0xEE => Command::SubTrackFineTune { value: f.read_u8()? },
-                0xEF => Command::SegTrackTune {
-                    bend: f.read_i16_be()?,
-                },
+                0xEF => Command::SegTrackTune { bend: f.read_i16_be()? },
                 0xF0 => Command::TrackTremolo {
                     amount: f.read_u8()?,
                     speed: f.read_u8()?,
