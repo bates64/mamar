@@ -1,4 +1,3 @@
-use pm64::bgm::midi;
 use pm64::bgm::Bgm;
 use std::fs::{read, File};
 
@@ -8,9 +7,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print_help_and_exit();
     }
     match args[1].as_ref() {
+        #[cfg(feature = "midly")]
         "convert" if args.len() == 4 => {
             let input = read(&args[2])?;
-            let bgm = midi::to_bgm(&input)?;
+            let bgm = pm64::bgm::midi::to_bgm(&input)?;
 
             let mut output = File::create(&args[3])?;
             bgm.encode(&mut output)?;
@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn print_help_and_exit() {
     eprintln!("Commands:");
+    #[cfg(feature = "midly")]
     eprintln!("  convert <input.mid> <output.bgm>");
     eprintln!("  listinstruments <input.bgm>");
     std::process::exit(1);
