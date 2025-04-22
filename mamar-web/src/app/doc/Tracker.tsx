@@ -276,22 +276,13 @@ function Command({ command }:{ command: pm64.Event }) {
         </div>
     } else if (command.type === "SegTrackTune") {
         return <div className={classNames(styles.command, styles.seg)}>
-            set coarse tune to
+            set pitch bend to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.coarse}
-                    minValue={0}
-                    maxValue={0xFF}
-                    onChange={coarse => mutate({ coarse })}
-                />
-            </InputBox>
-            and fine tune to
-            <InputBox>
-                <VerticalDragNumberInput
-                    value={command.fine}
-                    minValue={0}
-                    maxValue={0xFF}
-                    onChange={fine => mutate({ fine })}
+                    value={command.bend}
+                    minValue={-32768}
+                    maxValue={32767}
+                    onChange={bend => mutate({ bend })}
                 />
             </InputBox>
         </div>

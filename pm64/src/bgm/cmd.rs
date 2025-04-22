@@ -531,8 +531,7 @@ pub enum Command {
     },
 
     SegTrackTune {
-        coarse: u8,
-        fine: u8,
+        bend: i16,
     },
 
     // TODO: figure out whether Seg or Sub
