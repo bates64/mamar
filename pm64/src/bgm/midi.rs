@@ -371,18 +371,20 @@ fn midi_track_to_bgm_track(
                                         pitch_range_cmd_state = PitchRangeCommandState::None;
                                     }
                                     // Channel Volume
-                                    7 | 39 => track
-                                        .commands
-                                        .insert_end(convert_time(time, time_divisor), Command::SubTrackVolume { value }),
+                                    7 | 39 => track.commands.insert_end(
+                                        convert_time(time, time_divisor),
+                                        Command::SubTrackVolume { value },
+                                    ),
                                     // Pan
                                     10 | 42 | 8 | 40 => track.commands.insert_end(
                                         convert_time(time, time_divisor),
                                         Command::SubTrackPan { value: value as i8 },
                                     ),
                                     // Effect control 1
-                                    12 | 44 => track
-                                        .commands
-                                        .insert_end(convert_time(time, time_divisor), Command::SubTrackReverb { value }),
+                                    12 | 44 => track.commands.insert_end(
+                                        convert_time(time, time_divisor),
+                                        Command::SubTrackReverb { value },
+                                    ),
                                     // Damper pedal on/off (sustain)
                                     64 => {
                                         let sustain = if value >= 64 {

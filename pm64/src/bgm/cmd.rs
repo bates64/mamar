@@ -285,7 +285,10 @@ impl CommandSeq {
     pub fn shrink(&mut self) {
         // Remove useless commands
         self.vec.retain(|event| {
-            !matches!(event.command, Command::Delay { value: 0 } | Command::Note { length: 0, .. })
+            !matches!(
+                event.command,
+                Command::Delay { value: 0 } | Command::Note { length: 0, .. }
+            )
         });
 
         // TODO: combine redundant subsequences (e.g. multiple Delay, multiple MasterTempo without a delay between)
@@ -671,7 +674,8 @@ pub enum Command {
 
     UnkCmdFF {
         // mode 1: sets effect idx arg1's channel delay to arg2
-        // mode 2: resets unk_174 (cmdListPress override data) for id arg1 and sets channel unk_211 (idx of override for mode 3)=arg1
+        // mode 2: resets unk_174 (cmdListPress override data) for id arg1 and sets channel unk_211 (idx of override
+        // for mode 3)=arg1
         // mode 3: pushes a cmdListPress command arg1,arg2. if arg1<40 then it looks up opcode in D_80078558
         // mode 4: use override idx arg1
         // mode 5: sets bgmSounds[*].unk_0 = arg1
@@ -829,16 +833,14 @@ mod test {
     #[test]
     fn insert_end() {
         let mut seq = CommandSeq::new();
-        let note = || Command::Note { pitch: 0, velocity: 0, length: 0 };
+        let note = || Command::Note {
+            pitch: 0,
+            velocity: 0,
+            length: 0,
+        };
 
-        seq.insert_many_start(0, vec![
-            note(),
-            note(),
-        ]);
-        seq.insert_many_start(10, vec![
-            note(),
-            note(),
-        ]);
+        seq.insert_many_start(0, vec![note(), note()]);
+        seq.insert_many_start(10, vec![note(), note()]);
 
         seq.insert_end(0, Command::Marker { label: "test1".into() });
         seq.insert_end(10, Command::Marker { label: "test2".into() });

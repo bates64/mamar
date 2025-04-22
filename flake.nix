@@ -13,7 +13,7 @@
       overlays = [
         rust-overlay.overlays.default
         (final: prev: {
-          rustToolchain = final.rust-bin.stable.latest.default.override {
+          rustToolchain = final.rust-bin.nightly.latest.default.override {
             targets = [ "wasm32-unknown-unknown" ];
             extensions = [ "rust-src" ];
           };
@@ -23,7 +23,8 @@
       forEachSupportedSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f {
         pkgs = import nixpkgs { inherit overlays system; };
       });
-    in {
+    in
+    {
       schemas = flake-schemas.schemas;
       devShells = forEachSupportedSystem ({ pkgs }: {
         default = pkgs.mkShell {
@@ -46,6 +47,7 @@
           shellHook = "yarn install";
         };
       });
+      formatter = forEachSupportedSystem ({ pkgs }: pkgs.nixpkgs-fmt);
       # TODO: output a package
     };
 }
