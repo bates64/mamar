@@ -58,21 +58,14 @@ impl CommandSeq {
         Self::with_capacity(0)
     }
 
-    /// Inserts the given command at the specified time, keeping the temporal position of all other commands in the
-    /// sequence consistent. Has the side-effect of combining an adjacient Delay sequence, similar to that of
-    /// [`shrink`](CommandSeq::shrink).
+    /// Inserts the given command at the start of the specified time, keeping the temporal position of all other
+    /// commands in the sequence consistent. Has the side-effect of combining an adjacient Delay sequence, similar to
+    /// that of [`shrink`](CommandSeq::shrink).
     ///
     /// A delay will also be inserted after the subsequence where required,
     /// with delays after the insertion point combined into one.
-    ///
-    /// The command is inserted at the **start** of the subequence at `time`. That means that insertion at the same time
-    /// in series will result in a backwards result. Most of the time this does not matter, but it might be a source
-    /// of playback issues in specific circumstances.
-    ///
-    /// In cases such as the above example, you can use [`insert_many(time)`](CommandSeq::insert_many) to insert a
-    /// subsequence whilst preserving its order.
-    pub fn insert(&mut self, time: usize, command: Command) {
-        self.insert_many(time, iter::once(command))
+    pub fn insert_start(&mut self, time: usize, command: Command) {
+        self.insert_many_start(time, iter::once(command))
     }
 
     /// Consumes the given iterator of commands and inserts them at the start of the subsequence at the specified time.
@@ -82,7 +75,7 @@ impl CommandSeq {
     /// The order of the inserted subsequence is maintained.
     ///
     /// Has the side-effect of combining delays to the immediate right of the inserted subsequence.
-    pub fn insert_many<C: Into<Event>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
+    pub fn insert_many_start<C: Into<Event>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
         // Turn subsequence members into Commands if they are not already (C: Into<Command>)
         let subsequence = subsequence.into_iter().map(|cmd| cmd.into());
 
@@ -107,7 +100,93 @@ impl CommandSeq {
                 }) = self.vec.get(old_delay_range.end)
                 {
                     old_delay_range.end += 1;
-                    delta_time += *t as usize;
+                    delta_time += *t;
+                }
+
+                let insert_time = {
+                    let before_time = time - time_at_index;
+                    let after_time = delta_time.saturating_sub(before_time); // For delta_time = 0
+                    (before_time, after_time)
+                };
+
+                fn delay(time: usize) -> Box<dyn Iterator<Item = Event>> {
+                    if time > 0 {
+                        Box::new(iter::once(Command::Delay { value: time }.into()))
+                    } else {
+                        Box::new(iter::empty())
+                    }
+                }
+
+                // Vec::splice and using an iterator is more efficient than a naive while loop that inserts delays.
+                // See https://stackoverflow.com/questions/28678615.
+                self.vec.splice(
+                    old_delay_range, // Replace old delays
+                    delay(insert_time.0).chain(subsequence).chain(delay(insert_time.1)),
+                );
+            }
+        }
+    }
+
+    /// Inserts the given command at the end of specified time, keeping the temporal position of all other commands in
+    /// the sequence consistent. Has the side-effect of combining an adjacient Delay sequence, similar to that of
+    /// [`shrink`](CommandSeq::shrink).
+    ///
+    /// A delay will also be inserted after the subsequence where required,
+    /// with delays after the insertion point combined into one.
+    pub fn insert_end(&mut self, time: usize, command: Command) {
+        self.insert_many_end(time, iter::once(command))
+    }
+
+    /// Consumes the given iterator of commands and inserts them at the end of the subsequence at the specified time.
+    /// [Delays](Delay) are adjusted and inserted in order to maintain the time values of commands before and after in
+    /// the sequence.
+    ///
+    /// The order of the inserted subsequence is maintained.
+    ///
+    /// Has the side-effect of combining delays to the immediate right of the inserted subsequence.
+    pub fn insert_many_end<C: Into<Event>, I: IntoIterator<Item = C>>(&mut self, time: usize, subsequence: I) {
+        // Turn subsequence members into Commands if they are not already (C: Into<Command>)
+        let subsequence = subsequence.into_iter().map(|cmd| cmd.into());
+
+        match self.lookup_delay(time) {
+            DelayLookup::Found(start) => {
+                // Find the next delay, which ends `time`, and insert before it.
+                let mut index = self.vec.len();
+                for (end, Event { command, .. }) in self.vec.iter().enumerate().skip(start + 1) {
+                    if let Command::Delay { .. } = command {
+                        index = end - 1;
+                        break;
+                    } else if let Command::End = command {
+                        index = end - 1;
+                        break;
+                    }
+                }
+                self.vec.splice(
+                    index..index, // Remove no elements
+                    subsequence,
+                );
+            }
+
+            DelayLookup::Missing { index, time_at_index } => {
+                debug_assert!(time >= time_at_index);
+
+                let mut old_delay_range = index..index;
+
+                for (index, Event { command, .. }) in self.vec.iter().enumerate().skip(index + 1) {
+                    if let Command::Delay { .. } = command {
+                        old_delay_range = index..index;
+                        break;
+                    }
+                }
+
+                let mut delta_time: usize = 0;
+                while let Some(Event {
+                    command: Delay { value: t },
+                    ..
+                }) = self.vec.get(old_delay_range.end)
+                {
+                    old_delay_range.end += 1;
+                    delta_time += *t;
                 }
 
                 let insert_time = {
@@ -204,8 +283,13 @@ impl CommandSeq {
     /// Optimises this sequence to take up as little memory as possible whilst still being playback-equivalent (i.e.
     /// sounds the same).
     pub fn shrink(&mut self) {
-        // TODO: remove Delay(0) commands
+        // Remove useless commands
+        self.vec.retain(|event| {
+            !matches!(event.command, Command::Delay { value: 0 } | Command::Note { length: 0, .. })
+        });
+
         // TODO: combine redundant subsequences (e.g. multiple Delay, multiple MasterTempo without a delay between)
+
         self.vec.shrink_to_fit();
     }
 
@@ -405,7 +489,7 @@ impl CommandSeq {
 impl<C: Into<Event>> From<Vec<C>> for CommandSeq {
     fn from(vec: Vec<C>) -> Self {
         let mut new = Self::new();
-        new.insert_many(0, vec);
+        new.insert_many_start(0, vec);
         new
     }
 }
@@ -737,3 +821,31 @@ impl<'a> Iterator for TimeGroupIter<'a> {
 }
 
 pub type MarkerId = String;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn insert_end() {
+        let mut seq = CommandSeq::new();
+        let note = || Command::Note { pitch: 0, velocity: 0, length: 0 };
+
+        seq.insert_many_start(0, vec![
+            note(),
+            note(),
+        ]);
+        seq.insert_many_start(10, vec![
+            note(),
+            note(),
+        ]);
+
+        seq.insert_end(0, Command::Marker { label: "test1".into() });
+        seq.insert_end(10, Command::Marker { label: "test2".into() });
+        dbg!(&seq);
+
+        assert!(matches!(seq.vec[2].command, Command::Marker { .. }));
+
+        assert!(matches!(seq.vec.last().unwrap().command, Command::Marker { .. }));
+    }
+}
