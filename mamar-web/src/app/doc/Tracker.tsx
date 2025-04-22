@@ -104,10 +104,10 @@ function Command({ command }:{ command: pm64.Event }) {
         </div>
     } else if (command.type === "UnkCmdE3") {
         return <div className={classNames(styles.command, styles.master)}>
-            unk command E3 bank
+            unk command E3 effect type
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.bank}
+                    value={command.effect_type}
                     minValue={0}
                     maxValue={0xFF}
                     onChange={bank => mutate({ bank })}
