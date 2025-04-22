@@ -13,7 +13,10 @@
       overlays = [
         rust-overlay.overlays.default
         (final: prev: {
-          rustToolchain = final.rust-bin.stable.latest.default.override { targets = [ "wasm32-unknown-unknown" ]; };
+          rustToolchain = final.rust-bin.stable.latest.default.override {
+            targets = [ "wasm32-unknown-unknown" ];
+            extensions = [ "rust-src" ];
+          };
         })
       ];
       supportedSystems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" "aarch64-linux" ];
@@ -26,7 +29,7 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             nodejs-18_x
-            nodePackages.yarn
+            yarn
             rustToolchain
             cargo-bloat
             cargo-edit
