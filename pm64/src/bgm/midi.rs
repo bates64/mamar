@@ -423,7 +423,7 @@ fn midi_track_to_bgm_track(
                                             convert_time(time, time_divisor),
                                             Command::TrackOverridePatch {
                                                 bank: instruments[voice_idx].bank & 0xF0 | sustain,
-                                                patch: instruments[voice_idx].bank,
+                                                patch: instruments[voice_idx].patch,
                                             },
                                         );
                                     }
