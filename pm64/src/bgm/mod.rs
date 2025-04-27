@@ -91,7 +91,7 @@ impl Bgm {
 
         let id = max_id.wrapping_add(1);
 
-        debug_assert!(self.track_lists.get(&id).is_none());
+        debug_assert!(!self.track_lists.contains_key(&id));
 
         self.track_lists.insert(id, track_list);
         id
@@ -157,7 +157,7 @@ pub struct TrackList {
     pub tracks: [Track; 16],
 }
 
-#[derive(Clone, PartialEq, Eq, Default, Debug, Serialize, Deserialize, TypeDef)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
@@ -166,6 +166,21 @@ pub struct Track {
     pub is_drum_track: bool,
     pub parent_track_idx: u8,
     pub commands: CommandSeq,
+}
+
+/// 255 is never used in vanilla songs so we can repurpose it to mean 'please calculate a good polyphonic_idx for me'
+pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
+
+impl Default for Track {
+    fn default() -> Self {
+        Self {
+            is_disabled: true,
+            polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
+            is_drum_track: false,
+            parent_track_idx: 0,
+            commands: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]

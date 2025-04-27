@@ -1,19 +1,13 @@
 use std::error::Error;
 use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::num::NonZeroU8;
 
 use midly::{MetaMessage, Smf};
 
 use crate::bgm::*;
 use crate::id::gen_id;
 use crate::rw::*;
-
-#[derive(PartialEq)]
-pub enum PitchRangeCommandState {
-    None,
-    ParameterMSBSet,
-    ParameterLSBSet,
-}
 
 pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
     let previous_pos = file.pos().unwrap_or_default();
@@ -41,23 +35,26 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
 
     bgm.name = "New Song".to_string();
 
-    let total_song_length = {
-        let mut max = 0;
+    let total_song_length = convert_time(
+        {
+            let mut max = 0;
 
-        for track in &smf.tracks {
-            let mut length = 0;
+            for track in &smf.tracks {
+                let mut length = 0;
 
-            for event in track {
-                length += convert_time(event.delta.as_int() as usize, time_divisor);
+                for event in track {
+                    length += event.delta.as_int() as usize;
+                }
+
+                if length > max {
+                    max = length;
+                }
             }
 
-            if length > max {
-                max = length;
-            }
-        }
-
-        max
-    };
+            max
+        },
+        time_divisor,
+    );
 
     log::debug!("song length: {} ticks (48 ticks/beat)", total_song_length);
 
@@ -220,7 +217,7 @@ fn midi_track_to_bgm_track(
         Some(events) => {
             let mut track = Track {
                 is_disabled: false,
-                polyphonic_idx: 5,
+                polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
                 is_drum_track: false,
                 parent_track_idx: 0,
                 commands: CommandSeq::new(),
@@ -242,16 +239,22 @@ fn midi_track_to_bgm_track(
             let mut instrument_name = None;
             let mut track_name = None;
 
-            let mut is_pitch_bent = false;
-
-            let mut pitch_bend_semitone_range = 2.0; // Default pitch bend range
+            /// Linear automaton for reading 'pitch range set' event sequence
+            #[derive(PartialEq, Eq)]
+            pub enum PitchRangeCommandState {
+                None,
+                ParameterMSBSet,
+                ParameterLSBSet,
+            }
             let mut pitch_range_cmd_state = PitchRangeCommandState::None;
+            let mut pitch_bend_semitone_range = 2.0;
 
             for event in events {
                 time += event.delta.as_int() as usize;
+                let time_cvt = convert_time(time, time_divisor);
 
                 match event.kind {
-                    TrackEventKind::Midi { channel: _, message } => {
+                    TrackEventKind::Midi { channel: _, message } if track_number != 0 => {
                         match message {
                             MidiMessage::NoteOff { key, vel: _ } => {
                                 let key = key.as_int();
@@ -264,21 +267,14 @@ fn midi_track_to_bgm_track(
 
                                     let length = time - start.time;
 
-                                    let note = Command::Note {
-                                        pitch: key + 104,
-                                        velocity: start.vel,
-                                        length: convert_time(length, time_divisor) as u16,
-                                    };
-
-                                    if is_pitch_bent {
-                                        is_pitch_bent = false;
-                                        track.commands.insert_many_end(
-                                            convert_time(time, time_divisor),
-                                            vec![Command::SegTrackTune { bend: 0 }, note],
-                                        );
-                                    } else {
-                                        track.commands.insert_end(convert_time(start.time, time_divisor), note);
-                                    }
+                                    track.commands.insert_end(
+                                        convert_time(start.time, time_divisor),
+                                        Command::Note {
+                                            pitch: key + 104,
+                                            velocity: start.vel,
+                                            length: convert_time(length, time_divisor) as u16,
+                                        },
+                                    );
                                 } else {
                                     log::warn!("found NoteOff {} but saw no NoteOn", key);
                                 }
@@ -316,16 +312,12 @@ fn midi_track_to_bgm_track(
                                 let bend_f32 = bend.as_f32() * pitch_bend_range;
                                 let bend = bend_f32.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16;
 
-                                track
-                                    .commands
-                                    .insert_end(convert_time(time, time_divisor), Command::SegTrackTune { bend });
-                                is_pitch_bent = bend != 0;
+                                track.commands.insert_end(time_cvt, Command::SegTrackTune { bend });
                             }
                             MidiMessage::Aftertouch { key: _, vel } | MidiMessage::ChannelAftertouch { vel } => {
-                                track.commands.insert_end(
-                                    convert_time(time, time_divisor),
-                                    Command::SubTrackVolume { value: vel.as_int() },
-                                );
+                                track
+                                    .commands
+                                    .insert_end(time_cvt, Command::SubTrackVolume { value: vel.as_int() });
                             }
                             MidiMessage::ProgramChange { program } => {
                                 if !set_bank_patch {
@@ -333,7 +325,7 @@ fn midi_track_to_bgm_track(
                                     set_bank_patch = true;
                                 } else {
                                     track.commands.insert_end(
-                                        convert_time(time, time_divisor),
+                                        time_cvt,
                                         Command::TrackOverridePatch {
                                             bank: 48,
                                             patch: program.as_int(),
@@ -358,7 +350,7 @@ fn midi_track_to_bgm_track(
                                         //
                                         // I declare it...tremolo!
                                         track.commands.insert_end(
-                                            convert_time(time, time_divisor),
+                                            time_cvt,
                                             Command::TrackTremolo {
                                                 amount: 8,
                                                 speed: value,
@@ -371,20 +363,13 @@ fn midi_track_to_bgm_track(
                                         pitch_range_cmd_state = PitchRangeCommandState::None;
                                     }
                                     // Channel Volume
-                                    7 | 39 => track.commands.insert_end(
-                                        convert_time(time, time_divisor),
-                                        Command::SubTrackVolume { value },
-                                    ),
+                                    7 | 39 => track.commands.insert_end(time_cvt, Command::SubTrackVolume { value }),
                                     // Pan
-                                    10 | 42 | 8 | 40 => track.commands.insert_end(
-                                        convert_time(time, time_divisor),
-                                        Command::SubTrackPan { value: value as i8 },
-                                    ),
+                                    10 | 42 | 8 | 40 => track
+                                        .commands
+                                        .insert_end(time_cvt, Command::SubTrackPan { value: value as i8 }),
                                     // Effect control 1
-                                    12 | 44 => track.commands.insert_end(
-                                        convert_time(time, time_divisor),
-                                        Command::SubTrackReverb { value },
-                                    ),
+                                    12 | 44 => track.commands.insert_end(time_cvt, Command::SubTrackReverb { value }),
                                     // Damper pedal on/off (sustain)
                                     64 => {
                                         let sustain = if value >= 64 {
@@ -396,7 +381,7 @@ fn midi_track_to_bgm_track(
                                         };
 
                                         track.commands.insert_end(
-                                            convert_time(time, time_divisor),
+                                            time_cvt,
                                             Command::TrackOverridePatch {
                                                 bank: instruments[voice_idx].bank & 0xF0 | sustain,
                                                 patch: instruments[voice_idx].bank,
@@ -420,7 +405,7 @@ fn midi_track_to_bgm_track(
                                         };
 
                                         track.commands.insert_end(
-                                            convert_time(time, time_divisor),
+                                            time_cvt,
                                             Command::TrackOverridePatch {
                                                 bank: instruments[voice_idx].bank & 0xF0 | sustain,
                                                 patch: instruments[voice_idx].patch,
@@ -471,7 +456,7 @@ fn midi_track_to_bgm_track(
                             let microseconds_per_beat = tempo.as_int() as f32;
                             let beats_per_minute = (60_000_000.0 / microseconds_per_beat).round() as u16;
                             track.commands.insert_end(
-                                convert_time(time, time_divisor),
+                                time_cvt,
                                 Command::MasterTempo {
                                     value: beats_per_minute,
                                 },
@@ -489,9 +474,7 @@ fn midi_track_to_bgm_track(
                     }
                     TrackEventKind::Meta(MetaMessage::CuePoint(s)) | TrackEventKind::Meta(MetaMessage::Marker(s)) => {
                         if let Ok(s) = String::from_utf8(s.to_owned()) {
-                            track
-                                .commands
-                                .insert_end(convert_time(time, time_divisor), Command::Marker { label: s });
+                            track.commands.insert_end(time_cvt, Command::Marker { label: s });
                         }
                     }
                     _ => {}
@@ -517,9 +500,7 @@ fn midi_track_to_bgm_track(
                 return Track::default();
             }
 
-            track.commands.insert_end(total_song_length, Command::End);
-
-            if track_number != 0 {
+            if track.commands.max_polyphony() > 0 {
                 // Required else the game crashes D:
                 track.commands.insert_many_start(
                     0,
@@ -540,6 +521,7 @@ fn midi_track_to_bgm_track(
                 track.is_drum_track = true;
             }
 
+            track.commands.insert_end(total_song_length, Command::End);
             track.commands.shrink();
 
             track

@@ -487,6 +487,30 @@ impl CommandSeq {
     pub fn to_command_vec(self) -> Vec<Command> {
         self.vec.into_iter().map(|e| e.command).collect()
     }
+
+    /// Calculate the maximum number of notes that play at once.
+    pub fn max_polyphony(&self) -> u8 {
+        let mut polyphony = 0;
+        let mut notes = [0; u8::MAX as usize]; // Maps pitch->end_time of played notes
+        for (time, event) in self.iter_time() {
+            let time = time as u16;
+
+            if let Event {
+                command: Command::Note { pitch, length, .. },
+                ..
+            } = event
+            {
+                notes[*pitch as usize] = *length + time;
+
+                let current_polyphony = notes.iter().filter(|end_time| **end_time > time).count() as u8;
+                if current_polyphony > polyphony {
+                    polyphony = current_polyphony;
+                    dbg!(current_polyphony, time);
+                }
+            }
+        }
+        polyphony
+    }
 }
 
 impl<C: Into<Event>> From<Vec<C>> for CommandSeq {
@@ -849,5 +873,66 @@ mod test {
         assert!(matches!(seq.vec[2].command, Command::Marker { .. }));
 
         assert!(matches!(seq.vec.last().unwrap().command, Command::Marker { .. }));
+    }
+
+    #[test]
+    fn max_polyphony() {
+        let seq = CommandSeq::new();
+        assert_eq!(seq.max_polyphony(), 0);
+
+        let seq: CommandSeq = vec![Command::Note {
+            pitch: 100,
+            velocity: 100,
+            length: 10,
+        }]
+        .into();
+        assert_eq!(seq.max_polyphony(), 1);
+
+        let seq: CommandSeq = vec![
+            Command::Note {
+                pitch: 100,
+                velocity: 100,
+                length: 10,
+            },
+            Command::Delay { value: 15 },
+            Command::Note {
+                pitch: 100, // same pitch
+                velocity: 100,
+                length: 10,
+            },
+        ]
+        .into();
+        assert_eq!(seq.max_polyphony(), 1);
+
+        let seq: CommandSeq = vec![
+            Command::Note {
+                pitch: 100,
+                velocity: 100,
+                length: 10,
+            },
+            Command::Note {
+                pitch: 200,
+                velocity: 100,
+                length: 10,
+            },
+        ]
+        .into();
+        assert_eq!(seq.max_polyphony(), 2);
+
+        let seq: CommandSeq = vec![
+            Command::Note {
+                pitch: 100,
+                velocity: 100,
+                length: 10,
+            },
+            Command::Delay { value: 10 }, // note should finish
+            Command::Note {
+                pitch: 200,
+                velocity: 100,
+                length: 10,
+            },
+        ]
+        .into();
+        assert_eq!(seq.max_polyphony(), 1);
     }
 }

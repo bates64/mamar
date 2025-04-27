@@ -75,7 +75,6 @@ impl Bgm {
 
         debug_assert_eq!(f.pos()?, 0x14);
         let segment_offsets = (0..self.variations.len())
-            .into_iter()
             .map(|_| {
                 let pos = f.pos()?;
                 f.write_u16_be(0)?;
@@ -107,7 +106,7 @@ impl Bgm {
             }
         }
 
-        // Write voices
+        // Write instruments
         if !self.instruments.is_empty() {
             f.align(4)?;
             let pos = (f.pos()? >> 2) as u16;
@@ -234,8 +233,13 @@ impl Bgm {
                         }
                         f.write_u16_be(0)?; // Replaced later if !null
 
+                        let polyphonic_idx = match *polyphonic_idx {
+                            POLYPHONIC_IDX_AUTO_MAMAR => polyphony_to_polyphonic_idx(commands.max_polyphony()),
+                            n => n,
+                        };
+
                         let flags = (*is_disabled as u16) << 8
-                            | (*polyphonic_idx as u16) << 0xD
+                            | (polyphonic_idx as u16) << 0xD
                             | if *is_drum_track { 0x0080 } else { 0 }
                             | (*parent_track_idx as u16) << 9;
                         f.write_u16_be(flags)?;
@@ -597,5 +601,16 @@ impl CommandSeq {
 
         f.seek(end_pos)?;
         Ok(())
+    }
+}
+
+/// Performs the inverse of `player->unk_22A[polyphony]`
+fn polyphony_to_polyphonic_idx(polyphony: u8) -> u8 {
+    match polyphony {
+        0 => 0,
+        1 => 1,
+        2 => 5,
+        3 => 6,
+        _ => 7,
     }
 }
