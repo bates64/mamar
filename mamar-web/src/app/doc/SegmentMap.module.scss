@@ -1,8 +1,6 @@
 $trackHeight: 70px;
 
 .table {
-    border-collapse: collapse;
-
     width: 100%;
 
     user-select: none;
@@ -22,7 +20,14 @@ $trackHeight: 70px;
     }
 }
 
+.ruler {
+    display: flex;
+    width: max-content;
+}
+
 .track {
+    display: flex;
+    width: max-content;
     height: $trackHeight;
 
     &:nth-child(even) {

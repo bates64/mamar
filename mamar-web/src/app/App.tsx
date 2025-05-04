@@ -30,7 +30,7 @@ export function RomDataConsumer() {
             <div className={styles.playbackControlsContainer}>
                 <PlaybackControls />
             </div>
-            <View gridArea="content" overflow="auto">
+            <View gridArea="content">
                 <Main />
             </View>
         </Grid>
