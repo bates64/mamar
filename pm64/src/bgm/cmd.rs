@@ -254,7 +254,7 @@ impl CommandSeq {
                 ..
             } = command
             {
-                time += *delta_time as usize;
+                time += *delta_time;
             }
         }
 
@@ -267,7 +267,7 @@ impl CommandSeq {
     /// Equivalent to [CommandSeq::len_time] for a sequence with no [Command::Note]s.
     pub fn playback_time(&self) -> usize {
         self.iter_time().last().map_or(0, |(time, event)| match event.command {
-            Command::Delay { value: delta } => time + delta as usize,
+            Command::Delay { value: delta } => time + delta,
             Command::Note { length, .. } => time + length as usize,
             _ => time,
         })
@@ -438,7 +438,7 @@ impl CommandSeq {
                 let time_at_index = current_time;
 
                 // Advance past this Delay.
-                current_time += *delta_time as usize;
+                current_time += *delta_time;
 
                 if current_time == time {
                     // This Delay introduced the time we want! :)
@@ -800,7 +800,7 @@ impl<'a> Iterator for TimeIter<'a> {
                     ..
                 } = command
                 {
-                    self.current_time += *delta_time as usize;
+                    self.current_time += *delta_time;
                 }
 
                 Some(ret)
