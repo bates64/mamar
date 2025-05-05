@@ -1,6 +1,5 @@
 $trackHeight: 70px;
 $trackHead-width: 8em;
-$ruler-height: 22px;
 
 .table {
     width: 100%;
@@ -8,60 +7,6 @@ $ruler-height: 22px;
     user-select: none;
 
     --ruler-zoom: 2;
-}
-
-.ruler {
-    display: flex;
-    width: max-content;
-    height: $ruler-height;
-
-    margin-left: $trackHead-width;
-
-    --ticks-per-beat: 48px;
-    --color: var(--spectrum-global-color-gray-400);
-    background-color: var(--spectrum-global-color-gray-200);
-    background-image: repeating-linear-gradient(to right, var(--color) 0, var(--color) 1px, transparent 1px, transparent calc(var(--ticks-per-beat) / var(--ruler-zoom)));
-    background-size: calc(var(--ticks-per-beat) / var(--ruler-zoom)) 50%;
-    background-repeat: repeat no-repeat;
-    background-position-y: calc(var(--ticks-per-beat) / 4);
-
-    position: sticky;
-    top: 0;
-
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-
-    /* Hide ruler above where trackHeads are when scrolling */
-    &::after {
-        content: "";
-        position: fixed;
-        left: 0;
-        width: $trackHead-width;
-        height: $ruler-height;
-        background: var(--spectrum-global-color-gray-100);
-    }
-}
-
-.rulerSegment {
-    display: flex;
-    color: var(--spectrum-global-color-gray-800);
-}
-
-.loop {
-    background: var(--yellow);
-    color: var(--spectrum-global-color-gray-200);
-
-    /* Need to repeat .ruler background-image here since we overlaid it with a yellow background */
-    --color: rgba(0, 0, 0, 0.3);
-    background-image: repeating-linear-gradient(to right, var(--color) 0, var(--color) 1px, transparent 1px, transparent calc(var(--ticks-per-beat) / var(--ruler-zoom)));
-    background-size: calc(var(--ticks-per-beat) / var(--ruler-zoom)) 50%;
-    background-repeat: repeat no-repeat;
-    background-position-y: calc(var(--ticks-per-beat) / 4);
-}
-
-.bar {
-    padding-left: calc(8px / var(--ruler-zoom));
-    border-left: var(--color) 1px solid; /* Extend the background-image */
-    flex: none;
 }
 
 .track {
