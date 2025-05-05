@@ -8,8 +8,6 @@ import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
-const TICKS_PER_BEAT = 48
-
 interface Loop {
     start: number
     end: number
@@ -86,8 +84,68 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
 function ticksToStyle(ticks: number) {
     // TODO: zoom via a css variable
     return {
-        width: `calc(${ticks}px * 2)`,
+        width: `calc(${ticks}px / var(--ruler-zoom))`,
     }
+}
+
+function LoopHandle() {
+    // TODO
+    return <div>
+    </div>
+}
+
+// TODO: bar counts where a segment is not a full bar
+function Ruler({ segmentLengths, loops }: { segmentLengths: number[], loops: Loop[] }) {
+    const TICKS_PER_BEAT = 48
+    const BEATS_PER_BAR = 4 // TODO: read time signature from midi
+
+    const segments = []
+    let time = 0
+    let inLoop = false
+    for (let segment = 0; segment < segmentLengths.length; segment++) {
+        const length = segmentLengths[segment]
+
+        if (length === 0) {
+            // Loop or other, so check for loop handle
+            for (const { start, end } of loops) {
+                if (segment === start) {
+                    inLoop = true
+                    segments.push(<LoopHandle />)
+                }
+                if (segment === end) {
+                    inLoop = false
+                    segments.push(<LoopHandle />)
+                }
+                continue
+            }
+            continue
+        }
+
+        const barLength = length / (TICKS_PER_BEAT * BEATS_PER_BAR)
+        const bars = []
+        for (let i = 0; i < barLength; i++) {
+            const bar = Math.floor(time / (TICKS_PER_BEAT * BEATS_PER_BAR)) + i
+            bars.push(<div className={styles.bar} style={ticksToStyle(TICKS_PER_BEAT * BEATS_PER_BAR)}>
+                {bar}
+            </div>)
+        }
+
+        segments.push(<div
+            className={classNames({
+                [styles.rulerSegment]: true,
+                [styles.loop]: inLoop,
+            })}
+            style={ticksToStyle(length)}
+        >
+            {bars}
+        </div>)
+
+        time += length
+    }
+
+    return <div className={styles.ruler}>
+        {segments}
+    </div>
 }
 
 function Container() {
@@ -122,43 +180,22 @@ function Container() {
         }}
     >
         {variation && <div>
-            <div className={styles.ruler}>
-                <td className={styles.trackHead} />
-                {segmentLengths.filter(ticks => ticks > 0).map(ticks => {
-                    /* TODO: show bars/beats */
-                    return <div style={ticksToStyle(ticks)}>
-                        {ticks}
-                    </div>
-                })}
-            </div>
-            {/*loops.map(({ start, end }) => {
-                const endSeg = variation.segments[end]
-
-                if (endSeg.type !== "EndLoop")
-                    throw new Error("Expected EndLoop")
-
-                return <tr aria-label={`Loop ${endSeg.label_index} gutter`}>
-                    <td colSpan={start + 1} />
-                    <td colSpan={end - start + 1} className={styles.loop}>
-                        Loop {endSeg.iter_count !== 0 && `${endSeg.iter_count}x`}
-                    </td>
-                </tr>
-            })*/}
+            <Ruler segmentLengths={segmentLengths} loops={loops} />
             {tracks.map(i => <tr key={i} className={styles.track} aria-label={`Track ${i+1}`}>
-                <td className={styles.trackHead}>
+                {<div className={styles.trackHead}>
                     <div className={styles.trackName}>Track {i + 1}</div>
                     <TrackControls trackIndex={i} />
-                </td>
+                </div>}
                 {variation.segments.map((segment, segmentIndex) => {
                     if (segment.type === "Subseg") {
-                        return <td
+                        return <div
                             key={segment.id}
                             style={ticksToStyle(segmentLengths[segmentIndex])}
                         >
                             <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
-                        </td>
+                        </div>
                     } else {
-                        return <td key={segment.id} />
+                        return <div key={segment.id} />
                     }
                 })}
             </tr>)}
