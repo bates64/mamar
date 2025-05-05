@@ -4,7 +4,7 @@ import styles from "./SponsorButton.module.scss"
 
 export default function SponsorButton() {
     return <a
-        href="https://github.com/sponsors/nanaian"
+        href="https://github.com/sponsors/bates64"
         target="_blank"
         rel="noopener noreferrer"
         className={styles.button}
