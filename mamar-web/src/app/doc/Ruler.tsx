@@ -42,7 +42,7 @@ function LoopHandle({ segment, kind, loop, setHighlightedLoop }: {
     loop: Loop
     setHighlightedLoop: (id: Loop["id"] | null) => void
 }) {
-    const [active, setActive] = useState(true)
+    const [active, setActive] = useState(false)
     return <div className={styles.relative}>
         <div
             className={classNames({
