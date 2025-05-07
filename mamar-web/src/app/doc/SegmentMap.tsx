@@ -1,5 +1,5 @@
 import classNames from "classnames"
-import { useId } from "react"
+import { useId, useRef, createContext, useContext } from "react"
 
 import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
 import styles from "./SegmentMap.module.scss"
@@ -7,6 +7,24 @@ import styles from "./SegmentMap.module.scss"
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
+
+const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
+
+interface Time {
+    xToTicks: (clientX: number) => number
+}
+
+const TIME_CTX = createContext<Time | null>(null)
+
+export function useTime(): Time {
+    const time = useContext(TIME_CTX)
+
+    if (!time) {
+        throw new Error("TimeProvider missing in tree")
+    }
+
+    return time
+}
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
@@ -57,39 +75,50 @@ function Container() {
     const [variation] = useVariation()
     const selection = useSelection()
     const segmentLengths = useSegmentLengths()
+    const container = useRef<HTMLDivElement | null>(null)
 
     const tracks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // note: no master track
 
-    return <div
-        aria-label="Segments"
-        className={styles.table}
-        onClick={() => {
-            selection.clear()
-        }}
-    >
-        {variation && <div>
-            <Ruler segments={variation.segments} />
-            {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
-                {<div className={styles.trackHead}>
-                    <div className={styles.trackName}>Track {i}</div>
-                    <TrackControls trackIndex={i} />
-                </div>}
-                {variation.segments.map((segment, segmentIndex) => {
-                    if (segment.type === "Subseg") {
-                        return <div
-                            key={segment.id}
-                            style={ticksToStyle(segmentLengths[segmentIndex])}
-                        >
-                            <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
-                        </div>
-                    } else {
-                        return <div key={segment.id} />
-                    }
-                })}
-            </div>)}
-        </div>}
-    </div>
-
+    return <TIME_CTX.Provider value={{
+        xToTicks(clientX: number): number {
+            if (!container.current) return NaN
+            const px = clientX - container.current.getBoundingClientRect().left
+            const style = getComputedStyle(container.current)
+            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
+            return (px - TRACK_HEAD_WIDTH) * rulerZoom
+        },
+    }}>
+        <div
+            ref={container}
+            aria-label="Segments"
+            className={styles.table}
+            onClick={() => {
+                selection.clear()
+            }}
+        >
+            {variation && <div>
+                <Ruler segments={variation.segments} />
+                {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
+                    {<div className={styles.trackHead}>
+                        <div className={styles.trackName}>Track {i}</div>
+                        <TrackControls trackIndex={i} />
+                    </div>}
+                    {variation.segments.map((segment, segmentIndex) => {
+                        if (segment.type === "Subseg") {
+                            return <div
+                                key={segment.id}
+                                style={ticksToStyle(segmentLengths[segmentIndex])}
+                            >
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
+                            </div>
+                        } else {
+                            return <div key={segment.id} />
+                        }
+                    })}
+                </div>)}
+            </div>}
+        </div>
+    </TIME_CTX.Provider>
 }
 
 export default function SegmentMap() {

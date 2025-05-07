@@ -1,5 +1,5 @@
 $trackHeight: 70px;
-$trackHead-width: 8em;
+$trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
 .table {
     width: 100%;
@@ -7,6 +7,7 @@ $trackHead-width: 8em;
     user-select: none;
 
     --ruler-zoom: 2;
+    --trackHead-width: $trackHead-width;
 }
 
 .track {

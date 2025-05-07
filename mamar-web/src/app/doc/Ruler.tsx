@@ -3,6 +3,7 @@ import { Segment } from "pm64-typegen"
 import { useState } from "react"
 
 import styles from "./Ruler.module.scss"
+import { useTime } from "./SegmentMap"
 
 import { useBgm, useVariation } from "../store"
 
@@ -42,6 +43,9 @@ function LoopHandle({ segment, kind, loop, setHighlightedLoop }: {
     loop: Loop
     setHighlightedLoop: (id: Loop["id"] | null) => void
 }) {
+    const time = useTime()
+    const segmentLengths = useSegmentLengths()
+    const [, dispatch] = useVariation()
     const [active, setActive] = useState(false)
     return <div className={styles.relative}>
         <div
@@ -55,8 +59,32 @@ function LoopHandle({ segment, kind, loop, setHighlightedLoop }: {
                 setHighlightedLoop(loop.id)
                 setActive(true)
             }}
-            onMouseUp={() => {
-                // TODO: dispatch a segment move to the new location
+            onMouseUp={evt => {
+                const targetTime = time.xToTicks(evt.clientX)
+
+                // Find closest segment boundary
+                let curTime = 0
+                let closestIndex = -1
+                let closestDistance = targetTime
+                segmentLengths.forEach((length, index) => {
+                    curTime += length
+                    console.log(index, length)
+                    const distance = Math.abs(curTime - targetTime)
+                    if (distance < closestDistance) {
+                        closestDistance = distance
+                        closestIndex = index
+                    }
+                })
+
+                console.log({ targetTime, closestIndex, closestDistance })
+
+                if (closestDistance < 50) {
+                    dispatch({
+                        type: "move_segment",
+                        id: segment,
+                        toIndex: closestIndex + 1,
+                    })
+                }
                 setHighlightedLoop(null)
                 setActive(false)
             }}
@@ -105,19 +133,20 @@ export default function Ruler({ segments }: { segments: Segment[] }) {
     const elements = []
     let time = 0
     let currentLoop: Loop | null = null
-    for (let segment = 0; segment < segmentLengths.length; segment++) {
-        const length = segmentLengths[segment]
+    for (let i = 0; i < segmentLengths.length; i++) {
+        const segment = segments[i]
+        const length = segmentLengths[i]
 
         if (length === 0) {
             // Loop or other, so check for loop handle
             for (const loop of loops) {
-                if (segment === loop.start) {
+                if (i === loop.start) {
                     currentLoop = loop
-                    elements.push(<LoopHandle segment={segment} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={loop.id} segment={segment.id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
-                if (segment === loop.end) {
+                if (i === loop.end) {
                     currentLoop = null
-                    elements.push(<LoopHandle segment={segment} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={loop.id} segment={segment.id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
                 continue
             }
@@ -128,7 +157,7 @@ export default function Ruler({ segments }: { segments: Segment[] }) {
         const bars = []
         for (let i = 0; i < barLength; i++) {
             const bar = Math.floor(time / (TICKS_PER_BEAT * BEATS_PER_BAR)) + i
-            bars.push(<div className={styles.bar} style={ticksToStyle(TICKS_PER_BEAT * BEATS_PER_BAR)}>
+            bars.push(<div key={`bar_${i}`} className={styles.bar} style={ticksToStyle(TICKS_PER_BEAT * BEATS_PER_BAR)}>
                 {bar}
             </div>)
         }
