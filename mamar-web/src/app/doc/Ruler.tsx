@@ -11,6 +11,7 @@ interface Loop {
     id: number
     start: number
     end: number
+    iterCount: number
 }
 
 function getLoops(segments: Segment[]): Loop[] {
@@ -27,6 +28,7 @@ function getLoops(segments: Segment[]): Loop[] {
                         id: start.id,
                         start: startIdx,
                         end: endIdx,
+                        iterCount: end.iter_count,
                     })
                     break
                 }
@@ -131,11 +133,11 @@ export default function Ruler() {
     const BEATS_PER_BAR = 4 // TODO: read time signature from midi
 
     const elements = []
-    let time = 0
     let currentLoop: Loop | null = null
+    let totalTime = 0
     for (let i = 0; i < segmentLengths.length; i++) {
         const segment = segments[i]
-        const length = segmentLengths[i]
+        let length = segmentLengths[i]
 
         if (length === 0) {
             // Loop or other, so check for loop handle
@@ -153,23 +155,21 @@ export default function Ruler() {
             continue
         }
 
-        const barLength = length / (TICKS_PER_BEAT * BEATS_PER_BAR)
-        const bars = []
-        for (let i = 0; i < barLength; i++) {
-            const bar = Math.floor(time / (TICKS_PER_BEAT * BEATS_PER_BAR)) + i
-            bars.push(<div key={`bar_${i}`} className={styles.bar} style={ticksToStyle(TICKS_PER_BEAT * BEATS_PER_BAR)}>
-                {bar}
-            </div>)
+        // Consume all segments that are part of this loop
+        if (currentLoop !== null) {
+            while (segments[i + 1].type !== "EndLoop") {
+                length += segmentLengths[++i]
+            }
         }
 
         elements.push(<div
             key={segment.id}
             className={classNames({
                 [styles.rulerSegment]: true,
-                [styles.loop]: currentLoop !== null,
                 [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
             })}
             style={ticksToStyle(length)}
+            title={currentLoop === null ? "Double-click to loop" : "Double-click to remove loop"}
             onDoubleClick={() => {
                 dispatch({
                     type: "toggle_segment_loop",
@@ -177,13 +177,27 @@ export default function Ruler() {
                 })
             }}
         >
-            {bars}
+            {currentLoop && <div className={styles.loop}>
+                {currentLoop.iterCount > 0 && <span className={styles.loopIterCount}>{`×${currentLoop.iterCount}`}</span>}
+            </div>}
         </div>)
+        totalTime += length
+    }
 
-        time += length
+    const bars = []
+    for (let time = 0, bar = 0; time < totalTime; bar++, time += TICKS_PER_BEAT * BEATS_PER_BAR) {
+        const remaining = Math.min(totalTime - time, TICKS_PER_BEAT * BEATS_PER_BAR)
+        bars.push(<div key={bar} className={styles.bar} style={ticksToStyle(remaining)}>
+            {bar}
+        </div>)
     }
 
     return <div className={styles.ruler}>
-        {elements}
+        <div className={styles.loops}>
+            {elements}
+        </div>
+        <div className={styles.bars}>
+            {bars}
+        </div>
     </div>
 }
