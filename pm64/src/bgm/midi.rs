@@ -177,21 +177,10 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     let track_list_id = bgm.add_track_list(track_list);
 
     let (_, variation) = bgm.add_variation().unwrap();
-    variation.segments = vec![
-        Segment::StartLoop {
-            id: gen_id(),
-            label_index: 0,
-        },
-        Segment::Subseg {
-            id: gen_id(),
-            track_list: track_list_id,
-        },
-        Segment::EndLoop {
-            id: gen_id(),
-            label_index: 0,
-            iter_count: 0,
-        },
-    ];
+    variation.segments = vec![Segment::Subseg {
+        id: gen_id(),
+        track_list: track_list_id,
+    }];
 
     Ok(bgm)
 }
