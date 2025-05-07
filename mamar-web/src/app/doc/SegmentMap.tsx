@@ -77,7 +77,7 @@ function Container() {
     const segmentLengths = useSegmentLengths()
     const container = useRef<HTMLDivElement | null>(null)
 
-    const tracks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // note: no master track
+    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
 
     return <TIME_CTX.Provider value={{
         xToTicks(clientX: number): number {
@@ -100,8 +100,8 @@ function Container() {
                 <Ruler />
                 {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
                     {<div className={styles.trackHead}>
-                        <div className={styles.trackName}>Track {i}</div>
-                        <TrackControls trackIndex={i} />
+                        <div className={styles.trackName}>{i === 0 ? "Master" : `Track ${i}`}</div>
+                        {i > 0 && <TrackControls trackIndex={i} />}
                     </div>}
                     {variation.segments.map((segment, segmentIndex) => {
                         if (segment.type === "Subseg") {
