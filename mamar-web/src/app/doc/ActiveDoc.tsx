@@ -82,7 +82,7 @@ export default function ActiveDoc() {
                             overflow: "hidden",
                         }}
                     >
-                        <View overflow="overlay">
+                        <View overflow="overlay" UNSAFE_style={{ minHeight: 0 }}>
                             <SegmentMap />
                             {provided.placeholder}
                         </View>

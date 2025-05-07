@@ -1,8 +1,42 @@
+import produce from "immer"
 import { Segment, Variation } from "pm64-typegen"
 
 import { useBgm } from "./bgm"
 import { useDoc } from "./doc"
 import { SegmentAction, segmentReducer } from "./segment"
+
+function cleanLoops(segments: (Segment | null)[]): Segment[] {
+    return produce(segments, cleaned => {
+        // Ensure StartLoop comes before EndLoop with the same label_index
+        for (let i = 0; i < cleaned.length; i++) {
+            const endLoop = cleaned[i]
+            if (endLoop?.type === "EndLoop") {
+                for (let j = i + 1; j < cleaned.length; j++) {
+                    const startLoop = cleaned[j]
+                    if (startLoop?.type === "StartLoop" && startLoop.label_index === endLoop.label_index) {
+                        const temp = cleaned[i]
+                        cleaned[i] = cleaned[j]
+                        cleaned[j] = temp
+                        break
+                    }
+                }
+            }
+        }
+
+        // Remove adjacent StartLoop and EndLoop with matching label_index
+        for (let i = 0; i < cleaned.length - 1; i++) {
+            const a = cleaned[i]
+            const b = cleaned[i + 1]
+            if (a?.type === "StartLoop" &&
+                b?.type === "EndLoop" &&
+                a.label_index === b.label_index
+            ) {
+                cleaned[i] = null
+                cleaned[i + 1] = null
+            }
+        }
+    }).filter(s => s !== null) as Segment[]
+}
 
 export type VariationAction = {
     type: "segment"
@@ -17,9 +51,8 @@ export type VariationAction = {
     id: number
     trackList: number
 } | {
-    type: "add_loop_start"
+    type: "toggle_segment_loop"
     id: number
-    iterCount: number
 }
 
 export function variationReducer(variation: Variation, action: VariationAction): Variation {
@@ -36,51 +69,16 @@ export function variationReducer(variation: Variation, action: VariationAction):
             }),
         }
     case "move_segment":
-        const fromIndex = variation.segments.findIndex(s => s.id === action.id)
-        if (fromIndex !== -1) {
-            const segment = variation.segments[fromIndex]
-            let segments: (Segment | null)[] = JSON.parse(JSON.stringify(variation.segments))
+        return produce(variation, draft => {
+            const fromIndex = draft.segments.findIndex(s => s.id === action.id)
+            if (fromIndex === -1) return
 
-            segments[fromIndex] = null
-            segments.splice(action.toIndex, 0, segment)
-            segments = segments.filter(s => s !== null)
+            const segment = draft.segments[fromIndex]
+            draft.segments[fromIndex] = null as any
+            draft.segments.splice(action.toIndex, 0, segment)
 
-            // If EndLoop > StartLoop, swap them
-            for (let i = 0; i < segments.length; i++) {
-                const endLoop = segments[i]
-                if (endLoop?.type === "EndLoop") {
-                    for (let j = i + 1; j < segments.length; j++) {
-                        const startLoop = segments[j]
-                        if (startLoop?.type === "StartLoop" && startLoop.label_index === endLoop.label_index) {
-                            const temp = segments[i]
-                            segments[i] = segments[j]
-                            segments[j] = temp
-                            break
-                        }
-                    }
-                }
-            }
-
-            // If StartLoop and EndLoop are next to each other, remove them
-            for (let i = 0; i < segments.length - 1; i++) {
-                const a = segments[i]
-                const b = segments[i + 1]
-                if (a?.type === "StartLoop" &&
-                    b?.type === "EndLoop" &&
-                    a.label_index === b.label_index
-                ) {
-                    segments[i] = null
-                    segments[i + 1] = null
-                }
-            }
-
-            return {
-                ...variation,
-                segments: segments.filter(s => s !== null) as Segment[],
-            }
-        } else {
-            return variation
-        }
+            draft.segments = cleanLoops(draft.segments)
+        })
     case "add_segment":
         const newSeg: Segment = {
             type: "Subseg",
@@ -94,33 +92,49 @@ export function variationReducer(variation: Variation, action: VariationAction):
                 newSeg,
             ],
         }
-    case "add_loop_start": {
+    case "toggle_segment_loop": {
+        return produce(variation, draft => {
+            const i = draft.segments.findIndex(s => s.id === action.id)
+            if (i === -1) return
 
-        const startLoopSeg: Segment = {
-            id: action.id,
-            type: "StartLoop",
-            label_index: variation.segments.length ?? 0,
-        }
-        const loopSubSeg: Segment = {
-            type: "Subseg",
-            id: action.id + 1,
-            trackList: variation.segments.length + 1,
-        }
-        const endLoopSeg: Segment = {
-            type: "EndLoop",
-            id: action.id + 2,
-            label_index: variation.segments.length + 2,
-            iter_count: action.iterCount,
-        }
-        return {
-            ...variation,
-            segments: [
-                ...variation.segments,
-                startLoopSeg,
-                loopSubSeg,
-                endLoopSeg,
-            ],
-        }
+            let inLoop = false
+            let loopStartIndex = -1
+            let loopEndIndex = -1
+
+            // Traverse backwards to find StartLoops
+            for (let j = i - 1; j >= 0; j--) {
+                const s = draft.segments[j]
+                if (s.type === "StartLoop" && s.label_index !== undefined) {
+                    const startIndex = s.label_index
+                    // Now, search for matching EndLoop after the StartLoop
+                    for (let k = i + 1; k < draft.segments.length; k++) {
+                        const segment = draft.segments[k]
+                        if (segment.type === "EndLoop" && segment.label_index === startIndex) {
+                            inLoop = true
+                            loopStartIndex = j
+                            loopEndIndex = k
+                            break
+                        }
+                    }
+                    if (inLoop) break
+                }
+            }
+
+            const nextId = Math.max(...draft.segments.map(s => s.id)) + 1
+            const nextLabel = Math.max(0, ...draft.segments.map(s => ((s.type === "StartLoop" || s.type === "EndLoop") ? s.label_index ?? 0 : 0))) + 1
+
+            if (inLoop) {
+                // Remove the loop start/end
+                draft.segments.splice(loopStartIndex, 1)
+                draft.segments.splice(loopEndIndex - 1, 1)
+            } else {
+                // Create a new loop around this segment
+                draft.segments.splice(i, 0, { type: "StartLoop", id: nextId, label_index: nextLabel })
+                draft.segments.splice(i + 2, 0, { type: "EndLoop", id: nextId + 1, label_index: nextLabel, iter_count: 0 })
+            }
+
+            draft.segments = cleanLoops(draft.segments)
+        })
     }
     }
 }

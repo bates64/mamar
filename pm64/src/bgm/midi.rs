@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::io::prelude::*;
 use std::io::SeekFrom;
-use std::num::NonZeroU8;
 
 use midly::{MetaMessage, Smf};
 
@@ -62,7 +61,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
         pos: None,
         tracks: [
             midi_track_to_bgm_track(
-                smf.tracks.get(0),
+                smf.tracks.first(),
                 total_song_length,
                 0,
                 time_divisor,
@@ -178,21 +177,10 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
     let track_list_id = bgm.add_track_list(track_list);
 
     let (_, variation) = bgm.add_variation().unwrap();
-    variation.segments = vec![
-        Segment::StartLoop {
-            id: gen_id(),
-            label_index: 0,
-        },
-        Segment::Subseg {
-            id: gen_id(),
-            track_list: track_list_id,
-        },
-        Segment::EndLoop {
-            id: gen_id(),
-            label_index: 0,
-            iter_count: 0,
-        },
-    ];
+    variation.segments = vec![Segment::Subseg {
+        id: gen_id(),
+        track_list: track_list_id,
+    }];
 
     Ok(bgm)
 }
@@ -427,7 +415,7 @@ fn midi_track_to_bgm_track(
                                                 Command::Note {
                                                     pitch: key + 104,
                                                     velocity: start.vel,
-                                                    length: convert_time(length as usize, time_divisor) as u16,
+                                                    length: convert_time(length, time_divisor) as u16,
                                                 },
                                             );
                                         }

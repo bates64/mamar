@@ -1,40 +1,15 @@
 import classNames from "classnames"
-import { Segment } from "pm64-typegen"
-import { useId } from "react"
+import { useId, useRef } from "react"
 
+import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
 import styles from "./SegmentMap.module.scss"
+import { TimeProvider } from "./timectx"
 
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
-interface Loop {
-    start: number
-    end: number
-}
-
-function getLoops(segments: Segment[]): Loop[] {
-    const loops = []
-
-    for (let startIdx = 0; startIdx < segments.length; startIdx++) {
-        const start = segments[startIdx]
-        if (start.type === "StartLoop") {
-            // Look for EndLoop
-            for (let endIdx = 0; endIdx < segments.length; endIdx++) {
-                const end = segments[endIdx]
-                if (end.type === "EndLoop" && end.label_index === start.label_index) {
-                    loops.push({
-                        start: startIdx,
-                        end: endIdx,
-                    })
-                    break
-                }
-            }
-        }
-    }
-
-    return loops
-}
+const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
@@ -84,52 +59,51 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
 function Container() {
     const [variation] = useVariation()
     const selection = useSelection()
+    const segmentLengths = useSegmentLengths()
+    const container = useRef<HTMLDivElement | null>(null)
 
-    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    const loops = getLoops(variation?.segments ?? [])
+    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
 
-    return <table
-        aria-label="Segments"
-        className={styles.table}
-        onClick={() => {
-            selection.clear()
-        }}
-    >
-        {variation && <tbody>
-            {loops.map(({ start, end }) => {
-                const endSeg = variation.segments[end]
-
-                if (endSeg.type !== "EndLoop")
-                    throw new Error("Expected EndLoop")
-
-                return <tr aria-label={`Loop ${endSeg.label_index} gutter`}>
-                    <td colSpan={start + 1} />
-                    <td colSpan={end - start + 1} className={styles.loop}>
-                        Loop {endSeg.iter_count !== 0 && `${endSeg.iter_count}x`}
-                    </td>
-                </tr>
-            })}
-            {tracks.map(i => <tr key={i} className={styles.track} aria-label={`Track ${i+1}`}>
-                <td className={styles.trackHead}>
-                    <div className={styles.trackName}>Track {i + 1}</div>
-                    <TrackControls trackIndex={i} />
-                </td>
-                {variation.segments.map(segment => {
-                    if (segment.type === "Subseg") {
-                        return <td
-                            key={segment.id}
-                        >
-                            <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
-                        </td>
-                    } else {
-                        return <td key={segment.id} />
-                    }
-                })}
-            </tr>)}
-
-        </tbody>}
-    </table>
-
+    return <TimeProvider value={{
+        xToTicks(clientX: number): number {
+            if (!container.current) return NaN
+            const px = clientX - container.current.getBoundingClientRect().left
+            const style = getComputedStyle(container.current)
+            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
+            return (px - TRACK_HEAD_WIDTH) * rulerZoom
+        },
+    }}>
+        <div
+            ref={container}
+            aria-label="Segments"
+            className={styles.table}
+            onClick={() => {
+                selection.clear()
+            }}
+        >
+            {variation && <div>
+                <Ruler />
+                {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
+                    {<div className={styles.trackHead}>
+                        <div className={styles.trackName}>{i === 0 ? "Master" : `Track ${i}`}</div>
+                        {i > 0 && <TrackControls trackIndex={i} />}
+                    </div>}
+                    {variation.segments.map((segment, segmentIndex) => {
+                        if (segment.type === "Subseg") {
+                            return <div
+                                key={segment.id}
+                                style={ticksToStyle(segmentLengths[segmentIndex])}
+                            >
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
+                            </div>
+                        } else {
+                            return <div key={segment.id} />
+                        }
+                    })}
+                </div>)}
+            </div>}
+        </div>
+    </TimeProvider>
 }
 
 export default function SegmentMap() {

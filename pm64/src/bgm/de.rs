@@ -68,6 +68,7 @@ impl std::error::Error for Error {
 trait CollectArray<T, E, U: Default + AsMut<[T]>>: Sized + Iterator<Item = Result<T, E>> {
     /// Doesn't panic if the iterator is too large or too small for the output array. If the iterator is too short,
     /// the remaining elements have their default value.
+    #[allow(unused)]
     fn collect_array(mut self) -> Result<U, E> {
         let mut container = U::default();
 
@@ -148,7 +149,6 @@ impl Bgm {
 
         debug_assert!(f.pos()? == 0x14);
         let variation_offsets: Vec<u16> = (0..4)
-            .into_iter()
             .map(|_| -> io::Result<u16> { Ok(f.read_u16_be()? << 2) }) // 4 contiguous u16 offsets
             .collect::<Result<_, _>>()?; // We need to obtain all offsets before seeking to any
 
@@ -209,16 +209,12 @@ impl Bgm {
 
         if drums_offset != 0 {
             f.seek(SeekFrom::Start(drums_offset))?;
-            bgm.drums = (0..drums_count)
-                .into_iter()
-                .map(|_| Drum::decode(f))
-                .collect::<Result<_, _>>()?;
+            bgm.drums = (0..drums_count).map(|_| Drum::decode(f)).collect::<Result<_, _>>()?;
         }
 
         if voices_offset != 0 {
             f.seek(SeekFrom::Start(voices_offset))?;
             bgm.instruments = (0..voices_count)
-                .into_iter()
                 .map(|_| Instrument::decode(f))
                 .collect::<Result<_, _>>()?;
         };
@@ -284,7 +280,7 @@ impl Segment {
                                 // SAFETY: the for loop above has initialised the array. This is also how the std
                                 // documentation suggests initialising an array element-by-element:
                                 // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
-                                std::mem::transmute(tracks)
+                                std::mem::transmute::<[MaybeUninit<Track>; 16], [Track; 16]>(tracks)
                             },
                         })
                     }
@@ -366,7 +362,7 @@ impl CommandSeq {
 
         // A binary tree mapping input offset -> Command. This is then trivially converted to a
         // CommandSeq by performing an in-order traversal.
-        let mut commands = OffsetEventMap::new();
+        let mut events = OffsetEventMap::new();
 
         let mut seen_terminator = false;
 
@@ -378,12 +374,12 @@ impl CommandSeq {
                 // There's probably some command that I don't yet know about that points to this data.
                 if f.pos()? == 0x38EB {
                     // 0x64 Bowser's Castle
-                    commands.upsert_marker(0x39EB - start);
+                    events.upsert_marker(0x39EB - start);
                 }
 
                 // Sometimes there is a terminator followed by some marked commands (i.e. a subroutine section), so
                 // keep reading until every marker has been passed.
-                if cmd_offset >= commands.last_offset() {
+                if cmd_offset >= events.last_offset() {
                     break;
                 }
             }
@@ -508,8 +504,8 @@ impl CommandSeq {
                     let end_offset = start_offset + (f.read_u8()? as usize);
 
                     Command::Detour {
-                        start_label: commands.upsert_marker(start_offset),
-                        end_label: commands.upsert_marker(end_offset),
+                        start_label: events.upsert_marker(start_offset),
+                        end_label: events.upsert_marker(end_offset),
                     }
                 }
                 0xFF => Command::UnkCmdFF {
@@ -521,18 +517,18 @@ impl CommandSeq {
                 _ => return Err(Error::UnknownSeqCommand(cmd_byte)),
             };
 
-            commands.insert(cmd_offset, command.into());
+            events.insert(cmd_offset, command.into());
         }
 
         let size = f.pos()? as usize - start;
         //debug!("end commandseq {:#X}", f.pos()?);
 
         // Explode if there are no commands (must be markers) past the end of the file
-        for (offset, command) in commands.0.split_off(&OffsetEventMap::atob(size)).into_iter() {
-            panic!("command after end of parsed sequence {:?} @ {:#X}", command, offset);
+        if let Some((offset, event)) = events.0.split_off(&OffsetEventMap::atob(size)).into_iter().next() {
+            panic!("command after end of parsed sequence {:?} @ {:#X}", event, offset);
         }
 
-        Ok(commands.into())
+        Ok(events.into())
     }
 }
 
@@ -587,15 +583,14 @@ impl OffsetEventMap {
     pub fn last_offset(&self) -> usize {
         self.0
             .iter()
-            .rev()
-            .next() //self.0.last_key_value()
+            .next_back() //self.0.last_key_value()
             .map_or(0, |(&k, _)| Self::btoa(k))
     }
 }
 
 impl From<OffsetEventMap> for CommandSeq {
     fn from(map: OffsetEventMap) -> CommandSeq {
-        map.0.into_iter().map(|(_, cmd)| cmd).collect()
+        map.0.into_values().collect()
     }
 }
 

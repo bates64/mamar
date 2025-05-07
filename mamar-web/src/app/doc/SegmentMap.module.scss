@@ -1,28 +1,18 @@
 $trackHeight: 70px;
+$trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
 .table {
-    border-collapse: collapse;
-
     width: 100%;
 
     user-select: none;
 
-    /*tr {
-        &:not(:first-child) {
-            background: var(--spectrum-global-color-gray-100);
-        }
-
-        &:nth-child(even) {
-            background: var(--spectrum-global-color-gray-75);
-        }
-    }*/
-
-    td {
-        padding: 0;
-    }
+    --ruler-zoom: 2;
+    --trackHead-width: $trackHead-width;
 }
 
 .track {
+    display: flex;
+    width: max-content;
     height: $trackHeight;
 
     &:nth-child(even) {
@@ -30,25 +20,22 @@ $trackHeight: 70px;
     }
 }
 
-td.trackHead {
-    width: 8em;
+.trackHead {
+    width: $trackHead-width;
     border-right: 1px solid var(--spectrum-global-color-gray-100);
 
     padding: 4px 16px;
     height: 100%;
 
+    position: sticky;
+    left: 0;
+
+    background: var(--spectrum-global-color-gray-100);
+
     .trackName {
         color: var(--spectrum-global-color-gray-900);
         margin-bottom: 4px;
     }
-}
-
-td.loop {
-    color: black;
-    background: var(--yellow);
-    font-weight: 600;
-
-    padding: 0 4px;
 }
 
 .pianoRollThumbnail {

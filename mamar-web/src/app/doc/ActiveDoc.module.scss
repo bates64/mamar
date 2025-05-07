@@ -1,5 +1,5 @@
 .container {
-    height: 100%;
+    height: calc(100vh - 36px - 38px);
     overflow: hidden;
     display: grid;
 }

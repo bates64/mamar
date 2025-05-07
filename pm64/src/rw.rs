@@ -7,7 +7,7 @@ pub trait SeekExt: Seek {
 
 impl<S: Seek> SeekExt for S {
     fn pos(&mut self) -> Result<u64> {
-        self.seek(SeekFrom::Current(0))
+        self.stream_position()
     }
 }
 
@@ -85,6 +85,7 @@ pub trait WriteExt: Write + Seek {
     fn write_u16_be(&mut self, value: u16) -> Result<()>;
     fn write_i16_be(&mut self, value: i16) -> Result<()>;
     fn write_u32_be(&mut self, value: u32) -> Result<()>;
+    #[allow(unused)]
     fn write_cstring_lossy(&mut self, string: &str, max_len: usize) -> Result<()>; // len includes null terminator
 
     /// Seeks to a position, writes the value, then seeks back.
