@@ -97,7 +97,7 @@ function Container() {
             }}
         >
             {variation && <div>
-                <Ruler segments={variation.segments} />
+                <Ruler />
                 {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
                     {<div className={styles.trackHead}>
                         <div className={styles.trackName}>Track {i}</div>

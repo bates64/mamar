@@ -68,15 +68,12 @@ function LoopHandle({ segment, kind, loop, setHighlightedLoop }: {
                 let closestDistance = targetTime
                 segmentLengths.forEach((length, index) => {
                     curTime += length
-                    console.log(index, length)
                     const distance = Math.abs(curTime - targetTime)
                     if (distance < closestDistance) {
                         closestDistance = distance
                         closestIndex = index
                     }
                 })
-
-                console.log({ targetTime, closestIndex, closestDistance })
 
                 if (closestDistance < 50) {
                     dispatch({
@@ -122,7 +119,10 @@ export function useSegmentLengths(): number[] {
 }
 
 // TODO: bar counts where a segment is not a full bar
-export default function Ruler({ segments }: { segments: Segment[] }) {
+export default function Ruler() {
+    const [variation, dispatch] = useVariation()
+    const segments = variation?.segments ?? []
+
     const loops = getLoops(segments)
     const segmentLengths = useSegmentLengths()
     const [highlightedLoop, setHighlightedLoop] = useState<Loop["id"] | null>(null)
@@ -142,11 +142,11 @@ export default function Ruler({ segments }: { segments: Segment[] }) {
             for (const loop of loops) {
                 if (i === loop.start) {
                     currentLoop = loop
-                    elements.push(<LoopHandle key={loop.id} segment={segment.id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={`start_loop_${loop.id}`} segment={segment.id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
                 if (i === loop.end) {
                     currentLoop = null
-                    elements.push(<LoopHandle key={loop.id} segment={segment.id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={`end_loop_${loop.id}`} segment={segment.id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
                 continue
             }
@@ -163,12 +163,19 @@ export default function Ruler({ segments }: { segments: Segment[] }) {
         }
 
         elements.push(<div
+            key={segment.id}
             className={classNames({
                 [styles.rulerSegment]: true,
                 [styles.loop]: currentLoop !== null,
                 [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
             })}
             style={ticksToStyle(length)}
+            onDoubleClick={() => {
+                dispatch({
+                    type: "toggle_segment_loop",
+                    id: segment.id,
+                })
+            }}
         >
             {bars}
         </div>)
