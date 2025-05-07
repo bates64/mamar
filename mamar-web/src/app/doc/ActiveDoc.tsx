@@ -78,6 +78,7 @@ export default function ActiveDoc() {
                         {...provided.droppableProps}
                         className={styles.container}
                         style={{
+                            gridTemplateRows: doc.panelContent.type === "not_open" ? "100%" : "50% 50%",
                             overflow: "hidden",
                         }}
                     >
