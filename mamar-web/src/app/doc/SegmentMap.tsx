@@ -1,30 +1,15 @@
 import classNames from "classnames"
-import { useId, useRef, createContext, useContext } from "react"
+import { useId, useRef } from "react"
 
 import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
 import styles from "./SegmentMap.module.scss"
+import { TimeProvider } from "./timectx"
 
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
-
-interface Time {
-    xToTicks: (clientX: number) => number
-}
-
-const TIME_CTX = createContext<Time | null>(null)
-
-export function useTime(): Time {
-    const time = useContext(TIME_CTX)
-
-    if (!time) {
-        throw new Error("TimeProvider missing in tree")
-    }
-
-    return time
-}
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
@@ -79,7 +64,7 @@ function Container() {
 
     const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
 
-    return <TIME_CTX.Provider value={{
+    return <TimeProvider value={{
         xToTicks(clientX: number): number {
             if (!container.current) return NaN
             const px = clientX - container.current.getBoundingClientRect().left
@@ -118,7 +103,7 @@ function Container() {
                 </div>)}
             </div>}
         </div>
-    </TIME_CTX.Provider>
+    </TimeProvider>
 }
 
 export default function SegmentMap() {

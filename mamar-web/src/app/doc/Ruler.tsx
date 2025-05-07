@@ -1,11 +1,11 @@
-import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Footer, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
+import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import { Segment } from "pm64-typegen"
 import { useState } from "react"
 import { usePress } from "react-aria"
 
 import styles from "./Ruler.module.scss"
-import { useTime } from "./SegmentMap"
+import { useTime } from "./timectx"
 
 import { useBgm, useSegment, useVariation } from "../store"
 
@@ -122,9 +122,8 @@ export function useSegmentLengths(): number[] {
     })
 }
 
-// TODO: bar counts where a segment is not a full bar
 export default function Ruler() {
-    const [variation, dispatch] = useVariation()
+    const [variation] = useVariation()
     const segments = variation?.segments ?? []
 
     const loops = getLoops(segments)

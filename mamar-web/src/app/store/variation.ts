@@ -35,7 +35,7 @@ function cleanLoops(segments: (Segment | null)[]): Segment[] {
                 cleaned[i + 1] = null
             }
         }
-    }).filter(s => s !== null)
+    }).filter(s => s !== null) as Segment[]
 }
 
 export type VariationAction = {
