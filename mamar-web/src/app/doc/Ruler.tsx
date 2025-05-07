@@ -1,11 +1,13 @@
+import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Footer, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import { Segment } from "pm64-typegen"
 import { useState } from "react"
+import { usePress } from "react-aria"
 
 import styles from "./Ruler.module.scss"
 import { useTime } from "./SegmentMap"
 
-import { useBgm, useVariation } from "../store"
+import { useBgm, useSegment, useVariation } from "../store"
 
 interface Loop {
     id: number
@@ -155,32 +157,22 @@ export default function Ruler() {
             continue
         }
 
-        // Consume all segments that are part of this loop
         if (currentLoop !== null) {
+            // Consume all segments that are part of this loop
             while (segments[i + 1].type !== "EndLoop") {
                 length += segmentLengths[++i]
             }
+
+            const loop = Object.assign({}, currentLoop!) // Avoids stale currentLoop reference in dialog func below
+
+            elements.push(<DialogTrigger key={segment.id} >
+                <RulerSegment segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />
+                {close => <LoopDialog loop={loop} close={close} />}
+            </DialogTrigger>)
+        } else {
+            elements.push(<RulerSegment key={segment.id} segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />)
         }
 
-        elements.push(<div
-            key={segment.id}
-            className={classNames({
-                [styles.rulerSegment]: true,
-                [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
-            })}
-            style={ticksToStyle(length)}
-            title={currentLoop === null ? "Double-click to loop" : "Double-click to remove loop"}
-            onDoubleClick={() => {
-                dispatch({
-                    type: "toggle_segment_loop",
-                    id: segment.id,
-                })
-            }}
-        >
-            {currentLoop && <div className={styles.loop}>
-                {currentLoop.iterCount > 0 && <span className={styles.loopIterCount}>{`×${currentLoop.iterCount}`}</span>}
-            </div>}
-        </div>)
         totalTime += length
     }
 
@@ -200,4 +192,85 @@ export default function Ruler() {
             {bars}
         </div>
     </div>
+}
+
+function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }: {
+    segment: Segment
+    currentLoop: Loop | null
+    highlightedLoop: number | null
+    length: number
+    onPress?: (e: unknown) => void
+}) {
+    const [, dispatch] = useVariation()
+    const { pressProps } = usePress({ onPress })
+
+    return <div
+        {...pressProps}
+        className={classNames({
+            [styles.rulerSegment]: true,
+            [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
+        })}
+        style={ticksToStyle(length)}
+        title={currentLoop === null ? "Double-click to loop" : ""}
+        onDoubleClick={() => {
+            dispatch({
+                type: "toggle_segment_loop",
+                id: segment.id,
+            })
+        }}
+    >
+        {currentLoop && <div className={styles.loop}>
+            {currentLoop.iterCount > 0 && <span className={styles.loopIterCount}>{`×${currentLoop.iterCount + 1}`}</span>}
+        </div>}
+    </div>
+}
+
+function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
+    const [variation, variationDispatch] = useVariation()
+    const [, endDispatch] = useSegment(variation?.segments[loop.end].id)
+
+    function setIterCount(iterCount: number) {
+        endDispatch({
+            type: "set_loop_iter_count",
+            iter_count: iterCount,
+        })
+    }
+
+    function deleteLoop() {
+        const start = variation?.segments[loop.start]
+        if (start)
+            variationDispatch({
+                type: "toggle_segment_loop",
+                id: start.id,
+            })
+    }
+
+    return <Dialog size="S">
+        <Heading>
+            Edit Loop
+        </Heading>
+        <Divider />
+        <Content>
+            <Form>
+                <Switch autoFocus isSelected={loop.iterCount === 0} onChange={infinite => setIterCount(infinite ? 0 : 1)}>
+                    Repeat infinitely
+                </Switch>
+                <NumberField
+                    label="Repetitions"
+                    isDisabled={loop.iterCount === 0}
+                    value={loop.iterCount + 1}
+                    onChange={count => setIterCount(count - 1)}
+                    minValue={2} maxValue={256}
+                />
+            </Form>
+        </Content>
+        <ButtonGroup>
+            <Button variant="negative" onPress={deleteLoop}>
+                Delete
+            </Button>
+            <Button variant="cta" onPress={close}>
+                Close
+            </Button>
+        </ButtonGroup>
+    </Dialog>
 }
