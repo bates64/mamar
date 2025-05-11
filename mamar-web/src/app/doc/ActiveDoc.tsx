@@ -94,7 +94,7 @@ export default function ActiveDoc() {
                             borderTopWidth="thin"
                             UNSAFE_style={{ zIndex: "1" }}
                         >
-                            {doc.panelContent.type === "tracker" && <SubsegDetails trackListId={trackListId!} trackIndex={trackIndex!} />}
+                            {doc.panelContent.type === "tracker" && <SubsegDetails key={`${trackListId}_${trackIndex}`} trackListId={trackListId!} trackIndex={trackIndex!} />}
                         </View>}
                     </div>
                 )}

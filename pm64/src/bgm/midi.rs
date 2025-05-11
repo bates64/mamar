@@ -204,6 +204,7 @@ fn midi_track_to_bgm_track(
         None => Default::default(),
         Some(events) => {
             let mut track = Track {
+                name: "".into(),
                 is_disabled: false,
                 polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
                 is_drum_track: false,
@@ -511,6 +512,10 @@ fn midi_track_to_bgm_track(
 
             track.commands.insert_end(total_song_length, Command::End);
             track.commands.shrink();
+
+            if let Some(track_name) = track_name {
+                track.name = track_name;
+            }
 
             track
         }

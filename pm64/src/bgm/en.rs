@@ -3,7 +3,7 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io::{self, SeekFrom};
 
-use log::{debug, info};
+use log::{debug, info, warn};
 
 use super::*;
 use crate::rw::*;
@@ -56,6 +56,8 @@ impl Bgm {
     }
 
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
+        let mut metadata = mamar::Metadata::default();
+
         f.seek(SeekFrom::Start(0))?;
 
         f.write_all(MAGIC.as_bytes())?;
@@ -211,6 +213,8 @@ impl Bgm {
                         track_data_start - segment_start
                     );
 
+                    let track_list_no = encoded_tracks.len();
+
                     // Write offset in header
                     let pos = ((track_data_start - segment_start) >> 2) as u16;
                     f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
@@ -218,15 +222,23 @@ impl Bgm {
 
                     // Write flags
                     let mut todo_commands = Vec::new();
-                    for Track {
-                        is_disabled,
-                        polyphonic_idx,
-                        is_drum_track,
-                        parent_track_idx,
-                        commands,
-                        ..
-                    } in track_list.tracks.iter()
+                    for (
+                        track_no,
+                        Track {
+                            name,
+                            is_disabled,
+                            polyphonic_idx,
+                            is_drum_track,
+                            parent_track_idx,
+                            commands,
+                            ..
+                        },
+                    ) in track_list.tracks.iter().enumerate()
                     {
+                        if track_no != 0 {
+                            metadata.add_track_name(track_list_no as u16, name.clone());
+                        }
+
                         if !commands.is_empty() {
                             // Need to write command data after the track
                             todo_commands.push((f.pos()?, commands));
@@ -286,10 +298,21 @@ impl Bgm {
 
         debug!("end = {:#X}", f.pos()?);
 
+        // Write Mamar-specific information. But don't bother if its empty (needed for matching)
+        if metadata.has_data() {
+            f.align(8)?;
+            f.write_cstring_lossy(mamar::MAGIC, mamar::MAGIC_MAX_LEN)?;
+            if let Ok(metadata) = rmp_serde::to_vec(&metadata) {
+                f.write_all(&metadata)?;
+            } else {
+                warn!("failed to encode Mamar metadata");
+            }
+        }
+
         if f.pos()? <= 0x8A8F {
             Ok(())
         } else {
-            Err(Error::TooBig)
+            Err(Error::TooBig) // TODO: make into warning and surface to caller somehow
         }
     }
 }

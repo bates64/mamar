@@ -1,5 +1,5 @@
 use pm64::bgm::Bgm;
-use std::fs::{read, File};
+use std::fs::read;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input = read(&args[2])?;
             let bgm = pm64::bgm::midi::to_bgm(&input)?;
 
-            let mut output = File::create(&args[3])?;
+            let mut output = std::fs::File::create(&args[3])?;
             bgm.encode(&mut output)?;
         }
         "listinstruments" if args.len() == 3 => {

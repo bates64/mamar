@@ -4,6 +4,9 @@ pub mod en;
 /// Decoder (.bin -> [Bgm])
 pub mod de;
 
+/// Mamar-specific editor metadata
+pub mod mamar;
+
 #[cfg(feature = "midly")]
 pub mod midi;
 
@@ -81,15 +84,17 @@ impl Bgm {
     }
 
     pub fn add_track_list(&mut self, track_list: TrackList) -> TrackListId {
-        let mut max_id = 0;
-
-        for id in self.track_lists.keys() {
-            if *id > max_id {
-                max_id = *id;
+        let id = if self.track_lists.is_empty() {
+            0
+        } else {
+            let mut max_id = 0;
+            for id in self.track_lists.keys() {
+                if *id > max_id {
+                    max_id = *id;
+                }
             }
-        }
-
-        let id = max_id.wrapping_add(1);
+            max_id.wrapping_add(1)
+        };
 
         debug_assert!(!self.track_lists.contains_key(&id));
 
@@ -161,6 +166,8 @@ pub struct TrackList {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
+    #[serde(default)]
+    pub name: String,
     pub is_disabled: bool,
     pub polyphonic_idx: u8,
     pub is_drum_track: bool,
@@ -175,6 +182,7 @@ pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
 impl Default for Track {
     fn default() -> Self {
         Self {
+            name: "".to_owned(),
             is_disabled: true,
             polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
             is_drum_track: false,

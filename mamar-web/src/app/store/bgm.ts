@@ -32,6 +32,7 @@ export type BgmAction = {
     type: "modify_track_settings"
     trackList: number
     track: number
+    name?: string
     isDisabled?: boolean
     polyphonicIdx?: number
     isDrumTrack?: boolean
@@ -86,6 +87,9 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
     case "modify_track_settings":
         return produce(bgm, draft => {
             const track = draft.trackLists[action.trackList].tracks[action.track]
+            if (action.name !== undefined) {
+                track.name = action.name
+            }
             if (action.isDisabled !== undefined) {
                 track.isDisabled = action.isDisabled
             }

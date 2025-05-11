@@ -117,8 +117,16 @@ impl Bgm {
         debug_assert!(f.pos()? == 0x04);
         let internal_size = f.read_u32_be()?;
         let true_size = f.seek(SeekFrom::End(0))? as u32;
+        let mamar_magic_pos = align(internal_size, 8) as u64;
+        let mut has_mamar_metadata = false;
         if internal_size == true_size {
             // Ok
+        } else if {
+            // Check for Mamar metadata magic string
+            f.seek(SeekFrom::Start(mamar_magic_pos))?;
+            matches!(f.read_cstring(mamar::MAGIC_MAX_LEN as u64).as_deref(), Ok(s) if s == mamar::MAGIC)
+        } {
+            has_mamar_metadata = true;
         } else if align(internal_size, 16) == true_size {
             // Make sure the trailing bytes are all zero
             f.seek(SeekFrom::Start(internal_size as u64))?;
@@ -129,6 +137,7 @@ impl Bgm {
                 internal_size, true_size
             );
         }
+        let has_mamar_metadata = has_mamar_metadata;
 
         let mut bgm = Bgm::new();
 
@@ -218,6 +227,16 @@ impl Bgm {
                 .map(|_| Instrument::decode(f))
                 .collect::<Result<_, _>>()?;
         };
+
+        if has_mamar_metadata {
+            f.seek(SeekFrom::Start(mamar_magic_pos + mamar::MAGIC_MAX_LEN as u64))?;
+            if let Ok(metadata) = rmp_serde::from_read::<_, mamar::Metadata>(&mut *f) {
+                metadata.apply_to_bgm(&mut bgm);
+            } else {
+                warn!("unable to decode Mamar metadata, ignoring it");
+            }
+            furthest_read_pos = f.pos()?;
+        }
 
         // TODO: check that all the data between furthest_read_pos and align(furthest_read_pos) is padding (zero)
 
@@ -336,6 +355,7 @@ impl Track {
         let parent_track_idx = ((flags & (0xF << 9)) >> 9) as u8;
 
         Ok(Self {
+            name: Default::default(),
             is_disabled,
             polyphonic_idx,
             is_drum_track,

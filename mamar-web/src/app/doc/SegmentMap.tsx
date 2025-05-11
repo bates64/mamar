@@ -51,9 +51,15 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 }
             }}
         >
-            <div id={nameId} className={styles.segmentName}>Region {trackListIndex}.{trackIndex}</div>
+            <div id={nameId} className={styles.segmentName}>{track.name}</div>
         </div>
     }
+}
+
+function TrackName({ index }: { index: number }) {
+    return <div className={styles.trackName}>
+        {index === 0 ? "Master" : `Track ${index}`}
+    </div>
 }
 
 function Container() {
@@ -85,7 +91,7 @@ function Container() {
                 <Ruler />
                 {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
                     {<div className={styles.trackHead}>
-                        <div className={styles.trackName}>{i === 0 ? "Master" : `Track ${i}`}</div>
+                        <TrackName index={i} />
                         {i > 0 && <TrackControls trackIndex={i} />}
                     </div>}
                     {variation.segments.map((segment, segmentIndex) => {

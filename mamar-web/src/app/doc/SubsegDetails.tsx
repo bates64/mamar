@@ -1,5 +1,6 @@
-import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio } from "@adobe/react-spectrum"
-import { useId, useState } from "react"
+import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, TextField } from "@adobe/react-spectrum"
+import { useEffect, useId, useState } from "react"
+import { useDebounce } from "use-debounce"
 
 import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
@@ -37,6 +38,13 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     const [bgm, dispatch] = useBgm()
     const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
 
+    // Track name editing is debounced to prevent dispatch spam when typing
+    const [name, setName] = useState(track?.name)
+    const [debouncedName] = useDebounce(name, 500)
+    useEffect(() => {
+        dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name: debouncedName })
+    }, [debouncedName, dispatch, trackIndex, trackListId])
+
     if (!track) {
         return <div>Track not found</div>
     }
@@ -46,8 +54,13 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
         height="100%"
     >
         <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
-            <h3 id={hid} className={styles.regionName}>Region {trackListId}.{trackIndex}</h3>
+            <h3 id={hid} className={styles.regionName}>Region Settings</h3>
             <Form maxWidth="size-2000" aria-labelledby={hid}>
+                <TextField
+                    label="Name"
+                    value={name}
+                    onChange={setName}
+                />
                 <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 {trackIndex !== 0 ? <>
                     <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
@@ -115,7 +128,7 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
         setRecentNonZeroParentTrackIdx(parentTrackIdx)
     }
 
-    return <Form>
+    return <View>
         <RadioGroup
             label={polyphonyLabel}
             value={state}
@@ -151,5 +164,5 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
             step={1}
             onChange={parentTrackIdx => onChange(polyphonicIdx, parentTrackIdx)}
         /> : <></>}
-    </Form>
+    </View>
 }

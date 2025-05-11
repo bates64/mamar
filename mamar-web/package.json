@@ -33,6 +33,7 @@
     "react-stately": "^3.17.0",
     "react-tracked": "^1.7.10",
     "react-window": "^1.8.7",
+    "use-debounce": "^10.0.4",
     "use-undoable": "^3.3.11",
     "web-vitals": "^3.0.3"
   },
