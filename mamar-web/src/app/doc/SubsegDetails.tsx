@@ -1,5 +1,5 @@
-import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, Well } from "@adobe/react-spectrum"
-import { useEffect, useId, useMemo, useState } from "react"
+import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio } from "@adobe/react-spectrum"
+import { useId, useState } from "react"
 
 import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
@@ -66,7 +66,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
 function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onChange }: { polyphonicIdx: number, parentTrackIdx: number, maxParentTrackIdx: number, onChange: (polyphonicIdx: number, parentTrackIdx: number) => void }) {
     const polyphonyLabel = <Flex width="100%" alignItems="center">
         <Text flexGrow={1}>Polyphony</Text>
-        <ContextualHelp variant="help">
+        <ContextualHelp variant="help" placement="right">
             <Heading>Understanding Polyphony</Heading>
             <Content>
                 <Text>
@@ -79,6 +79,27 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
                 <Text>
                     The game can run up to 24 voices at once. If there are too many notes playing, regions with higher voice counts
                     might stop shorter notes in <i>other</i> regions to keep things running smoothly.
+                </Text>
+            </Footer>
+        </ContextualHelp>
+    </Flex>
+
+    const takeoverLabel = <Flex width="100%" alignItems="center">
+        <Text flexGrow={1}>Track to take over</Text>
+        <ContextualHelp variant="help" placement="right">
+            <Heading>Conditional Takeover</Heading>
+            <Content>
+                <Text>
+                    This track stays silent by default. When <code>bgm_set_variation</code> is called with
+                    a non-zero variation, <b>this track performs in place of the selected track</b>, which becomes silent.
+                    The takeover takes place over a 2 beat crossfade. Tracks can only take over tracks that are above them.
+                </Text>
+            </Content>
+            <Footer>
+                <Text>
+                    Use takeovers to <b>swap musical parts that serve the same role</b>. For instance,
+                    in <a href="https://github.com/bates64/papermario-dx/blob/main/src/world/area_sbk/sbk_56/main.c">Dry Dry Desert - S2E3 Oasis</a>,
+                    two oasis-specific layers take over tracks used elsewhere in the desert.
                 </Text>
             </Footer>
         </ContextualHelp>
@@ -106,13 +127,12 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
                     onChange(1, 0)
                 } else if (newState === "parent") {
                     onChange(polyphonicIdx, Math.min(recentNonZeroParentTrackIdx, maxParentTrackIdx))
-
                 }
             }}
         >
             <Radio value="auto">Automatic</Radio>
-            <Radio value="parent" isDisabled={maxParentTrackIdx <= 0}>Share with other track</Radio>
             <Radio value="manual">Manual</Radio>
+            <Radio value="parent" isDisabled={maxParentTrackIdx <= 0}>Conditional takeover</Radio>
         </RadioGroup>
         {state === "manual" ? <NumberField
             label="Number of voices"
@@ -123,13 +143,13 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
             onChange={voiceCount => onChange(voiceCountToPolyphonicIdx(voiceCount), 0)}
         /> : <></>}
         {state === "parent" ? <NumberField
-            label="Track to share voices with"
-            description="Select a track above this one."
-            value={parentTrackIdx + 1}
-            minValue={2}
-            maxValue={maxParentTrackIdx + 1}
+            label={takeoverLabel}
+            description="The number of the track this one will take over when triggered."
+            value={parentTrackIdx}
+            minValue={1}
+            maxValue={maxParentTrackIdx}
             step={1}
-            onChange={parentTrackIdx => onChange(polyphonicIdx, parentTrackIdx - 1)}
+            onChange={parentTrackIdx => onChange(polyphonicIdx, parentTrackIdx)}
         /> : <></>}
     </Form>
 }

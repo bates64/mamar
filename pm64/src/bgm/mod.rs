@@ -164,6 +164,7 @@ pub struct Track {
     pub is_disabled: bool,
     pub polyphonic_idx: u8,
     pub is_drum_track: bool,
+    /// Track index plus one. 0 means no parent. See au_bgm_load_subsegment
     pub parent_track_idx: u8,
     pub commands: CommandSeq,
 }
