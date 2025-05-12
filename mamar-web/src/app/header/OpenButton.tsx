@@ -32,7 +32,7 @@ export default function OpenButton() {
         <ActionButton
             onPress={async () => {
                 const file = await fileOpen({
-                    extensions: [".bgm", ".mid", ".midi", ".rmi", ".bin"],
+                    extensions: [".bgm", ".mid", ".midi", ".rmi", ".bin", ".ron"],
                     description: "BGM and MIDI files",
                     id: "bgm_open",
                 })

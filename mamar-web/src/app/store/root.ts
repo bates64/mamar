@@ -47,12 +47,13 @@ export function rootReducer(root: Root, action: RootAction): Root {
         }
     case "open_doc": {
         const fileExtension = action.file?.name?.split(".").pop()?.toLowerCase()
+        const saveSupported = fileExtension === "bgm" || fileExtension === "ron"
         const newDoc: Doc = {
             id: generateId(),
             bgm: action.bgm ?? new_bgm(),
-            fileHandle: (fileExtension === "bgm") ? action.file?.handle : undefined,
+            fileHandle: saveSupported ? action.file?.handle : undefined,
             name: action.name || action.file?.name || "New song",
-            isSaved: fileExtension === "bgm", // Prompt to save if not a BGM file (i.e. opened a MIDI)
+            isSaved: saveSupported,
             activeVariation: 0,
             panelContent: {
                 type: "not_open",

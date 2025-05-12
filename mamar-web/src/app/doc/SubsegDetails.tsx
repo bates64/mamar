@@ -42,8 +42,9 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     const [name, setName] = useState(track?.name)
     const [debouncedName] = useDebounce(name, 500)
     useEffect(() => {
-        dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name: debouncedName })
-    }, [debouncedName, dispatch, trackIndex, trackListId])
+        if (track?.name !== debouncedName)
+            dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name: debouncedName })
+    }, [debouncedName, dispatch, trackIndex, trackListId, track?.name])
 
     if (!track) {
         return <div>Track not found</div>

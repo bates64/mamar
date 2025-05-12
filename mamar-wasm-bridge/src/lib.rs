@@ -35,8 +35,13 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
             Ok(bgm) => to_js(&bgm),
             Err(e) => to_js(&e.to_string()),
         }
-    } else {
+    } else if data[0] == b'B' && data[1] == b'G' && data[2] == b'M' && data[3] == b' ' {
         match Bgm::decode(&mut f) {
+            Ok(bgm) => to_js(&bgm),
+            Err(e) => to_js(&e.to_string()),
+        }
+    } else {
+        match ron::from_str::<Bgm>(&String::from_utf8_lossy(data)) {
             Ok(bgm) => to_js(&bgm),
             Err(e) => to_js(&e.to_string()),
         }
@@ -56,6 +61,15 @@ pub fn bgm_encode(bgm: &JsValue) -> JsValue {
             }
             arr.into()
         }
+        Err(e) => e.to_string().into(),
+    }
+}
+
+#[wasm_bindgen]
+pub fn ron_encode(bgm: &JsValue) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    match ron::ser::to_string_pretty(&bgm, ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5)) {
+        Ok(ron) => ron.to_string().into(),
         Err(e) => e.to_string().into(),
     }
 }

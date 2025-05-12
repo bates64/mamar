@@ -1,6 +1,6 @@
-import { View, ActionButton } from "@adobe/react-spectrum"
+import { View, ActionButton, Tooltip, TooltipTrigger } from "@adobe/react-spectrum"
 import { fileSave } from "browser-fs-access"
-import { bgm_encode } from "mamar-wasm-bridge"
+import { bgm_encode, ron_encode } from "mamar-wasm-bridge"
 import { CSSProperties, useCallback, useEffect } from "react"
 
 import OpenButton from "./OpenButton"
@@ -35,12 +35,20 @@ export default function BgmActionGroup() {
         }
 
         const handle = await fileSave(new Blob([bgmBin]), {
-            fileName: trimFileName(doc.name) + ".bgm",
-            extensions: [".bgm"],
+            fileName: trimFileName(doc.name) + ".bgm", // FIXME?
+            extensions: [".bgm", ".ron"],
+            startIn: "music",
         }, saveAs ? undefined : doc.fileHandle)
 
         if (handle) {
             doc.fileHandle = handle
+
+            // If it was saved as .ron, overwrite the file contents (currently BGM) with the RON
+            if (handle.name.endsWith(".ron")) {
+                const writable = await handle.createWritable({ keepExistingData: false })
+                await writable.write(ron_encode(doc.bgm))
+                await writable.close()
+            }
         }
 
         docDispatch({ type: "mark_saved" })
@@ -71,11 +79,16 @@ export default function BgmActionGroup() {
             {...props}
         >New</ActionButton>
         <OpenButton />
-        <ActionButton
-            onPress={evt => save(evt.shiftKey)}
-            isDisabled={!doc || (doc.isSaved && !!doc?.fileHandle)}
-            {...props}
-        >Save</ActionButton>
+        <TooltipTrigger>
+            <ActionButton
+                onPress={evt => save(evt.shiftKey)}
+                isDisabled={!doc}
+                {...props}
+            >
+                Save
+            </ActionButton>
+            <Tooltip>Hold Shift to <i>Save As</i></Tooltip>
+        </TooltipTrigger>
         <ActionButton
             onPress={() => dispatch.undo()}
             isDisabled={!dispatch.canUndo}
