@@ -69,6 +69,7 @@ function Container() {
     const container = useRef<HTMLDivElement | null>(null)
 
     const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
+    const totalLength = segmentLengths.reduce((acc, len) => acc + len, 0)
 
     return <TimeProvider value={{
         xToTicks(clientX: number): number {
@@ -76,7 +77,18 @@ function Container() {
             const px = clientX - container.current.getBoundingClientRect().left
             const style = getComputedStyle(container.current)
             const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
-            return (px - TRACK_HEAD_WIDTH) * rulerZoom
+
+            const ticks = (px - TRACK_HEAD_WIDTH) * rulerZoom
+            if (ticks < 0) return 0
+            if (ticks > totalLength) return totalLength
+            return ticks
+        },
+
+        ticksToXOffset(ticks: number): number {
+            if (!container.current) return NaN
+            const style = getComputedStyle(container.current)
+            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
+            return ticks / rulerZoom
         },
     }}>
         <div

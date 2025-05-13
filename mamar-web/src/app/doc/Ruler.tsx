@@ -4,6 +4,7 @@ import { Segment } from "pm64-typegen"
 import { useState } from "react"
 import { usePress } from "react-aria"
 
+import Playhead from "./Playhead"
 import styles from "./Ruler.module.scss"
 import { useTime } from "./timectx"
 
@@ -188,6 +189,7 @@ export default function Ruler() {
             {elements}
         </div>
         <div className={styles.bars}>
+            <Playhead />
             {bars}
         </div>
     </div>

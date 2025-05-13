@@ -93,3 +93,10 @@ pub fn bgm_add_voice(bgm: &JsValue) -> JsValue {
     bgm.instruments.push(Instrument::default());
     to_js(&bgm)
 }
+
+#[wasm_bindgen]
+pub fn bgm_split_variation_at(bgm: &JsValue, variation: usize, time: usize) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+    bgm.split_variation_at(variation, time);
+    to_js(&bgm)
+}

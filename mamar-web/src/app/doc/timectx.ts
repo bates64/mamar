@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react"
 
 export interface Time {
-    xToTicks: (clientX: number) => number
+    xToTicks(clientX: number): number
+    ticksToXOffset(ticks: number): number
 }
 
 const TIME_CTX = createContext<Time | null>(null)

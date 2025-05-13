@@ -16,6 +16,7 @@ $trackHead-width: 100px;
 
     position: sticky;
     top: 0;
+    z-index: 1; /* above trackheads */
 
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 
@@ -109,8 +110,6 @@ $trackHead-width: 100px;
     background-position-y: calc(var(--ticks-per-beat) / 4);
 
     color: var(--spectrum-global-color-gray-700);
-
-    pointer-events: none;
 }
 
 .bar {

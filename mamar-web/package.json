@@ -45,6 +45,7 @@
     "@parcel/transformer-sass": "2.7.0",
     "@parcel/transformer-svg-react": "^2.7.0",
     "@parcel/transformer-webmanifest": "^2.7.0",
+    "@parcel/watcher": "^2.5.1",
     "@types/node": "^18.7.18",
     "@types/react": "^18.0.20",
     "@types/react-beautiful-dnd": "^13.1.2",

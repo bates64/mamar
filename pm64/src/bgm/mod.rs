@@ -19,7 +19,7 @@ use typescript_type_def::TypeDef;
 mod cmd;
 pub use cmd::*;
 
-use crate::id::Id;
+use crate::id::{gen_id, Id};
 
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &str = "BGM ";
@@ -101,6 +101,57 @@ impl Bgm {
         self.track_lists.insert(id, track_list);
         id
     }
+
+    /// Finds the segment playing at time `time` in variation `variation`, and splits it in two at `time`.
+    /// If a segment already starts/ends at `time`, does nothing.
+    pub fn split_variation_at(&mut self, variation: usize, time: usize) {
+        if variation >= self.variations.len() {
+            return;
+        }
+        let Some(variation_ref) = &self.variations[variation] else {
+            return;
+        };
+
+        let mut current_time = 0;
+        let mut new_track_list: Option<(usize, TrackList)> = None;
+        for (i, segment) in variation_ref.segments.iter().enumerate() {
+            let Segment::Subseg { track_list, .. } = segment else {
+                continue;
+            };
+
+            let duration = self
+                .track_lists
+                .get(track_list)
+                .map(|tl| tl.len_time())
+                .unwrap_or_default();
+
+            let seg_start = current_time;
+            let seg_end = current_time + duration;
+
+            if seg_start < time && time < seg_end {
+                let Some(track_list) = self.track_lists.get_mut(track_list) else {
+                    continue;
+                };
+                new_track_list = Some((i + 1, track_list.split_at(time - seg_start)));
+                break;
+            } else if seg_start == time || seg_end == time {
+                return;
+            }
+
+            current_time += duration;
+        }
+
+        if let Some((idx, track_list)) = new_track_list {
+            let track_list = self.add_track_list(track_list);
+            self.variations[variation].as_mut().unwrap().segments.insert(
+                idx,
+                Segment::Subseg {
+                    id: gen_id(),
+                    track_list,
+                },
+            )
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -162,6 +213,25 @@ pub struct TrackList {
     pub tracks: [Track; 16],
 }
 
+impl TrackList {
+    pub fn len_time(&self) -> usize {
+        self.tracks[0].commands.len_time()
+    }
+
+    pub fn split_at(&mut self, time: usize) -> TrackList {
+        TrackList {
+            pos: None,
+            tracks: {
+                let mut new_tracks = [(); 16].map(|_| Track::default());
+                for (i, track) in self.tracks.iter_mut().enumerate() {
+                    new_tracks[i] = track.split_at(time);
+                }
+                new_tracks
+            },
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
@@ -188,6 +258,19 @@ impl Default for Track {
             is_drum_track: false,
             parent_track_idx: 0,
             commands: Default::default(),
+        }
+    }
+}
+
+impl Track {
+    pub fn split_at(&mut self, time: usize) -> Track {
+        Track {
+            name: self.name.clone(),
+            is_disabled: self.is_disabled,
+            polyphonic_idx: self.polyphonic_idx,
+            is_drum_track: self.is_drum_track,
+            parent_track_idx: self.parent_track_idx,
+            commands: self.commands.split_at(time),
         }
     }
 }

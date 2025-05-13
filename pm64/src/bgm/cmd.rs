@@ -511,6 +511,30 @@ impl CommandSeq {
         }
         polyphony
     }
+
+    /// Splits this sequence at the given time such that self is the 'before `time`' sequence and the returned
+    /// sequence is the 'after `time`' sequence. Adjusts Wait commands on the boundaries to keep the sum len_time
+    /// the same as before this was called.
+    pub fn split_at(&mut self, time: usize) -> CommandSeq {
+        // insert_start has all the logic for finding and adjusting Wait commands
+        self.insert_start(time, Command::End);
+
+        // Find the End we just inserted
+        let Some((idx, _)) = self.vec.iter().enumerate().find(|(_, event)| {
+            matches!(
+                event,
+                Event {
+                    command: Command::End,
+                    ..
+                }
+            )
+        }) else {
+            return Default::default();
+        };
+
+        let commands = self.vec.split_off(idx + 1); // +1 so that End is left on self
+        CommandSeq { vec: commands }
+    }
 }
 
 impl<C: Into<Event>> From<Vec<C>> for CommandSeq {
@@ -934,5 +958,26 @@ mod test {
         ]
         .into();
         assert_eq!(seq.max_polyphony(), 1);
+    }
+
+    fn split_at() {
+        let mut seq = CommandSeq::from(vec![
+            Command::Marker { label: "A".to_string() },
+            Command::Delay { value: 5 },
+            Command::Marker { label: "B".to_string() },
+            Command::Delay { value: 5 },
+            Command::End,
+        ]);
+        let split = seq.split_at(4);
+
+        assert!(matches!(
+            split.vec[0],
+            Event {
+                command: Command::Marker { .. },
+                ..
+            }
+        ));
+        assert_eq!(seq.len_time(), 4);
+        assert_eq!(split.len_time(), 6);
     }
 }

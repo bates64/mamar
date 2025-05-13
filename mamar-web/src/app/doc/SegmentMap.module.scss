@@ -6,6 +6,8 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
     user-select: none;
 
+    position: relative; /* for Playhead */
+
     --ruler-zoom: 2;
     --trackHead-width: $trackHead-width;
 }

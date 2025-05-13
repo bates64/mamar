@@ -1,5 +1,5 @@
 import produce from "immer"
-import { bgm_add_voice } from "mamar-wasm-bridge"
+import { bgm_add_voice, bgm_split_variation_at } from "mamar-wasm-bridge"
 import { Bgm, Event, Instrument } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
@@ -41,6 +41,10 @@ export type BgmAction = {
     type: "update_instrument"
     index: number
     partial: Partial<Instrument>
+} | {
+    type: "split_variation"
+    variation: number
+    time: number
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -108,6 +112,8 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             const instrument = draft.instruments[action.index]
             Object.assign(instrument, action.partial)
         })
+    case "split_variation":
+        return bgm_split_variation_at(bgm, action.variation, action.time)
     }
 }
 
