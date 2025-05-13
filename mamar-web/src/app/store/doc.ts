@@ -26,6 +26,7 @@ export type DocAction = {
     action: BgmAction
 } | {
     type: "mark_saved"
+    fileHandle?: FileSystemFileHandle | null
 } | {
     type: "set_panel_content"
     panelContent: PanelContent
@@ -46,6 +47,8 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             isSaved: true,
+            fileHandle: action.fileHandle ?? state.fileHandle,
+            name: action.fileHandle?.name ?? state.name,
         }
     case "set_panel_content":
         return {

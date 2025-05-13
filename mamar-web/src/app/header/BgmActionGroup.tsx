@@ -7,13 +7,18 @@ import OpenButton from "./OpenButton"
 
 import { useDoc, useRoot } from "../store"
 
-function trimFileName(fileName: string) {
-    const index = fileName.lastIndexOf(".")
-    if (index === -1) {
-        return fileName
-    } else {
-        return fileName.substring(0, index)
+function createBgmFileName(fileName: string) {
+    // Remove supported extension
+    let extension = ""
+    if (fileName.endsWith(".bgm") || fileName.endsWith(".ron") || fileName.endsWith(".mid")) {
+        const index = fileName.lastIndexOf(".")
+        if (index !== -1) {
+            fileName = fileName.substring(0, index)
+            extension = fileName.substring(index + 1)
+        }
     }
+    fileName += extension === ".ron" ? ".ron" : ".bgm"
+    return fileName
 }
 
 export default function BgmActionGroup() {
@@ -34,24 +39,20 @@ export default function BgmActionGroup() {
             throw new Error(bgmBin)
         }
 
-        const handle = await fileSave(new Blob([bgmBin]), {
-            fileName: trimFileName(doc.name) + ".bgm", // FIXME?
+        const fileHandle = await fileSave(new Blob([bgmBin]), {
+            fileName: createBgmFileName(doc.name),
             extensions: [".bgm", ".ron"],
             startIn: "music",
         }, saveAs ? undefined : doc.fileHandle)
 
-        if (handle) {
-            doc.fileHandle = handle
-
-            // If it was saved as .ron, overwrite the file contents (currently BGM) with the RON
-            if (handle.name.endsWith(".ron")) {
-                const writable = await handle.createWritable({ keepExistingData: false })
-                await writable.write(ron_encode(doc.bgm))
-                await writable.close()
-            }
+        // If it was saved as .ron, overwrite the file contents (currently BGM) with the RON
+        if (fileHandle?.name.endsWith(".ron")) {
+            const writable = await fileHandle.createWritable({ keepExistingData: false })
+            await writable.write(ron_encode(doc.bgm))
+            await writable.close()
         }
 
-        docDispatch({ type: "mark_saved" })
+        docDispatch({ type: "mark_saved", fileHandle })
     }, [doc, docDispatch])
 
     useEffect(() => {
