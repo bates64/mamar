@@ -106,6 +106,15 @@ export default function PlaybackControls() {
 
     useEffect(() => {
         const onKeydown = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement
+            if (
+                target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.isContentEditable
+            ) {
+                return
+            }
+
             if (event.key === " ") {
                 setIsPlaying(p => !p)
                 event.preventDefault()
