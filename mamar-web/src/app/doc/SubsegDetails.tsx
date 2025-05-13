@@ -56,7 +56,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     >
         <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
             <h3 id={hid} className={styles.regionName}>Region Settings</h3>
-            <Form maxWidth="size-2000" aria-labelledby={hid}>
+            <Form maxWidth="size-2000" aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
                 <TextField
                     label="Name"
                     value={name}

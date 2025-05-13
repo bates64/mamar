@@ -72,7 +72,7 @@ export default function InstrumentInput({ index, onChange }: Props) {
                 </Flex>
             </Heading>
             <Content>
-                {instrument && <Form isQuiet>
+                {instrument && <Form isQuiet onSubmit={e => e.preventDefault()}>
                     <Flex gap="size-150">
                         <InstrumentComboBox bank={instrument.bank} patch={instrument.patch} onChange={partial => dispatch({ type: "update_instrument", index, partial })} />
                         <NumberField label="Bank" value={instrument.bank} onChange={bank => dispatch({ type: "update_instrument", index, partial: { bank } })} />

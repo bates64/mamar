@@ -250,7 +250,10 @@ function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
         </Heading>
         <Divider />
         <Content>
-            <Form>
+            <Form onSubmit={e => {
+                e.preventDefault()
+                close()
+            }}>
                 <Switch autoFocus isSelected={loop.iterCount === 0} onChange={infinite => setIterCount(infinite ? 0 : 1)}>
                     Repeat infinitely
                 </Switch>
