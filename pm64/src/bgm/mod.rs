@@ -27,7 +27,7 @@ pub const MAGIC: &str = "BGM ";
 /// An offset relative to the beginning of the decoded/encoded BGM.
 pub type FilePos = u64;
 
-pub type TrackListId = u64;
+pub type TrackListId = u64; // The TrackLists HashMap is 1-indexed
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
