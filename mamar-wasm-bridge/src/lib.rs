@@ -1,5 +1,6 @@
-use pm64::bgm::*;
+use log::debug;
 use pm64::sbn::Sbn;
+use pm64::{bgm::*, id::gen_id};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{io::Cursor, sync::LazyLock};
@@ -27,6 +28,9 @@ pub fn new_bgm() -> JsValue {
     to_js(&bgm)
 }
 
+static COMMAND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"name:\s*".*"(?:.|\n)*?commands:\s*(\[(?:.|\n)*?\])"#).unwrap());
+
 #[wasm_bindgen]
 pub fn bgm_decode(data: &[u8]) -> JsValue {
     let mut f = Cursor::new(data);
@@ -42,7 +46,30 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
             Err(e) => to_js(&e.to_string()),
         }
     } else {
-        match ron::from_str::<Bgm>(&String::from_utf8_lossy(data)) {
+        let input_string = String::from_utf8_lossy(data);
+
+        let matches: Vec<regex::Captures<'_>> = COMMAND_REGEX.captures_iter(&input_string).collect();
+        let mut modified_input_string = input_string.to_string();
+
+        for captures in matches.into_iter().rev() {
+            let commands_group = captures.get(1).unwrap();
+            let (_, [commands_str]) = captures.extract();
+
+            let commands: Vec<Command> = ron::de::from_str(commands_str).unwrap();
+            let events: Vec<Event> = commands
+                .into_iter()
+                .map(|command| Event { id: gen_id(), command })
+                .collect();
+
+            modified_input_string.replace_range(
+                commands_group.start()..commands_group.end(),
+                &ron::ser::to_string(&events).unwrap(),
+            );
+        }
+
+        debug!("{}", modified_input_string);
+
+        match ron::from_str::<Bgm>(&modified_input_string) {
             Ok(bgm) => to_js(&bgm),
             Err(e) => to_js(&e.to_string()),
         }
@@ -66,9 +93,6 @@ pub fn bgm_encode(bgm: &JsValue) -> JsValue {
     }
 }
 
-static EVENT_TO_COMMAND_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"name:\s*".*"(?:.|\n)*?commands:\s*(\[(?:.|\n)*?\])"#).unwrap());
-
 #[wasm_bindgen]
 pub fn ron_encode(bgm: &JsValue) -> JsValue {
     let pretty_config = ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5);
@@ -80,7 +104,7 @@ pub fn ron_encode(bgm: &JsValue) -> JsValue {
     };
 
     // strip commands of id field
-    let matches: Vec<regex::Captures<'_>> = EVENT_TO_COMMAND_REGEX.captures_iter(&bgm_string).collect();
+    let matches: Vec<regex::Captures<'_>> = COMMAND_REGEX.captures_iter(&bgm_string).collect();
     let mut modified_bgm_string = bgm_string.clone();
 
     for captures in matches.into_iter().rev() {
@@ -88,6 +112,10 @@ pub fn ron_encode(bgm: &JsValue) -> JsValue {
         let (_, [events_str]) = captures.extract();
 
         let events: Vec<Event> = ron::de::from_str(events_str).unwrap();
+        if events.is_empty() {
+            continue;
+        }
+
         let commands: Vec<Command> = events.into_iter().map(|event| event.command).collect();
 
         let mut commands_string = "[\n".to_owned();
