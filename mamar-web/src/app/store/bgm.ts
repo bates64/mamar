@@ -1,6 +1,6 @@
 import produce from "immer"
 import { bgm_add_voice, bgm_split_variation_at } from "mamar-wasm-bridge"
-import { Bgm, Event, Instrument } from "pm64-typegen"
+import { Bgm, Event, Instrument, Polyphony } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -34,9 +34,8 @@ export type BgmAction = {
     track: number
     name?: string
     isDisabled?: boolean
-    polyphonicIdx?: number
+    polyphony?: Polyphony
     isDrumTrack?: boolean
-    parentTrackIdx?: number
 } | {
     type: "update_instrument"
     index: number
@@ -97,14 +96,11 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             if (action.isDisabled !== undefined) {
                 track.isDisabled = action.isDisabled
             }
-            if (action.polyphonicIdx !== undefined) {
-                track.polyphonicIdx = action.polyphonicIdx
+            if (action.polyphony !== undefined) {
+                track.polyphony = action.polyphony
             }
             if (action.isDrumTrack !== undefined) {
                 track.isDrumTrack = action.isDrumTrack
-            }
-            if (action.parentTrackIdx !== undefined) {
-                track.parentTrackIdx = action.parentTrackIdx
             }
         })
     case "update_instrument":

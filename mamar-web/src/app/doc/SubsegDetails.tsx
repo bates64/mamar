@@ -6,31 +6,11 @@ import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
+import { Polyphony } from "pm64-typegen"
 
 export interface Props {
     trackListId: number
     trackIndex: number
-}
-
-function polyphonicIdxToVoiceCount(polyphonicIdx: number): number {
-    // player->unk_22A
-    switch (polyphonicIdx) {
-    case 1: return 1
-    case 5: return 2
-    case 6: return 3
-    case 7: return 4
-    default: return 0
-    }
-}
-
-function voiceCountToPolyphonicIdx(voiceCount: number): number {
-    switch (voiceCount) {
-    case 1: return 1
-    case 2: return 5
-    case 3: return 6
-    case 4: return 7
-    default: return 0
-    }
 }
 
 export default function SubsegDetails({ trackListId, trackIndex }: Props) {
@@ -65,8 +45,8 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                 <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 {trackIndex !== 0 ? <>
                     <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
-                    <PolyphonyForm {...track} maxParentTrackIdx={trackIndex - 1} onChange={(polyphonicIdx, parentTrackIdx) => {
-                        dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphonicIdx, parentTrackIdx })
+                    <PolyphonyForm {...track} maxParentTrackIdx={trackIndex - 1} onChange={polyphony => {
+                        dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphony })
                     }} />
                 </> : <></>}
             </Form>
@@ -77,7 +57,7 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     </Grid>
 }
 
-function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onChange }: { polyphonicIdx: number, parentTrackIdx: number, maxParentTrackIdx: number, onChange: (polyphonicIdx: number, parentTrackIdx: number) => void }) {
+function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: Polyphony, maxParentTrackIdx: number, onChange: (polyphony: Polyphony) => void }) {
     const polyphonyLabel = <Flex width="100%" alignItems="center">
         <Text flexGrow={1}>Polyphony</Text>
         <ContextualHelp variant="help" placement="right">
@@ -119,9 +99,18 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
         </ContextualHelp>
     </Flex>
 
-    let state = "manual"
-    if (polyphonicIdx === 255) state = "auto"
-    if (parentTrackIdx !== 0) state = "parent"
+    let state: "auto" | "manual" | "parent" = "manual"
+    let parentTrackIdx = 0
+    let voiceCount = 1
+    
+    if (polyphony === "Automatic") {
+        state = "auto"
+    } else if ("ConditionalTakeover" in polyphony) {
+        state = "parent"
+        parentTrackIdx = polyphony.ConditionalTakeover.parent
+    } else if ("Manual" in polyphony) {
+        voiceCount = polyphony.Manual.voices
+    }
 
     // Store parent track between states, e.g. so that parent->manual->parent doesn't forget which track it was
     const [recentNonZeroParentTrackIdx, setRecentNonZeroParentTrackIdx] = useState(1)
@@ -136,11 +125,19 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
             onChange={newState => {
                 if (state === newState) return
                 if (newState === "auto") {
-                    onChange(255, 0)
+                    onChange("Automatic")
                 } else if (newState === "manual") {
-                    onChange(1, 0)
+                    onChange({
+                        Manual: {
+                            voices: 1,
+                        },
+                    })
                 } else if (newState === "parent") {
-                    onChange(polyphonicIdx, Math.min(recentNonZeroParentTrackIdx, maxParentTrackIdx))
+                    onChange({
+                        ConditionalTakeover: {
+                            parent: Math.min(recentNonZeroParentTrackIdx, maxParentTrackIdx),
+                        },
+                    })
                 }
             }}
         >
@@ -150,11 +147,15 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
         </RadioGroup>
         {state === "manual" ? <NumberField
             label="Number of voices"
-            value={polyphonicIdxToVoiceCount(polyphonicIdx)}
+            value={voiceCount}
             minValue={0}
             maxValue={4}
             step={1}
-            onChange={voiceCount => onChange(voiceCountToPolyphonicIdx(voiceCount), 0)}
+            onChange={voices => onChange({
+                Manual: {
+                    voices,
+                },
+            })}
         /> : <></>}
         {state === "parent" ? <NumberField
             label={takeoverLabel}
@@ -163,7 +164,11 @@ function PolyphonyForm({ polyphonicIdx, parentTrackIdx, maxParentTrackIdx, onCha
             minValue={1}
             maxValue={maxParentTrackIdx}
             step={1}
-            onChange={parentTrackIdx => onChange(polyphonicIdx, parentTrackIdx)}
+            onChange={parentTrackIdx => onChange({
+                ConditionalTakeover: {
+                    parent: parentTrackIdx,
+                },
+            })}
         /> : <></>}
     </View>
 }

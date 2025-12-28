@@ -227,9 +227,8 @@ impl Bgm {
                         Track {
                             name,
                             is_disabled,
-                            polyphonic_idx,
+                            polyphony,
                             is_drum_track,
-                            parent_track_idx,
                             commands,
                             ..
                         },
@@ -245,15 +244,17 @@ impl Bgm {
                         }
                         f.write_u16_be(0)?; // Replaced later if !null
 
-                        let polyphonic_idx = match *polyphonic_idx {
-                            POLYPHONIC_IDX_AUTO_MAMAR => polyphony_to_polyphonic_idx(commands.max_polyphony()),
-                            n => n,
+                        let polyphonic_idx = match *polyphony {
+                            Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
+                            Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
+                            Polyphony::ConditionalTakeover { parent: _ } => 1,
+                            Polyphony::Other { priority } => priority,
                         };
 
                         let flags = (*is_disabled as u16) << 8
                             | (polyphonic_idx as u16) << 0xD
                             | if *is_drum_track { 0x0080 } else { 0 }
-                            | (*parent_track_idx as u16) << 9;
+                            | (polyphony.to_parent_idx() as u16) << 9;
                         f.write_u16_be(flags)?;
                     }
 

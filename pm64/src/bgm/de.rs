@@ -357,9 +357,8 @@ impl Track {
         Ok(Self {
             name: Default::default(),
             is_disabled,
-            polyphonic_idx,
+            polyphony: Polyphony::from_raw(polyphonic_idx, parent_track_idx),
             is_drum_track,
-            parent_track_idx,
             commands: if commands_offset == 0 {
                 CommandSeq::with_capacity(0)
             } else {

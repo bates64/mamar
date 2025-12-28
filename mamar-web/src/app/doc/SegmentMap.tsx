@@ -8,8 +8,14 @@ import { TimeProvider } from "./timectx"
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
+import { Track } from "pm64-typegen"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
+
+function hasParentTrack(track: Track): boolean {
+    const { polyphony } = track
+    return typeof polyphony === "object" && "ConditionalTakeover" in polyphony
+}
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
@@ -41,7 +47,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 [styles.pianoRollThumbnail]: true,
                 [styles.drumRegion]: track.isDrumTrack,
                 [styles.disabledRegion]: track.isDisabled,
-                [styles.hasInterestingParentTrack]: track.parentTrackIdx !== 0,
+                [styles.hasInterestingParentTrack]: hasParentTrack(track),
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
