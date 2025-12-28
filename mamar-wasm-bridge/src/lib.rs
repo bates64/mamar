@@ -1,7 +1,8 @@
 use pm64::bgm::*;
 use pm64::sbn::Sbn;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
+use std::{io::Cursor, sync::LazyLock};
 use wasm_bindgen::prelude::*;
 
 fn to_js<T: Serialize + for<'a> Deserialize<'a>>(t: &T) -> JsValue {
@@ -65,13 +66,47 @@ pub fn bgm_encode(bgm: &JsValue) -> JsValue {
     }
 }
 
+static EVENT_TO_COMMAND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"name:\s*".*"(?:.|\n)*?commands:\s*(\[(?:.|\n)*?\])"#).unwrap());
+
 #[wasm_bindgen]
 pub fn ron_encode(bgm: &JsValue) -> JsValue {
+    let pretty_config = ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5);
+
     let bgm: Bgm = from_js(bgm);
-    match ron::ser::to_string_pretty(&bgm, ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5)) {
-        Ok(ron) => ron.to_string().into(),
-        Err(e) => e.to_string().into(),
+    let bgm_string = match ron::ser::to_string_pretty(&bgm, pretty_config.clone()) {
+        Ok(ron) => ron.to_string(),
+        Err(e) => return e.to_string().into(),
+    };
+
+    // strip commands of id field
+    let matches: Vec<regex::Captures<'_>> = EVENT_TO_COMMAND_REGEX.captures_iter(&bgm_string).collect();
+    let mut modified_bgm_string = bgm_string.clone();
+
+    for captures in matches.into_iter().rev() {
+        let events_group = captures.get(1).unwrap();
+        let (_, [events_str]) = captures.extract();
+
+        let events: Vec<Event> = ron::de::from_str(events_str).unwrap();
+        let commands: Vec<Command> = events.into_iter().map(|event| event.command).collect();
+
+        let mut commands_string = "[\n".to_owned();
+        for line in ron::ser::to_string_pretty(&commands, pretty_config.clone().depth_limit(1))
+            .unwrap()
+            .lines()
+            .skip(1)
+        {
+            commands_string.push_str("        ");
+            commands_string.push_str(line);
+            commands_string.push('\n');
+        }
+        modified_bgm_string.replace_range(
+            events_group.start()..events_group.end(),
+            &commands_string[..commands_string.len() - 1],
+        );
     }
+
+    modified_bgm_string.into()
 }
 
 #[wasm_bindgen]

@@ -18,6 +18,7 @@ console_log = { version = "0.2", features = ["color"] }
 
 pm64 = { path = "../pm64", features = ["midly"] }
 ron = "0.10.1"
+regex = "1.12.2"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
