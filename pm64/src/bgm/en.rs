@@ -236,7 +236,7 @@ impl Bgm {
                     ) in track_list.tracks.iter().enumerate()
                     {
                         if track_no != 0 {
-                            metadata.add_track_name(track_list_no as u16, name.clone());
+                            metadata.add_track_name(track_list_no as u16 + 1, name.clone());
                         }
 
                         if !commands.is_empty() {

@@ -27,6 +27,7 @@ pub const MAGIC: &str = "BGM ";
 /// An offset relative to the beginning of the decoded/encoded BGM.
 pub type FilePos = u64;
 
+/// The TrackLists HashMap is 1-indexed
 pub type TrackListId = u64;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
@@ -84,17 +85,15 @@ impl Bgm {
     }
 
     pub fn add_track_list(&mut self, track_list: TrackList) -> TrackListId {
-        let id = if self.track_lists.is_empty() {
-            0
-        } else {
-            let mut max_id = 0;
-            for id in self.track_lists.keys() {
-                if *id > max_id {
-                    max_id = *id;
-                }
+        let mut max_id = 0;
+
+        for id in self.track_lists.keys() {
+            if *id > max_id {
+                max_id = *id;
             }
-            max_id.wrapping_add(1)
-        };
+        }
+
+        let id = max_id.wrapping_add(1);
 
         debug_assert!(!self.track_lists.contains_key(&id));
 
