@@ -40,7 +40,7 @@ export default function Playhead() {
         }
     }, [xToTicks])
 
-    if (!doc) return
+    if (!doc) return null
 
     return <div
         className={styles.container}

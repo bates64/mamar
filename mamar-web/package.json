@@ -8,7 +8,7 @@
   "scripts": {
     "start": "parcel src/index.html src/app/index.html",
     "build": "parcel build src/index.html src/app/index.html",
-    "lint": "yarn run tsc --noEmit && yarn run eslint ."
+    "lint": "yarn run tsc --noEmit && yarn run eslint src"
   },
   "dependencies": {
     "@adobe/react-spectrum": "^3.29.0",
@@ -56,6 +56,6 @@
     "parcel": "^2.7.0",
     "parcel-reporter-multiple-static-file-copier": "^1.0.5",
     "process": "^0.11.10",
-    "typescript": "^4.8.3"
+    "typescript": "^5.9.3"
   }
 }

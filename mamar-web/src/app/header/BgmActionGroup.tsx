@@ -32,7 +32,7 @@ export default function BgmActionGroup() {
             return
         }
 
-        const bgmBin: Uint8Array | string = bgm_encode(doc.bgm)
+        const bgmBin: Uint8Array<ArrayBuffer> | string = bgm_encode(doc.bgm)
 
         if (typeof bgmBin === "string") {
             // TODO: surface error in a dialog

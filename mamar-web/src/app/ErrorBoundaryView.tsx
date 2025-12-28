@@ -2,7 +2,7 @@ import { Flex, View, ViewProps } from "@adobe/react-spectrum"
 import AlertCircleFilled from "@spectrum-icons/workflow/AlertCircleFilled"
 import { Component } from "react"
 
-export default class ErrorBoundaryView extends Component<ViewProps> {
+export default class ErrorBoundaryView extends Component<ViewProps<5>> {
     state: { error: any } = { error: null }
 
     static getDerivedStateFromError(error: any) {

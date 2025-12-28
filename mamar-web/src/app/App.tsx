@@ -57,8 +57,7 @@ export default function App() {
 
     useEffect(() => {
         if ("windowControlsOverlay" in navigator) {
-            // @ts-ignore
-            const { windowControlsOverlay } = navigator
+            const { windowControlsOverlay } = navigator as any
 
             const update = () => {
                 const { width } = windowControlsOverlay.getTitlebarAreaRect()
