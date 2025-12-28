@@ -42,6 +42,7 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
 .pianoRollThumbnail {
     --color-800: #ffffffaa;
+    --note-color: #00000044;
     --color-500: var(--spectrum-blue-700);
     --color-400: var(--spectrum-blue-600);
     --color-200: #000000cc;
@@ -54,6 +55,8 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
     height: $trackHeight;
 
+    position: relative; // for svg
+
     &:focus-visible {
         outline: 3px solid var(--spectrum-gray-500);
     }
@@ -63,6 +66,7 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     }
 
     &.selected {
+        --note-color: #00000055;
         border-color: var(--color-800);
 
         .segmentName {
@@ -86,5 +90,19 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
         --color-500: var(--spectrum-gray-500);
         --color-400: var(--spectrum-gray-400);
         --color-200: var(--spectrum-gray-200);
+    }
+}
+
+.pianoRollThumbnail svg {
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+
+    position: absolute;
+    inset: 6px;
+
+    pointer-events: none;
+
+    rect {
+        fill: var(--note-color);
     }
 }

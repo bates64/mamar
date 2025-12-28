@@ -1,6 +1,7 @@
 import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
-import { useId, useRef } from "react"
+import type { Event } from "pm64-typegen"
+import { useId, useDeferredValue, useRef, memo, startTransition } from "react"
 
 import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
 import styles from "./SegmentMap.module.scss"
@@ -18,18 +19,21 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
     const track = bgm?.trackLists[trackListIndex]?.tracks[trackIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
+    const commands = useDeferredValue(track?.commands.vec || [])
 
     if (!track || track.commands.vec.length === 0) {
         return <></>
     } else {
         const handlePress = (evt: any) => {
-            dispatch({
-                type: "set_panel_content",
-                panelContent: isSelected ? { type: "not_open" } : {
-                    type: "tracker",
-                    trackList: trackListIndex,
-                    track: trackIndex,
-                },
+            startTransition(() => {
+                dispatch({
+                    type: "set_panel_content",
+                    panelContent: isSelected ? { type: "not_open" } : {
+                        type: "tracker",
+                        trackList: trackListIndex,
+                        track: trackIndex,
+                    },
+                })
             })
             evt.stopPropagation()
             evt.preventDefault()
@@ -52,6 +56,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 }
             }}
         >
+            <Thumbnail commands={commands} />
             <div id={nameId} className={styles.segmentName}>{track.name}</div>
         </div>
     }
@@ -62,6 +67,65 @@ function TrackName({ index }: { index: number }) {
         {index === 0 ? "Master" : `Track ${index}`}
     </div>
 }
+
+const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
+    // Preferred musical range so segments can be compared by their pitch range
+    const c2 = 107 + 36
+    const c5 = 107 + 72
+
+    // Determine pitch range
+    let minPitch = 256
+    let maxPitch = 0
+    let hasNoteInRange = false
+    for (const command of commands) {
+        if (command.type === "Note") {
+            minPitch = Math.min(minPitch, command.pitch)
+            maxPitch = Math.max(maxPitch, command.pitch)
+
+            if (command.pitch >= c2 && command.pitch <= c5) {
+                hasNoteInRange = true
+            }
+        }
+    }
+
+    // Prefer C2-C5 range, but if there are no notes there, center on where the notes are
+    if (hasNoteInRange) {
+        minPitch = c2
+        maxPitch = c5
+    } else {
+        const middle = Math.floor((minPitch + maxPitch) / 2)
+        const size = c5 - c2 + 1
+        minPitch = middle - Math.floor(size / 2)
+        maxPitch = middle + Math.floor(size / 2)
+    }
+
+    // Render each note as an svg <rect>
+    const notes = []
+    let time = 0
+    for (const command of commands) {
+        if (command.type === "Note") {
+            notes.push(<rect
+                key={command.id}
+                x={time}
+                y={command.pitch - minPitch}
+                width={command.length}
+                height={1}
+            />)
+        } else if (command.type === "Delay") {
+            time += command.value
+        }
+    }
+
+    // Display the whole used range
+    const height = maxPitch - minPitch + 1
+    const viewBox = `0 0 ${time} ${height}`
+
+    return <svg viewBox={viewBox} preserveAspectRatio="none">
+        <g transform={`translate(0, ${height}) scale(1,-1)`}>
+            {notes}
+        </g>
+    </svg>
+})
 
 function Container() {
     const [variation] = useVariation()
