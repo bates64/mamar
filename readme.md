@@ -1,11 +1,11 @@
-[![Mamar](mamar-web/src/logotype.svg)](https://mamar.nanaian.town)
+[![Mamar](mamar-web/src/logotype.svg)](https://mamar.bates64.com)
 
-[![](https://img.shields.io/github/actions/workflow/status/nanaian/mamar/test.yml?branch=main)](https://github.com/bates64/mamar/actions)
+[![](https://img.shields.io/github/actions/workflow/status/bates64/mamar/test.yml?branch=main)](https://github.com/bates64/mamar/actions)
 [![](https://img.shields.io/discord/279322074412089344?color=%237289DA&logo=discord&logoColor=ffffff)](https://discord.gg/qWSxcTjktv)
 
 Paper Mario music editor.
 
-[Website](https://mamar.nanaian.town) - [Open in your browser](https://mamar.nanaian.town/app) - [Changelog](/changelog.md)
+[Website](https://mamar.bates64.com) - [Open in your browser](https://mamar.bates64.com/app) - [Changelog](/changelog.md)
 
 ![Screenshot](mamar-web/src/screenshot.png)
 
@@ -78,11 +78,11 @@ You'll need:
 
 In the root of this repo:
 1. `yarn install`
-2. `cd mamar-web && yarn build`
+2. `yarn workspace mamar-web build`
 
 Output is at `mamar-web/dist`.
 
-For developing, `yarn start` in `mamar-web` will start a dev server at `localhost:1234`. This server supports hot-reloading but beware of editing code that talks to the emulator as it is quite likely that you will experience crashes or other weirdness - reload the page to fix this.
+For developing, `yarn workspace mamar-web start` will start a dev server at `localhost:1234`. This server supports hot-reloading but beware of editing code that talks to the emulator as it is quite likely that you will experience crashes or other weirdness - reload the page to fix this.
 
 Working on `mupen64plus-web`
 ----------------------------
@@ -112,7 +112,7 @@ To release a new version:
 Contributing
 ============
 
-If you interested in contributing to Mamar, great! Check out the [open issues](https://github.com/nanaian/mamar/issues) for something to do. If you have any questions, feel free to ask in [the `#mamar` channel](https://discord.gg/qWSxcTjktv). I'm also happy to help out people who are new to React or Rust but still want to contribute.
+If you interested in contributing to Mamar, great! Check out the [open issues](https://github.com/bates64/mamar/issues) for something to do. If you have any questions, feel free to ask in [the `#mamar` channel](https://discord.gg/qWSxcTjktv). I'm also happy to help out people who are new to React or Rust but still want to contribute.
 
 License
 =======
