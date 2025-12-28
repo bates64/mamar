@@ -18,7 +18,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
 
-    if (!track || track.commands.vec.length === 0) {
+    if (!track || track.commands.length === 0) {
         return <></>
     } else {
         const handlePress = (evt: any) => {

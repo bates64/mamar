@@ -532,7 +532,7 @@ function CommandList({ width, height }: {
     const [bgm] = useBgm()
     const { trackListId, trackIndex } = useContext(trackListCtx)!
     const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
-    const commands = track?.commands?.vec ?? []
+    const commands: pm64.Event[] = track?.commands ?? []
 
     return <Droppable
         droppableId="droppable"

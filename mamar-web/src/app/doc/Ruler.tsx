@@ -110,7 +110,7 @@ export function useSegmentLengths(): number[] {
     return segments.map(segment => {
         if (bgm && segment.type === "Subseg") {
             const master = bgm.trackLists[segment.trackList].tracks[0]
-            return master.commands.vec.reduce((totalDelay, event) => {
+            return master.commands.reduce((totalDelay, event) => {
                 if (event.type === "Delay") {
                     return totalDelay + event.value
                 } else {

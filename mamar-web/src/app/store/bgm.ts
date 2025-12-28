@@ -71,22 +71,22 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return bgm_add_voice(bgm)
     case "move_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            commands.vec = arrayMove(commands.vec, action.oldIndex, action.newIndex)
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            track.commands = arrayMove(track.commands, action.oldIndex, action.newIndex)
         })
     case "update_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            for (let i = 0; i < commands.vec.length; i++) {
-                if (commands.vec[i].id === action.command.id) {
-                    commands.vec[i] = action.command
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            for (let i = 0; i < track.commands.length; i++) {
+                if (track.commands[i].id === action.command.id) {
+                    track.commands[i] = action.command
                 }
             }
         })
     case "delete_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            commands.vec.splice(action.index, 1)
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            track.commands.splice(action.index, 1)
         })
     case "modify_track_settings":
         return produce(bgm, draft => {
