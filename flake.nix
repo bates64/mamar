@@ -8,7 +8,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
-  outputs = { self, flake-schemas, nixpkgs, rust-overlay }:
+  outputs =
+    {
+      self,
+      flake-schemas,
+      nixpkgs,
+      rust-overlay,
+    }:
     let
       overlays = [
         rust-overlay.overlays.default
@@ -19,34 +25,47 @@
           };
         })
       ];
-      supportedSystems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" "aarch64-linux" ];
-      forEachSupportedSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f {
-        pkgs = import nixpkgs { inherit overlays system; };
-      });
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+        "aarch64-linux"
+      ];
+      forEachSupportedSystem =
+        f:
+        nixpkgs.lib.genAttrs supportedSystems (
+          system:
+          f {
+            pkgs = import nixpkgs { inherit overlays system; };
+          }
+        );
     in
     {
       schemas = flake-schemas.schemas;
-      devShells = forEachSupportedSystem ({ pkgs }: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            nodejs-18_x
-            yarn
-            rustToolchain
-            cargo-bloat
-            cargo-edit
-            cargo-outdated
-            cargo-udeps
-            cargo-watch
-            rust-analyzer
-            nixpkgs-fmt
-            wasm-pack
-          ];
-          env = {
-            RUST_BACKTRACE = "1";
+      devShells = forEachSupportedSystem (
+        { pkgs }:
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              nodejs
+              yarn
+              rustToolchain
+              cargo-bloat
+              cargo-edit
+              cargo-outdated
+              cargo-udeps
+              cargo-watch
+              rust-analyzer
+              nixpkgs-fmt
+              wasm-pack
+            ];
+            env = {
+              RUST_BACKTRACE = "1";
+            };
+            shellHook = "yarn install";
           };
-          shellHook = "yarn install";
-        };
-      });
+        }
+      );
       formatter = forEachSupportedSystem ({ pkgs }: pkgs.nixpkgs-fmt);
       # TODO: output a package
     };
