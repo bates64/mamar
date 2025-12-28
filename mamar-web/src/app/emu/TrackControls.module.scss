@@ -8,23 +8,26 @@
         --spectrum-actionbutton-border-size: 0;
         --spectrum-actionbutton-min-width: 1.7em;
         --spectrum-actionbutton-height: 1.5em;
-        --spectrum-actionbutton-text-color: var(--spectrum-global-color-gray-700);
+        --spectrum-actionbutton-text-color: var(--spectrum-gray-400);
+        --spectrum-high-contrast-highlight-text: white;
     }
 }
 
 .mute {
-    --spectrum-actionbutton-background-color-selected: var(--spectrum-global-color-blue-400);
-    --spectrum-actionbutton-background-color-selected-hover: var(--spectrum-global-color-blue-400);
-    --spectrum-actionbutton-text-color-selected: white;
+    --spectrum-alias-toggle-color-selected: var(--spectrum-red-600);
+    --spectrum-alias-toggle-color-selected-hover: var(--spectrum-red-600);
+    --spectrum-alias-toggle-color-selected-down: var(--spectrum-red-700);
+    --spectrum-alias-toggle-color-selected-focus: var(--spectrum-red-600);
 
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
 }
 
 .solo {
-    --spectrum-actionbutton-background-color-selected: var(--spectrum-global-color-orange-400);
-    --spectrum-actionbutton-background-color-selected-hover: var(--spectrum-global-color-orange-400);
-    --spectrum-actionbutton-text-color-selected: white;
+    --spectrum-alias-toggle-color-selected: var(--spectrum-yellow-800);
+    --spectrum-alias-toggle-color-selected-hover: var(--spectrum-yellow-800);
+    --spectrum-alias-toggle-color-selected-down: var(--spectrum-yellow-900);
+    --spectrum-alias-toggle-color-selected-focus: var(--spectrum-yellow-800);
 
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;

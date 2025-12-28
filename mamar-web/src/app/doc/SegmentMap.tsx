@@ -1,3 +1,4 @@
+import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import { useId, useRef } from "react"
 
@@ -108,12 +109,13 @@ function Container() {
                     </div>}
                     {variation.segments.map((segment, segmentIndex) => {
                         if (segment.type === "Subseg") {
-                            return <div
+                            return <View
                                 key={segment.id}
-                                style={ticksToStyle(segmentLengths[segmentIndex])}
+                                colorVersion={6}
+                                UNSAFE_style={ticksToStyle(segmentLengths[segmentIndex])}
                             >
                                 <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
-                            </div>
+                            </View>
                         } else {
                             return <div key={segment.id} />
                         }

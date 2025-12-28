@@ -1,4 +1,4 @@
-import { ToggleButton, Tooltip, TooltipTrigger } from "@adobe/react-spectrum"
+import { ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
 import { RAM_MAMAR_trackMute } from "patches"
 import { useEffect, useState } from "react"
 import { VolumeX, Headphones } from "react-feather"
@@ -18,7 +18,7 @@ export default function TrackControls({ trackIndex }: { trackIndex: number }) {
         dram.writeU32(RAM_MAMAR_trackMute + trackIndex * 4, isMute ? 1 : (isSolo ? 2 : 0))
     }, [emu, isMute, isSolo, trackIndex])
 
-    return <div className={styles.controls}>
+    return <View colorVersion={6} UNSAFE_className={styles.controls}>
         <TooltipTrigger>
             <ToggleButton
                 UNSAFE_className={styles.mute}
@@ -47,5 +47,5 @@ export default function TrackControls({ trackIndex }: { trackIndex: number }) {
             </ToggleButton>
             <Tooltip>Toggle solo (if a track is soloed, only it will play)</Tooltip>
         </TooltipTrigger>
-    </div>
+    </View>
 }

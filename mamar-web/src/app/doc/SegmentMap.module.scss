@@ -18,13 +18,13 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     height: $trackHeight;
 
     &:nth-child(even) {
-        background: var(--spectrum-global-color-gray-75);
+        background: var(--spectrum-gray-75);
     }
 }
 
 .trackHead {
     width: $trackHead-width;
-    border-right: 1px solid var(--spectrum-global-color-gray-100);
+    border-right: 1px solid var(--spectrum-gray-100);
 
     padding: 4px 16px;
     height: 100%;
@@ -32,21 +32,21 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     position: sticky;
     left: 0;
 
-    background: var(--spectrum-global-color-gray-100);
+    background: var(--spectrum-gray-100);
 
     .trackName {
-        color: var(--spectrum-global-color-gray-900);
+        color: var(--spectrum-gray-900);
         margin-bottom: 4px;
     }
 }
 
 .pianoRollThumbnail {
     --color-800: #ffffffaa;
-    --color-500: var(--spectrum-global-color-blue-500);
-    --color-400: var(--spectrum-global-color-blue-400);
+    --color-500: var(--spectrum-blue-700);
+    --color-400: var(--spectrum-blue-600);
     --color-200: #000000cc;
 
-    border: 1px solid var(--spectrum-global-color-gray-300);
+    border: 1px solid var(--spectrum-gray-300);
     background: linear-gradient(var(--color-500) 0%, var(--color-400) 100%);
     color: #ffffffee;
     border-radius: 6px;
@@ -55,7 +55,7 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     height: $trackHeight;
 
     &:focus-visible {
-        outline: 3px solid var(--spectrum-global-color-yellow-500);
+        outline: 3px solid var(--spectrum-gray-500);
     }
 
     .segmentName {
@@ -72,19 +72,19 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     }
 
     &.hasInterestingParentTrack {
-        --color-500: var(--spectrum-global-color-indigo-500);
-        --color-400: var(--spectrum-global-color-indigo-400);
+        --color-500: var(--spectrum-indigo-700);
+        --color-400: var(--spectrum-indigo-600);
     }
 
     &.drumRegion {
-        --color-500: var(--spectrum-global-color-seafoam-500);
-        --color-400: var(--spectrum-global-color-seafoam-400);
+        --color-500: var(--spectrum-seafoam-700);
+        --color-400: var(--spectrum-seafoam-600);
     }
 
     &.disabledRegion {
-        --color-800: var(--spectrum-global-color-gray-800);
-        --color-500: var(--spectrum-global-color-gray-500);
-        --color-400: var(--spectrum-global-color-gray-400);
-        --color-200: var(--spectrum-global-color-gray-200);
+        --color-800: var(--spectrum-gray-800);
+        --color-500: var(--spectrum-gray-500);
+        --color-400: var(--spectrum-gray-400);
+        --color-200: var(--spectrum-gray-200);
     }
 }
