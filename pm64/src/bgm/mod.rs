@@ -10,9 +10,10 @@ pub mod mamar;
 #[cfg(feature = "midly")]
 pub mod midi;
 
-use std::collections::HashMap;
 use std::ops::Range;
+use std::{collections::HashMap, sync::LazyLock};
 
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
@@ -49,6 +50,9 @@ pub struct Bgm {
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
 pub struct NoSpace;
+
+static RON_COMMAND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"name:\s*".*"(?:.|\n)*?commands:\s*(\[(?:.|\n)*?\])"#).unwrap());
 
 impl Bgm {
     pub fn new() -> Bgm {
@@ -150,6 +154,66 @@ impl Bgm {
                 },
             )
         }
+    }
+
+    pub fn from_ron_string(input_string: &str) -> Result<Self, ron::Error> {
+        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&input_string).collect();
+        let mut modified_input_string = input_string.to_string();
+
+        for captures in matches.into_iter().rev() {
+            let commands_group = captures.get(1).unwrap();
+            let (_, [commands_str]) = captures.extract();
+
+            let commands: Vec<Command> = ron::de::from_str(commands_str)?;
+            let events: Vec<Event> = commands
+                .into_iter()
+                .map(|command| Event { id: gen_id(), command })
+                .collect();
+
+            modified_input_string.replace_range(
+                commands_group.start()..commands_group.end(),
+                &ron::ser::to_string(&events)?,
+            );
+        }
+
+        Ok(ron::from_str::<Bgm>(&modified_input_string)?)
+    }
+
+    pub fn to_ron_string(&self) -> Result<String, ron::Error> {
+        let pretty_config = ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5);
+        let bgm_string = ron::ser::to_string_pretty(&self, pretty_config.clone())?.to_string();
+
+        // strip commands of id field
+        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&bgm_string).collect();
+        let mut modified_bgm_string = bgm_string.clone();
+
+        for captures in matches.into_iter().rev() {
+            let events_group = captures.get(1).unwrap();
+            let (_, [events_str]) = captures.extract();
+
+            let events: Vec<Event> = ron::de::from_str(events_str)?;
+            if events.is_empty() {
+                continue;
+            }
+
+            let commands: Vec<Command> = events.into_iter().map(|event| event.command).collect();
+
+            let mut commands_string = "[\n".to_owned();
+            for line in ron::ser::to_string_pretty(&commands, pretty_config.clone().depth_limit(1))?
+                .lines()
+                .skip(1)
+            {
+                commands_string.push_str("        ");
+                commands_string.push_str(line);
+                commands_string.push('\n');
+            }
+            modified_bgm_string.replace_range(
+                events_group.start()..events_group.end(),
+                &commands_string[..commands_string.len() - 1],
+            );
+        }
+
+        Ok(modified_bgm_string)
     }
 }
 
