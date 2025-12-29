@@ -206,9 +206,8 @@ fn midi_track_to_bgm_track(
             let mut track = Track {
                 name: "".into(),
                 is_disabled: false,
-                polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
+                polyphony: Polyphony::Automatic,
                 is_drum_track: false,
-                parent_track_idx: 0,
                 commands: CommandSeq::new(),
             };
 
@@ -424,14 +423,14 @@ fn midi_track_to_bgm_track(
                                     // Poly[phonic] mode on/off
                                     126 => {
                                         if value == 0 {
-                                            track.polyphonic_idx = 0;
+                                            track.polyphony = Polyphony::Manual { voices: 0 };
                                         } else {
-                                            track.polyphonic_idx = 1;
+                                            track.polyphony = Polyphony::Manual { voices: 1 };
                                         }
                                     }
                                     // Poly[phonic] mode on
                                     127 => {
-                                        track.polyphonic_idx = 2;
+                                        track.polyphony = Polyphony::Automatic;
                                     }
                                     _ => {
                                         pitch_range_cmd_state = PitchRangeCommandState::None;

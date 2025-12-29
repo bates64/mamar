@@ -1,6 +1,6 @@
 import produce from "immer"
 import { bgm_add_voice, bgm_split_variation_at } from "mamar-wasm-bridge"
-import { Bgm, Event, Instrument } from "pm64-typegen"
+import { Bgm, Event, Instrument, Polyphony } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -34,9 +34,8 @@ export type BgmAction = {
     track: number
     name?: string
     isDisabled?: boolean
-    polyphonicIdx?: number
+    polyphony?: Polyphony
     isDrumTrack?: boolean
-    parentTrackIdx?: number
 } | {
     type: "update_instrument"
     index: number
@@ -71,22 +70,22 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return bgm_add_voice(bgm)
     case "move_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            commands.vec = arrayMove(commands.vec, action.oldIndex, action.newIndex)
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            track.commands = arrayMove(track.commands, action.oldIndex, action.newIndex)
         })
     case "update_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            for (let i = 0; i < commands.vec.length; i++) {
-                if (commands.vec[i].id === action.command.id) {
-                    commands.vec[i] = action.command
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            for (let i = 0; i < track.commands.length; i++) {
+                if (track.commands[i].id === action.command.id) {
+                    track.commands[i] = action.command
                 }
             }
         })
     case "delete_track_command":
         return produce(bgm, draft => {
-            const { commands } = draft.trackLists[action.trackList].tracks[action.track]
-            commands.vec.splice(action.index, 1)
+            const track = draft.trackLists[action.trackList].tracks[action.track]
+            track.commands.splice(action.index, 1)
         })
     case "modify_track_settings":
         return produce(bgm, draft => {
@@ -97,14 +96,11 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             if (action.isDisabled !== undefined) {
                 track.isDisabled = action.isDisabled
             }
-            if (action.polyphonicIdx !== undefined) {
-                track.polyphonicIdx = action.polyphonicIdx
+            if (action.polyphony !== undefined) {
+                track.polyphony = action.polyphony
             }
             if (action.isDrumTrack !== undefined) {
                 track.isDrumTrack = action.isDrumTrack
-            }
-            if (action.parentTrackIdx !== undefined) {
-                track.parentTrackIdx = action.parentTrackIdx
             }
         })
     case "update_instrument":

@@ -10,9 +10,10 @@ pub mod mamar;
 #[cfg(feature = "midly")]
 pub mod midi;
 
-use std::collections::HashMap;
 use std::ops::Range;
+use std::{collections::HashMap, sync::LazyLock};
 
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
@@ -49,6 +50,9 @@ pub struct Bgm {
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
 pub struct NoSpace;
+
+static RON_COMMAND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"name:\s*".*"(?:.|\n)*?commands:\s*(\[(?:.|\n)*?\])"#).unwrap());
 
 impl Bgm {
     pub fn new() -> Bgm {
@@ -151,6 +155,66 @@ impl Bgm {
             )
         }
     }
+
+    pub fn from_ron_string(input_string: &str) -> Result<Self, ron::Error> {
+        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&input_string).collect();
+        let mut modified_input_string = input_string.to_string();
+
+        for captures in matches.into_iter().rev() {
+            let commands_group = captures.get(1).unwrap();
+            let (_, [commands_str]) = captures.extract();
+
+            let commands: Vec<Command> = ron::de::from_str(commands_str)?;
+            let events: Vec<Event> = commands
+                .into_iter()
+                .map(|command| Event { id: gen_id(), command })
+                .collect();
+
+            modified_input_string.replace_range(
+                commands_group.start()..commands_group.end(),
+                &ron::ser::to_string(&events)?,
+            );
+        }
+
+        Ok(ron::from_str::<Bgm>(&modified_input_string)?)
+    }
+
+    pub fn to_ron_string(&self) -> Result<String, ron::Error> {
+        let pretty_config = ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5);
+        let bgm_string = ron::ser::to_string_pretty(&self, pretty_config.clone())?.to_string();
+
+        // strip commands of id field
+        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&bgm_string).collect();
+        let mut modified_bgm_string = bgm_string.clone();
+
+        for captures in matches.into_iter().rev() {
+            let events_group = captures.get(1).unwrap();
+            let (_, [events_str]) = captures.extract();
+
+            let events: Vec<Event> = ron::de::from_str(events_str)?;
+            if events.is_empty() {
+                continue;
+            }
+
+            let commands: Vec<Command> = events.into_iter().map(|event| event.command).collect();
+
+            let mut commands_string = "[\n".to_owned();
+            for line in ron::ser::to_string_pretty(&commands, pretty_config.clone().depth_limit(1))?
+                .lines()
+                .skip(1)
+            {
+                commands_string.push_str("        ");
+                commands_string.push_str(line);
+                commands_string.push('\n');
+            }
+            modified_bgm_string.replace_range(
+                events_group.start()..events_group.end(),
+                &commands_string[..commands_string.len() - 1],
+            );
+        }
+
+        Ok(modified_bgm_string)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -238,24 +302,18 @@ pub struct Track {
     #[serde(default)]
     pub name: String,
     pub is_disabled: bool,
-    pub polyphonic_idx: u8,
+    pub polyphony: Polyphony,
     pub is_drum_track: bool,
-    /// Track index plus one. 0 means no parent. See au_bgm_load_subsegment
-    pub parent_track_idx: u8,
     pub commands: CommandSeq,
 }
-
-/// 255 is never used in vanilla songs so we can repurpose it to mean 'please calculate a good polyphonic_idx for me'
-pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
 
 impl Default for Track {
     fn default() -> Self {
         Self {
             name: "".to_owned(),
             is_disabled: true,
-            polyphonic_idx: POLYPHONIC_IDX_AUTO_MAMAR,
+            polyphony: Polyphony::Automatic,
             is_drum_track: false,
-            parent_track_idx: 0,
             commands: Default::default(),
         }
     }
@@ -266,10 +324,62 @@ impl Track {
         Track {
             name: self.name.clone(),
             is_disabled: self.is_disabled,
-            polyphonic_idx: self.polyphonic_idx,
+            polyphony: self.polyphony,
             is_drum_track: self.is_drum_track,
-            parent_track_idx: self.parent_track_idx,
             commands: self.commands.split_at(time),
+        }
+    }
+}
+
+/// 255 is never used in vanilla songs so we can repurpose it to mean 'please calculate a good polyphonic_idx for me'
+pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, TypeDef)]
+pub enum Polyphony {
+    Automatic,
+    Manual { voices: u8 },
+    Link { parent: u8 },
+    Other { priority: u8 },
+}
+
+impl Polyphony {
+    pub fn from_raw(raw_priority: u8, raw_parent_track_idx: u8) -> Self {
+        if raw_parent_track_idx > 0 {
+            return Self::Link {
+                parent: raw_parent_track_idx - 1,
+            };
+        }
+
+        match raw_priority {
+            0 => Self::Manual { voices: 0 },
+            1 => Self::Manual { voices: 1 },
+            5 => Self::Manual { voices: 2 },
+            6 => Self::Manual { voices: 3 },
+            7 => Self::Manual { voices: 4 },
+            POLYPHONIC_IDX_AUTO_MAMAR => Self::Automatic,
+            _ => Self::Other { priority: raw_priority },
+        }
+    }
+
+    pub fn to_polyphonic_idx(self) -> u8 {
+        match self {
+            Polyphony::Automatic => POLYPHONIC_IDX_AUTO_MAMAR,
+            Polyphony::Manual { voices } => match voices {
+                1 => 1,
+                2 => 5,
+                3 => 6,
+                4 => 7,
+                _ => 0,
+            },
+            Polyphony::Link { parent: _ } => 0,
+            Polyphony::Other { priority } => priority,
+        }
+    }
+
+    pub fn to_parent_idx(self) -> u8 {
+        match self {
+            Polyphony::Automatic | Polyphony::Manual { .. } | Polyphony::Other { .. } => 0,
+            Polyphony::Link { parent } => parent + 1,
         }
     }
 }

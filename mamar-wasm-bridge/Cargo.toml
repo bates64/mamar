@@ -17,7 +17,6 @@ console_error_panic_hook = "0.1.6"
 console_log = { version = "0.2", features = ["color"] }
 
 pm64 = { path = "../pm64", features = ["midly"] }
-ron = "0.10.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"

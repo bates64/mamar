@@ -41,7 +41,9 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
             Err(e) => to_js(&e.to_string()),
         }
     } else {
-        match ron::from_str::<Bgm>(&String::from_utf8_lossy(data)) {
+        let input_string = String::from_utf8_lossy(data);
+
+        match Bgm::from_ron_string(&input_string) {
             Ok(bgm) => to_js(&bgm),
             Err(e) => to_js(&e.to_string()),
         }
@@ -68,8 +70,9 @@ pub fn bgm_encode(bgm: &JsValue) -> JsValue {
 #[wasm_bindgen]
 pub fn ron_encode(bgm: &JsValue) -> JsValue {
     let bgm: Bgm = from_js(bgm);
-    match ron::ser::to_string_pretty(&bgm, ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5)) {
-        Ok(ron) => ron.to_string().into(),
+
+    match bgm.to_ron_string() {
+        Ok(ron) => ron.into(),
         Err(e) => e.to_string().into(),
     }
 }
