@@ -24,7 +24,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
     const track = bgm?.trackLists[trackListIndex]?.tracks[trackIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
-    const commands = useDeferredValue(track?.commands.vec || [])
+    const commands = useDeferredValue(track?.commands)
 
     if (!track || track.commands.length === 0) {
         return <></>
@@ -61,7 +61,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                 }
             }}
         >
-            <Thumbnail commands={commands} />
+            {commands && <Thumbnail commands={commands} />}
             <div id={nameId} className={styles.segmentName}>{track.name}</div>
         </div>
     }
