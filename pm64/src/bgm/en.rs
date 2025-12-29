@@ -413,7 +413,7 @@ impl CommandSeq {
 
         for Event { command, .. } in self.iter() {
             match command {
-                Command::Delay { value: mut delay } => {
+                Command::Delay(mut delay) => {
                     // https://github.com/KernelEquinox/midi2bgm/blob/master/midi2bgm.cpp#L202
                     while delay > 0 {
                         if delay < 0x78 {
@@ -456,11 +456,11 @@ impl CommandSeq {
                         f.write_all(&[first_byte | 0xC0, second_byte])?;
                     }
                 }
-                Command::MasterTempo { value: bpm } => {
+                Command::MasterTempo(bpm) => {
                     f.write_u8(0xE0)?;
                     f.write_u16_be(*bpm)?;
                 }
-                Command::MasterVolume { value: volume } => {
+                Command::MasterVolume(volume) => {
                     f.write_u8(0xE1)?;
                     f.write_u8(*volume)?;
                 }
@@ -488,27 +488,27 @@ impl CommandSeq {
                     f.write_u8(*bank)?;
                     f.write_u8(*patch)?;
                 }
-                Command::SubTrackVolume { value: a } => {
+                Command::SubTrackVolume(a) => {
                     f.write_u8(0xE9)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackPan { value: a } => {
+                Command::SubTrackPan(a) => {
                     f.write_u8(0xEA)?;
                     f.write_i8(*a)?;
                 }
-                Command::SubTrackReverb { value: a } => {
+                Command::SubTrackReverb(a) => {
                     f.write_u8(0xEB)?;
                     f.write_u8(*a)?;
                 }
-                Command::SegTrackVolume { value: a } => {
+                Command::SegTrackVolume(a) => {
                     f.write_u8(0xEC)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackCoarseTune { value: a } => {
+                Command::SubTrackCoarseTune(a) => {
                     f.write_u8(0xED)?;
                     f.write_u8(*a)?;
                 }
-                Command::SubTrackFineTune { value: a } => {
+                Command::SubTrackFineTune(a) => {
                     f.write_u8(0xEE)?;
                     f.write_u8(*a)?;
                 }
@@ -559,7 +559,7 @@ impl CommandSeq {
                     f.write_u8(0xE3)?;
                     f.write_u8(*effect_type)?;
                 }
-                Command::TrackTremoloSpeed { value } => {
+                Command::TrackTremoloSpeed(value) => {
                     f.write_u8(0xF1)?;
                     f.write_u8(*value)?;
                 }

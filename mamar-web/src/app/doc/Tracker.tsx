@@ -77,7 +77,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
     } else if ("Delay" in command) {
         return <div className={classNames(styles.command, styles.control)}>
             wait
-            <InputBox><VerticalDragNumberInput value={command.Delay.value} minValue={1} maxValue={999} onChange={value => mutate({ Delay: { value } })} /></InputBox>
+            <InputBox><VerticalDragNumberInput value={command.Delay} minValue={1} maxValue={999} onChange={value => mutate({ Delay: value })} /></InputBox>
             ticks
         </div>
     } else if ("Note" in command) {
@@ -95,10 +95,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set tempo to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.MasterTempo.value}
+                    value={command.MasterTempo}
                     minValue={0}
                     maxValue={0xFFFF}
-                    onChange={value => mutate({ MasterTempo: { value } })}
+                    onChange={value => mutate({ MasterTempo: value })}
                 />
             </InputBox>
         </div>
@@ -107,10 +107,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set master volume to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.MasterVolume.value}
+                    value={command.MasterVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ MasterVolume: { value } })}
+                    onChange={value => mutate({ MasterVolume: value })}
                 />
             </InputBox>
         </div>
@@ -231,10 +231,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set region volume to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SubTrackVolume.value}
+                    value={command.SubTrackVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackVolume: { value } })}
+                    onChange={value => mutate({ SubTrackVolume: value })}
                 />
             </InputBox>
         </div>
@@ -244,10 +244,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set region pan to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SubTrackPan.value}
+                    value={command.SubTrackPan}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackPan: { value } })}
+                    onChange={value => mutate({ SubTrackPan: value })}
                 />
             </InputBox>
         </div>
@@ -256,10 +256,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set region reverb to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SubTrackReverb.value}
+                    value={command.SubTrackReverb}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackReverb: { value } })}
+                    onChange={value => mutate({ SubTrackReverb: value })}
                 />
             </InputBox>
         </div>
@@ -268,10 +268,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set volume to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SegTrackVolume.value}
+                    value={command.SegTrackVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SegTrackVolume: { value } })}
+                    onChange={value => mutate({ SegTrackVolume: value })}
                 />
             </InputBox>
         </div>
@@ -280,10 +280,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set region coarse tune to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SubTrackCoarseTune.value}
+                    value={command.SubTrackCoarseTune}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackCoarseTune: { value } })}
+                    onChange={value => mutate({ SubTrackCoarseTune: value })}
                 />
             </InputBox>
         </div>
@@ -292,10 +292,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             set region fine tune to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.SubTrackFineTune.value}
+                    value={command.SubTrackFineTune}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackFineTune: { value } })}
+                    onChange={value => mutate({ SubTrackFineTune: value })}
                 />
             </InputBox>
         </div>
@@ -346,10 +346,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         return <div className={classNames(styles.command, styles.track)}>
             set tremolo speed to
             <VerticalDragNumberInput
-                value={command.TrackTremoloSpeed.value}
+                value={command.TrackTremoloSpeed}
                 minValue={0}
                 maxValue={0xFF}
-                onChange={value => mutate({ TrackTremoloSpeed: { value } })}
+                onChange={value => mutate({ TrackTremoloSpeed: value })}
             />
         </div>
     } else if ("TrackTremoloTime" in command) {

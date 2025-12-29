@@ -120,7 +120,7 @@ export function useSegmentLengths(): number[] {
             
             return commands.reduce((totalDelay, event) => {
                 if ("Delay" in event) {
-                    return totalDelay + event.Delay.value
+                    return totalDelay + event.Delay
                 } else {
                     return totalDelay
                 }

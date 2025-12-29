@@ -10,8 +10,9 @@ pub mod mamar;
 #[cfg(feature = "midly")]
 pub mod midi;
 
+use std::collections::BTreeMap;
 use std::ops::Range;
-use std::{collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ pub struct Bgm {
     pub drums: Vec<Drum>,
     pub instruments: Vec<Instrument>,
 
-    pub track_lists: HashMap<TrackListId, TrackList>,
+    pub track_lists: BTreeMap<TrackListId, TrackList>,
 
     #[serde(skip)]
     pub unknowns: Vec<Unknown>,

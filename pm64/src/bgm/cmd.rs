@@ -95,11 +95,7 @@ impl CommandSeq {
 
                 let mut old_delay_range = index..index;
                 let mut delta_time: usize = 0;
-                while let Some(Event {
-                    command: Delay { value: t },
-                    ..
-                }) = self.vec.get(old_delay_range.end)
-                {
+                while let Some(Event { command: Delay(t), .. }) = self.vec.get(old_delay_range.end) {
                     old_delay_range.end += 1;
                     delta_time += *t;
                 }
@@ -112,7 +108,7 @@ impl CommandSeq {
 
                 fn delay(time: usize) -> Box<dyn Iterator<Item = Event>> {
                     if time > 0 {
-                        Box::new(iter::once(Command::Delay { value: time }.into()))
+                        Box::new(iter::once(Command::Delay(time).into()))
                     } else {
                         Box::new(iter::empty())
                     }
@@ -181,11 +177,7 @@ impl CommandSeq {
                 }
 
                 let mut delta_time: usize = 0;
-                while let Some(Event {
-                    command: Delay { value: t },
-                    ..
-                }) = self.vec.get(old_delay_range.end)
-                {
+                while let Some(Event { command: Delay(t), .. }) = self.vec.get(old_delay_range.end) {
                     old_delay_range.end += 1;
                     delta_time += *t;
                 }
@@ -198,7 +190,7 @@ impl CommandSeq {
 
                 fn delay(time: usize) -> Box<dyn Iterator<Item = Event>> {
                     if time > 0 {
-                        Box::new(iter::once(Command::Delay { value: time }.into()))
+                        Box::new(iter::once(Command::Delay(time).into()))
                     } else {
                         Box::new(iter::empty())
                     }
@@ -251,7 +243,7 @@ impl CommandSeq {
 
         for command in self.vec.iter() {
             if let Event {
-                command: Delay { value: delta_time },
+                command: Delay(delta_time),
                 ..
             } = command
             {
@@ -268,7 +260,7 @@ impl CommandSeq {
     /// Equivalent to [CommandSeq::len_time] for a sequence with no [Command::Note]s.
     pub fn playback_time(&self) -> usize {
         self.iter_time().last().map_or(0, |(time, event)| match event.command {
-            Command::Delay { value: delta } => time + delta,
+            Command::Delay(delta) => time + delta,
             Command::Note { length, .. } => time + length as usize,
             _ => time,
         })
@@ -285,12 +277,8 @@ impl CommandSeq {
     /// sounds the same).
     pub fn shrink(&mut self) {
         // Remove useless commands
-        self.vec.retain(|event| {
-            !matches!(
-                event.command,
-                Command::Delay { value: 0 } | Command::Note { length: 0, .. }
-            )
-        });
+        self.vec
+            .retain(|event| !matches!(event.command, Command::Delay(0) | Command::Note { length: 0, .. }));
 
         // TODO: combine redundant subsequences (e.g. multiple Delay, multiple MasterTempo without a delay between)
 
@@ -336,17 +324,17 @@ impl CommandSeq {
     }
 
     pub fn clear_command(&mut self, idx: usize) {
-        self.vec[idx] = Command::Delay { value: 0 }.into();
+        self.vec[idx] = Command::Delay(0).into();
     }
 
     pub fn zero_all_delays(&mut self) {
         for cmd in &mut self.vec {
             if let Event {
-                command: Command::Delay { value: _ },
+                command: Command::Delay(_),
                 ..
             } = cmd
             {
-                *cmd = Command::Delay { value: 0 }.into();
+                *cmd = Command::Delay(0).into();
             }
         }
     }
@@ -432,7 +420,7 @@ impl CommandSeq {
 
         for (index, command) in self.vec.iter().enumerate() {
             if let Event {
-                command: Delay { value: delta_time },
+                command: Delay(delta_time),
                 ..
             } = command
             {
@@ -580,9 +568,7 @@ pub enum Command {
     End,
 
     /// Sleeps for however many ticks before continuing playback on this track.
-    Delay {
-        value: usize,
-    },
+    Delay(usize),
 
     /// Plays a note or drum sound.
     Note {
@@ -592,14 +578,10 @@ pub enum Command {
     },
 
     /// Sets the beats-per-minute of the composition.
-    MasterTempo {
-        value: u16,
-    },
+    MasterTempo(u16),
 
     /// Sets the composition volume.
-    MasterVolume {
-        value: u8,
-    },
+    MasterVolume(u8),
 
     /// Sets the composition transpose value.
     MasterPitchShift {
@@ -636,33 +618,21 @@ pub enum Command {
     },
 
     /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
-    SubTrackVolume {
-        value: u8,
-    },
+    SubTrackVolume(u8),
 
     /// Left = (+/-)0.
     /// Middle = (+/-)64.
     /// Right = (+/-)127.
-    SubTrackPan {
-        value: i8,
-    },
+    SubTrackPan(i8),
 
-    SubTrackReverb {
-        value: u8,
-    },
+    SubTrackReverb(u8),
 
     /// Sets the volume for this track only. Resets at the end of the [super::Segment].
-    SegTrackVolume {
-        value: u8,
-    },
+    SegTrackVolume(u8),
 
-    SubTrackCoarseTune {
-        value: u8,
-    },
+    SubTrackCoarseTune(u8),
 
-    SubTrackFineTune {
-        value: u8,
-    },
+    SubTrackFineTune(u8),
 
     SegTrackTune {
         bend: i16,
@@ -675,9 +645,7 @@ pub enum Command {
         time: u8,
     },
 
-    TrackTremoloSpeed {
-        value: u8,
-    },
+    TrackTremoloSpeed(u8),
 
     TrackTremoloTime {
         time: u8,
@@ -750,7 +718,7 @@ pub const DELAY_MAX: u8 = 0x78;
 impl Default for Command {
     /// Returns a no-op command. Cannot be encoded.
     fn default() -> Self {
-        Delay { value: 0 }
+        Delay(0)
     }
 }
 
@@ -819,7 +787,7 @@ impl<'a> Iterator for TimeIter<'a> {
                 let ret = (self.current_time, command);
 
                 if let Event {
-                    command: Delay { value: delta_time },
+                    command: Delay(delta_time),
                     ..
                 } = command
                 {
@@ -917,7 +885,7 @@ mod test {
                 velocity: 100,
                 length: 10,
             },
-            Command::Delay { value: 15 },
+            Command::Delay(15),
             Command::Note {
                 pitch: 100, // same pitch
                 velocity: 100,
@@ -948,7 +916,7 @@ mod test {
                 velocity: 100,
                 length: 10,
             },
-            Command::Delay { value: 10 }, // note should finish
+            Command::Delay(10), // note should finish
             Command::Note {
                 pitch: 200,
                 velocity: 100,
@@ -962,9 +930,9 @@ mod test {
     fn split_at() {
         let mut seq = CommandSeq::from(vec![
             Command::Marker { label: "A".to_string() },
-            Command::Delay { value: 5 },
+            Command::Delay(5),
             Command::Marker { label: "B".to_string() },
-            Command::Delay { value: 5 },
+            Command::Delay(5),
             Command::End,
         ]);
         let split = seq.split_at(4);

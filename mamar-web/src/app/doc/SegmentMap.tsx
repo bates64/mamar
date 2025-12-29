@@ -118,7 +118,7 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
                 height={1}
             />)
         } else if ("Delay" in command) {
-            time += command.Delay.value
+            time += command.Delay
         }
     }
 

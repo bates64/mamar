@@ -195,6 +195,7 @@ fn midi_track_to_bgm_track(
     use midly::{MidiMessage, TrackEventKind};
 
     /// NoteOn data
+    #[derive(Clone, Copy)]
     struct Note {
         time: usize,
         vel: u8,
@@ -222,7 +223,7 @@ fn midi_track_to_bgm_track(
             let mut set_bank_patch = false;
 
             let mut time = 0;
-            let mut started_notes: HashMap<u8, Note> = HashMap::new(); // Maps key to notes that have not finished yet
+            let mut started_notes: BTreeMap<u8, Note> = BTreeMap::new(); // Maps key to notes that have not finished yet
 
             let mut instrument_name = None;
             let mut track_name = None;
@@ -305,7 +306,7 @@ fn midi_track_to_bgm_track(
                             MidiMessage::Aftertouch { key: _, vel } | MidiMessage::ChannelAftertouch { vel } => {
                                 track
                                     .commands
-                                    .insert_end(time_cvt, Command::SubTrackVolume { value: vel.as_int() });
+                                    .insert_end(time_cvt, Command::SubTrackVolume(vel.as_int()));
                             }
                             MidiMessage::ProgramChange { program } => {
                                 if !set_bank_patch {
@@ -351,13 +352,13 @@ fn midi_track_to_bgm_track(
                                         pitch_range_cmd_state = PitchRangeCommandState::None;
                                     }
                                     // Channel Volume
-                                    7 | 39 => track.commands.insert_end(time_cvt, Command::SubTrackVolume { value }),
+                                    7 | 39 => track.commands.insert_end(time_cvt, Command::SubTrackVolume(value)),
                                     // Pan
-                                    10 | 42 | 8 | 40 => track
-                                        .commands
-                                        .insert_end(time_cvt, Command::SubTrackPan { value: value as i8 }),
+                                    10 | 42 | 8 | 40 => {
+                                        track.commands.insert_end(time_cvt, Command::SubTrackPan(value as i8))
+                                    }
                                     // Effect control 1
-                                    12 | 44 => track.commands.insert_end(time_cvt, Command::SubTrackReverb { value }),
+                                    12 | 44 => track.commands.insert_end(time_cvt, Command::SubTrackReverb(value)),
                                     // Damper pedal on/off (sustain)
                                     64 => {
                                         let sustain = if value >= 64 {
@@ -408,7 +409,7 @@ fn midi_track_to_bgm_track(
                                     }
                                     // All notes off / All sound off
                                     123 | 120 => {
-                                        for (key, start) in started_notes.drain() {
+                                        for (&key, &start) in &started_notes {
                                             let length = time - start.time;
                                             track.commands.insert_end(
                                                 convert_time(start.time, time_divisor),
@@ -419,6 +420,8 @@ fn midi_track_to_bgm_track(
                                                 },
                                             );
                                         }
+
+                                        started_notes.clear();
                                     }
                                     // Poly[phonic] mode on/off
                                     126 => {
@@ -443,12 +446,9 @@ fn midi_track_to_bgm_track(
                         if track_number == 0 {
                             let microseconds_per_beat = tempo.as_int() as f32;
                             let beats_per_minute = (60_000_000.0 / microseconds_per_beat).round() as u16;
-                            track.commands.insert_end(
-                                time_cvt,
-                                Command::MasterTempo {
-                                    value: beats_per_minute,
-                                },
-                            );
+                            track
+                                .commands
+                                .insert_end(time_cvt, Command::MasterTempo(beats_per_minute));
                             log::debug!("bpm: {}", beats_per_minute);
                         } else {
                             log::warn!("ignoring non-master tempo change");
@@ -477,8 +477,8 @@ fn midi_track_to_bgm_track(
                 track.commands.insert_many_start(
                     0,
                     vec![
-                        Command::MasterTempo { value: 120 },
-                        Command::MasterVolume { value: 100 },
+                        Command::MasterTempo(120),
+                        Command::MasterVolume(100),
                         Command::MasterEffect { index: 0, value: 1 },
                     ],
                 );
@@ -493,9 +493,9 @@ fn midi_track_to_bgm_track(
                 track.commands.insert_many_start(
                     0,
                     vec![
-                        Command::SubTrackReverb { value: 0 },
-                        Command::SubTrackVolume { value: 100 },
-                        Command::SubTrackPan { value: 64 },
+                        Command::SubTrackReverb(0),
+                        Command::SubTrackVolume(100),
+                        Command::SubTrackPan(64),
                         Command::SetTrackVoice { index: voice_idx as u8 },
                     ],
                 );
