@@ -79,21 +79,20 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
     </Flex>
 
     const takeoverLabel = <Flex width="100%" alignItems="center">
-        <Text flexGrow={1}>Track to take over</Text>
+        <Text flexGrow={1}>Track to link against</Text>
         <ContextualHelp variant="help" placement="right">
-            <Heading>Conditional Takeover</Heading>
+            <Heading>Linking Tracks</Heading>
             <Content>
                 <Text>
-                    This track stays silent by default. When <code>bgm_set_variation</code> is called with
-                    a non-zero variation, <b>this track performs in place of the selected track</b>, which becomes silent.
-                    The takeover takes place over a 2 beat crossfade. Tracks can only take over tracks that are above them.
+                    <b>This track is silent by default.</b> Call <code>bgm_set_linked_mode</code> for <b>this track to fade in to replace the selected track</b>, which becomes silent.
+                    Tracks can only link with tracks that are above them.
                 </Text>
             </Content>
             <Footer>
                 <Text>
-                    Use takeovers to <b>swap musical parts that serve the same role</b>. For instance,
+                    Use linked tracks to <b>swap musical parts that serve the same role</b>. For example,
                     in <a href="https://github.com/bates64/papermario-dx/blob/main/src/world/area_sbk/sbk_56/main.c">Dry Dry Desert - S2E3 Oasis</a>,
-                    two oasis-specific layers take over tracks used elsewhere in the desert.
+                    four oasis-specific tracks are linked to four normal tracks, and fade in when Mario is near the oasis.
                 </Text>
             </Footer>
         </ContextualHelp>
@@ -102,12 +101,12 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
     let state: "auto" | "manual" | "parent" = "manual"
     let parentTrackIdx = 0
     let voiceCount = 1
-    
+
     if (polyphony === "Automatic") {
         state = "auto"
-    } else if ("ConditionalTakeover" in polyphony) {
+    } else if ("Link" in polyphony) {
         state = "parent"
-        parentTrackIdx = polyphony.ConditionalTakeover.parent
+        parentTrackIdx = polyphony.Link.parent
     } else if ("Manual" in polyphony) {
         voiceCount = polyphony.Manual.voices
     }
@@ -134,7 +133,7 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
                     })
                 } else if (newState === "parent") {
                     onChange({
-                        ConditionalTakeover: {
+                        Link: {
                             parent: Math.min(recentNonZeroParentTrackIdx, maxParentTrackIdx),
                         },
                     })
@@ -143,7 +142,7 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
         >
             <Radio value="auto">Automatic</Radio>
             <Radio value="manual">Manual</Radio>
-            <Radio value="parent" isDisabled={maxParentTrackIdx <= 0}>Conditional takeover</Radio>
+            <Radio value="parent" isDisabled={maxParentTrackIdx <= 0}>Link</Radio>
         </RadioGroup>
         {state === "manual" ? <NumberField
             label="Number of voices"
@@ -159,13 +158,13 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
         /> : <></>}
         {state === "parent" ? <NumberField
             label={takeoverLabel}
-            description="The number of the track this one will take over when triggered."
+            description="The track this one will replace."
             value={parentTrackIdx}
             minValue={1}
             maxValue={maxParentTrackIdx}
             step={1}
             onChange={parentTrackIdx => onChange({
-                ConditionalTakeover: {
+                Link: {
                     parent: parentTrackIdx,
                 },
             })}

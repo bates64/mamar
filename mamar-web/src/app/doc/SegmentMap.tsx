@@ -12,9 +12,8 @@ import { Track } from "pm64-typegen"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
 
-function hasParentTrack(track: Track): boolean {
-    const { polyphony } = track
-    return typeof polyphony === "object" && "ConditionalTakeover" in polyphony
+function hasParentTrack({ polyphony }: Track): boolean {
+    return typeof polyphony === "object" && "Link" in polyphony
 }
 
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {

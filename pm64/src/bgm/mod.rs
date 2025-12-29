@@ -338,14 +338,14 @@ pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
 pub enum Polyphony {
     Automatic,
     Manual { voices: u8 },
-    ConditionalTakeover { parent: u8 },
+    Link { parent: u8 },
     Other { priority: u8 },
 }
 
 impl Polyphony {
     pub fn from_raw(raw_priority: u8, raw_parent_track_idx: u8) -> Self {
         if raw_parent_track_idx > 0 {
-            return Self::ConditionalTakeover {
+            return Self::Link {
                 parent: raw_parent_track_idx - 1,
             };
         }
@@ -371,7 +371,7 @@ impl Polyphony {
                 4 => 7,
                 _ => 0,
             },
-            Polyphony::ConditionalTakeover { parent: _ } => 1,
+            Polyphony::Link { parent: _ } => 0,
             Polyphony::Other { priority } => priority,
         }
     }
@@ -379,7 +379,7 @@ impl Polyphony {
     pub fn to_parent_idx(self) -> u8 {
         match self {
             Polyphony::Automatic | Polyphony::Manual { .. } | Polyphony::Other { .. } => 0,
-            Polyphony::ConditionalTakeover { parent } => parent + 1,
+            Polyphony::Link { parent } => parent + 1,
         }
     }
 }

@@ -247,7 +247,10 @@ impl Bgm {
                         let polyphonic_idx = match *polyphony {
                             Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
                             Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
-                            Polyphony::ConditionalTakeover { parent: _ } => 1,
+                            Polyphony::Link { parent: _ } => {
+                                // Dry Dry Desert (only song that uses Link) happens to use this value, but it doesn't seem to matter
+                                5
+                            }
                             Polyphony::Other { priority } => priority,
                         };
 
