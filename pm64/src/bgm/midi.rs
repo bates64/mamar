@@ -178,7 +178,7 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
 
     let (_, variation) = bgm.add_variation().unwrap();
     variation.segments = vec![Segment::Subseg {
-        id: gen_id(),
+        id: Some(gen_id()),
         track_list: track_list_id,
     }];
 

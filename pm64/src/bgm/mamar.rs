@@ -60,7 +60,7 @@ mod test {
             variations: [
                 Some(Variation {
                     segments: vec![Segment::Subseg {
-                        id: 0,
+                        id: Some(0),
                         track_list: 0x1234,
                     }],
                 }),

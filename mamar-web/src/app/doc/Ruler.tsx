@@ -18,7 +18,7 @@ interface Loop {
 }
 
 function getLoops(segments: Segment[]): Loop[] {
-    const loops = []
+    const loops: Loop[] = []
 
     for (let startIdx = 0; startIdx < segments.length; startIdx++) {
         const start = segments[startIdx]
@@ -27,6 +27,11 @@ function getLoops(segments: Segment[]): Loop[] {
             for (let endIdx = 0; endIdx < segments.length; endIdx++) {
                 const end = segments[endIdx]
                 if (end.type === "EndLoop" && end.label_index === start.label_index) {
+                    if (start.id == null) {
+                        console.error("Segment", start, "does not have an ID")
+                        continue
+                    }
+                    
                     loops.push({
                         id: start.id,
                         start: startIdx,
@@ -139,6 +144,11 @@ export default function Ruler() {
     let totalTime = 0
     for (let i = 0; i < segmentLengths.length; i++) {
         const segment = segments[i]
+        if (segment.id == null) {
+            console.error("Segment", segment, "does not have an ID")
+            continue
+        }
+        
         let length = segmentLengths[i]
 
         if (length === 0) {
@@ -239,11 +249,17 @@ function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
 
     function deleteLoop() {
         const start = variation?.segments[loop.start]
-        if (start)
+        if (start) {
+            if (start.id == null) {
+                console.error("Segment", start, "does not have an ID")
+                return
+            }
+            
             variationDispatch({
                 type: "toggle_segment_loop",
                 id: start.id,
             })
+        }
     }
 
     return <Dialog size="S">

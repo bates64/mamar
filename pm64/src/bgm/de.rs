@@ -306,35 +306,35 @@ impl Segment {
                 };
 
                 Ok(Segment::Subseg {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     track_list,
                 })
             }
             segment_commands::START_LOOP => {
                 f.seek(SeekFrom::Current(-2))?;
                 Ok(Segment::StartLoop {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: f.read_u16_be()?,
                 })
             }
-            segment_commands::WAIT => Ok(Segment::Wait { id: gen_id() }),
+            segment_commands::WAIT => Ok(Segment::Wait { id: Some(gen_id()) }),
             segment_commands::END_LOOP => {
                 Ok(Segment::EndLoop {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_6 => {
                 Ok(Segment::Unknown6 {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_7 => {
                 Ok(Segment::Unknown7 {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
