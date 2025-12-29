@@ -84,8 +84,8 @@ export default function InstrumentInput({ index, onChange }: Props) {
                         <NumberField label="Reverb" value={instrument.reverb} onChange={reverb => dispatch({ type: "update_instrument", index, partial: { reverb } })} />
                     </Flex>
                     <Flex gap="size-150">
-                        <NumberField label="Coarse tune" value={instrument.coarseTune} onChange={coarseTune => dispatch({ type: "update_instrument", index, partial: { coarseTune } })} />
-                        <NumberField label="Fine tune" value={instrument.fineTune} onChange={fineTune => dispatch({ type: "update_instrument", index, partial: { fineTune } })} />
+                        <NumberField label="Coarse tune" value={instrument.coarse_tune} onChange={coarse_tune => dispatch({ type: "update_instrument", index, partial: { coarse_tune } })} />
+                        <NumberField label="Fine tune" value={instrument.fine_tune} onChange={fine_tune => dispatch({ type: "update_instrument", index, partial: { fine_tune } })} />
                     </Flex>
                 </Form>}
             </Content>

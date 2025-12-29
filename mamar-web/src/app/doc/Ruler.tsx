@@ -115,7 +115,7 @@ export function useSegmentLengths(): number[] {
 
     return segments.map(segment => {
         if (bgm && "Subseg" in segment) {
-            const master = bgm.trackLists[segment.Subseg.trackList].tracks[0]
+            const master = bgm.track_lists[segment.Subseg.track_list].tracks[0]
             return master.commands.reduce((totalDelay, event) => {
                 if (event.type === "Delay") {
                     return totalDelay + event.value

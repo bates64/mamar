@@ -33,7 +33,6 @@ pub type TrackListId = u64;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct Bgm {
     pub name: String,
 
@@ -243,14 +242,12 @@ impl Bgm {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 pub struct Variation {
     pub segments: Vec<Segment>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 pub enum Segment {
-    #[serde(rename_all = "camelCase")]
     Subseg {
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<Id>,
@@ -321,7 +318,6 @@ mod segment_commands {
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct TrackList {
     /// Encode/decode file position.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -351,7 +347,6 @@ impl TrackList {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct Track {
     #[serde(default)]
     pub name: String,
@@ -439,7 +434,6 @@ impl Polyphony {
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Drum {
     pub bank: u8,
@@ -464,7 +458,6 @@ pub struct Drum {
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Instrument {
     /// Upper nibble = bank. (0..=6 are valid?)

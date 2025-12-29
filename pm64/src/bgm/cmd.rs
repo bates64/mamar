@@ -565,7 +565,6 @@ enum DelayLookup {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 pub struct Event {
     pub id: Id,
     #[serde(flatten)]

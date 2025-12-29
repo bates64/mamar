@@ -83,7 +83,7 @@ export function variationReducer(variation: Variation, action: VariationAction):
         const newSeg: Segment = {
             Subseg: {
                 id: action.id,
-                trackList: action.trackList,
+                track_list: action.trackList,
             },
         }
         return {

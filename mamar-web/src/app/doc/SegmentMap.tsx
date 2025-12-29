@@ -22,7 +22,7 @@ function hasParentTrack({ polyphony }: Track): boolean {
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
     const [bgm] = useBgm()
-    const track = bgm?.trackLists[trackListIndex]?.tracks[trackIndex]
+    const track = bgm?.track_lists[trackListIndex]?.tracks[trackIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
     const commands = useDeferredValue(track?.commands)
@@ -50,8 +50,8 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
             aria-labelledby={nameId}
             className={classNames({
                 [styles.pianoRollThumbnail]: true,
-                [styles.drumRegion]: track.isDrumTrack,
-                [styles.disabledRegion]: track.isDisabled,
+                [styles.drumRegion]: track.is_drum_track,
+                [styles.disabledRegion]: track.is_disabled,
                 [styles.hasInterestingParentTrack]: hasParentTrack(track),
                 [styles.selected]: isSelected,
             })}
@@ -184,7 +184,7 @@ function Container() {
                                 colorVersion={6}
                                 UNSAFE_style={ticksToStyle(segmentLengths[segmentIndex])}
                             >
-                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.trackList} />
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} />
                             </View>
                         } else {
                             const id = getSegmentId(segment)
