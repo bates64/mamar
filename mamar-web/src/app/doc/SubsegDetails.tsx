@@ -6,7 +6,8 @@ import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
-import { Polyphony } from "pm64-typegen"
+import { Bgm, Polyphony } from "pm64-typegen"
+import { BgmAction } from "../store/bgm"
 
 export interface Props {
     trackListId: number
@@ -15,7 +16,7 @@ export interface Props {
 
 export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     const hid = useId()
-    const [bgm, dispatch] = useBgm()
+    const [bgm, dispatch]: [Bgm | undefined, (action: BgmAction) => void] = useBgm()
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
 
     // Track name editing is debounced to prevent dispatch spam when typing

@@ -574,7 +574,6 @@ pub struct Event {
 /// See audio.h union SeqArgs
 /// TODO: rename to use "Variant" and "Seg" prefixes rather than "Seg" and "Sub"; same in audio.h
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
-#[serde(tag = "type")]
 pub enum Command {
     /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
     /// via a [`Detour`](Command::Detour).

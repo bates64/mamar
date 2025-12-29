@@ -84,11 +84,11 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
     let maxPitch = 0
     let hasNoteInRange = false
     for (const command of commands) {
-        if (command.type === "Note") {
-            minPitch = Math.min(minPitch, command.pitch)
-            maxPitch = Math.max(maxPitch, command.pitch)
+        if ("Note" in command) {
+            minPitch = Math.min(minPitch, command.Note.pitch)
+            maxPitch = Math.max(maxPitch, command.Note.pitch)
 
-            if (command.pitch >= c2 && command.pitch <= c5) {
+            if (command.Note.pitch >= c2 && command.Note.pitch <= c5) {
                 hasNoteInRange = true
             }
         }
@@ -109,16 +109,16 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
     const notes = []
     let time = 0
     for (const command of commands) {
-        if (command.type === "Note") {
+        if ("Note" in command) {
             notes.push(<rect
                 key={command.id}
                 x={time}
-                y={command.pitch - minPitch}
-                width={command.length}
+                y={command.Note.pitch - minPitch}
+                width={command.Note.length}
                 height={1}
             />)
-        } else if (command.type === "Delay") {
-            time += command.value
+        } else if ("Delay" in command) {
+            time += command.Delay.value
         }
     }
 

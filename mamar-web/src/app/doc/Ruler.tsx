@@ -1,6 +1,6 @@
 import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
-import { Segment } from "pm64-typegen"
+import { Event, Segment } from "pm64-typegen"
 import { useState } from "react"
 import { usePress } from "react-aria"
 
@@ -116,9 +116,11 @@ export function useSegmentLengths(): number[] {
     return segments.map(segment => {
         if (bgm && "Subseg" in segment) {
             const master = bgm.track_lists[segment.Subseg.track_list].tracks[0]
-            return master.commands.reduce((totalDelay, event) => {
-                if (event.type === "Delay") {
-                    return totalDelay + event.value
+            const commands = master.commands as unknown as Event[]
+            
+            return commands.reduce((totalDelay, event) => {
+                if ("Delay" in event) {
+                    return totalDelay + event.Delay.value
                 } else {
                     return totalDelay
                 }
