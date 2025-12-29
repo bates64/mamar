@@ -177,7 +177,7 @@ export default function Ruler() {
     }
 
     const bars = []
-    for (let time = 0, bar = 0; time < totalTime; bar++, time += TICKS_PER_BEAT * BEATS_PER_BAR) {
+    for (let time = 0, bar = 1; time < totalTime; bar++, time += TICKS_PER_BEAT * BEATS_PER_BAR) {
         const remaining = Math.min(totalTime - time, TICKS_PER_BEAT * BEATS_PER_BAR)
         bars.push(<div key={bar} className={styles.bar} style={ticksToStyle(remaining)}>
             {bar}
