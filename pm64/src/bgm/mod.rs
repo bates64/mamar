@@ -249,7 +249,6 @@ pub struct Variation {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(tag = "type")]
 pub enum Segment {
     #[serde(rename_all = "camelCase")]
     Subseg {

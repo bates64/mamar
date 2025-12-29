@@ -9,6 +9,7 @@ import styles from "./Ruler.module.scss"
 import { useTime } from "./timectx"
 
 import { useBgm, useSegment, useVariation } from "../store"
+import { getSegmentId } from "../store/segment"
 
 interface Loop {
     id: number
@@ -22,21 +23,21 @@ function getLoops(segments: Segment[]): Loop[] {
 
     for (let startIdx = 0; startIdx < segments.length; startIdx++) {
         const start = segments[startIdx]
-        if (start.type === "StartLoop") {
+        if ("StartLoop" in start) {
             // Look for EndLoop
             for (let endIdx = 0; endIdx < segments.length; endIdx++) {
                 const end = segments[endIdx]
-                if (end.type === "EndLoop" && end.label_index === start.label_index) {
-                    if (start.id == null) {
+                if ("EndLoop" in end && end.EndLoop.label_index === start.StartLoop.label_index) {
+                    if (start.StartLoop.id == null) {
                         console.error("Segment", start, "does not have an ID")
                         continue
                     }
                     
                     loops.push({
-                        id: start.id,
+                        id: start.StartLoop.id,
                         start: startIdx,
                         end: endIdx,
-                        iterCount: end.iter_count,
+                        iterCount: end.EndLoop.iter_count,
                     })
                     break
                 }
@@ -113,8 +114,8 @@ export function useSegmentLengths(): number[] {
     const segments = variation?.segments ?? []
 
     return segments.map(segment => {
-        if (bgm && segment.type === "Subseg") {
-            const master = bgm.trackLists[segment.trackList].tracks[0]
+        if (bgm && "Subseg" in segment) {
+            const master = bgm.trackLists[segment.Subseg.trackList].tracks[0]
             return master.commands.reduce((totalDelay, event) => {
                 if (event.type === "Delay") {
                     return totalDelay + event.value
@@ -144,7 +145,8 @@ export default function Ruler() {
     let totalTime = 0
     for (let i = 0; i < segmentLengths.length; i++) {
         const segment = segments[i]
-        if (segment.id == null) {
+        const id = getSegmentId(segment)
+        if (id == null) {
             console.error("Segment", segment, "does not have an ID")
             continue
         }
@@ -156,11 +158,11 @@ export default function Ruler() {
             for (const loop of loops) {
                 if (i === loop.start) {
                     currentLoop = loop
-                    elements.push(<LoopHandle key={`start_loop_${loop.id}`} segment={segment.id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={`start_loop_${loop.id}`} segment={id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
                 if (i === loop.end) {
                     currentLoop = null
-                    elements.push(<LoopHandle key={`end_loop_${loop.id}`} segment={segment.id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    elements.push(<LoopHandle key={`end_loop_${loop.id}`} segment={id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
                 }
                 continue
             }
@@ -169,18 +171,18 @@ export default function Ruler() {
 
         if (currentLoop !== null) {
             // Consume all segments that are part of this loop
-            while (segments[i + 1].type !== "EndLoop") {
+            while (!("EndLoop" in segments[i + 1])) {
                 length += segmentLengths[++i]
             }
 
             const loop = Object.assign({}, currentLoop!) // Avoids stale currentLoop reference in dialog func below
 
-            elements.push(<DialogTrigger key={segment.id} >
+            elements.push(<DialogTrigger key={id} >
                 <RulerSegment segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />
                 {close => <LoopDialog loop={loop} close={close} />}
             </DialogTrigger>)
         } else {
-            elements.push(<RulerSegment key={segment.id} segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />)
+            elements.push(<RulerSegment key={id} segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />)
         }
 
         totalTime += length
@@ -224,9 +226,15 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
         style={ticksToStyle(length)}
         title={currentLoop === null ? "Double-click to loop" : ""}
         onDoubleClick={() => {
+            const id = getSegmentId(segment)
+            if (id == null) {
+                console.error("Segment", segment, "does not have an ID")
+                return
+            }
+            
             dispatch({
                 type: "toggle_segment_loop",
-                id: segment.id,
+                id,
             })
         }}
     >
@@ -238,7 +246,12 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
 
 function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
     const [variation, variationDispatch] = useVariation()
-    const [, endDispatch] = useSegment(variation?.segments[loop.end].id)
+    
+    const end = variation?.segments[loop.end]
+    const id = (end && "EndLoop" in end) ? end.EndLoop.id : undefined
+    console.assert(end && "EndLoop" in end, "Segment", end, "is not EndLoop")
+    
+    const [, endDispatch] = useSegment(id)
 
     function setIterCount(iterCount: number) {
         endDispatch({
@@ -250,14 +263,19 @@ function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
     function deleteLoop() {
         const start = variation?.segments[loop.start]
         if (start) {
-            if (start.id == null) {
+            if (!("StartLoop" in start)) {
+                console.error("Segment", start, "is not StartLoop")
+                return
+            }
+            
+            if (start.StartLoop.id == null) {
                 console.error("Segment", start, "does not have an ID")
                 return
             }
             
             variationDispatch({
                 type: "toggle_segment_loop",
-                id: start.id,
+                id: start.StartLoop.id,
             })
         }
     }

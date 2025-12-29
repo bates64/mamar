@@ -11,6 +11,7 @@ import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 import { Track } from "pm64-typegen"
+import { getSegmentId } from "../store/segment"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
 
@@ -177,16 +178,19 @@ function Container() {
                         {i > 0 && <TrackControls trackIndex={i} />}
                     </div>}
                     {variation.segments.map((segment, segmentIndex) => {
-                        if (segment.type === "Subseg") {
+                        if ("Subseg" in segment) {
                             return <View
-                                key={segment.id}
+                                key={segment.Subseg.id}
                                 colorVersion={6}
                                 UNSAFE_style={ticksToStyle(segmentLengths[segmentIndex])}
                             >
-                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.trackList} />
                             </View>
                         } else {
-                            return <div key={segment.id} />
+                            const id = getSegmentId(segment)
+                            console.assert(id != null, "Segment", segment, "does not have an ID")
+                            
+                            return <div key={id} />
                         }
                     })}
                 </div>)}
