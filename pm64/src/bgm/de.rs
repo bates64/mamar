@@ -306,35 +306,35 @@ impl Segment {
                 };
 
                 Ok(Segment::Subseg {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     track_list,
                 })
             }
             segment_commands::START_LOOP => {
                 f.seek(SeekFrom::Current(-2))?;
                 Ok(Segment::StartLoop {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: f.read_u16_be()?,
                 })
             }
-            segment_commands::WAIT => Ok(Segment::Wait { id: gen_id() }),
+            segment_commands::WAIT => Ok(Segment::Wait { id: Some(gen_id()) }),
             segment_commands::END_LOOP => {
                 Ok(Segment::EndLoop {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_6 => {
                 Ok(Segment::Unknown6 {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
             }
             segment_commands::UNKNOWN_7 => {
                 Ok(Segment::Unknown7 {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     label_index: (data & 0x1F) as u8,       // bits 0-4
                     iter_count: ((data >> 5) & 0x7F) as u8, // bits 5-11
                 })
@@ -413,9 +413,7 @@ impl CommandSeq {
                 }
 
                 // Delay
-                0x01..=0x77 => Command::Delay {
-                    value: cmd_byte as usize,
-                },
+                0x01..=0x77 => Command::Delay(cmd_byte as usize),
 
                 // Long delay
                 0x78..=0x7F => {
@@ -425,9 +423,7 @@ impl CommandSeq {
                     let num_256s = (cmd_byte - 0x78) as usize;
                     let extend = f.read_u8()? as usize;
 
-                    Command::Delay {
-                        value: 0x78 + num_256s * 256 + extend,
-                    }
+                    Command::Delay(0x78 + num_256s * 256 + extend)
 
                     // This logic taken from N64MidiTool
                     //Command::Delay(0x78 + (cmd_byte as usize) + ((f.read_u8()? & 7) as usize) << 8)
@@ -460,10 +456,8 @@ impl CommandSeq {
                     }
                 }
 
-                0xE0 => Command::MasterTempo {
-                    value: f.read_u16_be()?,
-                },
-                0xE1 => Command::MasterVolume { value: f.read_u8()? },
+                0xE0 => Command::MasterTempo(f.read_u16_be()?),
+                0xE1 => Command::MasterVolume(f.read_u8()?),
                 0xE2 => Command::MasterPitchShift { cent: f.read_u8()? },
                 0xE3 => Command::UnkCmdE3 {
                     effect_type: f.read_u8()?,
@@ -485,19 +479,19 @@ impl CommandSeq {
                     bank: f.read_u8()?,
                     patch: f.read_u8()?,
                 },
-                0xE9 => Command::SubTrackVolume { value: f.read_u8()? },
-                0xEA => Command::SubTrackPan { value: f.read_i8()? },
-                0xEB => Command::SubTrackReverb { value: f.read_u8()? },
-                0xEC => Command::SegTrackVolume { value: f.read_u8()? },
-                0xED => Command::SubTrackCoarseTune { value: f.read_u8()? },
-                0xEE => Command::SubTrackFineTune { value: f.read_u8()? },
+                0xE9 => Command::SubTrackVolume(f.read_u8()?),
+                0xEA => Command::SubTrackPan(f.read_i8()?),
+                0xEB => Command::SubTrackReverb(f.read_u8()?),
+                0xEC => Command::SegTrackVolume(f.read_u8()?),
+                0xED => Command::SubTrackCoarseTune(f.read_u8()?),
+                0xEE => Command::SubTrackFineTune(f.read_u8()?),
                 0xEF => Command::SegTrackTune { bend: f.read_i16_be()? },
                 0xF0 => Command::TrackTremolo {
                     amount: f.read_u8()?,
                     speed: f.read_u8()?,
                     time: f.read_u8()?,
                 },
-                0xF1 => Command::TrackTremoloSpeed { value: f.read_u8()? },
+                0xF1 => Command::TrackTremoloSpeed(f.read_u8()?),
                 0xF2 => Command::TrackTremoloTime { time: f.read_u8()? },
                 0xF3 => Command::TrackTremoloStop,
                 0xF4 => Command::UnkCmdF4 {

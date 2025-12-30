@@ -10,8 +10,9 @@ pub mod mamar;
 #[cfg(feature = "midly")]
 pub mod midi;
 
+use std::collections::BTreeMap;
 use std::ops::Range;
-use std::{collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
@@ -33,7 +34,6 @@ pub type TrackListId = u64;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct Bgm {
     pub name: String,
 
@@ -42,7 +42,7 @@ pub struct Bgm {
     pub drums: Vec<Drum>,
     pub instruments: Vec<Instrument>,
 
-    pub track_lists: HashMap<TrackListId, TrackList>,
+    pub track_lists: BTreeMap<TrackListId, TrackList>,
 
     #[serde(skip)]
     pub unknowns: Vec<Unknown>,
@@ -149,7 +149,7 @@ impl Bgm {
             self.variations[variation].as_mut().unwrap().segments.insert(
                 idx,
                 Segment::Subseg {
-                    id: gen_id(),
+                    id: Some(gen_id()),
                     track_list,
                 },
             )
@@ -157,6 +157,7 @@ impl Bgm {
     }
 
     pub fn from_ron_string(input_string: &str) -> Result<Self, ron::Error> {
+        // generate ids for commands
         let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&input_string).collect();
         let mut modified_input_string = input_string.to_string();
 
@@ -176,10 +177,34 @@ impl Bgm {
             );
         }
 
-        Ok(ron::from_str::<Bgm>(&modified_input_string)?)
+        let mut bgm = ron::from_str::<Bgm>(&modified_input_string)?;
+
+        // generate ids for segments
+        for variation in &mut bgm.variations {
+            let Some(variation) = variation else {
+                continue;
+            };
+
+            for segment in &mut variation.segments {
+                segment.add_new_id();
+            }
+        }
+
+        Ok(bgm)
     }
 
-    pub fn to_ron_string(&self) -> Result<String, ron::Error> {
+    pub fn to_ron_string(mut self) -> Result<String, ron::Error> {
+        // strip segments of id
+        for variation in &mut self.variations {
+            let Some(variation) = variation else {
+                continue;
+            };
+
+            for segment in &mut variation.segments {
+                segment.strip_id();
+            }
+        }
+
         let pretty_config = ron::ser::PrettyConfig::new().indentor("  ").depth_limit(5);
         let bgm_string = ron::ser::to_string_pretty(&self, pretty_config.clone())?.to_string();
 
@@ -218,41 +243,68 @@ impl Bgm {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 pub struct Variation {
     pub segments: Vec<Segment>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(tag = "type")]
 pub enum Segment {
-    #[serde(rename_all = "camelCase")]
     Subseg {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
         track_list: TrackListId,
     },
     StartLoop {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
         label_index: u16,
     },
     Wait {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
     },
     EndLoop {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
         label_index: u8,
         iter_count: u8,
     },
     Unknown6 {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
         label_index: u8,
         iter_count: u8,
     },
     Unknown7 {
-        id: Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<Id>,
         label_index: u8,
         iter_count: u8,
     },
+}
+
+impl Segment {
+    pub fn add_new_id(&mut self) {
+        match self {
+            Segment::Subseg { id, .. } => *id = Some(gen_id()),
+            Segment::StartLoop { id, .. } => *id = Some(gen_id()),
+            Segment::Wait { id } => *id = Some(gen_id()),
+            Segment::EndLoop { id, .. } => *id = Some(gen_id()),
+            Segment::Unknown6 { id, .. } => *id = Some(gen_id()),
+            Segment::Unknown7 { id, .. } => *id = Some(gen_id()),
+        }
+    }
+
+    pub fn strip_id(&mut self) {
+        match self {
+            Segment::Subseg { id, .. } => *id = None,
+            Segment::StartLoop { id, .. } => *id = None,
+            Segment::Wait { id } => *id = None,
+            Segment::EndLoop { id, .. } => *id = None,
+            Segment::Unknown6 { id, .. } => *id = None,
+            Segment::Unknown7 { id, .. } => *id = None,
+        }
+    }
 }
 
 mod segment_commands {
@@ -267,7 +319,6 @@ mod segment_commands {
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct TrackList {
     /// Encode/decode file position.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -297,7 +348,6 @@ impl TrackList {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
-#[serde(rename_all = "camelCase")]
 pub struct Track {
     #[serde(default)]
     pub name: String,
@@ -385,7 +435,6 @@ impl Polyphony {
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Drum {
     pub bank: u8,
@@ -410,7 +459,6 @@ pub struct Drum {
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Instrument {
     /// Upper nibble = bank. (0..=6 are valid?)

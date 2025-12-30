@@ -70,12 +70,12 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return bgm_add_voice(bgm)
     case "move_track_command":
         return produce(bgm, draft => {
-            const track = draft.trackLists[action.trackList].tracks[action.track]
+            const track = draft.track_lists[action.trackList].tracks[action.track]
             track.commands = arrayMove(track.commands, action.oldIndex, action.newIndex)
         })
     case "update_track_command":
         return produce(bgm, draft => {
-            const track = draft.trackLists[action.trackList].tracks[action.track]
+            const track = draft.track_lists[action.trackList].tracks[action.track]
             for (let i = 0; i < track.commands.length; i++) {
                 if (track.commands[i].id === action.command.id) {
                     track.commands[i] = action.command
@@ -84,23 +84,23 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         })
     case "delete_track_command":
         return produce(bgm, draft => {
-            const track = draft.trackLists[action.trackList].tracks[action.track]
+            const track = draft.track_lists[action.trackList].tracks[action.track]
             track.commands.splice(action.index, 1)
         })
     case "modify_track_settings":
         return produce(bgm, draft => {
-            const track = draft.trackLists[action.trackList].tracks[action.track]
+            const track = draft.track_lists[action.trackList].tracks[action.track]
             if (action.name !== undefined) {
                 track.name = action.name
             }
             if (action.isDisabled !== undefined) {
-                track.isDisabled = action.isDisabled
+                track.is_disabled = action.isDisabled
             }
             if (action.polyphony !== undefined) {
                 track.polyphony = action.polyphony
             }
             if (action.isDrumTrack !== undefined) {
-                track.isDrumTrack = action.isDrumTrack
+                track.is_drum_track = action.isDrumTrack
             }
         })
     case "update_instrument":

@@ -6,7 +6,8 @@ import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
-import { Polyphony } from "pm64-typegen"
+import { Bgm, Polyphony } from "pm64-typegen"
+import { BgmAction } from "../store/bgm"
 
 export interface Props {
     trackListId: number
@@ -15,8 +16,8 @@ export interface Props {
 
 export default function SubsegDetails({ trackListId, trackIndex }: Props) {
     const hid = useId()
-    const [bgm, dispatch] = useBgm()
-    const track = bgm?.trackLists[trackListId]?.tracks[trackIndex]
+    const [bgm, dispatch]: [Bgm | undefined, (action: BgmAction) => void] = useBgm()
+    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
 
     // Track name editing is debounced to prevent dispatch spam when typing
     const [name, setName] = useState(track?.name)
@@ -42,9 +43,9 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                     value={name}
                     onChange={setName}
                 />
-                <Switch isSelected={!track.isDisabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
+                <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 {trackIndex !== 0 ? <>
-                    <Switch isSelected={track.isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
+                    <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
                     <PolyphonyForm {...track} maxParentTrackIdx={trackIndex - 1} onChange={polyphony => {
                         dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphony })
                     }} />

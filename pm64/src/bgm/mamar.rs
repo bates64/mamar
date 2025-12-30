@@ -49,18 +49,18 @@ mod test {
 
     #[test]
     fn encode_decode_metadata_preserves_track_names() {
-        use std::collections::HashMap;
+        use std::collections::BTreeMap;
 
         let track_list = TrackList {
             pos: Some(0x1234),
             tracks: core::array::from_fn(|_| Track::default()),
         };
         let mut bgm = Bgm {
-            track_lists: HashMap::from([(0x1234, track_list)]),
+            track_lists: BTreeMap::from([(0x1234, track_list)]),
             variations: [
                 Some(Variation {
                     segments: vec![Segment::Subseg {
-                        id: 0,
+                        id: Some(0),
                         track_list: 0x1234,
                     }],
                 }),

@@ -11,6 +11,7 @@ import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 import { Track } from "pm64-typegen"
+import { getSegmentId } from "../store/segment"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
 
@@ -21,7 +22,7 @@ function hasParentTrack({ polyphony }: Track): boolean {
 function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
     const [doc, dispatch] = useDoc()
     const [bgm] = useBgm()
-    const track = bgm?.trackLists[trackListIndex]?.tracks[trackIndex]
+    const track = bgm?.track_lists[trackListIndex]?.tracks[trackIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
     const commands = useDeferredValue(track?.commands)
@@ -49,8 +50,8 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
             aria-labelledby={nameId}
             className={classNames({
                 [styles.pianoRollThumbnail]: true,
-                [styles.drumRegion]: track.isDrumTrack,
-                [styles.disabledRegion]: track.isDisabled,
+                [styles.drumRegion]: track.is_drum_track,
+                [styles.disabledRegion]: track.is_disabled,
                 [styles.hasInterestingParentTrack]: hasParentTrack(track),
                 [styles.selected]: isSelected,
             })}
@@ -83,11 +84,11 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
     let maxPitch = 0
     let hasNoteInRange = false
     for (const command of commands) {
-        if (command.type === "Note") {
-            minPitch = Math.min(minPitch, command.pitch)
-            maxPitch = Math.max(maxPitch, command.pitch)
+        if ("Note" in command) {
+            minPitch = Math.min(minPitch, command.Note.pitch)
+            maxPitch = Math.max(maxPitch, command.Note.pitch)
 
-            if (command.pitch >= c2 && command.pitch <= c5) {
+            if (command.Note.pitch >= c2 && command.Note.pitch <= c5) {
                 hasNoteInRange = true
             }
         }
@@ -108,16 +109,16 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
     const notes = []
     let time = 0
     for (const command of commands) {
-        if (command.type === "Note") {
+        if ("Note" in command) {
             notes.push(<rect
                 key={command.id}
                 x={time}
-                y={command.pitch - minPitch}
-                width={command.length}
+                y={command.Note.pitch - minPitch}
+                width={command.Note.length}
                 height={1}
             />)
-        } else if (command.type === "Delay") {
-            time += command.value
+        } else if ("Delay" in command) {
+            time += command.Delay
         }
     }
 
@@ -177,16 +178,19 @@ function Container() {
                         {i > 0 && <TrackControls trackIndex={i} />}
                     </div>}
                     {variation.segments.map((segment, segmentIndex) => {
-                        if (segment.type === "Subseg") {
+                        if ("Subseg" in segment) {
                             return <View
-                                key={segment.id}
+                                key={segment.Subseg.id}
                                 colorVersion={6}
                                 UNSAFE_style={ticksToStyle(segmentLengths[segmentIndex])}
                             >
-                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.trackList} />
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} />
                             </View>
                         } else {
-                            return <div key={segment.id} />
+                            const id = getSegmentId(segment)
+                            console.assert(id != null, "Segment", segment, "does not have an ID")
+                            
+                            return <div key={id} />
                         }
                     })}
                 </div>)}
