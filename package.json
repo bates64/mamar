@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "preinstall": "cd mamar-wasm-bridge && wasm-pack build -t web && cd ../pm64-typegen && cargo run",
-    "lint": "cargo fmt --all --check && cd mamar-web && yarn run lint"
+    "lint": "cargo fmt --all --check && cd mamar-web && yarn run lint",
+    "fmt": "cargo fmt --all && cd mamar-web && yarn run lint --fix"
   },
   "multipleStaticFileCopier": [
     {

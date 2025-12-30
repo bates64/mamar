@@ -1,6 +1,7 @@
 import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import type { Event } from "pm64-typegen"
+import { Track } from "pm64-typegen"
 import { useId, useDeferredValue, useRef, memo, startTransition } from "react"
 
 import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
@@ -9,9 +10,8 @@ import { TimeProvider } from "./timectx"
 
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
-import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
-import { Track } from "pm64-typegen"
 import { getSegmentId } from "../store/segment"
+import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
 const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
 
@@ -189,7 +189,7 @@ function Container() {
                         } else {
                             const id = getSegmentId(segment)
                             console.assert(id != null, "Segment", segment, "does not have an ID")
-                            
+
                             return <div key={id} />
                         }
                     })}

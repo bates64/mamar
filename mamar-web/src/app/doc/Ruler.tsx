@@ -32,7 +32,7 @@ function getLoops(segments: Segment[]): Loop[] {
                         console.error("Segment", start, "does not have an ID")
                         continue
                     }
-                    
+
                     loops.push({
                         id: start.StartLoop.id,
                         start: startIdx,
@@ -117,7 +117,7 @@ export function useSegmentLengths(): number[] {
         if (bgm && "Subseg" in segment) {
             const master = bgm.track_lists[segment.Subseg.track_list].tracks[0]
             const commands = master.commands as unknown as Event[]
-            
+
             return commands.reduce((totalDelay, event) => {
                 if ("Delay" in event) {
                     return totalDelay + event.Delay
@@ -152,7 +152,7 @@ export default function Ruler() {
             console.error("Segment", segment, "does not have an ID")
             continue
         }
-        
+
         let length = segmentLengths[i]
 
         if (length === 0) {
@@ -233,7 +233,7 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
                 console.error("Segment", segment, "does not have an ID")
                 return
             }
-            
+
             dispatch({
                 type: "toggle_segment_loop",
                 id,
@@ -248,11 +248,11 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
 
 function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
     const [variation, variationDispatch] = useVariation()
-    
+
     const end = variation?.segments[loop.end]
     const id = (end && "EndLoop" in end) ? end.EndLoop.id : undefined
     console.assert(end && "EndLoop" in end, "Segment", end, "is not EndLoop")
-    
+
     const [, endDispatch] = useSegment(id)
 
     function setIterCount(iterCount: number) {
@@ -269,12 +269,12 @@ function LoopDialog({ loop, close }: { loop: Loop, close: () => void }) {
                 console.error("Segment", start, "is not StartLoop")
                 return
             }
-            
+
             if (start.StartLoop.id == null) {
                 console.error("Segment", start, "does not have an ID")
                 return
             }
-            
+
             variationDispatch({
                 type: "toggle_segment_loop",
                 id: start.StartLoop.id,

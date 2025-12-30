@@ -248,7 +248,7 @@ impl Bgm {
                             Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
                             Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
                             Polyphony::Link { parent: _ } => {
-                                // Dry Dry Desert (only song that uses Link) happens to use this value, but it doesn't seem to matter
+                                // Dry Dry Desert (only song that uses Link) happens to use this value
                                 5
                             }
                             Polyphony::Other { priority } => priority,

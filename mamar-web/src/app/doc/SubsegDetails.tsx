@@ -1,4 +1,5 @@
 import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, TextField } from "@adobe/react-spectrum"
+import { Bgm, Polyphony } from "pm64-typegen"
 import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
@@ -6,7 +7,6 @@ import styles from "./SubsegDetails.module.scss"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
-import { Bgm, Polyphony } from "pm64-typegen"
 import { BgmAction } from "../store/bgm"
 
 export interface Props {

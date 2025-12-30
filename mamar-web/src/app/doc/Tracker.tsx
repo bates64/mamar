@@ -45,9 +45,7 @@ type DeepPartial<T> = T extends object ? {
 function Command({ command: rawCommand }:{ command: pm64.Event }) {
     // fix rust typescript mappings
     const command = rawCommand as FixSerdeEnum<pm64.Event>
-    
-    console.log(command)
-    
+
     const [, dispatch] = useBgm()
     const { trackListId, trackIndex } = useContext(trackListCtx)!
     const mutate = (partial: DeepPartial<pm64.Event>) => {
@@ -55,13 +53,13 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
 
         const newCommand: any = { ...command }
         for (const [key, value] of Object.entries(partial)) {
-            if (typeof value === 'object') {
+            if (typeof value === "object") {
                 newCommand[key] = { ...newCommand[key], ...value }
             } else {
                 newCommand[key] = value
             }
         }
-        
+
         dispatch({
             type: "update_track_command",
             trackList: trackListId,
@@ -559,8 +557,6 @@ function CommandList({ width, height }: {
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
     const commands: pm64.Event[] = track?.commands ?? []
 
-    console.log("command list", trackListId, trackIndex)
-    
     return <Droppable
         droppableId="droppable"
         mode="virtual"
@@ -605,8 +601,6 @@ export interface Props {
 export default function Tracker({ trackListId, trackIndex }: Props) {
     const container = useSize<HTMLDivElement>()
 
-    console.log("tracker")
-    
     return <div ref={container.ref} className={styles.container}>
         <trackListCtx.Provider value={{ trackListId, trackIndex }}>
             <CommandList
