@@ -354,23 +354,32 @@ impl Track {
         let is_drum_track = (flags & 0x0080) != 0;
         let parent_track_idx = ((flags & (0xF << 9)) >> 9) as u8;
 
+        let commands = if commands_offset == 0 {
+            CommandSeq::with_capacity(0)
+        } else {
+            f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
+            let seq = CommandSeq::decode(f)?;
+            assert_ne!(seq.len(), 0);
+            seq
+        };
+
         Ok(Self {
             name: Default::default(),
             is_disabled,
-            polyphony: Polyphony::from_raw(polyphonic_idx, parent_track_idx),
-            is_drum_track,
-            commands: if commands_offset == 0 {
-                CommandSeq::with_capacity(0)
-            } else {
-                f.seek(SeekFrom::Start(segment_start + commands_offset as u64))?;
-                let seq = CommandSeq::decode(f)?;
-
-                // Assumption; structure will need changing if false for matching.
-                // Maybe use command "groups" which can be represented in UI also
-                assert_ne!(seq.len(), 0, "CommandSeq assumption wrong");
-
-                seq
+            polyphony: {
+                // If the polyphony matches what would be automatically calculated, use Automatic
+                let actual = Polyphony::from_raw(polyphonic_idx, parent_track_idx);
+                let calculated = Polyphony::Manual {
+                    voices: commands.max_polyphony(),
+                };
+                if actual == calculated {
+                    Polyphony::Automatic
+                } else {
+                    actual
+                }
             },
+            is_drum_track,
+            commands,
         })
     }
 }

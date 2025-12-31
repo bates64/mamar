@@ -23,7 +23,6 @@ impl Metadata {
     }
 
     pub fn apply_to_bgm(&self, bgm: &mut super::Bgm) {
-        debug!("{:?}", self.track_names);
         for (id, track_list) in &mut bgm.track_lists {
             let Some(names) = self.track_names.get(&(*id as u16)) else {
                 debug!("no names for {id:X}");

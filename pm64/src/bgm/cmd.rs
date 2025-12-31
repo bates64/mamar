@@ -927,6 +927,7 @@ mod test {
         assert_eq!(seq.max_polyphony(), 1);
     }
 
+    #[test]
     fn split_at() {
         let mut seq = CommandSeq::from(vec![
             Command::Marker { label: "A".to_string() },
@@ -938,7 +939,7 @@ mod test {
         let split = seq.split_at(4);
 
         assert!(matches!(
-            split.vec[0],
+            seq.vec[0],
             Event {
                 command: Command::Marker { .. },
                 ..
