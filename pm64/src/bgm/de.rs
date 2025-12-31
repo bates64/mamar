@@ -172,13 +172,20 @@ impl Bgm {
         let mut furthest_read_pos = 0; // TODO: have `f` track this (i.e. a wrapper over f)
 
         // Special cases to get problematic BGMs to match
-        bgm.unknowns = match bgm.name.as_str() {
-            "169 " => vec![Unknown::decode(f, 0x0064..0x1294)?], /* Bowser's Castle Caves (entire segment? TODO look */
-            // into this)
-            "117 " => vec![Unknown::decode(f, 0x1934..0x19A0)?], // Battle Fanfare (very short segment at eof?)
-            "322 " => vec![Unknown::decode(f, 0x0D15..0x0D70)?], /* Bowser's Castle Explodes (very short segment at */
+        let unknown = match bgm.name.as_str() {
+            // Bowser's Castle Caves (entire segment? TODO look into this)
+            "169 " => Unknown::decode(f, 0x0064..0x1294).ok(),
+
+            // These appear to be extract.py artifacts as they are not present in the SBN files
+            "117 " => Unknown::decode(f, 0x1934..0x19A0).ok(), // Battle Fanfare (very short segment at eof?)
+            "322 " => Unknown::decode(f, 0x0D15..0x0D70).ok(), /* Bowser's Castle Explodes (very short segment at */
             // eof?)
-            _ => vec![],
+            _ => None,
+        };
+        bgm.unknowns = if let Some(unknown) = unknown {
+            vec![unknown]
+        } else {
+            vec![]
         };
 
         bgm.variations = variation_offsets

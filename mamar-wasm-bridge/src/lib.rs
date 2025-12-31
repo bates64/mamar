@@ -40,7 +40,10 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
     } else if data[0] == b'B' && data[1] == b'G' && data[2] == b'M' && data[3] == b' ' {
         match Bgm::decode(&mut f) {
             Ok(bgm) => to_js(&bgm),
-            Err(e) => to_js(&e.to_string()),
+            Err(e) => {
+                log::error!("Error decoding BGM: {:?}", e);
+                to_js(&e.to_string())
+            }
         }
     } else {
         let input_string = String::from_utf8_lossy(data);
