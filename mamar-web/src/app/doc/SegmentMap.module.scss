@@ -1,5 +1,4 @@
 $trackHeight: 70px;
-$trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
 .table {
     width: 100%;
@@ -8,14 +7,18 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 
     position: relative; /* for Playhead */
 
-    --ruler-zoom: 2;
-    --trackHead-width: $trackHead-width;
+    display: grid;
+    grid-template-columns: 225px auto;
+
+    overflow-y: auto;
 }
 
 .track {
     display: flex;
-    width: max-content;
+    width: 100%;
     height: $trackHeight;
+
+    background: var(--spectrum-gray-50);
 
     &:nth-child(even) {
         background: var(--spectrum-gray-75);
@@ -23,10 +26,10 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
 }
 
 .trackHead {
-    width: $trackHead-width;
     border-right: 1px solid var(--spectrum-gray-100);
 
     padding: 4px 16px;
+    width: 100%;
     height: 100%;
 
     position: sticky;
@@ -46,6 +49,8 @@ $trackHead-width: 100px; // Match with TRACK_HEAD_WIDTH
     --color-500: var(--spectrum-blue-700);
     --color-400: var(--spectrum-blue-600);
     --color-200: #000000cc;
+
+    width: 100%;
 
     border: 1px solid var(--spectrum-gray-300);
     background: linear-gradient(var(--color-500) 0%, var(--color-400) 100%);

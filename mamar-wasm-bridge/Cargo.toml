@@ -18,5 +18,9 @@ console_log = { version = "0.2", features = ["color"] }
 
 pm64 = { path = "../pm64", features = ["midly"] }
 
+[dependencies.web-sys]
+features = ['CanvasRenderingContext2d']
+version = "0.3"
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"

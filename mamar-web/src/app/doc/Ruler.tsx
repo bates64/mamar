@@ -6,7 +6,8 @@ import { usePress } from "react-aria"
 
 import Playhead from "./Playhead"
 import styles from "./Ruler.module.scss"
-import { useTime } from "./timectx"
+import TimeGrid from "./TimeGrid"
+import { useTime } from "./TimeProvider"
 
 import { useBgm, useSegment, useVariation } from "../store"
 import { getSegmentId } from "../store/segment"
@@ -101,6 +102,7 @@ function LoopHandle({ segment, kind, loop, setHighlightedLoop }: {
     </div>
 }
 
+/** @deprecated Use `TimeGrid` instead */
 export function ticksToStyle(ticks: number) {
     return {
         width: `calc(${ticks}px / var(--ruler-zoom))`,
@@ -156,35 +158,48 @@ export default function Ruler() {
         let length = segmentLengths[i]
 
         if (length === 0) {
+            // TimeGrid requires exactly 1 element per segment
+            let addedElements = 0
+
             // Loop or other, so check for loop handle
             for (const loop of loops) {
                 if (i === loop.start) {
                     currentLoop = loop
                     elements.push(<LoopHandle key={`start_loop_${loop.id}`} segment={id} kind="start" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    addedElements++
                 }
                 if (i === loop.end) {
                     currentLoop = null
                     elements.push(<LoopHandle key={`end_loop_${loop.id}`} segment={id} kind="end" loop={loop} setHighlightedLoop={setHighlightedLoop} />)
+                    addedElements++
                 }
-                continue
             }
+
+            if (addedElements === 0) {
+                elements.push(<div key={id} />)
+            } else if (addedElements > 1){
+                console.error(`Segment ${id} has more than one loop handle`)
+            }
+
             continue
         }
 
         if (currentLoop !== null) {
             // Consume all segments that are part of this loop
+            let numSegmentsInLoop = 0
             while (!("EndLoop" in segments[i + 1])) {
                 length += segmentLengths[++i]
+                numSegmentsInLoop++
             }
 
             const loop = Object.assign({}, currentLoop!) // Avoids stale currentLoop reference in dialog func below
 
             elements.push(<DialogTrigger key={id} >
-                <RulerSegment segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />
+                <RulerSegment segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={numSegmentsInLoop} />
                 {close => <LoopDialog loop={loop} close={close} />}
             </DialogTrigger>)
         } else {
-            elements.push(<RulerSegment key={id} segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={length} />)
+            elements.push(<RulerSegment key={id} segment={segment} currentLoop={currentLoop} highlightedLoop={highlightedLoop} length={1} />)
         }
 
         totalTime += length
@@ -199,13 +214,13 @@ export default function Ruler() {
     }
 
     return <div className={styles.ruler}>
-        <div className={styles.loops}>
+        <TimeGrid className={styles.loops}>
             {elements}
-        </div>
-        <div className={styles.bars}>
+        </TimeGrid>
+        <TimeGrid className={styles.bars}>
             <Playhead />
             {bars}
-        </div>
+        </TimeGrid>
     </div>
 }
 
@@ -213,7 +228,7 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
     segment: Segment
     currentLoop: Loop | null
     highlightedLoop: number | null
-    length: number
+    length: number // num segments in this loop
     onPress?: (e: unknown) => void
 }) {
     const [, dispatch] = useVariation()
@@ -225,7 +240,7 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
             [styles.rulerSegment]: true,
             [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
         })}
-        style={ticksToStyle(length)}
+        style={{ gridColumn: `span ${length}` }}
         title={currentLoop === null ? "Double-click to loop" : ""}
         onDoubleClick={() => {
             const id = getSegmentId(segment)

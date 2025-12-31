@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import styles from "./Playhead.module.scss"
-import { useTime } from "./timectx"
+import { useTime } from "./TimeProvider"
 
 import { useBgm, useDoc } from "../store"
 

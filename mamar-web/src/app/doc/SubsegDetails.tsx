@@ -3,7 +3,9 @@ import { Bgm, Polyphony } from "pm64-typegen"
 import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
+import PianoRoll from "./PianoRoll"
 import styles from "./SubsegDetails.module.scss"
+import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 
 import { useBgm } from "../store"
@@ -12,9 +14,10 @@ import { BgmAction } from "../store/bgm"
 export interface Props {
     trackListId: number
     trackIndex: number
+    segmentIndex: number
 }
 
-export default function SubsegDetails({ trackListId, trackIndex }: Props) {
+export default function SubsegDetails({ trackListId, trackIndex, segmentIndex }: Props) {
     const hid = useId()
     const [bgm, dispatch]: [Bgm | undefined, (action: BgmAction) => void] = useBgm()
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
@@ -27,12 +30,14 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
             dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name: debouncedName })
     }, [debouncedName, dispatch, trackIndex, trackListId, track?.name])
 
+    const [showTracker, setShowTracker] = useState(true)
+
     if (!track) {
         return <div>Track not found</div>
     }
 
     return <Grid
-        columns="auto 1fr"
+        columns="225px 1fr"
         height="100%"
     >
         <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
@@ -50,11 +55,16 @@ export default function SubsegDetails({ trackListId, trackIndex }: Props) {
                         dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphony })
                     }} />
                 </> : <></>}
+                <View paddingTop="size-300">
+                    <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
+                </View>
             </Form>
         </View>
-        <View overflow="hidden">
-            <Tracker trackListId={trackListId} trackIndex={trackIndex} />
-        </View>
+        {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{ backgroundColor: "var(--spectrum-gray-75)" }}>
+            <div style={{ gridColumn: segmentIndex + 1, overflowY: "auto" }}>
+                <PianoRoll trackListId={trackListId} trackIndex={trackIndex} />
+            </div>
+        </TimeGrid>}
     </Grid>
 }
 

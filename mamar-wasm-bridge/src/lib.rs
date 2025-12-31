@@ -1,3 +1,5 @@
+mod piano_roll;
+
 use pm64::bgm::*;
 use pm64::sbn::Sbn;
 use serde::{Deserialize, Serialize};

@@ -1,10 +1,12 @@
-import { View } from "@adobe/react-spectrum"
+import { Flex, View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd"
 
 import styles from "./ActiveDoc.module.scss"
+import Ruler from "./Ruler"
 import SegmentMap from "./SegmentMap"
 import SubsegDetails from "./SubsegDetails"
+import TimeProvider from "./TimeProvider"
 
 import { useDoc } from "../store"
 import WelcomeScreen from "../WelcomeScreen"
@@ -28,9 +30,10 @@ export default function ActiveDoc() {
 
     const trackListId = doc?.panelContent.type === "tracker" ? doc?.panelContent.trackList : null
     const trackIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.track : null
+    const segmentIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.segment : null
 
     function onDragEnd(result: DropResult) {
-        if (!trackListId || !trackIndex) {
+        if (!trackListId || !trackIndex || !segmentIndex) {
             console.warn("drag end with no open region")
             return
         }
@@ -70,35 +73,41 @@ export default function ActiveDoc() {
     if (doc.activeVariation < 0) {
         return <View />
     } else {
-        return <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="trash">
-                {(provided, _snapshot) => (
-                    <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={styles.container}
-                        style={{
-                            gridTemplateRows: doc.panelContent.type === "not_open" ? "100%" : "50% 50%",
-                            overflow: "hidden",
-                        }}
-                    >
-                        <View overflow="overlay" UNSAFE_style={{ minHeight: 0 }}>
-                            <SegmentMap />
-                            {provided.placeholder}
-                        </View>
-                        {doc.panelContent.type !== "not_open" && <View
-                            elementType="aside"
-                            overflow="hidden"
-                            borderTopColor="gray-300"
-                            backgroundColor="gray-100"
-                            borderTopWidth="thin"
-                            UNSAFE_style={{ zIndex: "1" }}
+        return <TimeProvider>
+            <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="trash">
+                    {(provided, _snapshot) => (
+                        <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={styles.container}
+                            style={{
+                                gridTemplateRows: doc.panelContent.type === "not_open" ? "100%" : "50% 50%",
+                                overflow: "hidden",
+                                backgroundColor: "var(--spectrum-gray-100)",
+                            }}
                         >
-                            {doc.panelContent.type === "tracker" && <SubsegDetails key={`${trackListId}_${trackIndex}`} trackListId={trackListId!} trackIndex={trackIndex!} />}
-                        </View>}
-                    </div>
-                )}
-            </Droppable>
-        </DragDropContext>
+                            <Flex direction="column" UNSAFE_style={{ overflowX: "hidden" }}>
+                                <div style={{ paddingLeft: "225px" }}>
+                                    <Ruler />
+                                </div>
+                                <SegmentMap />
+                                {provided.placeholder}
+                            </Flex>
+                            {doc.panelContent.type !== "not_open" && <View
+                                elementType="aside"
+                                overflow="hidden"
+                                borderTopColor="gray-300"
+                                backgroundColor="gray-100"
+                                borderTopWidth="thin"
+                                UNSAFE_style={{ zIndex: "1" }}
+                            >
+                                {doc.panelContent.type === "tracker" && <SubsegDetails key={`${trackListId}_${trackIndex}`} trackListId={trackListId!} trackIndex={trackIndex!} segmentIndex={segmentIndex!} />}
+                            </View>}
+                        </div>
+                    )}
+                </Droppable>
+            </DragDropContext>
+        </TimeProvider>
     }
 }

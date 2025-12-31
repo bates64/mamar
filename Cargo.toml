@@ -4,6 +4,7 @@ members = [
     "pm64",
     "pm64-typegen",
 ]
+resolver = "3"
 
 [profile.release]
 lto = true

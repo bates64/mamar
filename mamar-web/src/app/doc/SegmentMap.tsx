@@ -2,24 +2,21 @@ import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import type { Event } from "pm64-typegen"
 import { Track } from "pm64-typegen"
-import { useId, useDeferredValue, useRef, memo, startTransition } from "react"
+import { useId, useDeferredValue, memo, startTransition } from "react"
 
-import Ruler, { ticksToStyle, useSegmentLengths } from "./Ruler"
 import styles from "./SegmentMap.module.scss"
-import { TimeProvider } from "./timectx"
+import TimeGrid from "./TimeGrid"
 
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useVariation } from "../store"
 import { getSegmentId } from "../store/segment"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
-const TRACK_HEAD_WIDTH = 100 // Match with $trackHead-width
-
 function hasParentTrack({ polyphony }: Track): boolean {
     return typeof polyphony === "object" && "Link" in polyphony
 }
 
-function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
+function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trackIndex: number, trackListIndex: number, segmentIndex: number }) {
     const [doc, dispatch] = useDoc()
     const [bgm] = useBgm()
     const track = bgm?.track_lists[trackListIndex]?.tracks[trackIndex]
@@ -38,6 +35,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex }: { trackIndex: number
                         type: "tracker",
                         trackList: trackListIndex,
                         track: trackIndex,
+                        segment: segmentIndex,
                     },
                 })
             })
@@ -136,67 +134,45 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
 function Container() {
     const [variation] = useVariation()
     const selection = useSelection()
-    const segmentLengths = useSegmentLengths()
-    const container = useRef<HTMLDivElement | null>(null)
 
     const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
-    const totalLength = segmentLengths.reduce((acc, len) => acc + len, 0)
 
-    return <TimeProvider value={{
-        xToTicks(clientX: number): number {
-            if (!container.current) return NaN
-            const px = clientX - container.current.getBoundingClientRect().left
-            const style = getComputedStyle(container.current)
-            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
-
-            const ticks = (px - TRACK_HEAD_WIDTH) * rulerZoom
-            if (ticks < 0) return 0
-            if (ticks > totalLength) return totalLength
-            return ticks
-        },
-
-        ticksToXOffset(ticks: number): number {
-            if (!container.current) return NaN
-            const style = getComputedStyle(container.current)
-            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
-            return ticks / rulerZoom
-        },
-    }}>
+    return (
         <div
-            ref={container}
-            aria-label="Segments"
             className={styles.table}
             onClick={() => {
                 selection.clear()
             }}
         >
-            {variation && <div>
-                <Ruler />
-                {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
+            <View>
+                {tracks.map(i => <div key={i} className={styles.track}>
                     {<div className={styles.trackHead}>
                         <TrackName index={i} />
                         {i > 0 && <TrackControls trackIndex={i} />}
                     </div>}
-                    {variation.segments.map((segment, segmentIndex) => {
-                        if ("Subseg" in segment) {
-                            return <View
-                                key={segment.Subseg.id}
-                                colorVersion={6}
-                                UNSAFE_style={ticksToStyle(segmentLengths[segmentIndex])}
-                            >
-                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} />
-                            </View>
-                        } else {
-                            const id = getSegmentId(segment)
-                            console.assert(id != null, "Segment", segment, "does not have an ID")
-
-                            return <div key={id} />
-                        }
-                    })}
                 </div>)}
-            </div>}
+            </View>
+            {variation && <TimeGrid>
+                {variation.segments.map((segment, segmentIndex) => {
+                    if ("Subseg" in segment) {
+                        return <View
+                            key={segment.Subseg.id}
+                            colorVersion={6}
+                        >
+                            {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
+                                <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} segmentIndex={segmentIndex} />
+                            </div>)}
+                        </View>
+                    } else {
+                        const id = getSegmentId(segment)
+                        console.assert(id != null, "Segment", segment, "does not have an ID")
+
+                        return <div key={id} />
+                    }
+                })}
+            </TimeGrid>}
         </div>
-    </TimeProvider>
+    )
 }
 
 export default function SegmentMap() {

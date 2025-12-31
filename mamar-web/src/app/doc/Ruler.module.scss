@@ -1,34 +1,18 @@
 $ruler-height: 36px;
-$trackHead-width: 100px;
 
 .ruler {
     display: flex;
     flex-direction: column;
 
-    width: max-content;
     height: $ruler-height;
-
-    margin-left: $trackHead-width;
 
     --ticks-per-beat: 48px;
 
     background-color: var(--spectrum-global-color-gray-200);
 
-    position: sticky;
-    top: 0;
-    z-index: 1; /* above trackheads */
-
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 
-    /* Hide ruler above where trackHeads are when scrolling */
-    &::after {
-        content: "";
-        position: fixed;
-        left: 0;
-        width: $trackHead-width;
-        height: $ruler-height;
-        background: var(--spectrum-global-color-gray-100);
-    }
+    user-select: none;
 }
 
 .rulerSegment {
@@ -41,8 +25,8 @@ $trackHead-width: 100px;
 }
 
 .loops {
-    display: flex;
     height: $ruler-height - 22px;
+    scrollbar-width: none;
 }
 
 .loop {
@@ -101,15 +85,20 @@ $trackHead-width: 100px;
 }
 
 .bars {
-    display: flex;
+    scrollbar-width: none;
 
-    --color: var(--spectrum-global-color-gray-400);
-    background-image: repeating-linear-gradient(to right, var(--color) 0, var(--color) 1px, transparent 1px, transparent calc(var(--ticks-per-beat) / var(--ruler-zoom)));
-    background-size: calc(var(--ticks-per-beat) / var(--ruler-zoom)) 50%;
-    background-repeat: repeat no-repeat;
-    background-position-y: calc(var(--ticks-per-beat) / 4);
+    & > * {
+        // Opt out of TimeGrid's grid layout, we only want the scrolling
+        display: flex !important;
 
-    color: var(--spectrum-global-color-gray-700);
+        --color: var(--spectrum-global-color-gray-400);
+        background-image: repeating-linear-gradient(to right, var(--color) 0, var(--color) 1px, transparent 1px, transparent calc(var(--ticks-per-beat) / var(--ruler-zoom)));
+        background-size: calc(var(--ticks-per-beat) / var(--ruler-zoom)) 50%;
+        background-repeat: repeat no-repeat;
+        background-position-y: calc(var(--ticks-per-beat) / 4);
+
+        color: var(--spectrum-global-color-gray-700);
+    }
 }
 
 .bar {

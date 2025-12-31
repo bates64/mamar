@@ -9,6 +9,7 @@ export type PanelContent = {
     type: "tracker"
     trackList: number
     track: number
+    segment: number
 }
 
 export interface Doc {
