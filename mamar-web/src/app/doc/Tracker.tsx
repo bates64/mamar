@@ -48,23 +48,12 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
 
     const [, dispatch] = useBgm()
     const { trackListId, trackIndex } = useContext(trackListCtx)!
-    const mutate = (partial: DeepPartial<pm64.Event>) => {
-        // TODO: debounce trailing
-
-        const newCommand: any = { ...command }
-        for (const [key, value] of Object.entries(partial)) {
-            if (typeof value === "object") {
-                newCommand[key] = { ...newCommand[key], ...value }
-            } else {
-                newCommand[key] = value
-            }
-        }
-
+    const mutate = (command: pm64.Event | DeepPartial<pm64.Event>) => {
         dispatch({
             type: "update_track_command",
             trackList: trackListId,
             track: trackIndex,
-            command: newCommand as pm64.Event,
+            command: command as pm64.Event,
         })
     }
 
@@ -75,17 +64,17 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
     } else if ("Delay" in command) {
         return <div className={classNames(styles.command, styles.control)}>
             wait
-            <InputBox><VerticalDragNumberInput value={command.Delay} minValue={1} maxValue={999} onChange={value => mutate({ Delay: value })} /></InputBox>
+            <InputBox><VerticalDragNumberInput value={command.Delay} minValue={1} maxValue={999} onChange={value => mutate({ ...command, Delay: value })} /></InputBox>
             ticks
         </div>
     } else if ("Note" in command) {
         return <div className={classNames(styles.command, styles.playback)}>
             play note
-            <InputBox><NoteInput pitch={command.Note.pitch} onChange={pitch => mutate({ Note: { pitch } })} /></InputBox>
+            <InputBox><NoteInput pitch={command.Note.pitch} onChange={pitch => mutate({ ...command, Note: { ...command.Note, pitch } })} /></InputBox>
             at volume
-            <InputBox><VerticalDragNumberInput value={command.Note.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ Note: { velocity } })} /></InputBox>
+            <InputBox><VerticalDragNumberInput value={command.Note.velocity} minValue={0} maxValue={255} onChange={velocity => mutate({ ...command, Note: { ...command.Note, velocity } })} /></InputBox>
             for
-            <InputBox><VerticalDragNumberInput value={command.Note.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ Note: { length } })} /></InputBox>
+            <InputBox><VerticalDragNumberInput value={command.Note.length} minValue={1} maxValue={0xD3FF} onChange={length => mutate({ ...command, Note: { ...command.Note, length } })} /></InputBox>
             ticks
         </div>
     } else if ("MasterTempo" in command) {
@@ -96,7 +85,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterTempo}
                     minValue={0}
                     maxValue={0xFFFF}
-                    onChange={value => mutate({ MasterTempo: value })}
+                    onChange={value => mutate({ ...command, MasterTempo: value })}
                 />
             </InputBox>
         </div>
@@ -108,7 +97,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ MasterVolume: value })}
+                    onChange={value => mutate({ ...command, MasterVolume: value })}
                 />
             </InputBox>
         </div>
@@ -120,7 +109,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterPitchShift.cent}
                     minValue={0}
                     maxValue={0xff}
-                    onChange={cent => mutate({ MasterPitchShift: { cent } })}
+                    onChange={cent => mutate({ ...command, MasterPitchShift: { ...command.MasterPitchShift, cent } })}
                 />
             </InputBox>
             cents
@@ -133,7 +122,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.UnkCmdE3.effect_type}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={effect_type => mutate({ UnkCmdE3: { effect_type } })}
+                    onChange={effect_type => mutate({ ...command, UnkCmdE3: { ...command.UnkCmdE3, effect_type } })}
                 />
             </InputBox>
         </div>
@@ -145,7 +134,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterTempoFade.value}
                     minValue={0}
                     maxValue={0xFFFF}
-                    onChange={value => mutate({ MasterTempoFade: { value } })}
+                    onChange={value => mutate({ ...command, MasterTempoFade: { ...command.MasterTempoFade, value } })}
                 />
             </InputBox>
             over
@@ -154,7 +143,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterTempoFade.time}
                     minValue={0}
                     maxValue={0xFFFF}
-                    onChange={time => mutate({ MasterTempoFade: { time } })}
+                    onChange={time => mutate({ ...command, MasterTempoFade: { ...command.MasterTempoFade, time } })}
                 />
             </InputBox>
             ticks
@@ -167,7 +156,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterVolumeFade.volume}
                     minValue={0}
                     maxValue={0xFFFF}
-                    onChange={volume => mutate({ MasterVolumeFade: { volume } })}
+                    onChange={volume => mutate({ ...command, MasterVolumeFade: { ...command.MasterVolumeFade, volume } })}
                 />
             </InputBox>
             over
@@ -176,7 +165,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterVolumeFade.time}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={time => mutate({ MasterVolumeFade: { time } })}
+                    onChange={time => mutate({ ...command, MasterVolumeFade: { ...command.MasterVolumeFade, time } })}
                 />
             </InputBox>
             ticks
@@ -190,7 +179,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterEffect.index}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={index => mutate({ MasterEffect: { index } })}
+                    onChange={index => mutate({ ...command, MasterEffect: { ...command.MasterEffect, index } })}
                 />
             </InputBox>
             value
@@ -199,7 +188,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.MasterEffect.value}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ MasterEffect: { value } })}
+                    onChange={value => mutate({ ...command, MasterEffect: { ...command.MasterEffect, value } })}
                 />
             </InputBox>
         </div>
@@ -211,7 +200,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackOverridePatch.bank}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={bank => mutate({ TrackOverridePatch: { bank } })}
+                    onChange={bank => mutate({ ...command, TrackOverridePatch: { ...command.TrackOverridePatch, bank } })}
                 />
             </InputBox>
             patch
@@ -220,7 +209,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackOverridePatch.patch}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={patch => mutate({ TrackOverridePatch: { patch } })}
+                    onChange={patch => mutate({ ...command, TrackOverridePatch: { ...command.TrackOverridePatch, patch } })}
                 />
             </InputBox>
         </div>
@@ -232,7 +221,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackVolume: value })}
+                    onChange={value => mutate({ ...command, SubTrackVolume: value })}
                 />
             </InputBox>
         </div>
@@ -245,7 +234,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackPan}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackPan: value })}
+                    onChange={value => mutate({ ...command, SubTrackPan: value })}
                 />
             </InputBox>
         </div>
@@ -257,7 +246,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackReverb}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackReverb: value })}
+                    onChange={value => mutate({ ...command, SubTrackReverb: value })}
                 />
             </InputBox>
         </div>
@@ -269,7 +258,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SegTrackVolume}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SegTrackVolume: value })}
+                    onChange={value => mutate({ ...command, SegTrackVolume: value })}
                 />
             </InputBox>
         </div>
@@ -281,7 +270,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackCoarseTune}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackCoarseTune: value })}
+                    onChange={value => mutate({ ...command, SubTrackCoarseTune: value })}
                 />
             </InputBox>
         </div>
@@ -293,7 +282,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackFineTune}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ SubTrackFineTune: value })}
+                    onChange={value => mutate({ ...command, SubTrackFineTune: value })}
                 />
             </InputBox>
         </div>
@@ -305,7 +294,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SegTrackTune.bend}
                     minValue={-32768}
                     maxValue={32767}
-                    onChange={bend => mutate({ SegTrackTune: { bend } })}
+                    onChange={bend => mutate({ ...command, SegTrackTune: { ...command.SegTrackTune, bend } })}
                 />
             </InputBox>
         </div>
@@ -317,7 +306,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackTremolo.time}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={time => mutate({ TrackTremolo: { time } })}
+                    onChange={time => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, time } })}
                 />
             </InputBox>
             ticks at speed
@@ -326,7 +315,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackTremolo.speed}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={speed => mutate({ TrackTremolo: { speed } })}
+                    onChange={speed => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, speed } })}
                 />
             </InputBox>
             with
@@ -335,7 +324,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackTremolo.amount}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={amount => mutate({ TrackTremolo: { amount } })}
+                    onChange={amount => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, amount } })}
                 />
             </InputBox>
             wobble
@@ -347,7 +336,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 value={command.TrackTremoloSpeed}
                 minValue={0}
                 maxValue={0xFF}
-                onChange={value => mutate({ TrackTremoloSpeed: value })}
+                onChange={value => mutate({ ...command, TrackTremoloSpeed: value })}
             />
         </div>
     } else if ("TrackTremoloTime" in command) {
@@ -357,7 +346,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 value={command.TrackTremoloTime.time}
                 minValue={0}
                 maxValue={0xFF}
-                onChange={time => mutate({ TrackTremoloTime: { time } })}
+                onChange={time => mutate({ ...command, TrackTremoloTime: { ...command.TrackTremoloTime, time } })}
             />
         </div>
     } else if ("TrackTremoloStop" in command) {
@@ -374,7 +363,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             <InputBox>
                 <InstrumentInput
                     index={command.SetTrackVoice.index}
-                    onChange={index => mutate({ SetTrackVoice: { index } })}
+                    onChange={index => mutate({ ...command, SetTrackVoice: { ...command.SetTrackVoice, index } })}
                 />
             </InputBox>
         </div>
@@ -386,7 +375,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackVolumeFade.value}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={value => mutate({ TrackVolumeFade: { value } })}
+                    onChange={value => mutate({ ...command, TrackVolumeFade: { ...command.TrackVolumeFade, value } })}
                 />
             </InputBox>
             over
@@ -395,7 +384,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.TrackVolumeFade.time}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={time => mutate({ TrackVolumeFade: { time } })}
+                    onChange={time => mutate({ ...command, TrackVolumeFade: { ...command.TrackVolumeFade, time } })}
                 />
             </InputBox>
             ticks
@@ -408,7 +397,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.SubTrackReverbType.index}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={index => mutate({ SubTrackReverbType: { index } })}
+                    onChange={index => mutate({ ...command, SubTrackReverbType: { ...command.SubTrackReverbType, index } })}
                 />
             </InputBox>
         </div>
@@ -421,7 +410,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                         value={command.Jump.unk_00}
                         minValue={0}
                         maxValue={0xFF}
-                        onChange={unk_00 => mutate({ Jump: { unk_00 } })}
+                        onChange={unk_00 => mutate({ ...command, Jump: { ...command.Jump, unk_00 } })}
                     />
                 </InputBox>
                 <InputBox>
@@ -429,7 +418,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                         value={command.Jump.unk_02}
                         minValue={0}
                         maxValue={0xFF}
-                        onChange={unk_02 => mutate({ Jump: { unk_02 } })}
+                        onChange={unk_02 => mutate({ ...command, Jump: { ...command.Jump, unk_02 } })}
                     />
                 </InputBox>
             </> : null}
@@ -442,7 +431,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.EventTrigger.event_info}
                     minValue={0}
                     maxValue={0xFFFFFFFF}
-                    onChange={event_info => mutate({ EventTrigger: { event_info } })}
+                    onChange={event_info => mutate({ ...command, EventTrigger: { ...command.EventTrigger, event_info } })}
                 />
             </InputBox>
         </div>
@@ -453,14 +442,14 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             <InputBox>
                 <StringInput
                     value={command.Detour.start_label}
-                    onChange={start_label => mutate({ Detour: { start_label } })}
+                    onChange={start_label => mutate({ ...command, Detour: { ...command.Detour, start_label } })}
                 />
             </InputBox>
             to
             <InputBox>
                 <StringInput
                     value={command.Detour.end_label}
-                    onChange={end_label => mutate({ Detour: { end_label } })}
+                    onChange={end_label => mutate({ ...command, Detour: { ...command.Detour, end_label } })}
                 />
             </InputBox>
         </div>
@@ -473,7 +462,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.UnkCmdFF.unk_00}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={unk_00 => mutate({ UnkCmdFF: { unk_00 } })}
+                    onChange={unk_00 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_00 } })}
                 />
             </InputBox>
             1
@@ -482,7 +471,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     value={command.UnkCmdFF.unk_01}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={unk_01 => mutate({ UnkCmdFF: { unk_01 } })}
+                    onChange={unk_01 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_01 } })}
                 />
             </InputBox>
             2
@@ -490,7 +479,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 value={command.UnkCmdFF.unk_02}
                 minValue={0}
                 maxValue={0xFF}
-                onChange={unk_02 => mutate({ UnkCmdFF: { unk_02 } })}
+                onChange={unk_02 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_02 } })}
             />
         </div>
     } else if ("Marker" in command) {
@@ -499,7 +488,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             <InputBox>
                 <StringInput
                     value={command.Marker.label}
-                    onChange={label => mutate({ Marker: { label } })}
+                    onChange={label => mutate({ ...command, Marker: { ...command.Marker, label } })}
                 />
             </InputBox>
             "

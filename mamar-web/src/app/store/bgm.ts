@@ -1,10 +1,13 @@
-import produce from "immer"
+import produce, { setAutoFreeze } from "immer"
 import { bgm_add_voice, bgm_split_variation_at } from "mamar-wasm-bridge"
 import { Bgm, Event, Instrument, Polyphony } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
 import { VariationAction, variationReducer } from "./variation"
+
+// Freezing react-tracked proxies can cause proxy invariant errors
+setAutoFreeze(false)
 
 export type BgmAction = {
     type: "variation"

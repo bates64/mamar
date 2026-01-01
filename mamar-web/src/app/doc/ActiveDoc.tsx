@@ -33,7 +33,7 @@ export default function ActiveDoc() {
     const segmentIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.segment : null
 
     function onDragEnd(result: DropResult) {
-        if (!trackListId || !trackIndex || !segmentIndex) {
+        if (trackListId === null || trackIndex === null || segmentIndex === null) {
             console.warn("drag end with no open region")
             return
         }
