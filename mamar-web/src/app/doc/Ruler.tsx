@@ -186,7 +186,7 @@ export default function Ruler() {
 
         if (currentLoop !== null) {
             // Consume all segments that are part of this loop
-            let numSegmentsInLoop = 0
+            let numSegmentsInLoop = 1
             while (!("EndLoop" in segments[i + 1])) {
                 length += segmentLengths[++i]
                 numSegmentsInLoop++
