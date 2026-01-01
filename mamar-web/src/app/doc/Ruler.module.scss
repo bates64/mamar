@@ -26,7 +26,6 @@ $ruler-height: 36px;
 
 .loops {
     height: $ruler-height - 22px;
-    scrollbar-width: none;
 }
 
 .loop {
@@ -85,8 +84,6 @@ $ruler-height: 36px;
 }
 
 .bars {
-    scrollbar-width: none;
-
     & > * {
         // Opt out of TimeGrid's grid layout, we only want the scrolling
         display: flex !important;

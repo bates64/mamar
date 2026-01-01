@@ -44,6 +44,7 @@ export default function TimeGrid({
             overflowX: "scroll",
             overflowY: "hidden",
             display: "flex",
+            scrollbarWidth: "none", // hide the scrollbar
             ...styleProp,
         }
 
