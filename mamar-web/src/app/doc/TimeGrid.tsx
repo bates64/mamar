@@ -1,14 +1,19 @@
-import React, { useEffect, useMemo, useRef, useCallback } from "react"
+import React, { useEffect, useMemo, useCallback } from "react"
 
 import { useSegmentLengths } from "./Ruler"
+
+import useDragToScroll, { type DragScrollOptions } from "../util/hooks/useDragToScroll"
 
 type ScrollEl = HTMLDivElement
 
 type Bus = {
     els: Set<ScrollEl>
-    active: ScrollEl | null
     raf: number | null
     pendingLeft: number
+
+    // sync lock (fixes feedback loop)
+    syncing: boolean
+    source: ScrollEl | null
 }
 
 const buses = new Map<string, Bus>()
@@ -16,7 +21,13 @@ const buses = new Map<string, Bus>()
 function getBus(key: string): Bus {
     let bus = buses.get(key)
     if (!bus) {
-        bus = { els: new Set(), active: null, raf: null, pendingLeft: 0 }
+        bus = {
+            els: new Set(),
+            raf: null,
+            pendingLeft: 0,
+            syncing: false,
+            source: null,
+        }
         buses.set(key, bus)
     }
     return bus
@@ -29,11 +40,13 @@ export default function TimeGrid({
     syncKey = "TimeGrid",
     className,
     style: styleProp,
+    dragToScroll = { axis: "none" },
 }: {
     children: React.ReactNode
     syncKey?: string
     className?: string
     style?: React.CSSProperties
+    dragToScroll?: DragScrollOptions
 }) {
     const segmentLengths = useSegmentLengths()
 
@@ -44,7 +57,7 @@ export default function TimeGrid({
             overflowX: "scroll",
             overflowY: "hidden",
             display: "flex",
-            scrollbarWidth: "none", // hide the scrollbar
+            scrollbarWidth: "none",
             ...styleProp,
         }
 
@@ -59,8 +72,8 @@ export default function TimeGrid({
         return { outerStyle, gridStyle }
     }, [segmentLengths, styleProp])
 
-    const scrollRef = useRef<ScrollEl | null>(null)
-    const isApplying = useRef(false)
+    const drag = useDragToScroll<ScrollEl>(dragToScroll)
+    const scrollRef = drag.ref
 
     useEffect(() => {
         const el = scrollRef.current
@@ -70,36 +83,43 @@ export default function TimeGrid({
         el.scrollLeft = bus.pendingLeft
         return () => {
             bus.els.delete(el)
-            if (bus.active === el) bus.active = null
+            if (bus.source === el) bus.source = null
             if (bus.els.size === 0) buses.delete(syncKey)
         }
-    }, [syncKey])
+    }, [syncKey, scrollRef])
 
     const onScroll = useCallback(() => {
         const el = scrollRef.current
         if (!el) return
-        if (isApplying.current) return
 
         const bus = getBus(syncKey)
-        bus.active = el
+
+        // If a sync frame is ongoing and this isn't the source, ignore.
+        if (bus.syncing && bus.source !== el) return
+
+        // This element becomes the source for this frame.
+        bus.source = el
+        bus.syncing = true
         bus.pendingLeft = el.scrollLeft
 
         if (bus.raf != null) return
         bus.raf = requestAnimationFrame(() => {
             bus.raf = null
             const left = bus.pendingLeft
+
             for (const other of bus.els) {
-                if (other === bus.active) continue
+                if (other === bus.source) continue
                 if (other.scrollLeft === left) continue
-                isApplying.current = true
                 other.scrollLeft = left
-                isApplying.current = false
             }
+
+            bus.syncing = false
+            bus.source = null
         })
-    }, [syncKey])
+    }, [syncKey, scrollRef])
 
     return (
-        <div ref={scrollRef} className={className} style={outerStyle} onScroll={onScroll}>
+        <div className={className} style={outerStyle} onScroll={onScroll} {...drag}>
             <div style={gridStyle}>{children}</div>
         </div>
     )

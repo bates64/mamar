@@ -84,6 +84,8 @@ $ruler-height: 36px;
 }
 
 .bars {
+    cursor: grab;
+
     & > * {
         // Opt out of TimeGrid's grid layout, we only want the scrolling
         display: flex !important;

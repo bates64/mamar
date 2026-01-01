@@ -152,7 +152,7 @@ function Container() {
                     </div>}
                 </div>)}
             </View>
-            {variation && <TimeGrid>
+            {variation && <TimeGrid dragToScroll={{ axis: "both", button: 1 }}>
                 {variation.segments.map((segment, segmentIndex) => {
                     if ("Subseg" in segment) {
                         return <View

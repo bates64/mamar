@@ -63,6 +63,8 @@ $trackHeight: 70px;
 
     position: relative; // for svg
 
+    cursor: pointer;
+
     &:focus-visible {
         outline: 3px solid var(--spectrum-gray-500);
     }

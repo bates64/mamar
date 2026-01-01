@@ -217,7 +217,7 @@ export default function Ruler() {
         <TimeGrid className={styles.loops}>
             {elements}
         </TimeGrid>
-        <TimeGrid className={styles.bars}>
+        <TimeGrid className={styles.bars} dragToScroll={{ axis: "x", button: 0, thresholdPx: 0 }}>
             <Playhead />
             {bars}
         </TimeGrid>
