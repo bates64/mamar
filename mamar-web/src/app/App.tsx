@@ -8,6 +8,7 @@ import Main from "./Main"
 import { RootProvider } from "./store/dispatch"
 import { MupenProvider } from "./util/hooks/useMupen"
 import useRomData, { RomDataProvider } from "./util/hooks/useRomData"
+import { PlayheadContextProvider } from "./doc/Playhead"
 
 import { version } from "../../package.json"
 
@@ -24,15 +25,17 @@ export function RomDataConsumer() {
             rows={["auto", "1fr"]}
             height="100vh"
         >
-            <View gridArea="header">
-                <Header />
-            </View>
-            <div className={styles.playbackControlsContainer}>
-                <PlaybackControls />
-            </div>
-            <View gridArea="content">
-                <Main />
-            </View>
+            <PlayheadContextProvider>
+                <View gridArea="header">
+                    <Header />
+                </View>
+                <div className={styles.playbackControlsContainer}>
+                    <PlaybackControls />
+                </div>
+                <View gridArea="content">
+                    <Main />
+                </View>
+            </PlayheadContextProvider>
         </Grid>
     </MupenProvider>
 }

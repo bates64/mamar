@@ -573,6 +573,33 @@ impl CommandSeq {
         after_time.insert_many_start(0, setup);
         after_time
     }
+
+    /// Zeroes delays and notes before `time` as if the sequence started `time` ticks earlier.
+    pub fn fast_forward(&mut self, time: usize) {
+        let mut remaining = time;
+        for event in self.vec.iter_mut() {
+            match &mut event.command {
+                Command::Delay(delay) => {
+                    if remaining >= *delay {
+                        remaining -= *delay;
+                        *delay = 0;
+                    } else {
+                        *delay -= remaining;
+                        remaining = 0;
+                    }
+                }
+                Command::Note { length, velocity, .. } => {
+                    *length = 0;
+                    *velocity = 0;
+                }
+                _ => {}
+            }
+
+            if remaining == 0 {
+                break;
+            }
+        }
+    }
 }
 
 impl<C: Into<Event>> From<Vec<C>> for CommandSeq {

@@ -156,9 +156,49 @@ impl Bgm {
         }
     }
 
+    /// Makes the variation `variation` start `time` ticks in.
+    pub fn fast_forward(&mut self, variation: usize, time: usize) {
+        if variation >= self.variations.len() {
+            return;
+        }
+        let Some(variation_ref) = &self.variations[variation] else {
+            return;
+        };
+
+        // TODO: emulate loops
+
+        let mut current_time = 0;
+        for segment in variation_ref.segments.iter() {
+            let Segment::Subseg { track_list, .. } = segment else {
+                continue;
+            };
+
+            let duration = self
+                .track_lists
+                .get(track_list)
+                .map(|tl| tl.len_time())
+                .unwrap_or_default();
+
+            if current_time < time {
+                let Some(track_list) = self.track_lists.get_mut(track_list) else {
+                    continue;
+                };
+                log::info!("ffwd {}", current_time);
+                for track in &mut track_list.tracks {
+                    track.commands.fast_forward(time - current_time);
+                }
+            } else {
+                // We've reached time
+                break;
+            }
+
+            current_time += duration;
+        }
+    }
+
     pub fn from_ron_string(input_string: &str) -> Result<Self, ron::Error> {
         // generate ids for commands
-        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(&input_string).collect();
+        let matches: Vec<regex::Captures<'_>> = RON_COMMAND_REGEX.captures_iter(input_string).collect();
         let mut modified_input_string = input_string.to_string();
 
         for captures in matches.into_iter().rev() {

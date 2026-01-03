@@ -56,8 +56,18 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn bgm_encode(bgm: &JsValue) -> JsValue {
-    let bgm: Bgm = from_js(bgm);
+pub fn bgm_encode(bgm: &JsValue, ffwd_variation: usize, ffwd_time: usize) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+
+    if ffwd_time > 0 {
+        bgm.fast_forward(ffwd_variation, ffwd_time);
+        for (_, track_list) in bgm.track_lists.iter_mut() {
+            for track in track_list.tracks.iter_mut() {
+                track.commands.shrink();
+            }
+        }
+    }
+
     let mut f = Cursor::new(Vec::new());
     match bgm.encode(&mut f) {
         Ok(_) => {

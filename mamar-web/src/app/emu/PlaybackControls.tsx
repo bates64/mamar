@@ -3,11 +3,12 @@ import { bgm_encode } from "mamar-wasm-bridge"
 import { EmulatorControls } from "mupen64plus-web"
 import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
-import { useCallback, useEffect, useId, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState, useContext } from "react"
 import { Play, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
 
+import { CONTEXT as PLAYHEAD_CONTEXT } from "../doc/Playhead"
 import { useDoc } from "../store"
 import DramView from "../util/DramView"
 import useMupen from "../util/hooks/useMupen"
@@ -33,12 +34,12 @@ function writePatches(emu: EmulatorControls) {
 
 let tickTock = false
 
-function writeBgm(emu: EmulatorControls, bgm: Bgm, variation: number) {
+function writeBgm(emu: EmulatorControls, bgm: Bgm, variation: number, startTime: number) {
     if (variation < 0 || variation >= bgm.variations.length) {
         return
     }
 
-    const bgmBin: Uint8Array | string = bgm_encode(bgm)
+    const bgmBin: Uint8Array | string = bgm_encode(bgm, variation, startTime)
 
     if (bgmBin instanceof Uint8Array) {
         const dram = new DramView(emu)
@@ -91,6 +92,7 @@ export default function PlaybackControls() {
         //     }
         // }
     }, [bpmRef]))
+    const playhead = useContext(PLAYHEAD_CONTEXT)!
 
     // Access the entire bgm object so useDoc tracks any change to it
     JSON.stringify(bgm)
@@ -130,8 +132,8 @@ export default function PlaybackControls() {
         if (!bgm || activeVariation < 0)
             return
 
-        writeBgm(emu, bgm, activeVariation)
-    }, [emu, bgm, activeVariation])
+        writeBgm(emu, bgm, activeVariation, playhead.position)
+    }, [emu, bgm, activeVariation, playhead])
 
     useEffect(() => {
         writeAmbientSound(emu, ambientSound)
@@ -151,11 +153,12 @@ export default function PlaybackControls() {
             <ActionButton
                 aria-label="Restart"
                 onPress={async () => {
+                    playhead.setPosition(0)
                     if (emu) {
                         const wasPlaying = isPlaying
                         await emu.pause()
                         writePatches(emu)
-                        writeBgm(emu, bgm, activeVariation)
+                        writeBgm(emu, bgm, activeVariation, 0)
                         if (wasPlaying)
                             await emu.resume()
                     }
