@@ -1,10 +1,10 @@
 import { View, ActionButton, Tooltip, TooltipTrigger } from "@adobe/react-spectrum"
 import { fileSave } from "browser-fs-access"
-import { bgm_encode, ron_encode } from "mamar-wasm-bridge"
 import { CSSProperties, useCallback, useEffect } from "react"
 
 import OpenButton from "./OpenButton"
 
+import Bridge from "../bridge"
 import { useDoc, useRoot } from "../store"
 
 function createBgmFileName(fileName: string) {
@@ -32,7 +32,7 @@ export default function BgmActionGroup() {
             return
         }
 
-        const bgmBin: Uint8Array<ArrayBuffer> | string = bgm_encode(doc.bgm, 0, 0)
+        const bgmBin: Uint8Array<ArrayBuffer> | string = Bridge.bgm_encode(doc.bgm, 0, 0)
 
         if (typeof bgmBin === "string") {
             // TODO: surface error in a dialog
@@ -48,7 +48,7 @@ export default function BgmActionGroup() {
         // If it was saved as .ron, overwrite the file contents (currently BGM) with the RON
         if (fileHandle?.name.endsWith(".ron")) {
             const writable = await fileHandle.createWritable({ keepExistingData: false })
-            await writable.write(ron_encode(doc.bgm))
+            await writable.write(Bridge.ron_encode(doc.bgm))
             await writable.close()
         }
 

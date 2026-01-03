@@ -9,6 +9,7 @@
         "module": "esnext",
         "resolveJsonModule": true,
         "allowSyntheticDefaultImports": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "types": ["vite/client"]
     },
 }

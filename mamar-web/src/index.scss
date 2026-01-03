@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 :root {
     --grey-9: #efefef;
     --grey-8: #c8c8c8;
@@ -297,7 +299,7 @@ html, .App {
         border-color: rgb(172, 83, 114);
 
         &:hover {
-            background: mix(#ea7aa1, #000, 90%);
+            background: color.mix(#ea7aa1, #000, 90%);
         }
     }
 

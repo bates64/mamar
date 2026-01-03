@@ -1,5 +1,4 @@
 import { ActionButton, ToggleButton, View } from "@adobe/react-spectrum"
-import { bgm_encode } from "mamar-wasm-bridge"
 import { EmulatorControls } from "mupen64plus-web"
 import * as patches from "patches"
 import { Bgm } from "pm64-typegen"
@@ -8,6 +7,7 @@ import { Play, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
 
+import Bridge from "../bridge"
 import { CONTEXT as PLAYHEAD_CONTEXT } from "../doc/Playhead"
 import { useDoc } from "../store"
 import DramView from "../util/DramView"
@@ -39,7 +39,7 @@ function writeBgm(emu: EmulatorControls, bgm: Bgm, variation: number, startTime:
         return
     }
 
-    const bgmBin: Uint8Array | string = bgm_encode(bgm, variation, startTime)
+    const bgmBin: Uint8Array | string = Bridge.bgm_encode(bgm, variation, startTime)
 
     if (bgmBin instanceof Uint8Array) {
         const dram = new DramView(emu)

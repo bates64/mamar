@@ -1,10 +1,11 @@
 import produce, { setAutoFreeze } from "immer"
-import { bgm_add_voice, bgm_split_variation_at } from "mamar-wasm-bridge"
 import { Bgm, Event, Instrument, Polyphony } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
 import { VariationAction, variationReducer } from "./variation"
+
+import Bridge from "../bridge"
 
 // Freezing react-tracked proxies can cause proxy invariant errors
 setAutoFreeze(false)
@@ -70,7 +71,7 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             ],
         }
     } case "add_voice":
-        return bgm_add_voice(bgm)
+        return Bridge.bgm_add_voice(bgm)
     case "move_track_command":
         return produce(bgm, draft => {
             const track = draft.track_lists[action.trackList].tracks[action.track]
@@ -112,7 +113,7 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             Object.assign(instrument, action.partial)
         })
     case "split_variation":
-        return bgm_split_variation_at(bgm, action.variation, action.time)
+        return Bridge.bgm_split_variation_at(bgm, action.variation, action.time)
     }
 }
 

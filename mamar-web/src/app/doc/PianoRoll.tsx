@@ -1,7 +1,7 @@
-import { PianoRoll as Renderer } from "mamar-wasm-bridge"
 import { type Track } from "pm64-typegen"
 import { useEffect, useRef } from "react"
 
+import Bridge from "../bridge"
 import { useBgm } from "../store"
 import { useSize } from "../util/hooks/useSize"
 
@@ -22,6 +22,7 @@ export default function PianoRoll({ trackListId, trackIndex }: Props) {
 function Canvas({ track }: { track: Track }) {
     const canvas = useSize<HTMLCanvasElement>()
     const containerRef = useRef<HTMLDivElement | null>(null)
+    type Renderer = InstanceType<typeof Bridge.PianoRoll>
     const rendererRef = useRef<Renderer | null>(null)
     const rafRef = useRef<number>(0)
 
@@ -31,7 +32,7 @@ function Canvas({ track }: { track: Track }) {
         if (!el) return
 
         const ctx = el.getContext("2d", { alpha: false })!
-        const r = new Renderer()
+        const r = new Bridge.PianoRoll()
         rendererRef.current = r
 
         containerRef.current!.style.height = `${r.scroll_height()}px`

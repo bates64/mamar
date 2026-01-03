@@ -5,7 +5,6 @@ import react from "@vitejs/plugin-react"
 import { viteStaticCopy } from "vite-plugin-static-copy"
 import wasm from "vite-plugin-wasm"
 import topLevelAwait from "vite-plugin-top-level-await"
-import chokidar from "chokidar"
 
 const serveMupenAssets = () => ({
     name: "serve-mupen64plus-web",
@@ -28,18 +27,6 @@ const serveMupenAssets = () => ({
     },
 })
 
-const wasmHotReload = () => ({
-    name: "wasm-hot-reload",
-    configureServer(server: import("vite").ViteDevServer) {
-        const pkgDir = path.resolve(__dirname, "../mamar-wasm-bridge/pkg")
-        const watcher = chokidar.watch(pkgDir, { ignoreInitial: true })
-        watcher.on("all", (_event, filePath) => {
-            if (!filePath.endsWith(".wasm") && !filePath.endsWith(".js")) return
-            server.ws.send({ type: "full-reload" })
-        })
-        server.httpServer?.on("close", () => watcher.close())
-    },
-})
 
 export default defineConfig({
     root: path.resolve(__dirname, "src"),
@@ -47,7 +34,6 @@ export default defineConfig({
         react(),
         wasm(),
         topLevelAwait(),
-        wasmHotReload(),
         serveMupenAssets(),
         viteStaticCopy({
             targets: [
@@ -77,6 +63,13 @@ export default defineConfig({
         headers: {
             "Cross-Origin-Opener-Policy": "same-origin",
             "Cross-Origin-Embedder-Policy": "require-corp",
+        },
+        fs: {
+            allow: [
+                path.resolve(__dirname),
+                path.resolve(__dirname, "../node_modules/mupen64plus-web/bin/web"),
+                path.resolve(__dirname, "../mamar-wasm-bridge/pkg"),
+            ],
         },
     },
 })

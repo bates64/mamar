@@ -2,13 +2,13 @@ import { Provider as SpectrumProvider, defaultTheme, Grid, View } from "@adobe/r
 import { useEffect } from "react"
 
 import styles from "./App.module.scss"
+import { PlayheadContextProvider } from "./doc/Playhead"
 import PlaybackControls from "./emu/PlaybackControls"
 import Header from "./header/Header"
 import Main from "./Main"
 import { RootProvider } from "./store/dispatch"
 import { MupenProvider } from "./util/hooks/useMupen"
 import useRomData, { RomDataProvider } from "./util/hooks/useRomData"
-import { PlayheadContextProvider } from "./doc/Playhead"
 
 import { version } from "../../package.json"
 

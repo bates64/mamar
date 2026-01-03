@@ -1,9 +1,9 @@
-import * as WasmBridge from "mamar-wasm-bridge"
 import * as React from "react"
 import * as ReactDOM from "react-dom/client"
 
 import "../service-worker-load.js"
 import App from "./App"
+import bridge, { ensureBridge } from "./bridge"
 
 const rootEl = document.getElementById("root") as HTMLElement
 const root = ReactDOM.createRoot(rootEl)
@@ -40,10 +40,10 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-await WasmBridge.default()
-WasmBridge.init_logging()
+await ensureBridge()
+bridge.init_logging()
 root.render(<ErrorBoundary />)
 
-if (process.env.NODE_ENV !== "production") {
+if (import.meta.env.DEV) {
     import("@axe-core/react").then(({ default: axe }) => axe(React, ReactDOM, 1000))
 }

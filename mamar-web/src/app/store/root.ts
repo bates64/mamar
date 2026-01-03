@@ -1,8 +1,9 @@
 import { FileWithHandle } from "browser-fs-access"
-import { bgm_decode, new_bgm } from "mamar-wasm-bridge"
 import { Bgm } from "pm64-typegen"
 
 import { Doc, DocAction, docReducer } from "./doc"
+
+import Bridge from "../bridge"
 
 function generateId() {
     return Math.random().toString(36).substring(2, 15)
@@ -50,7 +51,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
         const saveSupported = fileExtension === "bgm" || fileExtension === "ron"
         const newDoc: Doc = {
             id: generateId(),
-            bgm: action.bgm ?? new_bgm(),
+            bgm: action.bgm ?? Bridge.new_bgm(),
             fileHandle: saveSupported ? action.file?.handle : undefined,
             name: action.name || action.file?.name || "New song",
             isSaved: saveSupported,
@@ -85,7 +86,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
 
 export async function openFile(file: FileWithHandle): Promise<RootAction> {
     const data = new Uint8Array(await file.arrayBuffer())
-    const bgm: Bgm | string = bgm_decode(data)
+    const bgm: Bgm | string = Bridge.bgm_decode(data)
 
     if (typeof bgm === "string") {
         throw new Error(bgm)
@@ -99,7 +100,7 @@ export async function openFile(file: FileWithHandle): Promise<RootAction> {
 }
 
 export function openData(data: Uint8Array, name?: string): RootAction {
-    const bgm: Bgm | string = bgm_decode(data)
+    const bgm: Bgm | string = Bridge.bgm_decode(data)
 
     if (typeof bgm === "string") {
         throw new Error(bgm)
