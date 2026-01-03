@@ -175,11 +175,7 @@ pub fn align(value: u32, n: u32) -> u32 {
         return value;
     }
 
-    if value % n == 0 {
-        n
-    } else {
-        value + (n - value % n)
-    }
+    if value % n == 0 { n } else { value + (n - value % n) }
 }
 
 #[cfg(test)]

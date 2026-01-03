@@ -1,6 +1,6 @@
 use std::error::Error;
-use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::io::prelude::*;
 
 use midly::{MetaMessage, Smf};
 
@@ -214,9 +214,13 @@ fn midi_track_to_bgm_track(
 
             let voice_idx = instruments.len();
             instruments.push(Instrument {
-                bank: 0x30,
+                patch: PatchAddress {
+                    bank_set: BankSetIndex::Music,
+                    bank: 0,
+                    instrument: 0,
+                    envelope: 0,
+                },
                 pan: 64,
-                patch: 1,
                 volume: 100,
                 ..Default::default()
             });
@@ -309,16 +313,22 @@ fn midi_track_to_bgm_track(
                                     .insert_end(time_cvt, Command::SubTrackVolume(vel.as_int()));
                             }
                             MidiMessage::ProgramChange { program } => {
+                                let program = program.as_int();
+                                let bank = program / 16;
+                                let instrument = program % 16;
+
                                 if !set_bank_patch {
-                                    instruments[voice_idx].patch = program.as_int();
+                                    instruments[voice_idx].patch.bank = bank;
+                                    instruments[voice_idx].patch.instrument = instrument;
                                     set_bank_patch = true;
                                 } else {
                                     track.commands.insert_end(
                                         time_cvt,
-                                        Command::TrackOverridePatch {
-                                            bank: 48,
-                                            patch: program.as_int(),
-                                        },
+                                        Command::TrackOverridePatch(PatchAddress {
+                                            bank,
+                                            instrument,
+                                            ..instruments[voice_idx].patch
+                                        }),
                                     );
                                 }
                             }
@@ -371,17 +381,14 @@ fn midi_track_to_bgm_track(
 
                                         track.commands.insert_end(
                                             time_cvt,
-                                            Command::TrackOverridePatch {
-                                                bank: instruments[voice_idx].bank & 0xF0 | sustain,
-                                                patch: instruments[voice_idx].bank,
-                                            },
+                                            Command::TrackOverridePatch(PatchAddress {
+                                                envelope: sustain,
+                                                ..instruments[voice_idx].patch
+                                            }),
                                         );
                                     }
                                     // Sound Controller 3 (Release Time)
                                     72 => {
-                                        // The lower nibble of the bank mod 3 is the 'staccatoness' (how short the
-                                        // notes are). The MIDI value for this event is the release time (sustain),
-                                        // change it to one of 4 levels:
                                         #[allow(clippy::bool_to_int_with_if)]
                                         let sustain = if value < (127 / 4) {
                                             3 // Staccato
@@ -395,10 +402,10 @@ fn midi_track_to_bgm_track(
 
                                         track.commands.insert_end(
                                             time_cvt,
-                                            Command::TrackOverridePatch {
-                                                bank: instruments[voice_idx].bank & 0xF0 | sustain,
-                                                patch: instruments[voice_idx].patch,
-                                            },
+                                            Command::TrackOverridePatch(PatchAddress {
+                                                envelope: sustain,
+                                                ..instruments[voice_idx].patch
+                                            }),
                                         );
                                     }
                                     100 if pitch_range_cmd_state == PitchRangeCommandState::ParameterMSBSet => {

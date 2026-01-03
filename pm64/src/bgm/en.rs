@@ -323,8 +323,7 @@ impl Bgm {
 
 impl Drum {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
-        f.write_u8(self.bank)?;
-        f.write_u8(self.patch)?;
+        self.patch.encode(f)?;
         f.write_u8(self.coarse_tune)?;
         f.write_u8(self.fine_tune)?;
         f.write_u8(self.volume)?;
@@ -341,14 +340,22 @@ impl Drum {
 
 impl Instrument {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
-        f.write_u8(self.bank)?;
-        f.write_u8(self.patch)?;
+        self.patch.encode(f)?;
         f.write_u8(self.volume)?;
         f.write_i8(self.pan)?;
         f.write_u8(self.reverb)?;
         f.write_u8(self.coarse_tune)?;
         f.write_u8(self.fine_tune)?;
         f.write_u8(self.pad_07)?;
+        Ok(())
+    }
+}
+
+impl PatchAddress {
+    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
+        let bank_set: u8 = self.bank_set.into();
+        f.write_u8(bank_set << 4 | self.envelope)?;
+        f.write_u8(self.bank << 4 | self.instrument)?;
         Ok(())
     }
 }
@@ -413,7 +420,8 @@ impl CommandSeq {
 
         for Event { command, .. } in self.iter() {
             match command {
-                Command::Delay(mut delay) => {
+                Command::Delay(delay) => {
+                    let mut delay = *delay;
                     // https://github.com/KernelEquinox/midi2bgm/blob/master/midi2bgm.cpp#L202
                     while delay > 0 {
                         if delay < 0x78 {
@@ -483,10 +491,9 @@ impl CommandSeq {
                     f.write_u8(*a)?;
                     f.write_u8(*b)?;
                 }
-                Command::TrackOverridePatch { bank, patch } => {
+                Command::TrackOverridePatch(patch) => {
                     f.write_u8(0xE8)?;
-                    f.write_u8(*bank)?;
-                    f.write_u8(*patch)?;
+                    patch.encode(f)?;
                 }
                 Command::SubTrackVolume(a) => {
                     f.write_u8(0xE9)?;

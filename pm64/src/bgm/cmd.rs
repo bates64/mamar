@@ -5,7 +5,10 @@ use std::ops::Range;
 use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
-use crate::id::{gen_id, Id};
+use crate::{
+    bgm::PatchAddress,
+    id::{Id, gen_id},
+};
 
 /// A contiguous sequence of [commands](Command) ordered by relative-time.
 /// Insertion and lookup is performed via a relative-time key.
@@ -611,11 +614,8 @@ pub enum Command {
     },
 
     // command E7 unused
-    /// Sets the bank/patch of this track, overriding its [super::Voice].
-    TrackOverridePatch {
-        bank: u8,
-        patch: u8,
-    },
+    /// Sets the patch of this track, overriding its [super::Instrument].
+    TrackOverridePatch(PatchAddress),
 
     /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
     SubTrackVolume(u8),

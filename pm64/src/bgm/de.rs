@@ -17,6 +17,7 @@ pub enum Error {
     InvalidNumVariations(u8),
     UnknownSegmentCommand(u32),
     UnknownSeqCommand(u8),
+    UnknownBankSet(u8),
     Io(io::Error),
 }
 
@@ -45,6 +46,7 @@ impl fmt::Display for Error {
             ),
             Error::UnknownSegmentCommand(cmd) => write!(f, "Unknown segment command: {:#X}", cmd),
             Error::UnknownSeqCommand(cmd) => write!(f, "Unknown sequence command: {:#X}", cmd),
+            Error::UnknownBankSet(bank_set) => write!(f, "Unknown bank set: {:#X}", bank_set),
             Error::Io(source) => {
                 if let io::ErrorKind::UnexpectedEof = source.kind() {
                     write!(f, "Unexpected end-of-file")
@@ -491,10 +493,7 @@ impl CommandSeq {
                     value: f.read_u8()?,
                 },
                 // command 0xE7 unused
-                0xE8 => Command::TrackOverridePatch {
-                    bank: f.read_u8()?,
-                    patch: f.read_u8()?,
-                },
+                0xE8 => Command::TrackOverridePatch(PatchAddress::decode(f)?),
                 0xE9 => Command::SubTrackVolume(f.read_u8()?),
                 0xEA => Command::SubTrackPan(f.read_i8()?),
                 0xEB => Command::SubTrackReverb(f.read_u8()?),
@@ -636,8 +635,7 @@ impl Drum {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
-            bank: f.read_u8()?,
-            patch: f.read_u8()?,
+            patch: PatchAddress::decode(f)?,
             coarse_tune: f.read_u8()?,
             fine_tune: f.read_u8()?,
             volume: f.read_u8()?,
@@ -656,8 +654,7 @@ impl Instrument {
     fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
         debug!("drum = {:#X}", f.pos()?);
         Ok(Self {
-            bank: f.read_u8()?,
-            patch: f.read_u8()?,
+            patch: PatchAddress::decode(f)?,
             volume: f.read_u8()?,
             pan: f.read_i8()?,
             reverb: f.read_u8()?,
@@ -682,6 +679,25 @@ impl Unknown {
                 buf
             },
             range,
+        })
+    }
+}
+
+impl PatchAddress {
+    fn decode<R: Read + Seek>(f: &mut R) -> Result<Self, Error> {
+        let raw_bank = f.read_u8()?;
+        let bank_set = (raw_bank & 0x70) >> 4;
+        let envelope = raw_bank & 3;
+
+        let raw_patch = f.read_u8()?;
+        let bank = raw_patch / 16;
+        let instrument = raw_patch % 16;
+
+        Ok(PatchAddress {
+            bank_set: bank_set.try_into().map_err(|_| Error::UnknownBankSet(bank_set))?,
+            bank,
+            instrument,
+            envelope,
         })
     }
 }

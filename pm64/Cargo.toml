@@ -2,7 +2,7 @@
 name = "pm64"
 version = "0.1.0"
 authors = ["Alex Bates <hi@imalex.xyz>"]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 lazy_static = "1"

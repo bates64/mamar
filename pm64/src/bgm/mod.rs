@@ -21,7 +21,7 @@ use typescript_type_def::TypeDef;
 mod cmd;
 pub use cmd::*;
 
-use crate::id::{gen_id, Id};
+use crate::id::{Id, gen_id};
 
 /// Constant signature string which appears at the start of every binary BGM file.
 pub const MAGIC: &str = "BGM ";
@@ -437,8 +437,7 @@ impl Polyphony {
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Drum {
-    pub bank: u8,
-    pub patch: u8,
+    pub patch: PatchAddress,
     pub coarse_tune: u8,
     pub fine_tune: u8,
     pub volume: u8,
@@ -461,11 +460,7 @@ pub struct Drum {
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct Instrument {
-    /// Upper nibble = bank. (0..=6 are valid?)
-    /// Lower nibble = staccatoness mod 3 (0 = sustain, 3 = staccato).
-    pub bank: u8,
-
-    pub patch: u8,
+    pub patch: PatchAddress,
     pub volume: u8,
 
     /// Values are just like in MIDI:
@@ -490,4 +485,75 @@ pub struct Unknown {
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Default, Serialize, Deserialize, TypeDef)]
+pub struct PatchAddress {
+    /// Index of `AuGlobals::bankSets[...]` to use.
+    pub bank_set: BankSetIndex,
+
+    /// Index of InstrumentBank in the bank set.
+    pub bank: u8,
+
+    /// Index of Instrument in the bank.
+    pub instrument: u8,
+
+    /// Index of envelope preset in the instrument.
+    /// If the instrument does not provide this envelope, a default is used.
+    pub envelope: u8,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, TypeDef)]
+pub enum BankSetIndex {
+    /// Extra banks loaded at request of BGM file
+    Aux,
+    Set2,
+    /// Used only for au_reset_drum_entry/au_reset_instrument_entry
+    Default,
+    /// Where standard music instruments are stored
+    Music,
+    Set4,
+    Set5,
+    Set6,
+    /// Same as Aux
+    AuxCopy,
+}
+
+impl Default for BankSetIndex {
+    fn default() -> Self {
+        BankSetIndex::Default
+    }
+}
+
+impl TryFrom<u8> for BankSetIndex {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(BankSetIndex::Aux),
+            1 => Ok(BankSetIndex::Set2),
+            2 => Ok(BankSetIndex::Default),
+            3 => Ok(BankSetIndex::Music),
+            4 => Ok(BankSetIndex::Set4),
+            5 => Ok(BankSetIndex::Set5),
+            6 => Ok(BankSetIndex::Set6),
+            7 => Ok(BankSetIndex::AuxCopy),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Into<u8> for BankSetIndex {
+    fn into(self) -> u8 {
+        match self {
+            BankSetIndex::Aux => 0,
+            BankSetIndex::Set2 => 1,
+            BankSetIndex::Default => 2,
+            BankSetIndex::Music => 3,
+            BankSetIndex::Set4 => 4,
+            BankSetIndex::Set5 => 5,
+            BankSetIndex::Set6 => 6,
+            BankSetIndex::AuxCopy => 7,
+        }
+    }
 }

@@ -14,7 +14,7 @@ import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
-import InstrumentInput from "../InstrumentInput"
+import InstrumentInput, { PatchInput } from "../InstrumentInput"
 import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
 import StringInput from "../StringInput"
@@ -194,22 +194,11 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("TrackOverridePatch" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            override instrument bank
+            use sound
             <InputBox>
-                <VerticalDragNumberInput
-                    value={command.TrackOverridePatch.bank}
-                    minValue={0}
-                    maxValue={0xFF}
-                    onChange={bank => mutate({ ...command, TrackOverridePatch: { ...command.TrackOverridePatch, bank } })}
-                />
-            </InputBox>
-            patch
-            <InputBox>
-                <VerticalDragNumberInput
-                    value={command.TrackOverridePatch.patch}
-                    minValue={0}
-                    maxValue={0xFF}
-                    onChange={patch => mutate({ ...command, TrackOverridePatch: { ...command.TrackOverridePatch, patch } })}
+                <PatchInput
+                    patch={command.TrackOverridePatch}
+                    onChange={patch => mutate({ ...command, TrackOverridePatch: patch })}
                 />
             </InputBox>
         </div>
@@ -359,7 +348,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("SetTrackVoice" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            use instrument
+            use part
             <InputBox>
                 <InstrumentInput
                     index={command.SetTrackVoice.index}
