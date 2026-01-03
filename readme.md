@@ -5,7 +5,7 @@
 
 Paper Mario music editor.
 
-[Website](https://mamar.bates64.com) - [Open in your browser](https://mamar.bates64.com/app) - [Changelog](/changelog.md)
+[Website](https://mamar.bates64.com) - [Open in your browser](https://mamar.bates64.com/app/) - [Changelog](/changelog.md)
 
 ![Screenshot](mamar-web/src/screenshot.png)
 
@@ -23,7 +23,7 @@ This is a monorepo with a number of modules in it. Following is a more detailed 
 `mamar-web`
 -----------
 
-This is the React frontend writen with strict-mode TypeScript. Styles are written in SCSS, with components using [CSS modules](https://github.com/css-modules/css-modules) for local scoping. The bundler is [Parcel 2](https://parceljs.org/). There is also a landing page that briefly explains what Mamar is, whilst the app itself lives at `/app`.
+This is the React frontend writen with strict-mode TypeScript. Styles are written in SCSS, with components using [CSS modules](https://github.com/css-modules/css-modules) for local scoping. There is also a landing page that briefly explains what Mamar is, whilst the app itself lives at `/app/`.
 
 Mamar uses [React Spectrum](https://react-spectrum.adobe.com/react-spectrum/index.html), Adobe's React component library. This means you can quickly build most views with just that and few design decisions need to be made. For more bespoke components, there's no need to fit within the Spectrum design system, so it's no issue to use the `UNSAFE_className` prop. The most important thing is that components are [accessible](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA) and keyboard-navigable. For example, the `PlaybackControls` component has styling that totally overrides Spectrum in order to completely rip off Garageband's UI. If you're thinking of contributing some feature but aren't much of a designer, feel free to focus on the functionality and I'll make it look nice!
 
@@ -66,23 +66,20 @@ This module contains C functions that are compiled and linked with the Paper Mar
 
 This module is then used in `mamar-web`, functions in the emulator's console memory are overwritten with the custom code. Functions that compile to a bigger blob than the original are not patched, instead the original code is replaced with a stub that immediately calls a custom function placed in `0x8040000` memory space, which goes unused by the game. Data is also placed here, but it is not initialized because that would require more complex objdump parsing in the Python script.
 
-Building
-========
+Development
+===========
 
-You'll need:
+Enter the Nix devshell (`nix develop`), or make sure you have:
 
 - [Node.js](https://nodejs.org/en/)
 - [Yarn](https://yarnpkg.com/getting-started/install) (rather than npm)
 - [Rust](https://rust-lang.org/tools/install)
 - [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
 
-In the root of this repo:
+Then run:
+
 1. `yarn install`
-2. `yarn workspace mamar-web build`
-
-Output is at `mamar-web/dist`.
-
-For developing, `yarn workspace mamar-web start` will start a dev server at `localhost:1234`. This server supports hot-reloading but beware of editing code that talks to the emulator as it is quite likely that you will experience crashes or other weirdness - reload the page to fix this.
+2. `yarn start`
 
 Working on `mupen64plus-web`
 ----------------------------
@@ -95,11 +92,6 @@ Working on `mupen64plus-web`
 - In mamar:
     1. Run: `yarn link mupen64plus-web`
     2. Restart the dev server in `mamar-web`; you may need to clear the cache (`rm -rf .parcel-cache`)
-
-Rebuilding `mamar-wasm-bridge` or `pm64`
-----------------------------------------
-
-In `mamar-wasm-bridge`, run `wasm-pack build -t web` to rebuild.
 
 Deployment
 ==========

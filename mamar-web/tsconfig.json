@@ -1,12 +1,12 @@
 {
     "include": ["src/**/*"],
     "compilerOptions": {
-        "target": "es2021",
+        "target": "es2022",
         "strict": true,
         "isolatedModules": true,
         "jsx": "preserve",
         "moduleResolution": "node",
-        "module": "ES2020",
+        "module": "esnext",
         "resolveJsonModule": true,
         "allowSyntheticDefaultImports": true,
         "skipLibCheck": true

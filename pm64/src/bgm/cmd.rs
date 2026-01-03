@@ -576,6 +576,7 @@ impl CommandSeq {
 
     /// Zeroes delays and notes before `time` as if the sequence started `time` ticks earlier.
     pub fn fast_forward(&mut self, time: usize) {
+        log::info!("hello world");
         let mut remaining = time;
         for event in self.vec.iter_mut() {
             match &mut event.command {
