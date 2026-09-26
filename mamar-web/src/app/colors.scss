@@ -1,0 +1,31 @@
+:root {
+    --grey-9: #efefef;
+    --grey-8: #c8c8c8;
+    --grey-7: #a2a2a2;
+    --grey-6: #7c7c7c;
+    --grey-5: #5c5c5c;
+    --grey-4: #494949;
+    --grey-3: #393939;
+    --grey-2: #2c2c2c;
+    --grey-1: #1e1e1e;
+    --grey-0: #111111;
+    --grey-0-alpha-50: #11111180;
+
+    // Invert grey scale for light mode
+    @media (prefers-color-scheme: light) {
+        --grey-9: #080808;
+        --grey-8: #1e1e1e;
+        --grey-7: #2c2c2c;
+        --grey-6: #393939;
+        --grey-5: #494949;
+        --grey-4: #5c5c5c;
+        --grey-3: #7c7c7c;
+        --grey-2: #a2a2a2;
+        --grey-1: #c8c8c8;
+        --grey-0: #ffffff;
+        --grey-0-alpha-50: #ffffff80;
+    }
+
+    --yellow: #ffc639;
+    --pink: #ea7aa1;
+}

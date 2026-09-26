@@ -28,6 +28,7 @@ export default function PlaybackControls() {
     const [isPlaying, setIsPlaying] = useState(false)
     const [ambientSound, setAmbientSound] = useState(6) // AMBIENT_SILENCE
     const bpmRef = useRef<HTMLSpanElement | null>(null)
+    const actionsRef = useRef<HTMLDivElement | null>(null)
     const player = useSongPlayer(useCallback(({ tempo }: PlayerStatus) => {
         if (bpmRef.current) {
             bpmRef.current.innerText = tempo.toString()
@@ -50,6 +51,11 @@ export default function PlaybackControls() {
                 target.tagName === "TEXTAREA" ||
                 target.isContentEditable
             ) {
+                return
+            }
+
+            const editor = actionsRef.current?.closest("[data-bgm-editor]")
+            if (editor && !editor.contains(target)) {
                 return
             }
 
@@ -85,7 +91,7 @@ export default function PlaybackControls() {
     }
 
     return <View paddingX="size-200" paddingY="size-50" UNSAFE_className={styles.container}>
-        <div className={styles.actions} role="group" aria-label="Playback actions">
+        <div ref={actionsRef} className={styles.actions} role="group" aria-label="Playback actions">
             <ActionButton
                 aria-label="Restart"
                 onPress={async () => {

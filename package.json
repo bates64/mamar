@@ -2,6 +2,7 @@
   "private": true,
   "workspaces": [
     "mamar-web",
+    "mamar-editor",
     "mamar-wasm-bridge/pkg",
     "pm64-typegen",
     "patches"

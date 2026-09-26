@@ -1,5 +1,4 @@
 import { Flex, View } from "@adobe/react-spectrum"
-import { useEffect } from "react"
 import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd"
 
 import styles from "./ActiveDoc.module.scss"
@@ -9,24 +8,9 @@ import SubsegDetails from "./SubsegDetails"
 import TimeProvider from "./TimeProvider"
 
 import { useDoc } from "../store"
-import WelcomeScreen from "../WelcomeScreen"
 
 export default function ActiveDoc() {
     const [doc, dispatch] = useDoc()
-
-    const title = doc ? (doc.isSaved ? doc.name : `${doc.name} (unsaved)`) : "Mamar"
-    useEffect(() => {
-        document.title = title
-
-        if (doc && !doc.isSaved) {
-            const onbeforeunload = (evt: BeforeUnloadEvent) => {
-                evt.preventDefault()
-                return evt.returnValue = "You have unsaved changes."
-            }
-            window.addEventListener("beforeunload", onbeforeunload)
-            return () => window.removeEventListener("beforeunload", onbeforeunload)
-        }
-    }, [title, doc])
 
     const trackListId = doc?.panelContent.type === "tracker" ? doc?.panelContent.trackList : null
     const trackIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.track : null
@@ -66,11 +50,7 @@ export default function ActiveDoc() {
         }
     }
 
-    if (!doc) {
-        return <WelcomeScreen />
-    }
-
-    if (doc.activeVariation < 0) {
+    if (!doc || doc.activeVariation < 0) {
         return <View />
     } else {
         return <TimeProvider>

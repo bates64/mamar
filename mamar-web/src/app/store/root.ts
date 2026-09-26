@@ -26,6 +26,7 @@ export type RootAction = {
     file?: FileWithHandle
     name?: string
     bgm?: Bgm
+    isSaved?: boolean
 } | {
     type: "close_doc"
     id: string
@@ -54,7 +55,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             bgm: action.bgm ?? Bridge.new_bgm(),
             fileHandle: saveSupported ? action.file?.handle : undefined,
             name: action.name || action.file?.name || "New song",
-            isSaved: saveSupported,
+            isSaved: action.isSaved ?? saveSupported,
             activeVariation: 0,
             panelContent: {
                 type: "not_open",
@@ -99,7 +100,7 @@ export async function openFile(file: FileWithHandle): Promise<RootAction> {
     }
 }
 
-export function openData(data: Uint8Array, name?: string): RootAction {
+export function openData(data: Uint8Array, name?: string, isSaved?: boolean): RootAction {
     const bgm: Bgm | string = Bridge.bgm_decode(data)
 
     if (typeof bgm === "string") {
@@ -110,5 +111,6 @@ export function openData(data: Uint8Array, name?: string): RootAction {
         type: "open_doc",
         name,
         bgm,
+        isSaved,
     }
 }

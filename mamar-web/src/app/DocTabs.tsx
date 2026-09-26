@@ -1,10 +1,12 @@
 import { Flex } from "@adobe/react-spectrum"
 import CircleFilled from "@spectrum-icons/workflow/CircleFilled"
 import Close from "@spectrum-icons/workflow/Close"
+import { useEffect } from "react"
 
 import ActiveDoc from "./doc/ActiveDoc"
 import ErrorBoundaryView from "./ErrorBoundaryView"
-import { Doc, useRoot } from "./store"
+import { Doc, useDoc, useRoot } from "./store"
+import WelcomeScreen from "./WelcomeScreen"
 
 import "./DocTabs.scss" // TODO: use css modules
 
@@ -46,13 +48,28 @@ function TabButton({ doc }: { doc: Doc }) {
 export default function DocTabs() {
     const [root] = useRoot()
     const docs = Object.values(root.docs)
+    const [doc] = useDoc()
+
+    const title = doc ? (doc.isSaved ? doc.name : `${doc.name} (unsaved)`) : "Mamar"
+    useEffect(() => {
+        document.title = title
+
+        if (doc && !doc.isSaved) {
+            const onbeforeunload = (evt: BeforeUnloadEvent) => {
+                evt.preventDefault()
+                return evt.returnValue = "You have unsaved changes."
+            }
+            window.addEventListener("beforeunload", onbeforeunload)
+            return () => window.removeEventListener("beforeunload", onbeforeunload)
+        }
+    }, [title, doc])
 
     return <Flex direction="column" width="100vw" height="100%">
         {docs.length > 0 && <Flex height="size-450" UNSAFE_className="DocTabs_container">
             {docs.map(doc => <TabButton key={doc.id} doc={doc} />)}
         </Flex>}
         <ErrorBoundaryView flex UNSAFE_className="DocTabs_main_content">
-            <ActiveDoc />
+            {doc ? <ActiveDoc /> : <WelcomeScreen />}
         </ErrorBoundaryView>
     </Flex>
 }

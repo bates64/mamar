@@ -1,0 +1,14 @@
+{
+    "extends": "../mamar-web/tsconfig.json",
+    "include": [
+        "../mamar-web/src/app/lib.ts",
+        "../mamar-web/src/app/special-imports.d.ts"
+    ],
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "rootDir": "../mamar-web/src/app",
+        "outDir": "dist/types"
+    }
+}
