@@ -58,7 +58,7 @@ const {
                 return newState
             },
             undefined,
-            actions.map(action => !shouldActionCommitToHistory(action)).reduce((a, b) => a && b, false),
+            actions.every(action => !shouldActionCommitToHistory(action)),
         )
     }
     dispatch.undo = undo
