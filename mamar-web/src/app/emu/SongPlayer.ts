@@ -20,6 +20,11 @@ export interface SongPlayer {
     setTrackMute(track: number, mute: TrackMute): void
     /** Calls `listener` with the player's status every frame until disposed. */
     onStatus(listener: (status: PlayerStatus) => void): () => void
+    /**
+     * Calls `listener` when playback stops without a call to setPaused, such
+     * as when another player takes over the emulator.
+     */
+    onStop?(listener: () => void): () => void
 }
 
 export const SongPlayerContext = createContext<SongPlayer | null>(null)

@@ -43,6 +43,8 @@ export default function PlaybackControls() {
         player.setPaused(!isPlaying)
     }, [player, isPlaying])
 
+    useEffect(() => player.onStop?.(() => setIsPlaying(false)), [player])
+
     useEffect(() => {
         const onKeydown = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement
