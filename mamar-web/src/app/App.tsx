@@ -3,6 +3,7 @@ import { useEffect } from "react"
 
 import styles from "./App.module.scss"
 import { PlayheadContextProvider } from "./doc/Playhead"
+import MupenSongPlayerProvider from "./emu/MupenSongPlayer"
 import PlaybackControls from "./emu/PlaybackControls"
 import Header from "./header/Header"
 import Main from "./Main"
@@ -16,27 +17,29 @@ export function RomDataConsumer() {
     const romData = useRomData()
 
     return <MupenProvider romData={romData}>
-        <Grid
-            areas={[
-                "header",
-                "content",
-            ]}
-            columns={["1fr"]}
-            rows={["auto", "1fr"]}
-            height="100vh"
-        >
-            <PlayheadContextProvider>
-                <View gridArea="header">
-                    <Header />
-                </View>
-                <div className={styles.playbackControlsContainer}>
-                    <PlaybackControls />
-                </div>
-                <View gridArea="content">
-                    <Main />
-                </View>
-            </PlayheadContextProvider>
-        </Grid>
+        <MupenSongPlayerProvider>
+            <Grid
+                areas={[
+                    "header",
+                    "content",
+                ]}
+                columns={["1fr"]}
+                rows={["auto", "1fr"]}
+                height="100vh"
+            >
+                <PlayheadContextProvider>
+                    <View gridArea="header">
+                        <Header />
+                    </View>
+                    <div className={styles.playbackControlsContainer}>
+                        <PlaybackControls />
+                    </div>
+                    <View gridArea="content">
+                        <Main />
+                    </View>
+                </PlayheadContextProvider>
+            </Grid>
+        </MupenSongPlayerProvider>
     </MupenProvider>
 }
 

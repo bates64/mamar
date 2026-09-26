@@ -11,7 +11,7 @@ enum State {
     RELOADING,
 }
 
-type ViFn = (emu: EmulatorControls) => void
+export type ViFn = (emu: EmulatorControls) => void
 
 interface Context {
     emu: EmulatorControls
