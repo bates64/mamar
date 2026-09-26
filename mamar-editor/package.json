@@ -4,6 +4,7 @@
   "description": "Paper Mario music editor as a React component",
   "repository": "https://github.com/bates64/mamar",
   "author": "Alex Bates <alex@bates64.com>",
+  "license": "0BSD",
   "type": "module",
   "main": "./dist/mamar-editor.js",
   "types": "./dist/types/lib.d.ts",
@@ -18,7 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.json"
+    "build": "yarn --cwd ../mamar-web wasm:build && vite build && tsc -p tsconfig.json",
+    "prepublishOnly": "yarn build"
   },
   "peerDependencies": {
     "react": "^18.2.0",
