@@ -1,0 +1,35 @@
+name: Publish mamar-editor
+
+# Publishes mamar-editor to npm when a tag such as mamar-editor-v0.1.0 is pushed.
+# The tag must match the version in mamar-editor/package.json.
+
+on:
+  push:
+    tags:
+      - "mamar-editor-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v23
+
+      - name: Check the tag matches the package version
+        run: |
+          version=$(jq -r .version mamar-editor/package.json)
+          if [ "${GITHUB_REF_NAME}" != "mamar-editor-v${version}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} doesn't match mamar-editor's version ${version}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: nix develop --command yarn install --frozen-lockfile
+
+      - name: Publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > "$HOME/.npmrc"
+          cd mamar-editor
+          nix develop --command npm publish --access public
