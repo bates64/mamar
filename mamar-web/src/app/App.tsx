@@ -34,7 +34,7 @@ export function RomDataConsumer() {
                     <div className={styles.playbackControlsContainer}>
                         <PlaybackControls />
                     </div>
-                    <View gridArea="content">
+                    <View gridArea="content" UNSAFE_style={{ minHeight: 0 }}>
                         <Main />
                     </View>
                 </PlayheadContextProvider>

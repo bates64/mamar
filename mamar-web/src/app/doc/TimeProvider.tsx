@@ -52,7 +52,7 @@ export default function TimeProvider({ children }: { children: React.ReactNode }
             return ticks / rulerZoom
         },
     }}>
-        <div ref={container} style={{ "--ruler-zoom": 2 } as any}>
+        <div ref={container} style={{ "--ruler-zoom": 2, "height": "100%" } as any}>
             {children}
         </div>
     </TIME_CTX.Provider>
