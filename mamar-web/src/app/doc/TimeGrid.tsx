@@ -63,6 +63,7 @@ export default function TimeGrid({
 
         const gridStyle: React.CSSProperties = {
             display: "grid",
+            position: "relative", // for PlayheadLine
             gridTemplateColumns: segmentLengths
                 .map(length => `calc(${length}px / var(--ruler-zoom))`)
                 .join(" "),

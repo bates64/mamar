@@ -4,6 +4,7 @@ import type { Event } from "pm64-typegen"
 import { Track } from "pm64-typegen"
 import { useId, useDeferredValue, memo, startTransition } from "react"
 
+import { PlayheadLine } from "./Playhead"
 import styles from "./SegmentMap.module.scss"
 import TimeGrid from "./TimeGrid"
 
@@ -170,6 +171,7 @@ function Container() {
                         return <div key={id} />
                     }
                 })}
+                <PlayheadLine />
             </TimeGrid>}
         </div>
     )

@@ -17,6 +17,7 @@ export const MAMAR_SYMBOL_NAMES = [
     "MamarStartTick",
     "MamarSegment",
     "MamarTick",
+    "MamarPlayingRequest",
 ] as const
 
 export type MamarSymbols = Record<(typeof MAMAR_SYMBOL_NAMES)[number], number>
@@ -118,13 +119,17 @@ export default class DxMamar {
         return await readU32(this.memory, this.symbols.MamarTempo) / 100
     }
 
-    /** Where the song playing is, or null if none is. */
+    /** Where the song last played is, or null if it hasn't started. */
     async readPosition(): Promise<SongPosition | null> {
-        const [segment, tick] = await Promise.all([
+        const [segment, tick, playingRequest] = await Promise.all([
             readU32(this.memory, this.symbols.MamarSegment),
             readU32(this.memory, this.symbols.MamarTick),
+            readU32(this.memory, this.symbols.MamarPlayingRequest),
         ])
-        return segment === 0xFFFFFFFF ? null : { segment, tick }
+        if (playingRequest !== this.request || segment === 0xFFFFFFFF) {
+            return null
+        }
+        return { segment, tick }
     }
 }
 

@@ -1,15 +1,10 @@
+$color: color-mix(in srgb, var(--spectrum-global-color-gray-900) 50%, transparent);
+
 .container {
     position: relative;
 }
 
-.head {
-    position: absolute;
-    bottom: 0;
-    z-index: 1;
-
-    /* Downward triangle */
-    $size: 21px;
-    $color: color-mix(in srgb, var(--spectrum-global-color-gray-900) 50%, transparent);
+@mixin triangle($size, $color) {
     width: 0;
     height: 0;
     border-left: calc($size / 2) solid transparent;
@@ -17,35 +12,43 @@
     border-top: calc($size * 0.8) solid $color;
 
     transform: translateX(calc($size * -0.5));
+}
+
+.head {
+    position: absolute;
+    bottom: 0;
+    z-index: 1;
+
+    @include triangle(21px, $color);
 
     cursor: grab;
     will-change: left;
-
-    &::after {
-        content: "";
-        position: fixed;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 1px;
-        height: 100vh;
-        background: $color;
-        pointer-events: none;
-    }
-}
-
-/* Smooths the playhead between the game's reports of where the song is. */
-.following {
-    transition: left 50ms linear;
 }
 
 /* Where the playhead returns when playback stops. */
 .startMarker {
     position: absolute;
     bottom: 0;
-    width: 2px;
-    height: 8px;
-    transform: translateX(-50%);
-    background: color-mix(in srgb, var(--spectrum-global-color-gray-900) 50%, transparent);
+
+    @include triangle(13px, color-mix(in srgb, var(--spectrum-global-color-gray-900) 25%, transparent));
+
     pointer-events: none;
+}
+
+.line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+
+    width: 1px;
+    background: var(--playhead-line-color, $color);
+
+    pointer-events: none;
+    will-change: left;
+}
+
+/* Smooths the playhead between the game's reports of where the song is. */
+.gliding {
+    transition: left 50ms linear;
 }

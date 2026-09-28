@@ -4,7 +4,6 @@ import { useSegmentLengths } from "./Ruler"
 
 export interface Time {
     xToTicks(clientX: number): number
-    ticksToXOffset(ticks: number): number
 }
 
 const TIME_CTX = createContext<Time | null>(null)
@@ -15,9 +14,6 @@ export function useTime(): Time {
     if (!time) {
         return {
             xToTicks(_: number): number {
-                throw new Error("TimeProvider missing in tree")
-            },
-            ticksToXOffset(_: number): number {
                 throw new Error("TimeProvider missing in tree")
             },
         }
@@ -43,13 +39,6 @@ export default function TimeProvider({ children }: { children: React.ReactNode }
             if (ticks < 0) return 0
             if (ticks > totalLength) return totalLength
             return ticks
-        },
-
-        ticksToXOffset(ticks: number): number {
-            if (!container.current) return NaN
-            const style = getComputedStyle(container.current)
-            const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
-            return ticks / rulerZoom
         },
     }}>
         <div ref={container} style={{ "--ruler-zoom": 2, "height": "100%" } as any}>

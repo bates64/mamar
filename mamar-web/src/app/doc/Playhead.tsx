@@ -36,9 +36,73 @@ export function PlayheadContextProvider({ children }: { children: React.ReactNod
 
     return (
         <CONTEXT.Provider value={{ start, setStart, playing, play, stop }}>
-            {children}
+            <DisplayProvider start={start} playing={playing}>
+                {children}
+            </DisplayProvider>
         </CONTEXT.Provider>
     )
+}
+
+interface Display {
+    /** Ticks along the timeline the playhead is at. */
+    ticks: number
+    /** Whether the playhead follows the song playing, rather than showing where playback starts. */
+    isFollowingSong: boolean
+    /** Whether the playhead moved forward a little since it last drew, so it glides there rather than jumping. */
+    isGliding: boolean
+    /** Shows the playhead at `ticks` while it's dragged, or where it would be otherwise if null. */
+    setDragPosition: (ticks: number | null) => void
+}
+
+// Separate from CONTEXT so that only the playhead redraws as the song plays.
+const DISPLAY_CONTEXT = createContext<Display | null>(null)
+
+/** The furthest the playhead glides, in ticks. Further moves, such as seeks, jump. */
+const MAX_GLIDE_TICKS = 48
+
+function DisplayProvider({ start, playing, children }: {
+    start: number
+    playing: Context["playing"]
+    children: React.ReactNode
+}) {
+    const timeline = useTimeline()
+    const [dragPosition, setDragPosition] = useState<number | null>(null)
+    // Tagged with what was playing when the player reported it, so a position from before playback started is ignored.
+    const [song, setSong] = useState<{ playing: Context["playing"], position: SongPosition | null } | null>(null)
+    const latestPlaying = useRef(playing)
+
+    useEffect(() => {
+        latestPlaying.current = playing
+    }, [playing])
+
+    useSongPlayer(useCallback(({ position }: PlayerStatus) => {
+        if (latestPlaying.current) {
+            setSong({ playing: latestPlaying.current, position: position ?? null })
+        }
+    }, []))
+
+    let ticks = start
+    let isFollowingSong = false
+    if (dragPosition !== null) {
+        ticks = dragPosition
+    } else if (playing) {
+        isFollowingSong = true
+        ticks = song?.playing === playing && song.position ? timeline.toTicks(song.position) : playing.from
+    }
+
+    const lastTicks = useRef(ticks)
+    useEffect(() => {
+        lastTicks.current = ticks
+    }, [ticks])
+    const isGliding = isFollowingSong && ticks >= lastTicks.current && ticks - lastTicks.current <= MAX_GLIDE_TICKS
+
+    return <DISPLAY_CONTEXT.Provider value={{ ticks, isFollowingSong, isGliding, setDragPosition }}>
+        {children}
+    </DISPLAY_CONTEXT.Provider>
+}
+
+function ticksToLeft(ticks: number): string {
+    return `calc(${ticks}px / var(--ruler-zoom))`
 }
 
 /**
@@ -74,41 +138,33 @@ function snapToBeat(ticks: number): number {
 }
 
 export default function Playhead() {
-    const { xToTicks, ticksToXOffset } = useTime()
-    const [dragPosition, setDragPosition] = useState(0)
-    const [songPosition, setSongPosition] = useState<SongPosition | null>(null)
+    const { xToTicks } = useTime()
     const context = useContext(CONTEXT)!
-    const timeline = useTimeline()
-    const dragging = useRef(false)
+    const display = useContext(DISPLAY_CONTEXT)!
+    const dragPosition = useRef<number | null>(null)
 
     const [doc] = useDoc()
 
-    useSongPlayer(useCallback(({ position }: PlayerStatus) => {
-        setSongPosition(position ?? null)
-    }, []))
-
-    // Forget where the last song got to, so the playhead doesn't show it until the new one reports.
-    useEffect(() => {
-        setSongPosition(null)
-    }, [context.playing])
-
     useEffect(() => {
         function onMouseMove(e: MouseEvent) {
-            if (!dragging.current) return
+            if (dragPosition.current === null) return
             let ticks = xToTicks(e.clientX)
             if (!e.shiftKey) {
                 ticks = snapToBeat(ticks)
             }
-            setDragPosition(ticks)
+            dragPosition.current = ticks
+            display.setDragPosition(ticks)
         }
 
         function onMouseUp() {
-            if (!dragging.current) return
-            dragging.current = false
+            const ticks = dragPosition.current
+            if (ticks === null) return
+            dragPosition.current = null
             document.body.style.cursor = ""
-            context.setStart(dragPosition)
+            display.setDragPosition(null)
+            context.setStart(ticks)
             if (context.playing) {
-                context.play(dragPosition)
+                context.play(ticks)
             }
         }
 
@@ -118,31 +174,24 @@ export default function Playhead() {
             window.removeEventListener("mousemove", onMouseMove)
             window.removeEventListener("mouseup", onMouseUp)
         }
-    }, [xToTicks, dragPosition, context])
+    }, [xToTicks, display, context])
 
     if (!doc) return null
-
-    let ticks = context.start
-    if (dragging.current) {
-        ticks = dragPosition
-    } else if (context.playing) {
-        ticks = songPosition ? timeline.toTicks(songPosition) : context.playing.from
-    }
-    const isFollowingSong = context.playing && !dragging.current
 
     return <div
         className={styles.container}
     >
-        {isFollowingSong && <div
+        {display.isFollowingSong && <div
             className={styles.startMarker}
-            style={{ left: ticksToXOffset(context.start) + "px" }}
+            style={{ left: ticksToLeft(context.start) }}
+            title="Where playback starts"
         />}
         <div
-            className={classNames(styles.head, { [styles.following]: isFollowingSong })}
-            style={{ left: ticksToXOffset(ticks) + "px" }}
+            className={classNames(styles.head, { [styles.gliding]: display.isGliding })}
+            style={{ left: ticksToLeft(display.ticks) }}
             onMouseDown={e => {
-                dragging.current = true
-                setDragPosition(ticks)
+                dragPosition.current = display.ticks
+                display.setDragPosition(display.ticks)
                 document.body.style.cursor = "grab"
                 e.stopPropagation()
             }}
@@ -151,4 +200,16 @@ export default function Playhead() {
 
         </div>
     </div>
+}
+
+/** A line down a TimeGrid where the playhead is. */
+export function PlayheadLine() {
+    const display = useContext(DISPLAY_CONTEXT)
+
+    if (!display) return null
+
+    return <div
+        className={classNames(styles.line, { [styles.gliding]: display.isGliding })}
+        style={{ left: ticksToLeft(display.ticks) }}
+    />
 }

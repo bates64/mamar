@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
 import PianoRoll from "./PianoRoll"
+import { PlayheadLine } from "./Playhead"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
@@ -60,10 +61,15 @@ export default function SubsegDetails({ trackListId, trackIndex, segmentIndex }:
                 </View>
             </Form>
         </View>
-        {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{ backgroundColor: "var(--spectrum-gray-75)" }}>
+        {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
+            "backgroundColor": "var(--spectrum-gray-75)",
+            // The piano roll is dark whatever the theme.
+            "--playhead-line-color": "rgb(255 255 255 / 50%)",
+        } as React.CSSProperties}>
             <div style={{ gridColumn: segmentIndex + 1, overflowY: "auto" }}>
                 <PianoRoll trackListId={trackListId} trackIndex={trackIndex} />
             </div>
+            <PlayheadLine />
         </TimeGrid>}
     </Grid>
 }
