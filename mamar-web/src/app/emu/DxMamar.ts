@@ -1,4 +1,4 @@
-import { TrackMute } from "./SongPlayer"
+import { SongPosition, TrackMute } from "./SongPlayer"
 
 /** The globals papermario-dx reads and writes to play Mamar's song (see its src/dx/mamar.h). */
 export const MAMAR_SYMBOL_NAMES = [
@@ -13,6 +13,10 @@ export const MAMAR_SYMBOL_NAMES = [
     "MamarAmbience",
     "MamarTrackMute",
     "MamarTempo",
+    "MamarStartSegment",
+    "MamarStartTick",
+    "MamarSegment",
+    "MamarTick",
 ] as const
 
 export type MamarSymbols = Record<(typeof MAMAR_SYMBOL_NAMES)[number], number>
@@ -76,8 +80,11 @@ export default class DxMamar {
         return new DxMamar(memory, symbols, bgmAddress)
     }
 
-    /** Plays an encoded BGM from its start, loading the auxiliary banks of the song with ID `bankSong` (-1 for none). */
-    play(bgm: Uint8Array, variation: number, bankSong: number) {
+    /**
+     * Plays an encoded BGM from `start`, loading the auxiliary banks of the song with ID `bankSong` (-1 for none). The
+     * game plays the song silently up to `start`, without repeating loops.
+     */
+    play(bgm: Uint8Array, variation: number, bankSong: number, start: SongPosition = { segment: 0, tick: 0 }) {
         if (bgm.length > MAX_BGM_SIZE) {
             throw new Error(`The song is too large to play: ${bgm.length} bytes, but the game holds ${MAX_BGM_SIZE}`)
         }
@@ -85,6 +92,8 @@ export default class DxMamar {
         writeU32(this.memory, this.symbols.MamarBGMSize, bgm.length)
         writeU32(this.memory, this.symbols.MamarVariation, variation)
         writeU32(this.memory, this.symbols.MamarBankSong, bankSong)
+        writeU32(this.memory, this.symbols.MamarStartSegment, start.segment)
+        writeU32(this.memory, this.symbols.MamarStartTick, start.tick)
         this.request++
         writeU32(this.memory, this.symbols.MamarRequest, this.request)
     }
@@ -107,6 +116,15 @@ export default class DxMamar {
     /** Beats per minute of the song playing. */
     async readTempo(): Promise<number> {
         return await readU32(this.memory, this.symbols.MamarTempo) / 100
+    }
+
+    /** Where the song playing is, or null if none is. */
+    async readPosition(): Promise<SongPosition | null> {
+        const [segment, tick] = await Promise.all([
+            readU32(this.memory, this.symbols.MamarSegment),
+            readU32(this.memory, this.symbols.MamarTick),
+        ])
+        return segment === 0xFFFFFFFF ? null : { segment, tick }
     }
 }
 

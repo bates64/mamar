@@ -33,3 +33,19 @@
         pointer-events: none;
     }
 }
+
+/* Smooths the playhead between the game's reports of where the song is. */
+.following {
+    transition: left 50ms linear;
+}
+
+/* Where the playhead returns when playback stops. */
+.startMarker {
+    position: absolute;
+    bottom: 0;
+    width: 2px;
+    height: 8px;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--spectrum-global-color-gray-900) 50%, transparent);
+    pointer-events: none;
+}

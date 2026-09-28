@@ -3,9 +3,19 @@ import { createContext, useContext, useEffect } from "react"
 /** Whether a track plays: `solo` silences every track that isn't soloed. */
 export type TrackMute = "none" | "mute" | "solo"
 
+/** A point in a song's variation. */
+export interface SongPosition {
+    /** Index of a segment in the variation. */
+    segment: number
+    /** Ticks into that segment. */
+    tick: number
+}
+
 export interface PlayerStatus {
     /** Beats per minute. */
     tempo: number
+    /** Where the song playing is, or null if none is. Players that can't tell leave it out. */
+    position?: SongPosition | null
 }
 
 /**
@@ -13,8 +23,11 @@ export interface PlayerStatus {
  * soon as it can, which might be after it returns.
  */
 export interface SongPlayer {
-    /** Plays an encoded BGM from its start, replacing whatever is playing. */
-    load(bgm: Uint8Array, variation: number): void | Promise<void>
+    /**
+     * Plays an encoded BGM from `start`, or from its start if not given, replacing whatever is playing. Players that
+     * can't seek play from the start.
+     */
+    load(bgm: Uint8Array, variation: number, start?: SongPosition): void | Promise<void>
     setPaused(paused: boolean): void | Promise<void>
     setAmbientSound(sound: number): void
     setTrackMute(track: number, mute: TrackMute): void

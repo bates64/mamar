@@ -31,7 +31,7 @@ export interface BgmEditorProps {
 }
 
 /**
- * Edits one song. Space plays and pauses it while focus is inside the editor.
+ * Edits one song. Space plays and stops it while focus is inside the editor, and Shift+Space continues from where it stopped.
  */
 const BgmEditor = forwardRef<BgmEditorHandle, BgmEditorProps>(function BgmEditor(props, ref) {
     const [isBridgeLoaded, setIsBridgeLoaded] = useState(false)
@@ -73,7 +73,7 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
             if (!doc) {
                 throw new Error("No song is open")
             }
-            const bgmBin: Uint8Array | string = Bridge.bgm_encode(doc.bgm, 0, 0)
+            const bgmBin: Uint8Array | string = Bridge.bgm_encode(doc.bgm)
             if (typeof bgmBin === "string") {
                 throw new Error(bgmBin)
             }

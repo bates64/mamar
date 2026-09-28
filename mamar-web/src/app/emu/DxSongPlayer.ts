@@ -1,7 +1,7 @@
 import DxMamar from "./DxMamar"
-import { PlayerStatus, SongPlayer, TrackMute } from "./SongPlayer"
+import { PlayerStatus, SongPlayer, SongPosition, TrackMute } from "./SongPlayer"
 
-const STATUS_POLL_MS = 100
+const STATUS_POLL_MS = 50
 
 /** AMBIENT_SILENCE */
 const DEFAULT_AMBIENT_SOUND = 6
@@ -9,7 +9,7 @@ const DEFAULT_AMBIENT_SOUND = 6
 /** Plays songs in a papermario-dx ROM once it's connected, holding whatever's asked of it until then. */
 export default class DxSongPlayer implements SongPlayer {
     private mamar?: DxMamar
-    private song?: { bgm: Uint8Array, variation: number }
+    private song?: { bgm: Uint8Array, variation: number, start?: SongPosition }
     private paused = true
     private ambientSound = DEFAULT_AMBIENT_SOUND
     private readonly trackMutes: TrackMute[] = new Array(16).fill("none")
@@ -26,8 +26,8 @@ export default class DxSongPlayer implements SongPlayer {
         )
     }
 
-    load(bgm: Uint8Array, variation: number) {
-        this.song = { bgm, variation }
+    load(bgm: Uint8Array, variation: number, start?: SongPosition) {
+        this.song = { bgm, variation, start }
         this.apply(true)
     }
 
@@ -67,7 +67,7 @@ export default class DxSongPlayer implements SongPlayer {
         mamar.setAmbientSound(this.ambientSound)
         mamar.setTrackMutes(this.trackMutes)
         if (song && this.song) {
-            mamar.play(this.song.bgm, this.song.variation, this.bankSong)
+            mamar.play(this.song.bgm, this.song.variation, this.bankSong, this.song.start)
         }
     }
 
@@ -75,9 +75,9 @@ export default class DxSongPlayer implements SongPlayer {
         if (!this.mamar) {
             return
         }
-        const tempo = await this.mamar.readTempo()
+        const [tempo, position] = await Promise.all([this.mamar.readTempo(), this.mamar.readPosition()])
         for (const listener of this.listeners) {
-            listener({ tempo })
+            listener({ tempo, position })
         }
     }
 }
