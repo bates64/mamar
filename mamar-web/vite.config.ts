@@ -36,7 +36,7 @@ export default defineConfig({
         },
     },
     server: {
-        // papermario-dx's CI publishes the patch and symbols the app plays songs with here. vercel.json does the same
+        // papermario-dx's CI publishes the patch and symbols the app plays songs with here. ../vercel.json does the same
         // in production, so the app fetches them from its own origin.
         proxy: {
             "/dx": {
