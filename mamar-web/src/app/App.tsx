@@ -8,16 +8,17 @@ import PlaybackControls from "./emu/PlaybackControls"
 import Header from "./header/Header"
 import Main from "./Main"
 import { RootProvider } from "./store/dispatch"
+import useDxRom, { DxRomProvider } from "./util/hooks/useDxRom"
 import { MupenProvider } from "./util/hooks/useMupen"
-import useRomData, { RomDataProvider } from "./util/hooks/useRomData"
+import { RomDataProvider } from "./util/hooks/useRomData"
 
 import { version } from "../../package.json"
 
-export function RomDataConsumer() {
-    const romData = useRomData()
+function DxRomConsumer() {
+    const { rom, symbols } = useDxRom()
 
-    return <MupenProvider romData={romData}>
-        <MupenSongPlayerProvider>
+    return <MupenProvider romData={rom}>
+        <MupenSongPlayerProvider symbols={symbols}>
             <Grid
                 areas={[
                     "header",
@@ -86,7 +87,9 @@ export default function App() {
         <SpectrumProvider theme={defaultTheme}>
             <View UNSAFE_className="App">
                 <RomDataProvider>
-                    <RomDataConsumer />
+                    <DxRomProvider>
+                        <DxRomConsumer />
+                    </DxRomProvider>
                 </RomDataProvider>
             </View>
         </SpectrumProvider>

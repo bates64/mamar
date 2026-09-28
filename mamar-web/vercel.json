@@ -1,5 +1,11 @@
 {
     "github": {
         "silent": true
-    }
+    },
+    "rewrites": [
+        {
+            "source": "/dx/:path*",
+            "destination": "https://fsn1.your-objectstorage.com/starhaven/mamar/:path*"
+        }
+    ]
 }

@@ -4,8 +4,7 @@
     "mamar-web",
     "mamar-editor",
     "mamar-wasm-bridge/pkg",
-    "pm64-typegen",
-    "patches"
+    "pm64-typegen"
   ],
   "scripts": {
     "start": "yarn workspace mamar-web dev",
