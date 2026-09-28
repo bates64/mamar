@@ -2,13 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="37 37 26 26">
 <style>
     svg {
-        color: #fff;
-    }
-
-    @media (prefers-color-scheme: light) {
-        svg {
-            color: #000;
-        }
+        color: #cdd6f4;
     }
 </style>
 <g transform="rotate(0 50 50)">

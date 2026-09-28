@@ -1,0 +1,34 @@
+// Spectrum's grays as Catppuccin Mocha's neutrals (https://catppuccin.com/palette). Its
+// other colors stay Spectrum's own.
+$crust: #11111b;
+$mantle: #181825;
+$base: #1e1e2e;
+$surface0: #313244;
+$surface1: #45475a;
+$surface2: #585b70;
+$overlay1: #7f849c;
+$overlay2: #9399b2;
+$subtext0: #a6adc8;
+$subtext1: #bac2de;
+$text: #cdd6f4;
+
+$grays: (
+    50: $crust,
+    75: $mantle,
+    100: $base,
+    200: $surface0,
+    300: $surface1,
+    400: $surface2,
+    500: $overlay1,
+    600: $overlay2,
+    700: $subtext0,
+    800: $subtext1,
+    900: $text,
+);
+
+// Doubled to outrank Spectrum's own dark theme class, which sets the same variables.
+.mocha.mocha {
+    @each $step, $color in $grays {
+        --spectrum-gray-#{$step}: #{$color};
+    }
+}

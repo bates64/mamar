@@ -66,17 +66,17 @@ impl PianoRoll {
         ctx.set_transform(self.dpr, 0.0, 0.0, self.dpr, 0.0, 0.0)?;
 
         // clear
-        ctx.set_fill_style_str("#0e0e0e"); // gray-75
+        ctx.set_fill_style_str("#181825"); // gray-75, Catppuccin Mocha mantle
         ctx.fill_rect(0.0, 0.0, self.vw, self.vh);
 
         // horizontal note stripes
-        ctx.set_fill_style_str("#000000"); // gray-50
+        ctx.set_fill_style_str("#11111b"); // gray-50, Catppuccin Mocha crust
         for y in (0..self.vh as i32).step_by(self.note_height() as usize * 2) {
             ctx.fill_rect(0.0, y as f64, self.vw, self.note_height());
         }
 
         // beat lines
-        ctx.set_stroke_style_str("#1d1d1d"); // gray-100
+        ctx.set_stroke_style_str("#1e1e2e"); // gray-100, Catppuccin Mocha base
         self.draw_lines(
             ctx,
             self.time_to_x(self.scroll_ticks),
@@ -85,7 +85,7 @@ impl PianoRoll {
         );
 
         // bar lines
-        ctx.set_stroke_style_str("#303030"); // gray-200
+        ctx.set_stroke_style_str("#313244"); // gray-200, Catppuccin Mocha surface0
         ctx.set_line_width(2.0);
         self.draw_lines(
             ctx,

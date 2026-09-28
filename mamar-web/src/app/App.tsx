@@ -1,4 +1,4 @@
-import { Provider as SpectrumProvider, defaultTheme, Grid, View } from "@adobe/react-spectrum"
+import { Provider as SpectrumProvider, Grid, View } from "@adobe/react-spectrum"
 import { useEffect } from "react"
 
 import styles from "./App.module.scss"
@@ -8,6 +8,7 @@ import PlaybackControls from "./emu/PlaybackControls"
 import Header from "./header/Header"
 import Main from "./Main"
 import { RootProvider } from "./store/dispatch"
+import { mochaTheme } from "./theme"
 import useDxRom, { DxRomProvider } from "./util/hooks/useDxRom"
 import { MupenProvider } from "./util/hooks/useMupen"
 import { RomDataProvider } from "./util/hooks/useRomData"
@@ -50,19 +51,6 @@ export default function App() {
     }, [])
 
     useEffect(() => {
-        const query = () => window.matchMedia("(prefers-color-scheme: light)")
-        const update = () => {
-            document.querySelector("meta[name=theme-color]")!.setAttribute("content", query().matches ? "#ffffff" : "#111111")
-        }
-
-        update()
-
-        const q = query()
-        q.addEventListener("change", update)
-        return () => q.removeEventListener("change", update)
-    }, [])
-
-    useEffect(() => {
         if ("windowControlsOverlay" in navigator) {
             const { windowControlsOverlay } = navigator as any
 
@@ -84,7 +72,7 @@ export default function App() {
     }, [])
 
     return <RootProvider>
-        <SpectrumProvider theme={defaultTheme}>
+        <SpectrumProvider theme={mochaTheme} colorScheme="dark">
             <View UNSAFE_className="App">
                 <RomDataProvider>
                     <DxRomProvider>

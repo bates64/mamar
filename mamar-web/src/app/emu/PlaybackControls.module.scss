@@ -9,9 +9,10 @@
 
 .actions {
     border-radius: 6px;
+    background: var(--spectrum-global-color-gray-200);
 
     &:hover {
-        background: var(--spectrum-global-color-gray-100);
+        background: var(--spectrum-global-color-gray-300);
     }
 
     button {
@@ -31,7 +32,7 @@
         }
 
         &:active {
-            background: var(--spectrum-global-color-gray-200) !important;
+            background: var(--spectrum-global-color-gray-400) !important;
         }
 
         &.play {

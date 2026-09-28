@@ -1,4 +1,4 @@
-import { Provider as SpectrumProvider, defaultTheme } from "@adobe/react-spectrum"
+import { Provider as SpectrumProvider } from "@adobe/react-spectrum"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 
 import styles from "./BgmEditor.module.scss"
@@ -11,6 +11,7 @@ import ErrorBoundaryView from "./ErrorBoundaryView"
 import { useRoot } from "./store"
 import { RootProvider } from "./store/dispatch"
 import { openData } from "./store/root"
+import { mochaTheme } from "./theme"
 
 import "./colors.scss"
 
@@ -27,7 +28,6 @@ export interface BgmEditorProps {
     player: SongPlayer
     /** Called when the song gains or loses unsaved changes. */
     onDirtyChange?: (dirty: boolean) => void
-    colorScheme?: "light" | "dark"
 }
 
 /**
@@ -40,7 +40,7 @@ const BgmEditor = forwardRef<BgmEditorHandle, BgmEditorProps>(function BgmEditor
         ensureBridge().then(() => setIsBridgeLoaded(true))
     }, [])
 
-    return <SpectrumProvider theme={defaultTheme} colorScheme={props.colorScheme} UNSAFE_className={styles.editor}>
+    return <SpectrumProvider theme={mochaTheme} colorScheme="dark" UNSAFE_className={styles.editor}>
         {isBridgeLoaded && <RootProvider>
             <SongPlayerContext.Provider value={props.player}>
                 <PlayheadContextProvider>
