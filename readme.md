@@ -81,6 +81,17 @@ Then run:
 1. `yarn install`
 2. `yarn start`
 
+Working on `papermario-dx`
+--------------------------
+
+Mamar plays songs in a [papermario-dx](https://github.com/bates64/papermario-dx) build, which it downloads from dx's CI. To play songs in your own clone of dx instead, set `DX_DIR` to it, relative to this repository:
+
+```sh
+DX_DIR=../papermario-dx yarn start
+```
+
+Each time you load the app, it builds the clone with `nix develop --command ninja`, so reloading picks up your changes to dx.
+
 Working on `mupen64plus-web`
 ----------------------------
 
