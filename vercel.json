@@ -2,7 +2,7 @@
     "github": {
         "silent": true
     },
-    "installCommand": "(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y) && . \"${CARGO_HOME:-$HOME/.cargo}/env\" && (curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh -s -- -y) && yarn install --production=false",
+    "installCommand": "(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y) && . \"${CARGO_HOME:-$HOME/.cargo}/env\" && rustup target add wasm32-unknown-unknown && (curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh -s -- -y) && yarn install --production=false",
     "buildCommand": ". \"${CARGO_HOME:-$HOME/.cargo}/env\" && yarn workspace mamar-web build",
     "outputDirectory": "mamar-web/dist",
     "rewrites": [

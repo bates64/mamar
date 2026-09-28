@@ -18,6 +18,9 @@ let wasmBuilding = false
 let wasmQueued = false
 
 let typegenBuilding = false
+
+// In build mode, exit with an error if either build failed.
+let buildFailed = false
 let typegenQueued = false
 
 const runWasmBuild = (reason = "change") => {
@@ -41,6 +44,7 @@ const runWasmBuild = (reason = "change") => {
             runWasmBuild("queued")
         } else if (code !== 0) {
             console.error(`[wasm-pack] build failed (exit ${code}) after ${reason}`)
+            buildFailed = true
         }
     })
 }
@@ -64,6 +68,7 @@ const runTypegenBuild = (reason = "change") => {
             runTypegenBuild("queued")
         } else if (code !== 0) {
             console.error(`[pm64-typegen] build failed (exit ${code}) after ${reason}`)
+            buildFailed = true
         }
     })
 }
@@ -87,7 +92,7 @@ if (mode !== "build") {
     const maybeExit = setInterval(() => {
         if (!wasmBuilding && !wasmQueued && !typegenBuilding && !typegenQueued) {
             clearInterval(maybeExit)
-            process.exit(0)
+            process.exit(buildFailed ? 1 : 0)
         }
     }, 200)
 }
