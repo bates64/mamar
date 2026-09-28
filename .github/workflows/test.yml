@@ -35,6 +35,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+          target: wasm32-unknown-unknown
           components: clippy, rustfmt
           override: true
       - uses: actions-rs/cargo@v1
@@ -42,7 +43,8 @@ jobs:
           command: check
       - uses: jetli/wasm-pack-action@v0.3.0
       - run: yarn install
-      - run: yarn workspace pm64-typegen build
+      # Builds mamar-wasm-bridge and pm64-typegen, which mamar-web type-checks against.
+      - run: yarn workspace mamar-web wasm:build
       - run: yarn run lint
       - uses: actions-rs/clippy-check@v1
         with:
