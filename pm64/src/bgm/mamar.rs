@@ -12,17 +12,23 @@ pub const MAGIC_MAX_LEN: usize = 8;
 pub struct Metadata {
     /// Maps track list pos to vec of track names, excluding the master track.
     track_names: HashMap<u16, Vec<String>>,
+
+    beats_per_bar: Option<u8>,
 }
 
 impl Metadata {
     pub fn has_data(&self) -> bool {
         // Look for any non-empty track name
-        self.track_names
-            .values()
-            .any(|names| names.iter().any(|name| !name.is_empty()))
+        self.beats_per_bar.is_some()
+            || self
+                .track_names
+                .values()
+                .any(|names| names.iter().any(|name| !name.is_empty()))
     }
 
     pub fn apply_to_bgm(&self, bgm: &mut super::Bgm) {
+        bgm.beats_per_bar = self.beats_per_bar;
+
         for (id, track_list) in &mut bgm.track_lists {
             let Some(names) = self.track_names.get(&(*id as u16)) else {
                 debug!("no names for {id:X}");
@@ -33,6 +39,10 @@ impl Metadata {
                 track.name = name.clone();
             }
         }
+    }
+
+    pub fn set_beats_per_bar(&mut self, beats_per_bar: Option<u8>) {
+        self.beats_per_bar = beats_per_bar;
     }
 
     pub fn add_track_name(&mut self, tracks_pos: u16, name: String) {
@@ -83,5 +93,25 @@ mod test {
         for (_, track_list) in bgm2.track_lists {
             assert_eq!(track_list.tracks[1].name, "My Cool Track");
         }
+    }
+
+    #[test]
+    fn encode_decode_metadata_preserves_beats_per_bar() {
+        let mut bgm = Bgm::new();
+        bgm.beats_per_bar = Some(3);
+
+        let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
+        assert_eq!(bgm2.beats_per_bar, Some(3));
+    }
+
+    #[test]
+    fn decode_metadata_without_beats_per_bar() {
+        let mut metadata = Metadata::default();
+        metadata.add_track_name(0x1234, "My Cool Track".to_string());
+        let data = rmp_serde::to_vec(&(metadata.track_names.clone(),)).unwrap();
+
+        let decoded: Metadata = rmp_serde::from_slice(&data).unwrap();
+        assert_eq!(decoded.track_names, metadata.track_names);
+        assert_eq!(decoded.beats_per_bar, None);
     }
 }

@@ -4,6 +4,7 @@ import { Bgm } from "pm64-typegen"
 import { Doc, DocAction, docReducer } from "./doc"
 
 import Bridge from "../bridge"
+import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
 
 function generateId() {
     return Math.random().toString(36).substring(2, 15)
@@ -92,6 +93,7 @@ export async function openFile(file: FileWithHandle): Promise<RootAction> {
     if (typeof bgm === "string") {
         throw new Error(bgm)
     }
+    bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
 
     return {
         type: "open_doc",
@@ -106,6 +108,7 @@ export function openData(data: Uint8Array, name?: string, isSaved?: boolean): Ro
     if (typeof bgm === "string") {
         throw new Error(bgm)
     }
+    bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
 
     return {
         type: "open_doc",

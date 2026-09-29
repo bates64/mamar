@@ -2,7 +2,7 @@ import classNames from "classnames"
 import { useEffect, useRef, useState, useContext, createContext, useCallback } from "react"
 
 import styles from "./Playhead.module.scss"
-import { TICKS_PER_BEAT, usePickup, useSegmentLengths } from "./Ruler"
+import { TICKS_PER_BEAT, usePickup, useSegmentLengths, useTicksPerBar } from "./Ruler"
 import { useTime } from "./TimeProvider"
 
 import useSongPlayer, { PlayerStatus, SongPosition } from "../emu/SongPlayer"
@@ -133,6 +133,9 @@ export function useTimeline() {
     }
 }
 
+/** How close the playhead gets to either edge of the timeline, as a fraction of its width, before it scrolls. */
+const FOLLOW_MARGIN = 0.1
+
 /** Rounds to the nearest beat, counting beats from bar 1. */
 function snapToBeat(ticks: number, pickup: number): number {
     return Math.max(0, pickup + Math.round((ticks - pickup) / TICKS_PER_BEAT) * TICKS_PER_BEAT)
@@ -144,8 +147,24 @@ export default function Playhead() {
     const context = useContext(CONTEXT)!
     const display = useContext(DISPLAY_CONTEXT)!
     const dragPosition = useRef<number | null>(null)
+    const head = useRef<HTMLDivElement | null>(null)
 
     const [doc] = useDoc()
+
+    // Scrolls the timeline to keep the playhead in view while it follows the song. Other TimeGrids scroll with it.
+    useEffect(() => {
+        const scroller = head.current?.closest<HTMLElement>("[data-time-grid]")
+        if (!display.isFollowingSong || !scroller) return
+
+        const zoom = parseFloat(getComputedStyle(scroller).getPropertyValue("--ruler-zoom"))
+        const x = display.ticks / zoom
+        const margin = scroller.clientWidth * FOLLOW_MARGIN
+        if (x > scroller.scrollLeft + scroller.clientWidth - margin) {
+            scroller.scrollLeft = x - scroller.clientWidth + margin
+        } else if (x < scroller.scrollLeft + margin) {
+            scroller.scrollLeft = x - margin
+        }
+    }, [display.isFollowingSong, display.ticks])
 
     useEffect(() => {
         function onMouseMove(e: MouseEvent) {
@@ -189,6 +208,7 @@ export default function Playhead() {
             title="Where playback starts"
         />}
         <div
+            ref={head}
             className={classNames(styles.head, { [styles.gliding]: display.isGliding })}
             style={{ left: ticksToLeft(display.ticks) }}
             onMouseDown={e => {
@@ -215,4 +235,18 @@ export function PlayheadLine() {
         className={classNames(styles.line, { [styles.gliding]: display.isGliding })}
         style={{ left: ticksToLeft(display.ticks) }}
     />
+}
+
+/** Where the playhead is, as bar and beat, counting the pickup as bar 0. */
+export function PlayheadPosition() {
+    const display = useContext(DISPLAY_CONTEXT)
+    const pickup = usePickup()
+    const ticksPerBar = useTicksPerBar()
+
+    if (!display) return null
+
+    const ticks = display.ticks - pickup
+    const bar = Math.floor(ticks / ticksPerBar)
+    const beat = Math.floor((ticks - bar * ticksPerBar) / TICKS_PER_BEAT)
+    return <>{bar + 1}.{beat + 1}</>
 }

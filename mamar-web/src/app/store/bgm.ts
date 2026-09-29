@@ -48,6 +48,9 @@ export type BgmAction = {
     type: "split_variation"
     variation: number
     time: number
+} | {
+    type: "set_beats_per_bar"
+    beatsPerBar: number
 }
 
 export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
@@ -114,6 +117,8 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         })
     case "split_variation":
         return Bridge.bgm_split_variation_at(bgm, action.variation, action.time)
+    case "set_beats_per_bar":
+        return { ...bgm, beats_per_bar: action.beatsPerBar }
     }
 }
 

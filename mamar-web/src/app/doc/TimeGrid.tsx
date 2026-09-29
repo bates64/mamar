@@ -120,7 +120,7 @@ export default function TimeGrid({
     }, [syncKey, scrollRef])
 
     return (
-        <div className={className} style={outerStyle} onScroll={onScroll} {...drag}>
+        <div className={className} style={outerStyle} onScroll={onScroll} data-time-grid {...drag}>
             <div style={gridStyle}>{children}</div>
         </div>
     )

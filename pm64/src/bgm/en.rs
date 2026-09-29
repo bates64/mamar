@@ -57,6 +57,7 @@ impl Bgm {
 
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         let mut metadata = mamar::Metadata::default();
+        metadata.set_beats_per_bar(self.beats_per_bar);
 
         f.seek(SeekFrom::Start(0))?;
 

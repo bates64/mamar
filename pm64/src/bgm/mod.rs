@@ -44,6 +44,10 @@ pub struct Bgm {
 
     pub track_lists: BTreeMap<TrackListId, TrackList>,
 
+    /// Beats in each bar, for editors to show bars with. The game doesn't use it. None means the editor's default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beats_per_bar: Option<u8>,
+
     #[serde(skip)]
     pub unknowns: Vec<Unknown>,
 }

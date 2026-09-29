@@ -7,7 +7,8 @@ import styles from "./PlaybackControls.module.scss"
 import useSongPlayer, { PlayerStatus, SongPosition } from "./SongPlayer"
 
 import Bridge from "../bridge"
-import { CONTEXT as PLAYHEAD_CONTEXT, useTimeline } from "../doc/Playhead"
+import { CONTEXT as PLAYHEAD_CONTEXT, PlayheadPosition, useTimeline } from "../doc/Playhead"
+import { DEFAULT_BEATS_PER_BAR } from "../doc/Ruler"
 import { useDoc } from "../store"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
@@ -123,6 +124,7 @@ export default function PlaybackControls() {
         player.setAmbientSound(ambientSound)
     }, [player, ambientSound])
 
+    const beatsPerBarId = useId()
     const variationId = useId()
     const ambientSoundId = useId()
 
@@ -160,9 +162,25 @@ export default function PlaybackControls() {
             </ToggleButton>
         </div>
         <div className={styles.position} role="group" aria-label="Playback status">
+            <div className={styles.field} tabIndex={0}>
+                <label className={styles.fieldName}>Position</label>
+                <span className={styles.songPosition}><PlayheadPosition /></span>
+            </div>
             <div className={styles.field} tabIndex={0} aria-live="polite">
                 <label className={styles.fieldName}>Tempo</label>
                 <span className={styles.tempo} ref={bpmRef}>-</span>
+            </div>
+            <div className={styles.field}>
+                <label htmlFor={beatsPerBarId} className={styles.fieldName}>Beats/bar</label>
+                <VerticalDragNumberInput
+                    id={beatsPerBarId}
+                    value={bgm.beats_per_bar ?? DEFAULT_BEATS_PER_BAR}
+                    minValue={1}
+                    maxValue={16}
+                    onChange={beatsPerBar => {
+                        dispatch({ type: "bgm", action: { type: "set_beats_per_bar", beatsPerBar } })
+                    }}
+                />
             </div>
             <div className={styles.field}>
                 <label htmlFor={variationId} className={styles.fieldName}>Variation</label>
