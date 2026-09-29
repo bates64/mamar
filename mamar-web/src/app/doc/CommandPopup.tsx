@@ -1,6 +1,7 @@
-import { Content, Dialog, Flex, Heading, Item, NumberField, Picker, Text, TextField } from "@adobe/react-spectrum"
+import { Flex, NumberField, Text, TextField } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 
+import styles from "./CommandPopup.module.scss"
 import { commandName } from "./lanes"
 import { toEvent } from "./useLaneEditing"
 
@@ -100,15 +101,13 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
                 const current = get(value, field.path)
                 const key = field.path.join(".") || "value"
                 if (field.options) {
-                    return <Picker
-                        key={key}
-                        label={field.label}
-                        selectedKey={String(current)}
-                        onSelectionChange={selected => update(field.path, String(selected))}
-                        items={field.options.map(option => ({ key: option }))}
-                    >
-                        {item => <Item key={item.key}>{item.key}</Item>}
-                    </Picker>
+                    // A native list, as a Spectrum picker's own popup would count as outside this one and close it
+                    return <label key={key} className={styles.select}>
+                        {field.label}
+                        <select value={String(current)} onChange={event => update(field.path, event.target.value)}>
+                            {field.options.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                    </label>
                 } else if (typeof current === "string") {
                     return <TextField key={key} label={field.label} value={current} onChange={text => update(field.path, text)} />
                 }
@@ -130,8 +129,8 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
         </Flex>
     }
 
-    return <Dialog size="S">
-        <Heading>{commandName(event)}</Heading>
-        <Content>{body}</Content>
-    </Dialog>
+    return <div className={styles.popup}>
+        <h3 className={styles.heading}>{commandName(event)}</h3>
+        {body}
+    </div>
 }

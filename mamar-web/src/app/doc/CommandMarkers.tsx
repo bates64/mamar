@@ -1,9 +1,9 @@
-import { ActionButton, DialogTrigger } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 import { ReactNode, useRef, useState } from "react"
 
 import styles from "./AutomationLane.module.scss"
 import CommandPopup from "./CommandPopup"
+import FixedPopover from "./FixedPopover"
 import { useSnap } from "./snap"
 
 import Bridge from "../bridge"
@@ -33,9 +33,8 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
     const [, snap] = useSnap()
     const ref = useRef<HTMLDivElement>(null)
     const [drag, setDrag] = useState<{ id: number, startX: number, time: number, moved: boolean } | null>(null)
-    // The marker whose popup is open, and the element it opens beside
-    const [editing, setEditing] = useState<number | null>(null)
-    const editingElement = useRef<HTMLElement | null>(null)
+    // The marker whose popup is open, and where it was on screen
+    const [editing, setEditing] = useState<{ id: number, anchor: DOMRect } | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
     const selectedIds = useSelectedIds(trackListId, trackIndex)
 
@@ -90,8 +89,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
                         })
                     } else if (!drag.moved) {
                         docDispatch({ type: "set_selection", selection: { ...target, events: [event.id] } })
-                        editingElement.current = e.currentTarget
-                        setEditing(event.id)
+                        setEditing({ id: event.id, anchor: e.currentTarget.getBoundingClientRect() })
                     }
                     setDrag(null)
                 }}
@@ -107,16 +105,12 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
             </span>
         })}
         {children}
-        {editing !== null && <DialogTrigger
-            type="popover"
-            isOpen
-            onOpenChange={open => !open && setEditing(null)}
-            targetRef={editingElement}
-        >
-            <ActionButton isHidden aria-hidden="true">Edit</ActionButton>
-            {events.find(({ event }) => event.id === editing)
-                ? <CommandPopup event={events.find(({ event }) => event.id === editing)!.event} trackListId={trackListId} trackIndex={trackIndex} />
-                : <></>}
-        </DialogTrigger>}
+        {editing && events.some(({ event }) => event.id === editing.id) && <FixedPopover anchor={editing.anchor} onClose={() => setEditing(null)}>
+            <CommandPopup
+                event={events.find(({ event }) => event.id === editing.id)!.event}
+                trackListId={trackListId}
+                trackIndex={trackIndex}
+            />
+        </FixedPopover>}
     </div>
 }

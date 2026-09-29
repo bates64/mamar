@@ -1,7 +1,7 @@
-import { Item, Picker } from "@adobe/react-spectrum"
 import { useRef, useState } from "react"
 
 import styles from "./AutomationLane.module.scss"
+import FixedPopover, { ChoiceList } from "./FixedPopover"
 import { formatBeats, LaneKind, LanePoint } from "./lanes"
 import { useSnap } from "./snap"
 
@@ -50,7 +50,7 @@ export default function AutomationLane({
     const ref = useRef<HTMLDivElement>(null)
     const [dragging, setDragging] = useState<Drag | null>(null)
     // Where a choice of value is open, for discrete lanes: for a point, or for a new point at a time
-    const [choosing, setChoosing] = useState<{ point: LanePoint } | { time: number } | null>(null)
+    const [choosing, setChoosing] = useState<({ point: LanePoint } | { time: number }) & { anchor: DOMRect } | null>(null)
     const [, snap] = useSnap()
 
     const range = kind.max - kind.min
@@ -99,7 +99,7 @@ export default function AutomationLane({
             }
             const time = Math.min(snap(ticksAt(event.clientX), event.shiftKey), length)
             if (kind.discrete) {
-                setChoosing({ time })
+                setChoosing({ time, anchor: new DOMRect(event.clientX, event.clientY, 0, 0) })
             } else {
                 onAdd(time, valueAt(event.clientY))
             }
@@ -152,7 +152,7 @@ export default function AutomationLane({
                     setDragging({ ...dragging, axis, value: valueAt(event.clientY) })
                 }
             }}
-            onPointerUp={() => {
+            onPointerUp={event => {
                 if (dragging?.point.event.id === point.event.id) {
                     // `point` is drawn where it's being dragged to, so compare with where it started
                     const original = dragging.point
@@ -163,7 +163,7 @@ export default function AutomationLane({
                     } else if (dragging.axis === null) {
                         onSelect?.(original)
                         if (kind.discrete) {
-                            setChoosing({ point: original })
+                            setChoosing({ point: original, anchor: event.currentTarget.getBoundingClientRect() })
                         }
                     }
                     setDragging(null)
@@ -174,17 +174,12 @@ export default function AutomationLane({
                 onDelete(point)
             }}
         />)}
-        {choosing && <div className={styles.chooserAnchor} style={{ left: leftOf("point" in choosing ? choosing.point.time : choosing.time) }}>
-            <Picker
-                aria-label={kind.name}
-                isQuiet
-                isOpen
-                autoFocus
-                menuWidth="size-2400"
-                onOpenChange={open => !open && setChoosing(null)}
-                selectedKey={"point" in choosing ? String(choosing.point.value) : null}
-                onSelectionChange={key => {
-                    const value = Number(key)
+        {choosing && <FixedPopover anchor={choosing.anchor} onClose={() => setChoosing(null)}>
+            <ChoiceList
+                label={kind.name}
+                choices={Array.from({ length: kind.max - kind.min + 1 }, (_, i) => ({ value: kind.min + i, name: format(kind.min + i) }))}
+                value={"point" in choosing ? choosing.point.value : undefined}
+                onChoose={value => {
                     if ("point" in choosing) {
                         if (value !== choosing.point.value) {
                             onChange(choosing.point, value)
@@ -194,11 +189,8 @@ export default function AutomationLane({
                     }
                     setChoosing(null)
                 }}
-                items={Array.from({ length: kind.max - kind.min + 1 }, (_, i) => ({ key: String(kind.min + i), name: format(kind.min + i) }))}
-            >
-                {item => <Item key={item.key}>{item.name}</Item>}
-            </Picker>
-        </div>}
+            />
+        </FixedPopover>}
         {dragging?.axis === "value" && !kind.discrete && <span className={styles.readout} style={{ left: leftOf(dragging.time) }}>{format(dragging.value)}</span>}
     </div>
 }

@@ -128,15 +128,7 @@
     }
 }
 
-// Where a discrete lane's choice of value opens. Its picker is hidden, as only its list is wanted.
-.chooserAnchor {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    opacity: 0;
-    pointer-events: none;
-}
+
 
 // A note's velocity, as a bar up from the bottom of the lane with a handle on top.
 .velocity {
