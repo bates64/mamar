@@ -1,5 +1,6 @@
 import { ActionButton, Item, Menu, MenuTrigger, Text } from "@adobe/react-spectrum"
-import { Event } from "pm64-typegen"
+import classNames from "classnames"
+import { Command, Event } from "pm64-typegen"
 import { useMemo, useState } from "react"
 import { Plus } from "react-feather"
 
@@ -7,6 +8,7 @@ import CommandPopup from "./CommandPopup"
 import FixedPopover, { ChoiceList } from "./FixedPopover"
 import InstrumentEditor from "./InstrumentEditor"
 import { defaultValue, LaneKind, startingEvents, timeline, trackLanes } from "./lanes"
+import { CarriedValue, useCarriedValues } from "./segmentTracks"
 import styles from "./StartingValues.module.scss"
 import { toEvent } from "./useLaneEditing"
 
@@ -39,11 +41,56 @@ function summaryOf({ event, kinds }: StartingValue): string {
     return kinds.map(kind => (kind.format ?? String)(valueOf(kind, event))).join(", ")
 }
 
+/** Values carried from earlier segments, grouped as the commands that set them would be. */
+interface CarriedGroup {
+    name: string
+    values: CarriedValue[]
+}
+
+function groupCarried(values: CarriedValue[]): CarriedGroup[] {
+    const groups: CarriedGroup[] = []
+    for (const value of values) {
+        const name = value.kind.name.split(" ")[0]
+        const group = groups.find(group => group.name === name)
+        if (group) {
+            group.values.push(value)
+        } else {
+            groups.push({ name, values: [value] })
+        }
+    }
+    return groups.map(group => (group.values.length === 1 ? { ...group, name: group.values[0].kind.name } : group))
+}
+
+/**
+ * The commands that set `values` at the start of a segment: one command if a kind's command can hold all of them, as
+ * tremolo's can, or one for each.
+ */
+function commandsFor(values: CarriedValue[]): Command[] {
+    for (const base of values) {
+        let command = base.kind.set(base.value)
+        const others = values.filter(other => other !== base)
+        if (others.every(other => other.kind.read(command as unknown as Record<string, unknown>) !== undefined)) {
+            for (const other of others) {
+                command = other.kind.update?.(command as unknown as Record<string, unknown>, other.value) ?? command
+            }
+            return [command]
+        }
+    }
+    return values.map(({ kind, value }) => kind.set(value))
+}
+
 /**
  * What a track starts the segment with, such as its instrument, volume, and pan, as in a DAW's channel strip. Its
- * lanes show only the changes after the start. Click a value to change or remove it, or add one with the menu.
+ * lanes show only the changes after the start. Click a value to change or remove it, or add one with the menu. Values
+ * the track keeps from earlier segments are dimmed, and clicking one sets it in this segment.
  */
-export default function StartingValues({ trackListId, trackIndex }: { trackListId: number, trackIndex: number }) {
+export default function StartingValues({ trackListId, trackIndex, mainIndex, segmentIndex }: {
+    trackListId: number
+    trackIndex: number
+    /** The track, or the track that its alternate part is for, and the segment, whose earlier segments carry values. */
+    mainIndex: number
+    segmentIndex: number
+}) {
     const [bgm, dispatch] = useBgm()
     const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
@@ -56,6 +103,14 @@ export default function StartingValues({ trackListId, trackIndex }: { trackListI
 
     const unset = kinds.filter(kind => !values.some(value => value.kinds.includes(kind)))
     const opened = values.find(value => value.event.id === open?.id)
+    const carried = useCarriedValues(mainIndex, segmentIndex)
+    const carriedGroups = groupCarried(carried.values.filter(value => unset.some(kind => kind.key === value.kind.key)))
+    const carriedPatch = values.some(({ event }) => "TrackOverridePatch" in event) ? null : carried.patch
+    const setHere = (commands: Command[]) => {
+        for (const command of commands) {
+            dispatch({ type: "insert_track_command", ...target, time: 0, command })
+        }
+    }
 
     const remove = (event: Event) => {
         const index = Bridge.commands_without_detours(commands ?? []).findIndex((played: Event) => played.id === event.id)
@@ -92,6 +147,25 @@ export default function StartingValues({ trackListId, trackIndex }: { trackListI
         >
             <span className={styles.name}>{nameOf(value)}</span>
             <span className={styles.summary}>{summaryOf(value)}</span>
+        </button>)}
+        {carriedPatch && <button
+            className={classNames(styles.value, styles.carried)}
+            title="From an earlier segment"
+            onClick={() => setHere([{ TrackOverridePatch: carriedPatch }])}
+        >
+            <span className={styles.name}>Patch</span>
+            <span className={styles.summary}>{instruments.getName(carriedPatch)}</span>
+        </button>}
+        {carriedGroups.map(group => <button
+            key={group.name}
+            className={classNames(styles.value, styles.carried)}
+            title="From an earlier segment"
+            onClick={() => setHere(commandsFor(group.values))}
+        >
+            <span className={styles.name}>{group.name}</span>
+            <span className={styles.summary}>
+                {group.values.map(({ kind, value }) => (kind.format ?? String)(value)).join(", ")}
+            </span>
         </button>)}
         {opened && open && <FixedPopover anchor={open.anchor} onClose={() => setOpen(null)}>
             {"SetTrackVoice" in opened.event

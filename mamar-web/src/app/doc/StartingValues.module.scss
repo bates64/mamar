@@ -1,8 +1,11 @@
 .values {
+    // Long values are cut short rather than widening the settings
+    width: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-top: 16px;
+    margin-top: 4px;
 }
 
 .heading {
@@ -10,8 +13,6 @@
     align-items: center;
     justify-content: space-between;
 
-    color: var(--spectrum-gray-700);
-    font-size: 12px;
 }
 
 // A compact row per value, which opens its editor
@@ -25,8 +26,9 @@
     border-radius: 4px;
     background: var(--spectrum-gray-100);
     color: var(--spectrum-gray-900);
+    min-width: 0;
     font: inherit;
-    font-size: 12px;
+    font-size: 13px;
     text-align: left;
     cursor: pointer;
 
@@ -37,12 +39,20 @@
     }
 }
 
+// Kept from an earlier segment, until this one sets it
+.carried {
+    background: transparent;
+    color: var(--spectrum-gray-600);
+    font-style: italic;
+}
+
 .name {
     flex: none;
     color: var(--spectrum-gray-700);
 }
 
 .summary {
+    min-width: 0;
     margin-left: auto;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -8,6 +8,7 @@ import CommandMarkers from "./CommandMarkers"
 import { LaneOption } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, startingEvents, timeline, trackLanes } from "./lanes"
 import { TICKS_PER_BEAT, useTicksPerBar } from "./Ruler"
+import { useCarriedValues } from "./segmentTracks"
 import laneStyles from "./TrackLanes.module.scss"
 import useLaneEditing from "./useLaneEditing"
 import VelocityLane from "./VelocityLane"
@@ -72,11 +73,21 @@ const LANE_HEIGHT = 64
  * One lane under the piano roll for a track's commands other than notes, as in Logic's automation view. A menu
  * above it chooses the lane, listing the lanes the track uses first.
  */
-export default function TrackLanes({ trackListId, trackIndex, length }: { trackListId: number, trackIndex: number, length: number }) {
+export default function TrackLanes({ trackListId, trackIndex, mainIndex, segmentIndex, length, isGreyed = false }: {
+    trackListId: number
+    trackIndex: number
+    /** The track, or the track that its alternate part is for, and the segment, whose earlier segments carry values. */
+    mainIndex: number
+    segmentIndex: number
+    length: number
+    /** Whether the lane is only shown beside the segment being edited, so it has no menu. */
+    isGreyed?: boolean
+}) {
     const [, dispatch] = useBgm()
     const [doc, docDispatch] = useDoc()
     const { played, starting, kinds, events, options } = useTrackLanes(trackListId, trackIndex)
     const [adding, setAdding] = useState<number | null>(null)
+    const carried = useCarriedValues(mainIndex, segmentIndex)
     const ticksPerBar = useTicksPerBar()
 
     // Commands no lane is for
@@ -96,7 +107,7 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
 
     return <div className={laneStyles.trackLanes}>
         <div className={laneStyles.header}>
-            <div className={laneStyles.menu}>
+            {!isGreyed && <div className={laneStyles.menu}>
                 <Picker
                     aria-label="Lane"
                     isQuiet
@@ -112,7 +123,7 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
                         </Section>] : []),
                     ]}
                 </Picker>
-            </div>
+            </div>}
         </div>
         <div
             className={laneStyles.body}
@@ -122,7 +133,7 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
                 "--beats-per-bar": ticksPerBar / TICKS_PER_BEAT,
             } as React.CSSProperties}
         >
-            {!chosen.hasCommands && <span className={laneStyles.hint}>{emptyHint(chosen)}</span>}
+            {!chosen.hasCommands && !isGreyed && <span className={laneStyles.hint}>{emptyHint(chosen)}</span>}
             {chosen.key === VELOCITY_LANE && <VelocityLane trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />}
             {kind && <TrackLane
                 kind={kind}
@@ -130,7 +141,7 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
                 trackIndex={trackIndex}
                 length={length}
                 played={played}
-                initial={lanePoints(kind, starting)[0]?.value}
+                initial={lanePoints(kind, starting)[0]?.value ?? carried.values.find(value => value.kind.key === kind.key)?.value}
             />}
             {chosen.key === EVENTS_LANE && <CommandMarkers
                 name="Events"

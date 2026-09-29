@@ -1,3 +1,13 @@
+// Scrolls when its settings are taller than the piano roll
+// A grid item is as wide as its contents unless told otherwise, which would push it under the piano roll
+.panel {
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
+    user-select: none;
+}
+
 .regionName {
     margin: 0;
 }
@@ -7,4 +17,33 @@
     margin-top: 4px;
     color: var(--spectrum-orange-700);
     font-size: 12px;
+}
+
+.greyed {
+    position: relative;
+    display: flex;
+    min-height: 0;
+}
+
+.greyedContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    opacity: 0.35;
+    filter: grayscale(1);
+}
+
+// Covers the greyed segment, so a click anywhere on it opens it
+.openGreyed {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+
+    &:hover {
+        background: rgb(255 255 255 / 4%);
+    }
 }

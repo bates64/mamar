@@ -1,12 +1,13 @@
 import { ActionButton, Grid, View, Form, Switch, ContextualHelp, Heading, Content, Text, Flex, TextField } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
-import { useEffect, useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useDebounce } from "use-debounce"
 
 import Inspector from "./Inspector"
 import PianoRoll from "./PianoRoll"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
+import { SegmentTrack, useSegmentTracks } from "./segmentTracks"
 import StartingValues from "./StartingValues"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
@@ -15,7 +16,7 @@ import TrackLanes from "./TrackLanes"
 import { MAX_VOICES, total, useVoices } from "./voices"
 
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
-import { useBgm, useLocation, useVariation } from "../store"
+import { useBgm, useDoc, useLocation, useVariation } from "../store"
 import { alternatePartOf, BgmAction, canAddAlternatePart, playingTrack } from "../store/bgm"
 
 export interface Props {
@@ -43,6 +44,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
 
     const [showTracker, setShowTracker] = useState(true)
     const segmentLengths = useSegmentLengths()
+    const segments = useSegmentTracks(mainIndex)
 
     if (!track) {
         return <div>Track not found</div>
@@ -52,18 +54,17 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
         columns="225px 1fr"
         height="100%"
     >
-        {/* Scrolls when its settings are taller than the piano roll */}
         <View
             padding="size-150"
             borderEndColor="gray-100"
             borderEndWidth="thin"
-            overflow="auto"
-            minHeight={0}
-            UNSAFE_style={{ userSelect: "none" }}
+            UNSAFE_className={styles.panel}
         >
             <h3 id={hid} className={styles.regionName}>Region Settings</h3>
-            <Form maxWidth="size-2000" aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
+            {/* Spectrum gives forms a minimum width wider than the panel */}
+            <Form width="100%" UNSAFE_style={{ minWidth: 0 }} aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
                 <TextField
+                    width="100%"
                     label="Name"
                     value={name}
                     onChange={setName}
@@ -72,6 +73,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                     {trackIndex !== 0 && <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}
                 </Flex>
+                <StartingValues trackListId={trackListId} trackIndex={trackIndex} mainIndex={mainIndex} segmentIndex={segmentIndex} />
                 {trackIndex !== 0 ? <>
                     <VoicesInfo trackListId={trackListId} trackIndex={trackIndex} />
                     <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
@@ -80,7 +82,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
                 </View>
             </Form>
-            <StartingValues trackListId={trackListId} trackIndex={trackIndex} />
             <Inspector trackListId={trackListId} trackIndex={trackIndex} />
         </View>
         {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
@@ -88,19 +89,89 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             // The piano roll is dark whatever the theme.
             "--playhead-line-color": "rgb(255 255 255 / 50%)",
         } as React.CSSProperties}>
-            <div style={{ gridColumn: segmentIndex + 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            {segments.map((segment, index) => segment && index !== segmentIndex && <GreyedSegment
+                key={index}
+                segment={segment}
+                mainIndex={mainIndex}
+                segmentIndex={index}
+                segmentStart={segmentLengths.slice(0, index).reduce((sum, length) => sum + length, 0)}
+                length={segmentLengths[index] ?? 0}
+            />)}
+            {/* Every segment is in the one row, whatever order they're in here */}
+            <div style={{ gridColumn: segmentIndex + 1, gridRow: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} data-selected-roll onScroll={event => syncGreyedRolls(event.currentTarget)}>
                     <PianoRoll
                         trackListId={trackListId}
                         trackIndex={trackIndex}
                         segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
                     />
                 </div>
-                <TrackLanes trackListId={trackListId} trackIndex={trackIndex} length={segmentLengths[segmentIndex] ?? 0} />
+                <TrackLanes
+                    trackListId={trackListId}
+                    trackIndex={trackIndex}
+                    mainIndex={mainIndex}
+                    segmentIndex={segmentIndex}
+                    length={segmentLengths[segmentIndex] ?? 0}
+                />
             </div>
             <PlayheadLine />
         </TimeGrid>}
     </Grid>
+}
+
+/** Scrolls the greyed segments' piano rolls to the pitches the selected one shows, so their notes line up. */
+function syncGreyedRolls(selected: HTMLElement) {
+    for (const roll of selected.closest("[data-time-grid]")?.querySelectorAll<HTMLElement>("[data-greyed-roll]") ?? []) {
+        roll.scrollTop = selected.scrollTop
+    }
+}
+
+/**
+ * The track in another segment, greyed out beside the one being edited so it shows what comes before and after. It
+ * can't be edited, but clicking it opens it.
+ */
+function GreyedSegment({ segment, mainIndex, segmentIndex, segmentStart, length }: {
+    segment: SegmentTrack
+    mainIndex: number
+    segmentIndex: number
+    segmentStart: number
+    length: number
+}) {
+    const [, docDispatch] = useDoc()
+    const roll = useRef<HTMLDivElement>(null)
+
+    // Line up with the selected segment's pitches once this one has centred itself on its own notes
+    useEffect(() => {
+        const selected = roll.current?.closest("[data-time-grid]")?.querySelector<HTMLElement>("[data-selected-roll]")
+        if (selected && roll.current) {
+            roll.current.scrollTop = selected.scrollTop
+        }
+    }, [])
+
+    return <div className={styles.greyed} style={{ gridColumn: segmentIndex + 1, gridRow: 1 }}>
+        {/* Inert, so none of it can be pressed, focused, or edited */}
+        <div className={styles.greyedContent} {...{ inert: "" }}>
+            <div ref={roll} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} data-greyed-roll>
+                <PianoRoll trackListId={segment.trackListId} trackIndex={segment.trackIndex} segmentStart={segmentStart} />
+            </div>
+            <TrackLanes
+                trackListId={segment.trackListId}
+                trackIndex={segment.trackIndex}
+                mainIndex={mainIndex}
+                segmentIndex={segmentIndex}
+                length={length}
+                isGreyed
+            />
+        </div>
+        <button
+            className={styles.openGreyed}
+            aria-label="Open this segment"
+            onClick={() => docDispatch({
+                type: "set_panel_content",
+                panelContent: { type: "tracker", trackList: segment.trackListId, track: mainIndex, segment: segmentIndex },
+            })}
+        />
+    </div>
 }
 
 /** How many voices the track gets, which pm64 chooses from its notes, and whether that cuts any off. */
@@ -187,12 +258,14 @@ function AlternatePartForm({ trackListId, trackIndex, segmentIndex }: Props) {
         <Text>{label}</Text>
         <Flex direction="column" gap="size-50" marginTop="size-50">
             <ActionButton
+                width="100%"
                 isDisabled={!canAdd}
                 onPress={() => dispatch({ type: "add_alternate_part", trackLists: [trackListId], track: trackIndex })}
             >
                 Add in this segment
             </ActionButton>
             <ActionButton
+                width="100%"
                 isDisabled={!canAdd}
                 onPress={() => dispatch({ type: "add_alternate_part", trackLists: variationTrackLists, track: trackIndex })}
             >
