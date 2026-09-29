@@ -1,7 +1,8 @@
 import createMupen64PlusWeb, { EmulatorControls } from "mupen64plus-web"
-import { useEffect, useRef, useState, useContext, createContext, ReactNode, MutableRefObject } from "react"
+import { useCallback, useEffect, useRef, useState, useContext, createContext, ReactNode, MutableRefObject } from "react"
 
 import { loading } from "../.."
+import { EmulatorAudio } from "../../emu/AudioLatencyMeter"
 
 enum State {
     MOUNTING,
@@ -16,6 +17,8 @@ export type ViFn = (emu: EmulatorControls) => void
 interface Context {
     emu: EmulatorControls
     viRef: MutableRefObject<ViFn[]>
+    /** Where the emulator sends its audio, once it has started some. */
+    audio: () => EmulatorAudio | undefined
 }
 
 const mupenCtx = createContext<Context | null>(null)
@@ -25,6 +28,14 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
     const [error, setError] = useState<any>()
     const state = useRef(State.MOUNTING)
     const viRef = useRef<ViFn[]>([])
+    // The emulator's Emscripten module, which holds its SDL audio output.
+    const moduleRef = useRef<any>()
+    const audio = useCallback(() => {
+        const sdl = moduleRef.current?.SDL2
+        if (sdl?.audioContext && sdl.audio?.scriptProcessorNode) {
+            return { context: sdl.audioContext, node: sdl.audio.scriptProcessorNode }
+        }
+    }, [])
 
     useEffect(() => {
         if (!romData) {
@@ -65,6 +76,7 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
                 // @ts-ignore
                 preRun: [m => {
                     module = m
+                    moduleRef.current = m
                 }],
             }).then(async _emu => {
                 emu = _emu
@@ -111,7 +123,7 @@ export function MupenProvider({ romData, children }: { romData: ArrayBuffer, chi
         return loading
     }
 
-    return <mupenCtx.Provider value={{ emu, viRef }}>
+    return <mupenCtx.Provider value={{ emu, viRef, audio }}>
         {children}
     </mupenCtx.Provider>
 }

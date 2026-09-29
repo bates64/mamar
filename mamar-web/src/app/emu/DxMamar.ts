@@ -18,6 +18,7 @@ export const MAMAR_SYMBOL_NAMES = [
     "MamarSegment",
     "MamarTick",
     "MamarPlayingRequest",
+    "MamarNotesStarted",
 ] as const
 
 export type MamarSymbols = Record<(typeof MAMAR_SYMBOL_NAMES)[number], number>
@@ -117,6 +118,15 @@ export default class DxMamar {
     /** Beats per minute of the song playing. */
     async readTempo(): Promise<number> {
         return await readU32(this.memory, this.symbols.MamarTempo) / 100
+    }
+
+    /** How many notes the song last played has started, or 0 if it hasn't started. */
+    async readNotesStarted(): Promise<number> {
+        const [notes, playingRequest] = await Promise.all([
+            readU32(this.memory, this.symbols.MamarNotesStarted),
+            readU32(this.memory, this.symbols.MamarPlayingRequest),
+        ])
+        return playingRequest === this.request ? notes : 0
     }
 
     /** Where the song last played is, or null if it hasn't started. */

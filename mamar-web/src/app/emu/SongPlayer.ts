@@ -16,6 +16,10 @@ export interface PlayerStatus {
     tempo: number
     /** Where the song playing is, or null if none is. Players that can't tell leave it out. */
     position?: SongPosition | null
+    /**
+     * How long after the song reaches a position it's heard there, in ms. Players that can't tell leave it out.
+     */
+    latency?: number
 }
 
 /**

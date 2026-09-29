@@ -30,8 +30,11 @@ function mupenMemory(emu: EmulatorControls): EmulatorMemory {
 }
 
 export default function MupenSongPlayerProvider({ symbols, children }: { symbols: MamarSymbols, children: ReactNode }) {
-    const { emu } = useMupen()
-    const player = useMemo(() => new DxSongPlayer(DxMamar.connect(mupenMemory(emu), symbols)), [emu, symbols])
+    const { emu, audio } = useMupen()
+    const player = useMemo(
+        () => new DxSongPlayer(DxMamar.connect(mupenMemory(emu), symbols), -1, audio),
+        [emu, symbols, audio],
+    )
 
     return <SongPlayerContext.Provider value={player}>
         {children}

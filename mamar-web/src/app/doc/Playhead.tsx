@@ -1,4 +1,3 @@
-import classNames from "classnames"
 import { useEffect, useRef, useState, useContext, createContext, useCallback } from "react"
 
 import styles from "./Playhead.module.scss"
@@ -60,6 +59,9 @@ const DISPLAY_CONTEXT = createContext<Display | null>(null)
 /** The furthest the playhead glides, in ticks. Further moves, such as seeks, jump. */
 const MAX_GLIDE_TICKS = 48
 
+/** How long the playhead takes to glide to where it's going, in ms. */
+const GLIDE_MS = 50
+
 function DisplayProvider({ start, playing, children }: {
     start: number
     playing: Context["playing"]
@@ -75,9 +77,32 @@ function DisplayProvider({ start, playing, children }: {
         latestPlaying.current = playing
     }, [playing])
 
-    useSongPlayer(useCallback(({ position }: PlayerStatus) => {
-        if (latestPlaying.current) {
-            setSong({ playing: latestPlaying.current, position: position ?? null })
+    // What the player reported, oldest first, so the playhead can show what's being heard rather than played.
+    const reports = useRef<{ time: number, playing: Context["playing"], position: SongPosition | null }[]>([])
+
+    useSongPlayer(useCallback(({ position, latency = 0 }: PlayerStatus) => {
+        const playing = latestPlaying.current
+        if (!playing) {
+            return
+        }
+
+        const now = performance.now()
+        reports.current.push({ time: now, playing, position: position ?? null })
+        // Aims for what will be heard once the playhead has glided there. Drops the reports from before then.
+        const heardAt = now - latency + GLIDE_MS
+        while (reports.current.length > 1 && reports.current[1].time <= heardAt) {
+            reports.current.shift()
+        }
+        const [before, after] = reports.current
+        if (before.time > heardAt || before.playing !== playing) {
+            setSong({ playing, position: null })
+        } else if (before.position && after?.position?.segment === before.position.segment) {
+            // Between two reports in the same segment, so between their ticks too.
+            const progress = (heardAt - before.time) / (after.time - before.time)
+            const tick = Math.round(before.position.tick + (after.position.tick - before.position.tick) * progress)
+            setSong({ playing, position: { segment: before.position.segment, tick } })
+        } else {
+            setSong({ playing, position: before.position })
         }
     }, []))
 
@@ -99,6 +124,10 @@ function DisplayProvider({ start, playing, children }: {
     return <DISPLAY_CONTEXT.Provider value={{ ticks, isFollowingSong, isGliding, setDragPosition }}>
         {children}
     </DISPLAY_CONTEXT.Provider>
+}
+
+function glide(isGliding: boolean): string | undefined {
+    return isGliding ? `left ${GLIDE_MS}ms linear` : undefined
 }
 
 function ticksToLeft(ticks: number): string {
@@ -209,8 +238,8 @@ export default function Playhead() {
         />}
         <div
             ref={head}
-            className={classNames(styles.head, { [styles.gliding]: display.isGliding })}
-            style={{ left: ticksToLeft(display.ticks) }}
+            className={styles.head}
+            style={{ left: ticksToLeft(display.ticks), transition: glide(display.isGliding) }}
             onMouseDown={e => {
                 dragPosition.current = display.ticks
                 display.setDragPosition(display.ticks)
@@ -232,8 +261,8 @@ export function PlayheadLine() {
     if (!display) return null
 
     return <div
-        className={classNames(styles.line, { [styles.gliding]: display.isGliding })}
-        style={{ left: ticksToLeft(display.ticks) }}
+        className={styles.line}
+        style={{ left: ticksToLeft(display.ticks), transition: glide(display.isGliding) }}
     />
 }
 

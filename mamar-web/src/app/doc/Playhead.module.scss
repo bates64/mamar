@@ -47,8 +47,3 @@ $color: color-mix(in srgb, var(--spectrum-global-color-gray-900) 50%, transparen
     pointer-events: none;
     will-change: left;
 }
-
-/* Smooths the playhead between the game's reports of where the song is. */
-.gliding {
-    transition: left 50ms linear;
-}

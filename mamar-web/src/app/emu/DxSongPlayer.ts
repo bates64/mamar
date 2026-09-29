@@ -1,3 +1,4 @@
+import AudioLatencyMeter, { EmulatorAudio } from "./AudioLatencyMeter"
 import DxMamar from "./DxMamar"
 import { PlayerStatus, SongPlayer, SongPosition, TrackMute } from "./SongPlayer"
 
@@ -15,8 +16,14 @@ export default class DxSongPlayer implements SongPlayer {
     private readonly trackMutes: TrackMute[] = new Array(16).fill("none")
     private readonly listeners = new Set<(status: PlayerStatus) => void>()
     private statusTimer?: ReturnType<typeof setInterval>
+    private latencyMeter?: AudioLatencyMeter
 
-    constructor(connection: Promise<DxMamar>, private readonly bankSong = -1) {
+    /** `audio` gives where the game's audio goes, if the host can tell, so the player can measure its latency. */
+    constructor(
+        connection: Promise<DxMamar>,
+        private readonly bankSong = -1,
+        private readonly audio?: () => EmulatorAudio | undefined,
+    ) {
         connection.then(
             mamar => {
                 this.mamar = mamar
@@ -68,7 +75,30 @@ export default class DxSongPlayer implements SongPlayer {
         mamar.setTrackMutes(this.trackMutes)
         if (song && this.song) {
             mamar.play(this.song.bgm, this.song.variation, this.bankSong, this.song.start)
+            this.measureLatency(mamar)
         }
+    }
+
+    private measureLatency(mamar: DxMamar) {
+        const audio = this.audio?.()
+        if (!audio) {
+            return
+        }
+        this.latencyMeter ??= new AudioLatencyMeter(audio)
+
+        const deadline = performance.now() + 2000
+        this.latencyMeter.measure(new Promise(resolve => {
+            const poll = async () => {
+                if (await mamar.readNotesStarted() > 0) {
+                    resolve(performance.now())
+                } else if (performance.now() > deadline) {
+                    resolve(undefined)
+                } else {
+                    requestAnimationFrame(poll)
+                }
+            }
+            requestAnimationFrame(poll)
+        }))
     }
 
     private async pollStatus() {
@@ -76,8 +106,9 @@ export default class DxSongPlayer implements SongPlayer {
             return
         }
         const [tempo, position] = await Promise.all([this.mamar.readTempo(), this.mamar.readPosition()])
+        const latency = this.latencyMeter?.latency
         for (const listener of this.listeners) {
-            listener({ tempo, position })
+            listener({ tempo, position, latency })
         }
     }
 }
