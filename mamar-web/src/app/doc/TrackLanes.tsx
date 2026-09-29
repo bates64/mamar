@@ -1,11 +1,11 @@
-import { ActionButton, Item, Menu, MenuTrigger } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 import { useMemo, useState } from "react"
 
 import AutomationLane from "./AutomationLane"
 import styles from "./AutomationLane.module.scss"
 import CommandMarkers from "./CommandMarkers"
-import { commandName, isShown, LaneKind, lanePoints, timeline, trackLanes } from "./lanes"
+import { LaneOption, useLaneShown } from "./LaneMenu"
+import { commandName, inLane, LaneKind, lanePoints, timeline, trackLanes } from "./lanes"
 import useLaneEditing from "./useLaneEditing"
 
 import { useBgm } from "../store"
@@ -25,26 +25,31 @@ function eventLabel(event: Event): string {
     return commandName(event)
 }
 
-/**
- * Lanes under the piano roll for a track's commands other than notes, a lane for any others, and a menu to show more
- * lanes.
- */
-export default function TrackLanes({ trackListId, trackIndex, length }: { trackListId: number, trackIndex: number, length: number }) {
-    const [bgm, dispatch] = useBgm()
+/** The lanes a track can show, and its commands with the time each plays at. */
+export function useTrackLanes(trackListId: number, trackIndex: number) {
+    const [bgm] = useBgm()
     const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands
     const played = useMemo(() => timeline(commands ?? []), [commands])
-    const [addedLanes, setAddedLanes] = useState<string[]>([])
-    const [adding, setAdding] = useState<number | null>(null)
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
-
     const events = played.filter(({ event }) => isEvent(event))
-    const others = played.filter(({ event }) => !isEvent(event) && !isShown(event, kinds))
-    const shownLanes = kinds.filter(kind => addedLanes.includes(kind.key) || lanePoints(kind, played).length > 0)
-    const showEvents = events.length > 0 || addedLanes.includes(EVENTS_LANE)
-    const hiddenLanes = [
-        ...kinds.filter(kind => !shownLanes.includes(kind)).map(kind => ({ key: kind.key, name: kind.name })),
-        ...(showEvents ? [] : [{ key: EVENTS_LANE, name: "Events" }]),
+    const options: LaneOption[] = [
+        ...kinds.map(kind => ({ key: kind.key, name: kind.name, hasCommands: lanePoints(kind, played).length > 0 })),
+        { key: EVENTS_LANE, name: "Events", hasCommands: events.length > 0 },
     ]
+    return { played, kinds, events, options }
+}
+
+/** Lanes under the piano roll for a track's commands other than notes, and a lane for any others. */
+export default function TrackLanes({ trackListId, trackIndex, length }: { trackListId: number, trackIndex: number, length: number }) {
+    const [, dispatch] = useBgm()
+    const { played, kinds, events, options } = useTrackLanes(trackListId, trackIndex)
+    const isShown = useLaneShown()
+    const [adding, setAdding] = useState<number | null>(null)
+
+    // Commands no lane is for, whether or not the lane is shown
+    const others = played.filter(({ event }) => !isEvent(event) && !inLane(event, kinds))
+    const shownLanes = kinds.filter((_, i) => isShown(options[i]))
+    const showEvents = isShown(options[options.length - 1])
 
     const add = (command: object) => {
         if (adding !== null) {
@@ -88,12 +93,6 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
                 label={commandName}
             />
         </div>}
-        {hiddenLanes.length > 0 && <MenuTrigger>
-            <ActionButton isQuiet aria-label="Show another lane">+ Lane</ActionButton>
-            <Menu onAction={key => setAddedLanes([...addedLanes, String(key)])} items={hiddenLanes}>
-                {item => <Item key={item.key}>{item.name}</Item>}
-            </Menu>
-        </MenuTrigger>}
     </div>
 }
 

@@ -1,5 +1,6 @@
 import { type Bgm, type Event, type Track } from "pm64-typegen"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { getUntrackedObject } from "react-tracked"
 
 import { timeline } from "./lanes"
 import { useSnap } from "./snap"
@@ -151,7 +152,9 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
     }, [canvas.ref])
 
     useEffect(() => {
-        rendererRef.current?.set_track(track, branches, mix, behind)
+        // The renderer's methods aren't unwrapped by the bridge, so pass the objects under react-tracked's proxies
+        const untracked = <T extends object>(value: T | null) => (value && getUntrackedObject(value)) ?? value
+        rendererRef.current?.set_track(untracked(track), untracked(branches), mix, untracked(behind))
     }, [track, branches, mix, behind])
 
     useEffect(() => {
@@ -192,6 +195,7 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
         <canvas
             ref={canvas.ref}
             style={{ width: "100%", height: "100%", display: "block", touchAction: "none", cursor: "crosshair" }}
+            title="Click to add a note. Drag a note to move it, or its end to resize it. Double-click a note, or select it and press Delete, to delete it. Hold Shift to place freely."
             data-no-drag-scroll
             onPointerDown={event => {
                 if (event.button !== 0) return

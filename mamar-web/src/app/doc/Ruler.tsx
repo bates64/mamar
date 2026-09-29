@@ -3,6 +3,7 @@ import classNames from "classnames"
 import { Bgm, Branch, Event, Segment, TrackList } from "pm64-typegen"
 import { useContext, useState } from "react"
 import { usePress } from "react-aria"
+import { getUntrackedObject } from "react-tracked"
 
 import Playhead, { CONTEXT as PLAYHEAD_CONTEXT, snapToBeat } from "./Playhead"
 import styles from "./Ruler.module.scss"
@@ -128,6 +129,22 @@ export function usePickup(): number {
 }
 
 // TODO: cache this better
+/** Lengths of track lists already measured, as measuring one reads every command in it. */
+const trackListLengths = new WeakMap<TrackList, { branches: Bgm["branches"], length: number }>()
+
+function cachedTrackListLength(tracked: TrackList, trackedBranches: Bgm["branches"]): number {
+    // Reading the objects under react-tracked's proxies is faster, and the caller already depends on each as a whole
+    const trackList = getUntrackedObject(tracked) ?? tracked
+    const branches = getUntrackedObject(trackedBranches) ?? trackedBranches
+    const cached = trackListLengths.get(trackList)
+    if (cached?.branches === branches) {
+        return cached.length
+    }
+    const length = trackListLength(trackList, branches)
+    trackListLengths.set(trackList, { branches, length })
+    return length
+}
+
 export function useSegmentLengths(): number[] {
     const [bgm] = useBgm()
     const [variation] = useVariation()
@@ -135,7 +152,7 @@ export function useSegmentLengths(): number[] {
 
     return segments.map(segment => {
         if (bgm && "Subseg" in segment) {
-            return trackListLength(bgm.track_lists[segment.Subseg.track_list], bgm.branches)
+            return cachedTrackListLength(bgm.track_lists[segment.Subseg.track_list], bgm.branches)
         } else {
             return 0
         }

@@ -1,7 +1,8 @@
+import { Item, Picker } from "@adobe/react-spectrum"
 import { useRef, useState } from "react"
 
 import styles from "./AutomationLane.module.scss"
-import { LaneKind, LanePoint } from "./lanes"
+import { formatBeats, LaneKind, LanePoint } from "./lanes"
 import { useSnap } from "./snap"
 
 /** Pixels a point moves before a drag chooses whether it changes time or value. */
@@ -48,6 +49,8 @@ export default function AutomationLane({
 }: Props) {
     const ref = useRef<HTMLDivElement>(null)
     const [dragging, setDragging] = useState<Drag | null>(null)
+    // Where a choice of value is open, for discrete lanes: for a point, or for a new point at a time
+    const [choosing, setChoosing] = useState<{ point: LanePoint } | { time: number } | null>(null)
     const [, snap] = useSnap()
 
     const range = kind.max - kind.min
@@ -94,7 +97,12 @@ export default function AutomationLane({
             if (event.button !== 0 || event.target !== ref.current) {
                 return
             }
-            onAdd(Math.min(snap(ticksAt(event.clientX), event.shiftKey), length), valueAt(event.clientY))
+            const time = Math.min(snap(ticksAt(event.clientX), event.shiftKey), length)
+            if (kind.discrete) {
+                setChoosing({ time })
+            } else {
+                onAdd(time, valueAt(event.clientY))
+            }
         }}
     >
         {showName && <span className={styles.name}>{kind.name}</span>}
@@ -119,7 +127,7 @@ export default function AutomationLane({
                 left: leftOf(point.time + (point.fade ?? 0)),
                 top: kind.display === "line" ? `${yOf(point.value)}%` : "50%",
             }}
-            title={`${format(point.value)}${point.fade !== undefined ? ` over ${point.fade} ticks` : ""}. Drag sideways to move or up and down to change, double-click to delete${onToggleFade ? ", Alt-click to switch between a step and a fade" : ""}.`}
+            title={`${format(point.value)}${point.fade !== undefined ? ` over ${formatBeats(point.fade)}` : ""}. Drag sideways to move or up and down to change, double-click to delete${onToggleFade ? ", Alt-click to switch between a step and a fade" : ""}.`}
             onPointerDown={event => {
                 event.stopPropagation()
                 if (event.altKey && onToggleFade) {
@@ -136,7 +144,7 @@ export default function AutomationLane({
                 const dx = event.clientX - dragging.startX
                 const dy = event.clientY - dragging.startY
                 const axis = dragging.axis ?? (Math.max(Math.abs(dx), Math.abs(dy)) > DRAG_THRESHOLD ? (Math.abs(dx) > Math.abs(dy) ? "time" : "value") : null)
-                if (axis === "time") {
+                if (axis === "time" || (axis === "value" && kind.discrete)) {
                     const width = ref.current!.getBoundingClientRect().width
                     const time = Math.min(length, snap(dragging.point.time + (dx / width) * length, event.shiftKey))
                     setDragging({ ...dragging, axis, time })
@@ -154,6 +162,9 @@ export default function AutomationLane({
                         onChange(original, dragging.value)
                     } else if (dragging.axis === null) {
                         onSelect?.(original)
+                        if (kind.discrete) {
+                            setChoosing({ point: original })
+                        }
                     }
                     setDragging(null)
                 }
@@ -163,6 +174,31 @@ export default function AutomationLane({
                 onDelete(point)
             }}
         />)}
-        {dragging?.axis === "value" && <span className={styles.readout} style={{ left: leftOf(dragging.time) }}>{format(dragging.value)}</span>}
+        {choosing && <div className={styles.chooserAnchor} style={{ left: leftOf("point" in choosing ? choosing.point.time : choosing.time) }}>
+            <Picker
+                aria-label={kind.name}
+                isQuiet
+                isOpen
+                autoFocus
+                menuWidth="size-2400"
+                onOpenChange={open => !open && setChoosing(null)}
+                selectedKey={"point" in choosing ? String(choosing.point.value) : null}
+                onSelectionChange={key => {
+                    const value = Number(key)
+                    if ("point" in choosing) {
+                        if (value !== choosing.point.value) {
+                            onChange(choosing.point, value)
+                        }
+                    } else {
+                        onAdd(choosing.time, value)
+                    }
+                    setChoosing(null)
+                }}
+                items={Array.from({ length: kind.max - kind.min + 1 }, (_, i) => ({ key: String(kind.min + i), name: format(kind.min + i) }))}
+            >
+                {item => <Item key={item.key}>{item.name}</Item>}
+            </Picker>
+        </div>}
+        {dragging?.axis === "value" && !kind.discrete && <span className={styles.readout} style={{ left: leftOf(dragging.time) }}>{format(dragging.value)}</span>}
     </div>
 }

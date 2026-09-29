@@ -4,7 +4,6 @@ import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd"
 import styles from "./ActiveDoc.module.scss"
 import Ruler from "./Ruler"
 import SegmentMap from "./SegmentMap"
-import SongLanes from "./SongLanes"
 import SubsegDetails from "./SubsegDetails"
 import TimeProvider from "./TimeProvider"
 
@@ -79,7 +78,6 @@ export default function ActiveDoc() {
                                 <div style={{ paddingLeft: "225px" }}>
                                     <Ruler />
                                 </div>
-                                <SongLanes />
                                 <SegmentMap />
                                 {provided.placeholder}
                             </Flex>

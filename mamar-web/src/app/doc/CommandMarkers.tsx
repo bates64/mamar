@@ -1,9 +1,10 @@
+import { ActionButton, DialogTrigger } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 import { ReactNode, useRef, useState } from "react"
 
 import styles from "./AutomationLane.module.scss"
+import CommandPopup from "./CommandPopup"
 import { useSnap } from "./snap"
-import { segmentOf } from "./useLaneEditing"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc } from "../store"
@@ -12,7 +13,7 @@ import { useBgm, useDoc } from "../store"
 const DRAG_THRESHOLD = 4
 
 /**
- * Commands as labeled markers. Click one to inspect it, drag it to move it, and double-click it to delete it. Clicking
+ * Commands as labeled markers. Click one to edit it in a popup, drag it to move it, and double-click it to delete it. Clicking
  * empty space calls `onAddAt`, if given. Markers snap to the grid unless Shift is held.
  */
 export default function CommandMarkers({ name, trackListId, trackIndex, length, events, label, onAddAt, children }: {
@@ -31,6 +32,9 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
     const [, snap] = useSnap()
     const ref = useRef<HTMLDivElement>(null)
     const [drag, setDrag] = useState<{ id: number, startX: number, time: number, moved: boolean } | null>(null)
+    // The marker whose popup is open, and the element it opens beside
+    const [editing, setEditing] = useState<number | null>(null)
+    const editingElement = useRef<HTMLElement | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
     const selection = doc?.selection
     const selectedId = selection?.trackList === trackListId && selection.track === trackIndex ? selection.event : undefined
@@ -58,7 +62,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
                 className={styles.marker}
                 data-selected={event.id === selectedId}
                 style={{ left: `${(shownTime / length) * 100}%` }}
-                title="Click to inspect, drag to move, double-click to delete"
+                title="Click to edit, drag to move, double-click to delete"
                 onPointerDown={e => {
                     e.stopPropagation()
                     e.currentTarget.setPointerCapture(e.pointerId)
@@ -72,7 +76,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
                         setDrag({ ...drag, moved, time: Math.min(length, snap(time + dx, e.shiftKey)) })
                     }
                 }}
-                onPointerUp={() => {
+                onPointerUp={e => {
                     if (drag?.id !== event.id) return
                     if (drag.moved && drag.time !== time) {
                         const fields = event as unknown as Record<string, unknown>
@@ -86,9 +90,8 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
                         })
                     } else if (!drag.moved) {
                         docDispatch({ type: "set_selection", selection: { ...target, event: event.id } })
-                        if (trackIndex === 0) {
-                            docDispatch({ type: "set_panel_content", panelContent: { type: "tracker", trackList: trackListId, track: 0, segment: segmentOf(doc, trackListId) } })
-                        }
+                        editingElement.current = e.currentTarget
+                        setEditing(event.id)
                     }
                     setDrag(null)
                 }}
@@ -104,5 +107,16 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
             </span>
         })}
         {children}
+        {editing !== null && <DialogTrigger
+            type="popover"
+            isOpen
+            onOpenChange={open => !open && setEditing(null)}
+            targetRef={editingElement}
+        >
+            <ActionButton isHidden aria-hidden="true">Edit</ActionButton>
+            {events.find(({ event }) => event.id === editing)
+                ? <CommandPopup event={events.find(({ event }) => event.id === editing)!.event} trackListId={trackListId} trackIndex={trackIndex} />
+                : <></>}
+        </DialogTrigger>}
     </div>
 }

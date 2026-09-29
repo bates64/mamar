@@ -1,5 +1,7 @@
 import { Bgm, Command, Event } from "pm64-typegen"
 
+import { TICKS_PER_BEAT } from "./Ruler"
+
 import Bridge from "../bridge"
 import * as instruments from "../instruments"
 
@@ -20,6 +22,8 @@ export interface LaneKind {
     max: number
     /** A line for values that change gradually, or labeled spans for values that each hold until the next. */
     display: "line" | "spans"
+    /** Whether each value is a named choice, picked from a list rather than dragged to. */
+    discrete?: boolean
     read(command: Record<string, unknown>): { value: number, fade?: number } | undefined
     set(value: number): Command
     /** Changes the value of `command`, for commands with other fields to keep. Defaults to `set`. */
@@ -47,6 +51,12 @@ function field(
         read: command => (variant in command ? { value: (command[variant] as Fields)[valueField] } : undefined),
         set: value => ({ [variant]: { [valueField]: value } }) as Command,
     }
+}
+
+/** A length of time in beats, for showing a length in ticks, which are the engine's own unit. */
+export function formatBeats(ticks: number): string {
+    const beats = +(ticks / TICKS_PER_BEAT).toFixed(2)
+    return `${beats} ${beats === 1 ? "beat" : "beats"}`
 }
 
 const signed = (unit: string) => (value: number) => `${value > 0 ? "+" : ""}${value} ${unit}`
@@ -77,7 +87,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
     return [
         ...TRACK_LANES,
         {
-            key: "instrument", name: "Instrument", min: 0, max: Math.max(0, bgm.instruments.length - 1), display: "spans",
+            key: "instrument", name: "Instrument", min: 0, max: Math.max(0, bgm.instruments.length - 1), display: "spans", discrete: true,
             format: index => {
                 const instrument = bgm.instruments[index]
                 return instrument ? `${index}: ${instruments.getName(instrument.patch)}` : `${index}`
@@ -117,13 +127,21 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
                 : { TrackTremoloSpeed: speed }) as Command,
         },
         {
+            // Only a full tremolo command has a delay, so a new point starts one with a gentle speed and depth
+            key: "tremoloDelay", name: "Tremolo delay", min: 0, max: 255, display: "spans",
+            format: formatBeats,
+            read: command => ("TrackTremolo" in command ? { value: (command.TrackTremolo as Fields).delay } : undefined),
+            set: delay => ({ TrackTremolo: { delay, speed: 64, depth: 32 } }),
+            update: (command, delay) => ({ TrackTremolo: { ...(command.TrackTremolo as Fields), delay } }) as Command,
+        },
+        {
             key: "randomPan", name: "Random pan", min: 0, max: 127, display: "line",
             read: command => ("SubTrackRandomPan" in command ? { value: (command.SubTrackRandomPan as Fields).amount } : undefined),
             set: amount => ({ SubTrackRandomPan: { pan: 64, amount } }),
             update: (command, amount) => ({ SubTrackRandomPan: { ...(command.SubTrackRandomPan as Fields), amount } }) as Command,
         },
         {
-            key: "busSend", name: "Bus send", min: 0, max: 3, display: "spans",
+            key: "busSend", name: "Bus send", min: 0, max: 1, display: "spans", discrete: true,
             format: busName,
             read: command => ("SubTrackReverbType" in command ? { value: (command.SubTrackReverbType as Fields).index } : undefined),
             set: index => ({ SubTrackReverbType: { index } }),
@@ -134,8 +152,8 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
 /** Commands that aren't shown on their own: notes and the structure of the track. */
 const STRUCTURE = ["Note", "Delay", "End", "Detour"]
 
-/** Whether any of `lanes` shows `event`, or it's part of the track's structure. */
-export function isShown(event: Event, lanes: LaneKind[]): boolean {
+/** Whether any of `lanes` is for `event`, or it's part of the track's structure. */
+export function inLane(event: Event, lanes: LaneKind[]): boolean {
     const command = event as unknown as Record<string, unknown>
     return STRUCTURE.some(key => key in command) || lanes.some(kind => kind.read(command) !== undefined)
 }
@@ -194,7 +212,7 @@ export function busName(slot: number): string {
 
 function busLane(slot: number): LaneKind {
     return {
-        key: `bus${slot}`, name: busName(slot), min: 0, max: EFFECT_NAMES.length - 1, display: "spans",
+        key: `bus${slot}`, name: busName(slot), min: 0, max: EFFECT_NAMES.length - 1, display: "spans", discrete: true,
         format: effectName,
         read: command => {
             const effect = command.MasterEffect as Fields | undefined

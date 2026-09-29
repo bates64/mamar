@@ -7,7 +7,7 @@ import { useTime } from "./TimeProvider"
 import useSongPlayer, { PlayerStatus, SongPosition } from "../emu/SongPlayer"
 import { useDoc } from "../store"
 
-interface Context {
+export interface Context {
     /** Where playback starts, and where the playhead returns when it stops, in ticks along the timeline. */
     start: number
     setStart: (ticks: number) => void

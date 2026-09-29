@@ -1,18 +1,18 @@
-import { ActionButton, Item, Menu, MenuTrigger } from "@adobe/react-spectrum"
 import { Event, TrackList } from "pm64-typegen"
-import { useMemo, useRef, useState } from "react"
+import { useMemo } from "react"
 
 import AutomationLane from "./AutomationLane"
 import CommandMarkers from "./CommandMarkers"
-import { commandName, isShown, LaneKind, lanePoints, lastValue, MASTER_LANES, MASTER_VOLUME_LANE, TEMPO_LANE, timeline, TRANSPOSE_LANE } from "./lanes"
+import Inspector from "./Inspector"
+import LaneMenu, { useLaneShown } from "./LaneMenu"
+import { commandName, inLane, LaneKind, lanePoints, lastValue, MASTER_LANES, MASTER_VOLUME_LANE, TEMPO_LANE, timeline, TRANSPOSE_LANE } from "./lanes"
 import { PlayheadLine } from "./Playhead"
-import { useSegmentLengths, useTicksPerBar } from "./Ruler"
-import { useSnap } from "./snap"
+import { useSegmentLengths } from "./Ruler"
 import styles from "./SongLanes.module.scss"
 import TimeGrid from "./TimeGrid"
 import useLaneEditing from "./useLaneEditing"
 
-import { useBgm, useVariation } from "../store"
+import { useBgm, useDoc, useVariation } from "../store"
 import { getSegmentId } from "../store/segment"
 
 /** Every lane of the master track's commands. */
@@ -29,7 +29,9 @@ export default function SongLanes() {
     const [bgm] = useBgm()
     const [variation] = useVariation()
     const segmentLengths = useSegmentLengths()
-    const [addedLanes, setAddedLanes] = useState<string[]>([])
+    const isShown = useLaneShown()
+    const [doc] = useDoc()
+    const selection = doc?.selection
 
     const segments = useMemo(() => (variation?.segments ?? []).map((segment, i) => {
         const key = getSegmentId(segment) ?? i
@@ -51,12 +53,15 @@ export default function SongLanes() {
 
     const pointsOf = (kind: LaneKind) => masterTimelines.flatMap(commands => lanePoints(kind, commands))
 
-    // Effects that never change are the song's settings, so only lanes whose value changes are shown
-    const shownMasterLanes = MASTER_LANES.filter(kind => {
-        const values = new Set(pointsOf(kind).map(point => point.value))
-        return kind === MASTER_VOLUME_LANE || values.size > 1 || addedLanes.includes(kind.key)
-    })
-    const hiddenMasterLanes = MASTER_LANES.filter(kind => !shownMasterLanes.includes(kind))
+    // Effects that never change are the song's settings, so only effect lanes whose value changes are shown by default
+    const laneOptions = SONG_LANES.map(kind => ({
+        key: kind.key,
+        name: kind.name,
+        hasCommands: MASTER_LANES.includes(kind) && kind !== MASTER_VOLUME_LANE
+            ? new Set(pointsOf(kind).map(point => point.value)).size > 1
+            : kind === MASTER_VOLUME_LANE || pointsOf(kind).length > 0,
+    }))
+    const shownLanes = SONG_LANES.filter((_, i) => isShown(laneOptions[i]))
 
     const row = (kind: LaneKind, className: string, label: React.ReactNode = kind.name) => <div key={kind.key} className={`${styles.row} ${className}`}>
         <div className={styles.label}>{label}</div>
@@ -80,28 +85,17 @@ export default function SongLanes() {
     </div>
 
     return <div className={styles.lanes}>
-        <div className={`${styles.row} ${styles.ruler}`}>
-            <div className={styles.label}>Segments</div>
-            <TimeGrid>
-                {segments.map((segment, i) => (segment.trackListId === undefined
-                    ? <div key={segment.key} />
-                    : <SegmentLength key={segment.key} trackListId={segment.trackListId} length={segmentLengths[i]} />))}
-                <PlayheadLine />
-            </TimeGrid>
+        <div className={`${styles.row} ${styles.masterHeading}`}>
+            <div className={styles.label}>
+                <LaneMenu lanes={laneOptions} />
+            </div>
+            <div />
         </div>
-        {row(TEMPO_LANE, styles.ruler)}
-        {row(TRANSPOSE_LANE, styles.ruler)}
-        {shownMasterLanes.map((kind, i) => row(kind, styles.master, <>
-            {i === 0 && <strong>Master</strong>}
-            <span>{kind.name}</span>
-            {i === 0 && hiddenMasterLanes.length > 0 && <MenuTrigger>
-                <ActionButton isQuiet aria-label="Show another master lane">+ Lane</ActionButton>
-                <Menu onAction={key => setAddedLanes([...addedLanes, String(key)])}>
-                    {hiddenMasterLanes.map(kind => <Item key={kind.key}>{kind.name}</Item>)}
-                </Menu>
-            </MenuTrigger>}
-        </>))}
-        {masterTimelines.some(commands => commands.some(({ event }) => !isShown(event, SONG_LANES))) && <div className={`${styles.row} ${styles.master}`}>
+        {selection?.track === 0 && segments.some(segment => segment.trackListId === selection.trackList) && <div className={styles.inspector}>
+            <Inspector trackListId={selection.trackList} trackIndex={0} />
+        </div>}
+        {shownLanes.map(kind => row(kind, styles.master))}
+        {masterTimelines.some(commands => commands.some(({ event }) => !inLane(event, SONG_LANES))) && <div className={`${styles.row} ${styles.master}`}>
             <div className={styles.label}><span>Other</span></div>
             <TimeGrid>
                 {segments.map((segment, i) => (segment.trackListId === undefined
@@ -112,48 +106,12 @@ export default function SongLanes() {
                         trackListId={segment.trackListId}
                         trackIndex={0}
                         length={segmentLengths[i]}
-                        events={masterTimelines[i].filter(({ event }) => !isShown(event, SONG_LANES))}
+                        events={masterTimelines[i].filter(({ event }) => !inLane(event, SONG_LANES))}
                         label={commandName}
                     />))}
                 <PlayheadLine />
             </TimeGrid>
         </div>}
-    </div>
-}
-
-/** A segment's length, with a handle on its end to drag it longer or shorter. */
-function SegmentLength({ trackListId, length }: { trackListId: number, length: number }) {
-    const [, dispatch] = useBgm()
-    const [, snap] = useSnap()
-    const ticksPerBar = useTicksPerBar()
-    const ref = useRef<HTMLDivElement>(null)
-    const [drag, setDrag] = useState<{ startX: number, length: number } | null>(null)
-    const bars = (ticks: number) => `${+(ticks / ticksPerBar).toFixed(2)} bars`
-
-    return <div ref={ref} className={styles.segment}>
-        <span>{bars(drag?.length ?? length)}</span>
-        <span
-            className={styles.resize}
-            title="Drag to change the segment's length. Hold Shift to place freely."
-            data-no-drag-scroll
-            onPointerDown={event => {
-                event.stopPropagation()
-                event.currentTarget.setPointerCapture(event.pointerId)
-                setDrag({ startX: event.clientX, length })
-            }}
-            onPointerMove={event => {
-                if (!drag) return
-                const ticksPerPx = length / ref.current!.getBoundingClientRect().width
-                const newLength = snap(length + (event.clientX - drag.startX) * ticksPerPx, event.shiftKey)
-                setDrag({ ...drag, length: Math.max(1, newLength) })
-            }}
-            onPointerUp={() => {
-                if (drag && drag.length !== length) {
-                    dispatch({ type: "set_segment_length", trackList: trackListId, length: drag.length })
-                }
-                setDrag(null)
-            }}
-        />
     </div>
 }
 

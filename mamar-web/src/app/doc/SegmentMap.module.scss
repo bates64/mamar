@@ -122,3 +122,38 @@ $trackHeight: 70px;
         fill: var(--note-color);
     }
 }
+
+.segment {
+    position: relative;
+}
+
+// A zero-width line at the end of a segment, with a wider area to grab it by.
+.segmentEnd {
+    position: absolute;
+    top: 0;
+    right: -5px;
+    bottom: 0;
+    width: 10px;
+    z-index: 2;
+    cursor: ew-resize;
+    touch-action: none;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 4px;
+        width: 2px;
+        background: transparent;
+    }
+
+    &:hover::after,
+    &[data-dragging="true"]::after {
+        background: var(--spectrum-blue-700);
+    }
+}
+
+.songLanes {
+    grid-column: 1 / -1;
+}

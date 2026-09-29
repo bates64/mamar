@@ -4,7 +4,10 @@ import type { Event } from "pm64-typegen"
 import { useId, useDeferredValue, useMemo, memo, startTransition } from "react"
 
 import { PlayheadLine } from "./Playhead"
+import { useSegmentLengths } from "./Ruler"
+import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
+import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 
 import Bridge from "../bridge"
@@ -147,6 +150,7 @@ function Container() {
     const [variation] = useVariation()
     const [bgm] = useBgm()
     const selection = useSelection()
+    const segmentLengths = useSegmentLengths()
 
     // Rows used only by alternate parts are hidden, as they show in the rows of the tracks they're for.
     const trackLists = (variation?.segments ?? [])
@@ -165,6 +169,9 @@ function Container() {
                 selection.clear()
             }}
         >
+            <div className={styles.songLanes}>
+                <SongLanes />
+            </div>
             <View>
                 {tracks.map(i => <div key={i} className={styles.track}>
                     {<div className={styles.trackHead}>
@@ -182,10 +189,12 @@ function Container() {
                         return <View
                             key={segment.Subseg.id}
                             colorVersion={6}
+                            UNSAFE_className={styles.segment}
                         >
                             {tracks.map(i => <div key={i} className={styles.track} aria-label={`Track ${i}`}>
                                 <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} segmentIndex={segmentIndex} />
                             </div>)}
+                            <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
                         </View>
                     } else {
                         const id = getSegmentId(segment)

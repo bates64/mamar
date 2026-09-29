@@ -58,6 +58,8 @@ export interface Doc {
     location: Location
     snap: Snap
     selection?: Selection | null
+    /** Lanes chosen to be shown or hidden, by key. Others are shown if they have commands. */
+    shownLanes?: Record<string, boolean>
 }
 
 export type DocAction = {
@@ -81,6 +83,10 @@ export type DocAction = {
 } | {
     type: "set_selection"
     selection: Selection | null
+} | {
+    type: "set_lane_shown"
+    lane: string
+    shown: boolean
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -107,6 +113,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeVariation: action.index,
+        }
+    case "set_lane_shown":
+        return {
+            ...state,
+            shownLanes: { ...state.shownLanes, [action.lane]: action.shown },
         }
     case "set_selection":
         return {

@@ -1,15 +1,15 @@
 import { ActionButton, ToggleButton, View } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
-import { useCallback, useEffect, useId, useRef, useContext } from "react"
+import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext } from "react"
 import { Play, SkipBack } from "react-feather"
 
 import LocationControls from "./LocationControls"
 import styles from "./PlaybackControls.module.scss"
 import SnapControl from "./SnapControl"
-import useSongPlayer, { PlayerStatus, SongPosition } from "./SongPlayer"
+import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
 
 import Bridge from "../bridge"
-import { CONTEXT as PLAYHEAD_CONTEXT, PlayheadPosition, useTimeline } from "../doc/Playhead"
+import { CONTEXT as PLAYHEAD_CONTEXT, Context as PlayheadContext, PlayheadPosition, useTimeline } from "../doc/Playhead"
 import { DEFAULT_BEATS_PER_BAR } from "../doc/Ruler"
 import { useDoc, useLocation } from "../store"
 import { proximityMixValue } from "../store/doc"
@@ -23,6 +23,44 @@ function encodeBgm(bgm: Bgm): Uint8Array {
     }
 
     return bgmBin
+}
+
+/**
+ * Loads the song when playback starts, and again when it changes while playing, from wherever it has got to. It reads
+ * only the song as a whole, so it re-renders when any of it changes without reading all of it.
+ */
+function SongLoader({ player, playing, timeline, songPosition }: {
+    player: SongPlayer
+    playing: PlayheadContext["playing"]
+    timeline: ReturnType<typeof useTimeline>
+    songPosition: MutableRefObject<SongPosition | null>
+}) {
+    const [doc] = useDoc()
+    const bgm = doc?.bgm ?? null
+    const activeVariation = doc?.activeVariation ?? -1
+    const loaded = useRef<{ playing: typeof playing, variation: number } | null>(null)
+
+    useEffect(() => {
+        if (!bgm || activeVariation < 0 || !playing) {
+            loaded.current = null
+            return
+        }
+
+        let start = timeline.toPosition(playing.from)
+        if (loaded.current?.playing === playing) {
+            if (loaded.current.variation !== activeVariation) {
+                start = { segment: 0, tick: 0 }
+            } else if (songPosition.current) {
+                start = songPosition.current
+            }
+        }
+        loaded.current = { playing, variation: activeVariation }
+        player.load(encodeBgm(bgm), activeVariation, start)
+    // timeline and songPosition change as the song does, which bgm tracks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [player, bgm, activeVariation, playing])
+
+    return null
 }
 
 export default function PlaybackControls() {
@@ -43,31 +81,6 @@ export default function PlaybackControls() {
     const timeline = useTimeline()
     // Ticks along the timeline where playback last stopped, which Shift+Space continues from.
     const stoppedAt = useRef<number | null>(null)
-    const loaded = useRef<{ playing: typeof playing, variation: number } | null>(null)
-
-    // Access the entire bgm object so useDoc tracks any change to it
-    JSON.stringify(bgm)
-
-    // Loads the song when playback starts, and again when it changes while playing, from wherever it has got to.
-    useEffect(() => {
-        if (!bgm || activeVariation < 0 || !playing) {
-            loaded.current = null
-            return
-        }
-
-        let start = timeline.toPosition(playing.from)
-        if (loaded.current?.playing === playing) {
-            if (loaded.current.variation !== activeVariation) {
-                start = { segment: 0, tick: 0 }
-            } else if (songPosition.current) {
-                start = songPosition.current
-            }
-        }
-        loaded.current = { playing, variation: activeVariation }
-        player.load(encodeBgm(bgm), activeVariation, start)
-    // timeline and songPosition change as the song does, which bgm tracks.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [player, bgm, activeVariation, playing])
 
     useEffect(() => {
         player.setPaused(!playing)
@@ -136,6 +149,7 @@ export default function PlaybackControls() {
     }
 
     return <View paddingX="size-200" paddingY="size-50" UNSAFE_className={styles.container}>
+        <SongLoader player={player} playing={playing} timeline={timeline} songPosition={songPosition} />
         <div ref={actionsRef} className={styles.actions} role="group" aria-label="Playback actions">
             <ActionButton
                 aria-label="Restart"

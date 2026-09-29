@@ -75,19 +75,7 @@ export default function useLaneEditing(
                 }
             }
         }),
-        onSelect: point => {
-            docDispatch({ type: "set_selection", selection: { ...target, event: point.event.id } })
-            // The master track has no row of its own, so open it to show the selected command
-            if (trackIndex === 0) {
-                docDispatch({ type: "set_panel_content", panelContent: { type: "tracker", trackList: trackListId, track: 0, segment: segmentOf(doc, trackListId) } })
-            }
-        },
+        onSelect: point => docDispatch({ type: "set_selection", selection: { ...target, event: point.event.id } }),
         selectedId: selection?.trackList === trackListId && selection.track === trackIndex ? selection.event : undefined,
     }
-}
-
-/** The index of the first segment in the active variation that plays track list `trackListId`. */
-export function segmentOf(doc: ReturnType<typeof useDoc>[0], trackListId: number): number {
-    const segments = doc?.bgm.variations[doc.activeVariation]?.segments ?? []
-    return Math.max(0, segments.findIndex(segment => "Subseg" in segment && segment.Subseg.track_list === trackListId))
 }

@@ -22,38 +22,19 @@
     overflow: hidden;
 }
 
-.ruler {
-    background: var(--spectrum-gray-200);
-}
-
 .master {
     height: 40px;
     background: var(--spectrum-gray-75);
 }
 
-.segment {
-    position: relative;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    font-size: 11px;
-    color: var(--spectrum-gray-800);
-    border-left: 1px dashed var(--spectrum-gray-400);
-    white-space: nowrap;
-    overflow: hidden;
+
+.masterHeading {
+    height: 30px;
+    background: var(--spectrum-gray-100);
 }
 
-.resize {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: ew-resize;
-    touch-action: none;
-    background: var(--spectrum-gray-400);
-
-    &:hover {
-        background: var(--spectrum-blue-700);
-    }
+.inspector {
+    padding: 0 16px 8px 16px;
+    background: var(--spectrum-gray-100);
+    border-bottom: 1px solid var(--spectrum-gray-300);
 }
