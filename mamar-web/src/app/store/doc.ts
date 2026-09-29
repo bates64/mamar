@@ -62,6 +62,17 @@ export interface Doc {
     shownLanes?: Record<string, boolean>
     /** Ticks per pixel along the timeline. */
     zoom?: number
+    /** The part of the active variation that playback repeats, if one has been marked. */
+    cycle?: Cycle | null
+}
+
+/** A part of the timeline that playback can repeat, as in a DAW. */
+export interface Cycle {
+    /** Where it starts and ends, in ticks along the timeline. */
+    start: number
+    end: number
+    /** Whether playback repeats it. */
+    isEnabled: boolean
 }
 
 export const DEFAULT_ZOOM = 2
@@ -96,6 +107,9 @@ export type DocAction = {
     type: "set_lane_shown"
     lane: string
     shown: boolean
+} | {
+    type: "set_cycle"
+    cycle: Cycle | null
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -122,6 +136,8 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeVariation: action.index,
+            // A cycle marks a part of one variation's timeline
+            cycle: null,
         }
     case "set_zoom":
         return {
@@ -142,6 +158,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             snap: action.snap,
+        }
+    case "set_cycle":
+        return {
+            ...state,
+            cycle: action.cycle,
         }
     case "set_location":
         return {

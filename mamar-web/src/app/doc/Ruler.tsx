@@ -5,6 +5,7 @@ import { useContext, useState } from "react"
 import { usePress } from "react-aria"
 import { getUntrackedObject } from "react-tracked"
 
+import CycleStrip, { CycleShade, useCycleDrag } from "./CycleRegion"
 import Playhead, { CONTEXT as PLAYHEAD_CONTEXT, snapToBeat } from "./Playhead"
 import styles from "./Ruler.module.scss"
 import TimeGrid from "./TimeGrid"
@@ -239,6 +240,7 @@ export default function Ruler() {
     const ticksPerBar = useTicksPerBar()
     const time = useTime()
     const playhead = useContext(PLAYHEAD_CONTEXT)!
+    const cycleDrag = useCycleDrag()
 
     const elements = []
     let currentLoop: Loop | null = null
@@ -313,6 +315,10 @@ export default function Ruler() {
     }
 
     return <div className={styles.ruler}>
+        {/* Dragging along the top of the ruler marks a cycle, as in Logic */}
+        <TimeGrid className={styles.cycleArea} onMouseDown={cycleDrag.beginMark}>
+            <CycleStrip drag={cycleDrag} />
+        </TimeGrid>
         <TimeGrid className={styles.loops}>
             {elements}
         </TimeGrid>
@@ -329,6 +335,7 @@ export default function Ruler() {
                 }
             }}
         >
+            <CycleShade />
             <Playhead />
             {bars}
         </TimeGrid>
@@ -352,7 +359,9 @@ function RulerSegment({ segment, currentLoop, highlightedLoop, length, onPress }
             [styles.highlighted]: currentLoop !== null && (currentLoop.id === highlightedLoop),
         })}
         style={{ gridColumn: `span ${length}` }}
-        title={currentLoop === null ? "Double-click to loop" : ""}
+        title={currentLoop === null
+            ? "Double-click to loop this part of the song"
+            : `Loop in the song, which ${currentLoop.iterCount > 0 ? `plays this part ${currentLoop.iterCount + 1} times` : "repeats this part forever"} in the game. Click to change it.`}
         onDoubleClick={() => {
             const id = getSegmentId(segment)
             if (id == null) {

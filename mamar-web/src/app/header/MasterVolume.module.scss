@@ -1,0 +1,10 @@
+.volume {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    color: var(--spectrum-global-color-gray-700);
+
+    // The header drags the window, which would take the slider's drags too
+    -webkit-app-region: no-drag;
+}

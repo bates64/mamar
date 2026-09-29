@@ -1,7 +1,7 @@
 import { Flex, Grid, Heading, View } from "@adobe/react-spectrum"
 
 import BgmActionGroup from "./BgmActionGroup"
-import SponsorButton from "./SponsorButton"
+import MasterVolume from "./MasterVolume"
 
 import "./Header.scss"
 
@@ -33,7 +33,7 @@ export default function Header() {
                         Mamar
                     </h2>
                 </Flex>
-                <SponsorButton />
+                <MasterVolume />
             </Grid>
         </View>
     </header>

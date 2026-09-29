@@ -1,6 +1,6 @@
 import type { AudioEngineMessage, AudioEngineOptions, AudioEngineStatus } from "./audioEngine.worklet"
 import workletUrl from "./audioEngine.worklet?worker&url"
-import { PlayerStatus, SongPlayer, SongPosition, TrackMute } from "./SongPlayer"
+import { PlayerStatus, SongCycle, SongPlayer, SongPosition, TrackMute } from "./SongPlayer"
 
 import wasmUrl from "../../../../mamar-audio/build/mamar_audio.wasm?url"
 
@@ -70,6 +70,14 @@ export default class WasmSongPlayer implements SongPlayer {
 
     setLocation(proximityMix: number, alternateParts: boolean) {
         this.post({ type: "location", proximityMix, alternateParts })
+    }
+
+    setCycle(cycle: SongCycle | null) {
+        this.post({ type: "cycle", cycle })
+    }
+
+    setVolume(volume: number) {
+        this.post({ type: "volume", volume })
     }
 
     onStatus(listener: (status: PlayerStatus) => void): () => void {

@@ -1,7 +1,7 @@
-import { ActionButton, ToggleButton, View } from "@adobe/react-spectrum"
+import { ActionButton, ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
-import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext } from "react"
-import { Play, SkipBack } from "react-feather"
+import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext, useState } from "react"
+import { Play, Repeat, SkipBack } from "react-feather"
 
 import LocationControls from "./LocationControls"
 import styles from "./PlaybackControls.module.scss"
@@ -9,10 +9,11 @@ import SnapControl, { ZoomControls } from "./SnapControl"
 import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
 
 import Bridge from "../bridge"
+import { CYCLE_DESCRIPTION } from "../doc/CycleRegion"
 import { CONTEXT as PLAYHEAD_CONTEXT, Context as PlayheadContext, PlayheadPosition, useTimeline } from "../doc/Playhead"
-import { DEFAULT_BEATS_PER_BAR } from "../doc/Ruler"
+import { DEFAULT_BEATS_PER_BAR, TICKS_PER_BEAT, usePickup, useTicksPerBar } from "../doc/Ruler"
 import { useDoc, useLocation } from "../store"
-import { proximityMixValue } from "../store/doc"
+import { Cycle, proximityMixValue } from "../store/doc"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 function encodeBgm(bgm: Bgm): Uint8Array {
@@ -63,6 +64,67 @@ function SongLoader({ player, playing, timeline, songPosition }: {
     return null
 }
 
+/**
+ * Shows where the playhead is. Clicking it lets the user type a bar and beat, such as 5.3, and press Enter to move
+ * playback there.
+ */
+function PositionField() {
+    const playhead = useContext(PLAYHEAD_CONTEXT)!
+    const pickup = usePickup()
+    const ticksPerBar = useTicksPerBar()
+    const [draft, setDraft] = useState<string | null>(null)
+    const id = useId()
+
+    // Bars count from 1, so a pickup before bar 1 is bar 0.
+    const startBar = Math.floor((playhead.start - pickup) / ticksPerBar)
+    const startBeat = Math.floor((playhead.start - pickup - startBar * ticksPerBar) / TICKS_PER_BEAT)
+
+    function commit() {
+        const match = /^\s*(\d+)(?:\.(\d+))?\s*$/.exec(draft ?? "")
+        setDraft(null)
+        if (!match) return
+
+        const bar = Number(match[1])
+        const beat = Number(match[2] ?? 1)
+        if (beat < 1) return
+        const ticks = Math.max(0, pickup + (bar - 1) * ticksPerBar + (beat - 1) * TICKS_PER_BEAT)
+        playhead.setStart(ticks)
+        if (playhead.playing) {
+            playhead.play(ticks)
+        }
+    }
+
+    return <div className={styles.field}>
+        <label htmlFor={id} className={styles.fieldName}>Position</label>
+        {draft === null
+            ? <button
+                id={id}
+                className={styles.positionButton}
+                title="Click to go to a bar and beat"
+                onClick={() => setDraft(`${startBar + 1}.${startBeat + 1}`)}
+            >
+                <PlayheadPosition />
+            </button>
+            : <input
+                id={id}
+                className={styles.positionInput}
+                autoFocus
+                size={5}
+                value={draft}
+                onChange={event => setDraft(event.target.value)}
+                onFocus={event => event.target.select()}
+                onBlur={() => setDraft(null)}
+                onKeyDown={event => {
+                    if (event.key === "Enter") {
+                        commit()
+                    } else if (event.key === "Escape") {
+                        setDraft(null)
+                    }
+                }}
+            />}
+    </div>
+}
+
 export default function PlaybackControls() {
     const [doc, dispatch] = useDoc()
     const bgm = doc?.bgm ?? null
@@ -81,6 +143,31 @@ export default function PlaybackControls() {
     const timeline = useTimeline()
     // Ticks along the timeline where playback last stopped, which Shift+Space continues from.
     const stoppedAt = useRef<number | null>(null)
+    const cycle = doc?.cycle ?? null
+    const pickup = usePickup()
+    const ticksPerBar = useTicksPerBar()
+
+    // While cycling, playback from outside the cycle starts at the cycle instead, as it would soon go there anyway.
+    const playFrom = useCallback((ticks: number) => {
+        play(cycle?.isEnabled && (ticks < cycle.start || ticks >= cycle.end) ? cycle.start : ticks)
+    }, [play, cycle])
+
+    const toggleCycle = useCallback(() => {
+        // Without a cycle, cycle the bar playback starts in and the three after it.
+        const barStart = pickup + Math.floor((playhead.start - pickup) / ticksPerBar) * ticksPerBar
+        const next: Cycle = cycle
+            ? { ...cycle, isEnabled: !cycle.isEnabled }
+            : { start: Math.max(0, barStart), end: Math.max(0, barStart) + ticksPerBar * 4, isEnabled: true }
+        dispatch({ type: "set_cycle", cycle: next })
+    }, [cycle, dispatch, pickup, ticksPerBar, playhead.start])
+
+    const cycleStart = cycle?.isEnabled ? timeline.toPosition(cycle.start) : null
+    const cycleEnd = cycle?.isEnabled ? timeline.toPosition(cycle.end) : null
+    useEffect(() => {
+        player.setCycle(cycleStart && cycleEnd ? { start: cycleStart, end: cycleEnd } : null)
+    // The positions are new objects each render, so the effect depends on their values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [player, cycleStart?.segment, cycleStart?.tick, cycleEnd?.segment, cycleEnd?.tick])
 
     useEffect(() => {
         player.setPaused(!playing)
@@ -128,16 +215,19 @@ export default function PlaybackControls() {
                 if (playing) {
                     stop()
                 } else if (activeVariation >= 0) {
-                    play(event.shiftKey ? stoppedAt.current ?? playhead.start : playhead.start)
+                    playFrom(event.shiftKey ? stoppedAt.current ?? playhead.start : playhead.start)
                 }
                 event.preventDefault()
                 event.stopPropagation()
+            } else if (event.key === "c" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                toggleCycle()
+                event.preventDefault()
             }
         }
         // Captures Space before the playback buttons do, so Shift+Space works while one has focus.
         document.addEventListener("keydown", onKeydown, true)
         return () => document.removeEventListener("keydown", onKeydown, true)
-    }, [playing, play, stop, activeVariation, playhead.start])
+    }, [playing, playFrom, stop, activeVariation, playhead.start, toggleCycle])
 
     const timeSignatureId = useId()
     const variationId = useId()
@@ -169,18 +259,26 @@ export default function PlaybackControls() {
                     if (!p) {
                         stop()
                     } else if (activeVariation >= 0) {
-                        play(playhead.start)
+                        playFrom(playhead.start)
                     }
                 }}
             >
                 <Play />
             </ToggleButton>
+            <TooltipTrigger>
+                <ToggleButton
+                    aria-label="Cycle"
+                    UNSAFE_className={styles.cycle}
+                    isSelected={cycle?.isEnabled ?? false}
+                    onChange={toggleCycle}
+                >
+                    <Repeat />
+                </ToggleButton>
+                <Tooltip>{CYCLE_DESCRIPTION}</Tooltip>
+            </TooltipTrigger>
         </div>
         <div className={styles.position} role="group" aria-label="Playback status">
-            <div className={styles.field} tabIndex={0}>
-                <label className={styles.fieldName}>Position</label>
-                <span className={styles.songPosition}><PlayheadPosition /></span>
-            </div>
+            <PositionField />
             <div className={styles.field} tabIndex={0} aria-live="polite">
                 <label className={styles.fieldName}>Tempo</label>
                 <span className={styles.tempo} ref={bpmRef}>-</span>

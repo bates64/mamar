@@ -1,6 +1,6 @@
 // Runs papermario-dx's audio engine, compiled to WebAssembly by mamar-audio, on the audio thread.
 
-import type { SongPosition } from "./SongPlayer"
+import type { SongCycle, SongPosition } from "./SongPlayer"
 
 declare const currentTime: number
 declare const sampleRate: number
@@ -22,6 +22,8 @@ export type AudioEngineMessage =
     | { type: "pause", paused: boolean }
     | { type: "mutes", muteMask: number, soloMask: number }
     | { type: "location", proximityMix: number, alternateParts: boolean }
+    | { type: "cycle", cycle: SongCycle | null }
+    | { type: "volume", volume: number }
 
 export interface AudioEngineStatus {
     /** Beats per minute. */
@@ -68,6 +70,10 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
     /** How loud the output is, which fades towards 0 while paused and 1 otherwise. */
     private gain = 0
     private lastStatus = -Infinity
+    private volume = 1
+    /** The song last played, which a cycle plays again from its start. */
+    private song: { size: number, variation: number } | null = null
+    private cycle: SongCycle | null = null
 
     constructor({ processorOptions }: { processorOptions: AudioEngineOptions }) {
         super()
@@ -91,6 +97,7 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
         switch (message.type) {
         case "play":
             new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), message.bgm.length).set(message.bgm)
+            this.song = { size: message.bgm.length, variation: message.variation }
             engine.mamar_audio_play(message.bgm.length, message.variation, -1, message.start.segment, message.start.tick)
             break
         case "pause":
@@ -98,6 +105,12 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
             break
         case "mutes":
             engine.mamar_audio_set_track_mutes(message.muteMask, message.soloMask)
+            break
+        case "cycle":
+            this.cycle = message.cycle
+            break
+        case "volume":
+            this.volume = message.volume
             break
         case "location":
             engine.mamar_audio_set_proximity_mix(message.proximityMix)
@@ -121,8 +134,8 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
             this.gain = this.paused
                 ? Math.max(0, this.gain - fadeStep)
                 : Math.min(1, this.gain + fadeStep)
-            left[i] = this.pending[this.readStart] * this.gain
-            right[i] = this.pending[this.readStart + 1] * this.gain
+            left[i] = this.pending[this.readStart] * this.gain * this.volume
+            right[i] = this.pending[this.readStart + 1] * this.gain * this.volume
             this.readStart = (this.readStart + 2) % PENDING_SIZE
         }
         this.pendingLength -= left.length * 2
@@ -145,6 +158,21 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
             write = (write + 1) % PENDING_SIZE
         }
         this.pendingLength += output.length
+        this.repeatCycle()
+    }
+
+    /** Plays the cycle again from its start once the song reaches its end. */
+    private repeatCycle() {
+        const { engine, cycle, song } = this
+        const segment = engine.mamar_audio_segment()
+        if (!cycle || !song || segment < 0) {
+            return
+        }
+
+        const tick = engine.mamar_audio_tick()
+        if (segment > cycle.end.segment || (segment === cycle.end.segment && tick >= cycle.end.tick)) {
+            engine.mamar_audio_play(song.size, song.variation, -1, cycle.start.segment, cycle.start.tick)
+        }
     }
 
     /** Reports where the song is once the engine has rendered it, which is heard `delay` seconds from now. */

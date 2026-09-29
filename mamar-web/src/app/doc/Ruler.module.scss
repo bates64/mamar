@@ -1,4 +1,5 @@
-$ruler-height: 36px;
+$ruler-height: 44px;
+$cycle-height: 8px;
 
 .ruler {
     display: flex;
@@ -25,7 +26,7 @@ $ruler-height: 36px;
 }
 
 .loops {
-    height: $ruler-height - 22px;
+    height: $ruler-height - 22px - $cycle-height;
 }
 
 .loop {
@@ -105,4 +106,52 @@ $ruler-height: 36px;
     padding-left: calc(8px / var(--ruler-zoom));
     border-left: var(--color) 1px solid; /* Extend the background-image */
     flex: none;
+}
+
+/* The strip along the top of the ruler, where dragging marks the part of the timeline playback repeats. */
+.cycleArea {
+    height: $cycle-height;
+    cursor: crosshair;
+}
+
+.cycleStrip, .cycleShade {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+
+    --cycle-color: var(--teal);
+
+    &.cycleDisabled {
+        --cycle-color: var(--grey-5);
+    }
+}
+
+.cycleStrip {
+    background: var(--cycle-color);
+    cursor: pointer;
+}
+
+// Stripes, unlike the song's solid loops, show the cycle is only a selection for listening
+.cycleShade {
+    --cycle-stripe: color-mix(in srgb, var(--cycle-color) 30%, transparent);
+    background: repeating-linear-gradient(-45deg, var(--cycle-stripe) 0 4px, transparent 4px 8px);
+    border-left: 1px solid var(--cycle-color);
+    border-right: 1px solid var(--cycle-color);
+    pointer-events: none;
+}
+
+.cycleEdge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+
+    &[data-edge=start] {
+        left: -4px;
+    }
+
+    &[data-edge=end] {
+        right: -4px;
+    }
 }
