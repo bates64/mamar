@@ -30,6 +30,8 @@ export interface LaneKind {
     update?(command: Record<string, unknown>, value: number): Command
     fade?(value: number, time: number): Command
     format?(value: number): string
+    /** The value a new starting value has. Defaults to 0, or the nearest value in range. */
+    defaultValue?: number
 }
 
 type Fields = Record<string, number>
@@ -64,6 +66,7 @@ const signed = (unit: string) => (value: number) => `${value > 0 ? "+" : ""}${va
 export const TRACK_LANES: LaneKind[] = [
     {
         ...simple("volume", "Volume", "SubTrackVolume", 0, 127),
+        defaultValue: 127,
         read: command => {
             if ("SubTrackVolume" in command) {
                 return { value: command.SubTrackVolume as number }
@@ -74,8 +77,11 @@ export const TRACK_LANES: LaneKind[] = [
         },
         fade: (value, time) => ({ TrackVolumeFade: { time, value } }),
     },
-    simple("trackVolume", "Track volume", "SegTrackVolume", 0, 127),
-    simple("pan", "Pan", "SubTrackPan", 0, 127, value => (value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`)),
+    { ...simple("trackVolume", "Track volume", "SegTrackVolume", 0, 127), defaultValue: 127 },
+    {
+        ...simple("pan", "Pan", "SubTrackPan", 0, 127, value => (value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`)),
+        defaultValue: 64,
+    },
     simple("reverb", "Reverb", "SubTrackReverb", 0, 127),
     simple("coarseTune", "Coarse tune", "SubTrackCoarseTune", -24, 24, signed("st")),
     simple("fineTune", "Fine tune", "SubTrackFineTune", -100, 100, signed("cents")),
@@ -99,7 +105,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
         // Vanilla songs use depths up to about 44, speeds up to about 40, and delays up to 2 beats, so the ranges
         // leave room past those without squashing them.
         {
-            key: "tremolo", name: "Tremolo depth", min: 0, max: 127, display: "line",
+            key: "tremolo", name: "Tremolo depth", min: 0, max: 127, display: "line", defaultValue: 10,
             // The peak of the wave, in cents
             format: depth => (depth === 0 ? "Off" : `±${depth} cents`),
             read: command => {
@@ -117,7 +123,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
                 : (depth === 0 ? "TrackTremoloStop" : { TrackTremoloDepth: { depth } })) as Command,
         },
         {
-            key: "tremoloSpeed", name: "Tremolo speed", min: 0, max: 64, display: "line",
+            key: "tremoloSpeed", name: "Tremolo speed", min: 0, max: 64, display: "line", defaultValue: 15,
             // The wave advances by the speed each tick, out of 256 for a whole wave
             format: speed => `${+(speed * TICKS_PER_BEAT / 256).toFixed(2)} per beat`,
             read: command => {
@@ -154,6 +160,21 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
             set: index => ({ SubTrackReverbType: { index } }),
         },
     ]
+}
+
+/** The value a new starting value of `kind` has. */
+export function defaultValue(kind: LaneKind): number {
+    return kind.defaultValue ?? Math.min(kind.max, Math.max(kind.min, 0))
+}
+
+/**
+ * The commands at the very start of a track that set what it starts with: values lanes show, and an override of its
+ * patch. The track's starting values show these rather than its lanes, which show only changes after the start.
+ */
+export function startingEvents(kinds: LaneKind[], played: { time: number, event: Event }[]): { time: number, event: Event }[] {
+    return played.filter(({ time, event }) => time === 0 && (
+        "TrackOverridePatch" in event || kinds.some(kind => kind.read(event as unknown as Record<string, unknown>) !== undefined)
+    ))
 }
 
 /** Commands that aren't shown on their own: notes and the structure of the track. */

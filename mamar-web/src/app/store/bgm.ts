@@ -44,6 +44,13 @@ export type BgmAction = {
     index: number
     partial: Partial<Instrument>
 } | {
+    type: "add_instrument"
+    instrument: Instrument
+    /** The command, in track `track` of track list `trackList`, that chooses the new instrument. */
+    trackList: number
+    track: number
+    event: Event
+} | {
     type: "split_variation"
     variation: number
     time: number
@@ -194,6 +201,13 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return produce(bgm, draft => {
             const instrument = draft.instruments[action.index]
             Object.assign(instrument, action.partial)
+        })
+    case "add_instrument":
+        return bgmReducer({ ...bgm, instruments: [...bgm.instruments, action.instrument] }, {
+            type: "update_track_command",
+            trackList: action.trackList,
+            track: action.track,
+            command: { id: action.event.id, SetTrackVoice: { index: bgm.instruments.length } } as unknown as Event,
         })
     case "split_variation":
         return Bridge.bgm_split_variation_at(bgm, action.variation, action.time)

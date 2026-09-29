@@ -7,6 +7,7 @@ import Inspector from "./Inspector"
 import PianoRoll from "./PianoRoll"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
+import StartingValues from "./StartingValues"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
@@ -79,6 +80,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
                 </View>
             </Form>
+            <StartingValues trackListId={trackListId} trackIndex={trackIndex} />
             <Inspector trackListId={trackListId} trackIndex={trackIndex} />
         </View>
         {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{

@@ -43,8 +43,9 @@ export default function FixedPopover({ anchor, onClose, children }: { anchor: DO
         className={styles.popover}
         role="dialog"
         style={below
-            ? { top: anchor.bottom + 4, left: anchor.left }
-            : { bottom: window.innerHeight - anchor.top + 4, left: anchor.left }}
+            // As tall as its contents, up to the room on that side of the anchor
+            ? { top: anchor.bottom + 4, left: anchor.left, maxHeight: Math.max(EXPECTED_HEIGHT, window.innerHeight - anchor.bottom - 12) }
+            : { bottom: window.innerHeight - anchor.top + 4, left: anchor.left, maxHeight: anchor.top - 12 }}
         onPointerDown={event => event.stopPropagation()}
         onClick={event => event.stopPropagation()}
         onDoubleClick={event => event.stopPropagation()}

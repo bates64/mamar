@@ -1,0 +1,56 @@
+.editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 280px;
+    padding: 4px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--spectrum-gray-700);
+
+    select {
+        min-width: 0;
+        font: inherit;
+        font-size: 14px;
+        padding: 4px;
+        color: var(--spectrum-gray-900);
+        background: var(--spectrum-gray-75);
+        border: 1px solid var(--spectrum-gray-400);
+        border-radius: 4px;
+    }
+}
+
+// Which other tracks an edit changes, and a way to change only this one
+.shared {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--spectrum-gray-700);
+}
+
+.copy {
+    padding: 2px 8px;
+    border: 1px solid var(--spectrum-gray-400);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-900);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+        background: var(--spectrum-gray-200);
+    }
+}

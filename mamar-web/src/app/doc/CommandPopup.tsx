@@ -2,10 +2,10 @@ import { Flex, NumberField, Text, TextField } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 
 import styles from "./CommandPopup.module.scss"
+import { SoundSelect } from "./InstrumentEditor"
 import { commandName } from "./lanes"
 import { toEvent } from "./useLaneEditing"
 
-import * as instruments from "../instruments"
 import { useBgm } from "../store"
 
 type Value = number | string | { [key: string]: Value }
@@ -96,7 +96,7 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
     } else {
         const shown = FIELDS[variant] ?? numberFields(value)
         body = <Flex direction="column" gap="size-100">
-            {variant === "TrackOverridePatch" && <Text>{instruments.getName(value as never)}</Text>}
+            {variant === "TrackOverridePatch" && <SoundSelect patch={value as never} onChange={patch => update([], patch as never)} />}
             {shown.map(field => {
                 const current = get(value, field.path)
                 const key = field.path.join(".") || "value"

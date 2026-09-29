@@ -6,7 +6,7 @@ import AutomationLane from "./AutomationLane"
 import styles from "./AutomationLane.module.scss"
 import CommandMarkers from "./CommandMarkers"
 import { LaneOption } from "./LaneMenu"
-import { commandName, inLane, LaneKind, lanePoints, timeline, trackLanes } from "./lanes"
+import { commandName, inLane, LaneKind, lanePoints, startingEvents, timeline, trackLanes } from "./lanes"
 import { TICKS_PER_BEAT, useTicksPerBar } from "./Ruler"
 import laneStyles from "./TrackLanes.module.scss"
 import useLaneEditing from "./useLaneEditing"
@@ -31,19 +31,26 @@ function eventLabel(event: Event): string {
     return commandName(event)
 }
 
-/** The lanes a track can show, and its commands with the time each plays at. */
+/**
+ * The lanes a track can show, and its commands with the time each plays at, apart from those that set its starting
+ * values, which lanes don't show.
+ */
 function useTrackLanes(trackListId: number, trackIndex: number) {
     const [bgm] = useBgm()
     const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands
-    const played = useMemo(() => timeline(commands ?? []), [commands])
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
+    const { played, starting } = useMemo(() => {
+        const all = timeline(commands ?? [])
+        const starting = startingEvents(kinds, all)
+        return { played: all.filter(played => !starting.includes(played)), starting }
+    }, [commands, kinds])
     const events = played.filter(({ event }) => isEvent(event))
     const options: LaneOption[] = [
         { key: VELOCITY_LANE, name: "Velocity", hasCommands: played.some(({ event }) => "Note" in event) },
         ...kinds.map(kind => ({ key: kind.key, name: kind.name, hasCommands: lanePoints(kind, played).length > 0 })),
         { key: EVENTS_LANE, name: "Events", hasCommands: events.length > 0 },
     ]
-    return { played, kinds, events, options }
+    return { played, starting, kinds, events, options }
 }
 
 /** What to do in a lane that has nothing in it yet. */
@@ -68,7 +75,7 @@ const LANE_HEIGHT = 64
 export default function TrackLanes({ trackListId, trackIndex, length }: { trackListId: number, trackIndex: number, length: number }) {
     const [, dispatch] = useBgm()
     const [doc, docDispatch] = useDoc()
-    const { played, kinds, events, options } = useTrackLanes(trackListId, trackIndex)
+    const { played, starting, kinds, events, options } = useTrackLanes(trackListId, trackIndex)
     const [adding, setAdding] = useState<number | null>(null)
     const ticksPerBar = useTicksPerBar()
 
@@ -117,7 +124,14 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
         >
             {!chosen.hasCommands && <span className={laneStyles.hint}>{emptyHint(chosen)}</span>}
             {chosen.key === VELOCITY_LANE && <VelocityLane trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />}
-            {kind && <TrackLane kind={kind} trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />}
+            {kind && <TrackLane
+                kind={kind}
+                trackListId={trackListId}
+                trackIndex={trackIndex}
+                length={length}
+                played={played}
+                initial={lanePoints(kind, starting)[0]?.value}
+            />}
             {chosen.key === EVENTS_LANE && <CommandMarkers
                 name="Events"
                 showName={false}
@@ -151,13 +165,15 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
     </div>
 }
 
-function TrackLane({ kind, trackListId, trackIndex, length, played }: {
+function TrackLane({ kind, trackListId, trackIndex, length, played, initial }: {
     kind: LaneKind
     trackListId: number
     trackIndex: number
     length: number
     played: { time: number, event: Event }[]
+    /** The track's starting value for the lane. */
+    initial?: number
 }) {
     const editing = useLaneEditing(trackListId, trackIndex, kind)
-    return <AutomationLane kind={kind} length={length} points={lanePoints(kind, played)} showName={false} {...editing} />
+    return <AutomationLane kind={kind} length={length} points={lanePoints(kind, played)} initial={initial} showName={false} {...editing} />
 }
