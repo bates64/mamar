@@ -1,6 +1,6 @@
 import { ActionButton, ToggleButton, View } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
-import { useCallback, useEffect, useId, useRef, useState, useContext } from "react"
+import { useCallback, useEffect, useId, useRef, useContext } from "react"
 import { Play, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
@@ -26,7 +26,6 @@ export default function PlaybackControls() {
     const [doc, dispatch] = useDoc()
     const bgm = doc?.bgm ?? null
     const activeVariation = doc?.activeVariation ?? -1
-    const [ambientSound, setAmbientSound] = useState(6) // AMBIENT_SILENCE
     const bpmRef = useRef<HTMLSpanElement | null>(null)
     const actionsRef = useRef<HTMLDivElement | null>(null)
     const songPosition = useRef<SongPosition | null>(null)
@@ -120,13 +119,8 @@ export default function PlaybackControls() {
         return () => document.removeEventListener("keydown", onKeydown, true)
     }, [playing, play, stop, activeVariation, playhead.start])
 
-    useEffect(() => {
-        player.setAmbientSound(ambientSound)
-    }, [player, ambientSound])
-
-    const beatsPerBarId = useId()
+    const timeSignatureId = useId()
     const variationId = useId()
-    const ambientSoundId = useId()
 
     if (!bgm) {
         return <View />
@@ -171,16 +165,19 @@ export default function PlaybackControls() {
                 <span className={styles.tempo} ref={bpmRef}>-</span>
             </div>
             <div className={styles.field}>
-                <label htmlFor={beatsPerBarId} className={styles.fieldName}>Beats/bar</label>
-                <VerticalDragNumberInput
-                    id={beatsPerBarId}
-                    value={bgm.beats_per_bar ?? DEFAULT_BEATS_PER_BAR}
-                    minValue={1}
-                    maxValue={16}
-                    onChange={beatsPerBar => {
-                        dispatch({ type: "bgm", action: { type: "set_beats_per_bar", beatsPerBar } })
-                    }}
-                />
+                <label htmlFor={timeSignatureId} className={styles.fieldName}>Time signature</label>
+                <span className={styles.timeSignature}>
+                    <VerticalDragNumberInput
+                        id={timeSignatureId}
+                        value={bgm.beats_per_bar ?? DEFAULT_BEATS_PER_BAR}
+                        minValue={1}
+                        maxValue={16}
+                        onChange={beatsPerBar => {
+                            dispatch({ type: "bgm", action: { type: "set_beats_per_bar", beatsPerBar } })
+                        }}
+                    />
+                    /4
+                </span>
             </div>
             <div className={styles.field}>
                 <label htmlFor={variationId} className={styles.fieldName}>Variation</label>
@@ -192,16 +189,6 @@ export default function PlaybackControls() {
                     onChange={index => {
                         dispatch({ type: "set_variation", index })
                     }}
-                />
-            </div>
-            <div className={styles.field}>
-                <label htmlFor={ambientSoundId} className={styles.fieldName}>Ambient SFX</label>
-                <VerticalDragNumberInput
-                    id={ambientSoundId}
-                    value={ambientSound}
-                    minValue={0}
-                    maxValue={16}
-                    onChange={setAmbientSound}
                 />
             </div>
         </div>
