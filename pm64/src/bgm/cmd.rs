@@ -210,6 +210,48 @@ impl CommandSeq {
         }
     }
 
+    /// Returns this sequence ending at `time`: commands from `time` on are dropped, or a delay is added to reach it.
+    /// [Detours](Command::Detour) are written out first.
+    pub fn with_end_at(&self, time: usize) -> CommandSeq {
+        let mut vec = Vec::new();
+        let mut now = 0;
+        for event in self.without_detours().vec {
+            match event.command {
+                Command::End => break,
+                Command::Delay(delay) => {
+                    if now + delay >= time {
+                        break;
+                    }
+                    now += delay;
+                    vec.push(event);
+                }
+                _ => vec.push(event),
+            }
+        }
+        if time > now {
+            match vec.last_mut() {
+                Some(Event {
+                    command: Command::Delay(delay),
+                    ..
+                }) => *delay += time - now,
+                _ => vec.push(Command::Delay(time - now).into()),
+            }
+        }
+        vec.push(Command::End.into());
+        CommandSeq { vec }
+    }
+
+    /// Inserts `command` after the commands already at `time`, keeping the time of every other command.
+    pub fn insert_after(&mut self, time: usize, command: Command) {
+        let index = self.iter_time().position(|(event_time, event)| {
+            event_time == time && matches!(event.command, Command::Delay(_) | Command::End)
+        });
+        match index {
+            Some(index) => self.vec.insert(index, command.into()),
+            None => self.insert_start(time, command),
+        }
+    }
+
     /// Returns the commands occurring at the given time, including the terminating Delay command if there is one.
     pub fn at_time(&self, wanted_time: usize) -> Vec<&Event> {
         self.iter_time_groups()
@@ -1240,6 +1282,64 @@ mod test {
         assert!(matches!(seq.vec[2].command, Command::Marker { .. }));
 
         assert!(matches!(seq.vec.last().unwrap().command, Command::Marker { .. }));
+    }
+
+    #[test]
+    fn with_end_at() {
+        let note = || Command::Note {
+            pitch: 0,
+            velocity: 0,
+            length: 0,
+        };
+        let seq = CommandSeq::from(vec![
+            note(),
+            Command::Delay(10),
+            note(),
+            Command::Delay(10),
+            Command::End,
+        ]);
+
+        assert_eq!(
+            seq.with_end_at(15).to_command_vec(),
+            vec![note(), Command::Delay(10), note(), Command::Delay(5), Command::End]
+        );
+        assert_eq!(
+            seq.with_end_at(30).to_command_vec(),
+            vec![note(), Command::Delay(10), note(), Command::Delay(20), Command::End]
+        );
+        assert_eq!(
+            seq.with_end_at(10).to_command_vec(),
+            vec![note(), Command::Delay(10), Command::End]
+        );
+    }
+
+    #[test]
+    fn insert_after() {
+        let note = || Command::Note {
+            pitch: 0,
+            velocity: 0,
+            length: 0,
+        };
+        let mut seq = CommandSeq::from(vec![note(), Command::Delay(10), note(), Command::Delay(10)]);
+
+        seq.insert_after(0, Command::MasterTempo(1));
+        seq.insert_after(10, Command::MasterTempo(2));
+        seq.insert_after(15, Command::MasterTempo(3));
+
+        let commands = seq.to_command_vec();
+        assert_eq!(
+            commands,
+            vec![
+                note(),
+                Command::MasterTempo(1),
+                Command::Delay(10),
+                note(),
+                Command::MasterTempo(2),
+                Command::Delay(5),
+                Command::MasterTempo(3),
+                Command::Delay(5),
+            ]
+        );
     }
 
     #[test]

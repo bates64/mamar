@@ -66,6 +66,10 @@ export type BgmAction = {
     trackList: number
     track: number
 } | {
+    type: "set_segment_length"
+    trackList: number
+    length: number
+} | {
     type: "set_alternate_parts_name"
     name: string
 } | {
@@ -216,6 +220,14 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                 }
             }
         })
+    case "set_segment_length":
+        return {
+            ...bgm,
+            track_lists: {
+                ...bgm.track_lists,
+                [action.trackList]: Bridge.track_list_set_length(bgm.track_lists[action.trackList], action.length),
+            },
+        }
     case "set_alternate_parts_name":
         return { ...bgm, alternate_parts_name: action.name || undefined }
     case "set_mix_name": {

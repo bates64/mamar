@@ -110,12 +110,20 @@ pub fn commands_without_detours(commands: &JsValue) -> JsValue {
     to_js(&commands.without_detours())
 }
 
-/// Returns `commands` with `command` inserted at the start of `time`.
+/// Returns `commands` with `command` inserted after the commands already at `time`.
 #[wasm_bindgen]
 pub fn commands_insert(commands: &JsValue, time: usize, command: &JsValue) -> JsValue {
     let mut commands: CommandSeq = from_js(commands);
-    commands.insert_start(time, from_js::<Command>(command));
+    commands.insert_after(time, from_js::<Command>(command));
     to_js(&commands)
+}
+
+/// Returns `track_list` changed to play for `time` ticks. See [TrackList::set_len_time].
+#[wasm_bindgen]
+pub fn track_list_set_length(track_list: &JsValue, time: usize) -> JsValue {
+    let mut track_list: TrackList = from_js(track_list);
+    track_list.set_len_time(time);
+    to_js(&track_list)
 }
 
 /// Returns a copy of `commands` with new IDs.

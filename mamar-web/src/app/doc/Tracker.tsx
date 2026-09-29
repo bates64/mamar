@@ -12,6 +12,7 @@ import {
 import { memo } from "react-tracked"
 import { FixedSizeList, areEqual } from "react-window"
 
+import { busName, effectName } from "./lanes"
 import styles from "./Tracker.module.scss"
 
 import Bridge from "../bridge"
@@ -117,7 +118,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("BusEffect" in command) {
         return <div className={classNames(styles.command, styles.master)}>
-            set bus effect to
+            set main bus effect to
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.BusEffect.effect_type}
@@ -126,6 +127,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     onChange={effect_type => mutate({ ...command, BusEffect: { ...command.BusEffect, effect_type } })}
                 />
             </InputBox>
+            ({effectName(command.BusEffect.effect_type)})
         </div>
     } else if ("MasterTempoFade" in command) {
         return <div className={classNames(styles.command, styles.master)}>
@@ -172,18 +174,17 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             ticks
         </div>
     } else if ("MasterEffect" in command) {
-        // TODO: effect combobox
         return <div className={classNames(styles.command, styles.master)}>
-            use room effect
+            set effect of slot
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.MasterEffect.index}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={3}
                     onChange={index => mutate({ ...command, MasterEffect: { ...command.MasterEffect, index } })}
                 />
             </InputBox>
-            value
+            ({busName(command.MasterEffect.index)}) to
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.MasterEffect.value}
@@ -192,6 +193,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                     onChange={value => mutate({ ...command, MasterEffect: { ...command.MasterEffect, value } })}
                 />
             </InputBox>
+            ({effectName(command.MasterEffect.value)})
         </div>
     } else if ("TrackOverridePatch" in command) {
         return <div className={classNames(styles.command, styles.track)}>
@@ -400,15 +402,16 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("SubTrackReverbType" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            set region reverb type to
+            send to effect slot
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.SubTrackReverbType.index}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={3}
                     onChange={index => mutate({ ...command, SubTrackReverbType: { ...command.SubTrackReverbType, index } })}
                 />
             </InputBox>
+            ({busName(command.SubTrackReverbType.index)})
         </div>
     } else if ("Branch" in command) {
         return <div className={classNames(styles.command, styles.track)}>

@@ -34,6 +34,11 @@ export function proximityMixValue({ mix, level }: Location): number {
     return ((MIX_LEVEL_VOLUMES[level] << 24) | (mix & 0xFF)) >>> 0
 }
 
+/** The grid that points placed on the timeline snap to. */
+export type Snap = "bar" | "beat" | "eighth" | "sixteenth" | "off"
+
+export const DEFAULT_SNAP: Snap = "eighth"
+
 export interface Doc {
     id: string
     bgm: Bgm
@@ -43,6 +48,7 @@ export interface Doc {
     activeVariation: number
     panelContent: PanelContent
     location: Location
+    snap: Snap
 }
 
 export type DocAction = {
@@ -60,6 +66,9 @@ export type DocAction = {
 } | {
     type: "set_location"
     location: Partial<Location>
+} | {
+    type: "set_snap"
+    snap: Snap
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -86,6 +95,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeVariation: action.index,
+        }
+    case "set_snap":
+        return {
+            ...state,
+            snap: action.snap,
         }
     case "set_location":
         return {

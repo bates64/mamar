@@ -1,7 +1,7 @@
 import { FileWithHandle } from "browser-fs-access"
 import { Bgm } from "pm64-typegen"
 
-import { DEFAULT_LOCATION, Doc, DocAction, docReducer } from "./doc"
+import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./doc"
 
 import Bridge from "../bridge"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
@@ -62,6 +62,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
                 type: "not_open",
             },
             location: DEFAULT_LOCATION,
+            snap: DEFAULT_SNAP,
         }
         return {
             ...root,

@@ -155,7 +155,8 @@ function Container() {
     const isAlternatePartsRow = (i: number) =>
         trackLists.some(trackList => trackList.tracks[i].alternate_for != null) &&
         trackLists.every(trackList => trackList.tracks[i].alternate_for != null || trackList.tracks[i].commands.length === 0)
-    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].filter(i => !isAlternatePartsRow(i)) // TODO: don't show track 0
+    // The master track's commands show as lanes above, and its length as the segment's
+    const tracks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].filter(i => !isAlternatePartsRow(i))
 
     return (
         <div

@@ -5,9 +5,11 @@ import { useDebounce } from "use-debounce"
 
 import PianoRoll from "./PianoRoll"
 import { PlayheadLine } from "./Playhead"
+import { useSegmentLengths } from "./Ruler"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
+import TrackLanes from "./TrackLanes"
 
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
 import { useBgm, useLocation, useVariation } from "../store"
@@ -37,6 +39,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     }, [debouncedName, dispatch, trackIndex, trackListId, track?.name])
 
     const [showTracker, setShowTracker] = useState(true)
+    const segmentLengths = useSegmentLengths()
 
     if (!track) {
         return <div>Track not found</div>
@@ -72,8 +75,11 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             // The piano roll is dark whatever the theme.
             "--playhead-line-color": "rgb(255 255 255 / 50%)",
         } as React.CSSProperties}>
-            <div style={{ gridColumn: segmentIndex + 1, overflowY: "auto" }}>
-                <PianoRoll trackListId={trackListId} trackIndex={trackIndex} />
+            <div style={{ gridColumn: segmentIndex + 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                    <PianoRoll trackListId={trackListId} trackIndex={trackIndex} />
+                </div>
+                <TrackLanes trackListId={trackListId} trackIndex={trackIndex} length={segmentLengths[segmentIndex] ?? 0} />
             </div>
             <PlayheadLine />
         </TimeGrid>}

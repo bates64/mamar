@@ -1,0 +1,59 @@
+.lanes {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 225px 1fr;
+    height: 30px;
+}
+
+.label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    font-size: 12px;
+    color: var(--spectrum-gray-800);
+    background: var(--spectrum-gray-100);
+    border-right: 1px solid var(--spectrum-gray-100);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.ruler {
+    background: var(--spectrum-gray-200);
+}
+
+.master {
+    height: 40px;
+    background: var(--spectrum-gray-75);
+}
+
+.segment {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--spectrum-gray-800);
+    border-left: 1px dashed var(--spectrum-gray-400);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.resize {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+    touch-action: none;
+    background: var(--spectrum-gray-400);
+
+    &:hover {
+        background: var(--spectrum-blue-700);
+    }
+}

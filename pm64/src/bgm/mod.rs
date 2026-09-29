@@ -371,6 +371,17 @@ impl TrackList {
             .unwrap_or_else(|| self.tracks[0].commands.len_time())
     }
 
+    /// Makes the phrase play for `time` ticks: every track that ends, and the master track, ends at `time`.
+    pub fn set_len_time(&mut self, time: usize) {
+        for (index, track) in self.tracks.iter_mut().enumerate() {
+            let ends = track.commands.iter().any(|event| event.command == Command::End);
+            if (index == 0 || ends) && !track.commands.is_empty() {
+                track.commands = track.commands.with_end_at(time);
+                track.pos = None;
+            }
+        }
+    }
+
     pub fn split_at(&mut self, time: usize) -> TrackList {
         TrackList {
             pos: None,
