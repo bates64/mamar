@@ -31,7 +31,8 @@ export default function TimeProvider({ children }: { children: React.ReactNode }
     return <TIME_CTX.Provider value={{
         xToTicks(clientX: number): number {
             if (!container.current) return NaN
-            const px = clientX - container.current.getBoundingClientRect().left
+            const scrollLeft = container.current.querySelector("[data-time-grid]")?.scrollLeft ?? 0
+            const px = clientX - container.current.getBoundingClientRect().left + scrollLeft
             const style = getComputedStyle(container.current)
             const rulerZoom = parseFloat(style.getPropertyValue("--ruler-zoom"))
 
@@ -41,7 +42,7 @@ export default function TimeProvider({ children }: { children: React.ReactNode }
             return ticks
         },
     }}>
-        <div ref={container} style={{ "--ruler-zoom": 2, "height": "100%" } as any}>
+        <div ref={container} style={{ "--ruler-zoom": 2, "height": "100%" } as any} data-time-provider>
             {children}
         </div>
     </TIME_CTX.Provider>
