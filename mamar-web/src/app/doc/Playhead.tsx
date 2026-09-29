@@ -231,7 +231,7 @@ export function useTimeline() {
 const FOLLOW_MARGIN = 0.1
 
 /** Rounds to the nearest beat, counting beats from bar 1. */
-function snapToBeat(ticks: number, pickup: number): number {
+export function snapToBeat(ticks: number, pickup: number): number {
     return Math.max(0, pickup + Math.round((ticks - pickup) / TICKS_PER_BEAT) * TICKS_PER_BEAT)
 }
 

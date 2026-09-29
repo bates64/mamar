@@ -41,12 +41,15 @@ export default function TimeGrid({
     className,
     style: styleProp,
     dragToScroll = { axis: "none" },
+    onClick,
 }: {
     children: React.ReactNode
     syncKey?: string
     className?: string
     style?: React.CSSProperties
     dragToScroll?: DragScrollOptions
+    /** Called on clicks that don't end a drag to scroll. */
+    onClick?: (event: React.MouseEvent) => void
 }) {
     const segmentLengths = useSegmentLengths()
 
@@ -120,7 +123,18 @@ export default function TimeGrid({
     }, [syncKey, scrollRef])
 
     return (
-        <div className={className} style={outerStyle} onScroll={onScroll} data-time-grid {...drag}>
+        <div
+            className={className}
+            style={outerStyle}
+            onScroll={onScroll}
+            data-time-grid
+            {...drag}
+            onClick={event => {
+                if (!event.defaultPrevented) {
+                    onClick?.(event)
+                }
+            }}
+        >
             <div style={gridStyle}>{children}</div>
         </div>
     )

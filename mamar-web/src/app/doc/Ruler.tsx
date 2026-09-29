@@ -1,10 +1,10 @@
 import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import { Bgm, Branch, Event, Segment, TrackList } from "pm64-typegen"
-import { useState } from "react"
+import { useContext, useState } from "react"
 import { usePress } from "react-aria"
 
-import Playhead from "./Playhead"
+import Playhead, { CONTEXT as PLAYHEAD_CONTEXT, snapToBeat } from "./Playhead"
 import styles from "./Ruler.module.scss"
 import TimeGrid from "./TimeGrid"
 import { useTime } from "./TimeProvider"
@@ -220,6 +220,8 @@ export default function Ruler() {
 
     const pickup = usePickup()
     const ticksPerBar = useTicksPerBar()
+    const time = useTime()
+    const playhead = useContext(PLAYHEAD_CONTEXT)!
 
     const elements = []
     let currentLoop: Loop | null = null
@@ -300,7 +302,15 @@ export default function Ruler() {
         <TimeGrid
             className={styles.bars}
             style={{ "--beat-offset": `${pickup % TICKS_PER_BEAT}px` } as React.CSSProperties}
-            dragToScroll={{ axis: "x", button: 0, thresholdPx: 0 }}
+            dragToScroll={{ axis: "x", button: 0, thresholdPx: 4 }}
+            onClick={event => {
+                // Clicking the ruler moves where playback starts, like dragging the playhead
+                const ticks = event.shiftKey ? time.xToTicks(event.clientX) : snapToBeat(time.xToTicks(event.clientX), pickup)
+                playhead.setStart(ticks)
+                if (playhead.playing) {
+                    playhead.play(ticks)
+                }
+            }}
         >
             <Playhead />
             {bars}
