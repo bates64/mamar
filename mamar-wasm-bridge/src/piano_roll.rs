@@ -1,4 +1,4 @@
-use pm64::bgm::{Branch, BranchId, Command, Track};
+use pm64::bgm::{Branch, BranchId, Command, Event, Track};
 use std::collections::BTreeMap;
 use std::f64;
 use wasm_bindgen::prelude::*;
@@ -19,15 +19,23 @@ pub struct PianoRoll {
 
     // state
     track: Track,
-    branches: BTreeMap<BranchId, Branch>,
-    mix: u8,
-    /// Another version of the track, drawn as outlines behind it.
-    behind: Option<Track>,
+    /// The notes the track plays, worked out once per change, as finding them follows every detour and branch.
+    notes: Vec<Note>,
+    /// Notes of another version of the track, drawn as outlines behind it.
+    behind_notes: Vec<Note>,
+    /// Times the track can switch to another mix's branch option.
+    branch_times: Vec<usize>,
     /// IDs of the selected notes.
     selection: Vec<u32>,
     /// Ticks per CSS pixel.
     zoom: f64,
+    /// Whether anything drawn has changed since the last render. The canvas keeps what was drawn until then.
+    dirty: bool,
 }
+
+/// A note to draw: its time, pitch, length, velocity, and ID. Notes in branches have no ID, as they aren't the
+/// track's own.
+type Note = (usize, u8, u16, u8, Option<u32>);
 
 #[wasm_bindgen]
 impl PianoRoll {
@@ -39,44 +47,59 @@ impl PianoRoll {
             dpr: 1.0,
             scroll_ticks: 0.0,
             track: Track::default(),
-            branches: BTreeMap::new(),
-            mix: 0,
-            behind: None,
+            notes: Vec::new(),
+            behind_notes: Vec::new(),
+            branch_times: Vec::new(),
             selection: Vec::new(),
             zoom: 2.0,
+            dirty: true,
         }
     }
 
     /// Draws `track`, playing the option of each branch that proximity mix `mix` chooses. If `behind` isn't null,
     /// it's another version of the track to draw behind it.
     pub fn set_track(&mut self, track: &JsValue, branches: &JsValue, mix: u8, behind: &JsValue) {
-        self.track = crate::from_js(track);
-        self.branches = crate::from_js(branches);
-        self.mix = mix;
-        self.behind = if behind.is_null() || behind.is_undefined() {
-            None
+        let track: Track = crate::from_js(track);
+        let branches: BTreeMap<BranchId, Branch> = crate::from_js(branches);
+        let played = track.commands.playback(&branches);
+        self.notes = notes(&played, &branches, mix);
+        self.branch_times = played
+            .iter()
+            .filter(|(_, event)| matches!(event.command, Command::Branch { .. }))
+            .map(|(time, _)| *time)
+            .collect();
+        self.behind_notes = if behind.is_null() || behind.is_undefined() {
+            Vec::new()
         } else {
-            Some(crate::from_js(behind))
+            let behind: Track = crate::from_js(behind);
+            notes(&behind.commands.playback(&branches), &branches, mix)
         };
+        self.track = track;
+        self.dirty = true;
     }
 
     pub fn set_viewport(&mut self, width_css_px: f64, height_css_px: f64, dpr: f64) {
         self.vw = width_css_px.max(0.0);
         self.vh = height_css_px.max(0.0);
         self.dpr = dpr.max(1.0);
+        // Resizing a canvas clears it
+        self.dirty = true;
     }
 
     pub fn set_selection(&mut self, ids: Vec<u32>) {
         self.selection = ids;
+        self.dirty = true;
     }
 
     /// Sets how many ticks each CSS pixel is.
     pub fn set_zoom(&mut self, ticks_per_px: f64) {
         self.zoom = ticks_per_px.max(0.01);
+        self.dirty = true;
     }
 
     pub fn set_scroll_x(&mut self, scroll_left_css_px: f64) {
         self.scroll_ticks = scroll_left_css_px.max(0.0);
+        self.dirty = true;
     }
 
     fn draw_lines(&self, ctx: &web_sys::CanvasRenderingContext2d, start: f64, end: f64, step: f64) {
@@ -91,7 +114,13 @@ impl PianoRoll {
         ctx.stroke();
     }
 
+    /// Draws the piano roll, if anything has changed since it was last drawn.
     pub fn render(&mut self, ctx: &web_sys::CanvasRenderingContext2d) -> Result<(), JsValue> {
+        if !self.dirty {
+            return Ok(());
+        }
+        self.dirty = false;
+
         // Draw in device pixels, but use CSS pixel coordinates in the API.
         // JS should have set canvas.width/height = css * dpr.
         ctx.save();
@@ -126,32 +155,28 @@ impl PianoRoll {
             self.beat_width() * 4.0,
         );
 
-        if let Some(behind) = &self.behind {
-            ctx.set_stroke_style_str("rgb(29 128 245 / 45%)");
-            for (time, pitch, length, _, _) in self.notes(behind) {
-                self.draw_note(ctx, time, pitch, length, false);
-            }
+        ctx.set_stroke_style_str("rgb(29 128 245 / 45%)");
+        for &(time, pitch, length, _, _) in &self.behind_notes {
+            self.draw_note(ctx, time, pitch, length, false);
         }
 
         // Dashed lines where each branch can switch to another mix's option
         ctx.set_stroke_style_str("rgb(249 226 175 / 35%)"); // Catppuccin Mocha yellow
         let _ = ctx.set_line_dash(&js_sys::Array::of2(&4.0.into(), &4.0.into()));
         ctx.set_line_width(1.0);
-        for (time, event) in self.track.commands.playback(&self.branches) {
-            if let Command::Branch { .. } = event.command {
-                let x = self.time_to_x(time as f64);
-                ctx.begin_path();
-                ctx.move_to(x, 0.0);
-                ctx.line_to(x, self.vh);
-                ctx.stroke();
-            }
+        for &time in &self.branch_times {
+            let x = self.time_to_x(time as f64);
+            ctx.begin_path();
+            ctx.move_to(x, 0.0);
+            ctx.line_to(x, self.vh);
+            ctx.stroke();
         }
         let _ = ctx.set_line_dash(&js_sys::Array::new());
         ctx.set_line_width(2.0);
 
         ctx.set_stroke_style_str("#1d80f5");
         ctx.set_fill_style_str("#066ce7");
-        for (time, pitch, length, velocity, id) in self.notes(&self.track) {
+        for &(time, pitch, length, velocity, id) in &self.notes {
             let selected = id.is_some_and(|id| self.selection.contains(&id));
             if selected {
                 ctx.set_fill_style_str("#f9e2af"); // Catppuccin Mocha yellow
@@ -169,42 +194,6 @@ impl PianoRoll {
 
         ctx.restore();
         Ok(())
-    }
-
-    /// The notes `track` plays, as (time, pitch, length, velocity, ID), with each branch playing the option for the
-    /// current mix. Notes in branches have no ID, as they aren't the track's own.
-    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16, u8, Option<u32>)> {
-        let mut notes = Vec::new();
-        for (time, event) in track.commands.playback(&self.branches) {
-            match event.command {
-                Command::Note {
-                    pitch,
-                    length,
-                    velocity,
-                } => notes.push((time, pitch, length, velocity, Some(event.id))),
-                Command::Branch { branch } => {
-                    let Some(branch) = self.branches.get(&branch) else {
-                        continue;
-                    };
-                    let option = branch.options.get(self.mix as usize).or(branch.options.first());
-                    for (offset, event) in option
-                        .map(|option| option.commands.playback(&self.branches))
-                        .unwrap_or_default()
-                    {
-                        if let Command::Note {
-                            pitch,
-                            length,
-                            velocity,
-                        } = event.command
-                        {
-                            notes.push((time + offset, pitch, length, velocity, None));
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        notes
     }
 
     fn draw_note(&self, ctx: &web_sys::CanvasRenderingContext2d, time: usize, pitch: u8, length: u16, fill: bool) {
@@ -265,6 +254,41 @@ impl PianoRoll {
         let middle = (range.start + range.end) / 2;
         self.pitch_to_y(middle).unwrap_or(0.0) + self.note_height() / 2.0
     }
+}
+
+/// The notes in `played`, with each branch playing the option for proximity mix `mix`.
+fn notes(played: &[(usize, Event)], branches: &BTreeMap<BranchId, Branch>, mix: u8) -> Vec<Note> {
+    let mut notes = Vec::new();
+    for (time, event) in played {
+        match event.command {
+            Command::Note {
+                pitch,
+                length,
+                velocity,
+            } => notes.push((*time, pitch, length, velocity, Some(event.id))),
+            Command::Branch { branch } => {
+                let Some(branch) = branches.get(&branch) else {
+                    continue;
+                };
+                let option = branch.options.get(mix as usize).or(branch.options.first());
+                for (offset, event) in option
+                    .map(|option| option.commands.playback(branches))
+                    .unwrap_or_default()
+                {
+                    if let Command::Note {
+                        pitch,
+                        length,
+                        velocity,
+                    } = event.command
+                    {
+                        notes.push((time + offset, pitch, length, velocity, None));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    notes
 }
 
 impl Default for PianoRoll {
