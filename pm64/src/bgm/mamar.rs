@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use log::debug;
 use serde_derive::{Deserialize, Serialize};
@@ -14,12 +14,18 @@ pub struct Metadata {
     track_names: HashMap<u16, Vec<String>>,
 
     beats_per_bar: Option<u8>,
+
+    alternate_parts_name: Option<String>,
+
+    mix_names: BTreeMap<u8, String>,
 }
 
 impl Metadata {
     pub fn has_data(&self) -> bool {
         // Look for any non-empty track name
         self.beats_per_bar.is_some()
+            || self.alternate_parts_name.is_some()
+            || !self.mix_names.is_empty()
             || self
                 .track_names
                 .values()
@@ -28,6 +34,8 @@ impl Metadata {
 
     pub fn apply_to_bgm(&self, bgm: &mut super::Bgm) {
         bgm.beats_per_bar = self.beats_per_bar;
+        bgm.alternate_parts_name = self.alternate_parts_name.clone();
+        bgm.mix_names = self.mix_names.clone();
 
         for (id, track_list) in &mut bgm.track_lists {
             let Some(names) = self.track_names.get(&(*id as u16)) else {
@@ -43,6 +51,11 @@ impl Metadata {
 
     pub fn set_beats_per_bar(&mut self, beats_per_bar: Option<u8>) {
         self.beats_per_bar = beats_per_bar;
+    }
+
+    pub fn set_names(&mut self, alternate_parts_name: Option<String>, mix_names: BTreeMap<u8, String>) {
+        self.alternate_parts_name = alternate_parts_name;
+        self.mix_names = mix_names;
     }
 
     pub fn add_track_name(&mut self, tracks_pos: u16, name: String) {
@@ -102,6 +115,17 @@ mod test {
 
         let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
         assert_eq!(bgm2.beats_per_bar, Some(3));
+    }
+
+    #[test]
+    fn encode_decode_metadata_preserves_names() {
+        let mut bgm = Bgm::new();
+        bgm.alternate_parts_name = Some("Oasis parts".to_string());
+        bgm.mix_names.insert(2, "Near the station".to_string());
+
+        let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
+        assert_eq!(bgm2.alternate_parts_name, bgm.alternate_parts_name);
+        assert_eq!(bgm2.mix_names, bgm.mix_names);
     }
 
     #[test]

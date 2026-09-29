@@ -1,7 +1,7 @@
 import { FileWithHandle } from "browser-fs-access"
 import { Bgm } from "pm64-typegen"
 
-import { Doc, DocAction, docReducer } from "./doc"
+import { DEFAULT_LOCATION, Doc, DocAction, docReducer } from "./doc"
 
 import Bridge from "../bridge"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
@@ -61,6 +61,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             panelContent: {
                 type: "not_open",
             },
+            location: DEFAULT_LOCATION,
         }
         return {
             ...root,

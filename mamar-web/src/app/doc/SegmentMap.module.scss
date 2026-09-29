@@ -83,7 +83,15 @@ $trackHeight: 70px;
         }
     }
 
-    &.hasInterestingParentTrack {
+    .versionTag {
+        margin-left: 6px;
+        padding: 0 6px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        background: #00000033;
+    }
+
+    &.showsAlternatePart {
         --color-500: var(--spectrum-indigo-700);
         --color-400: var(--spectrum-indigo-600);
     }

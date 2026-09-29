@@ -20,6 +20,9 @@ pub struct PianoRoll {
     // state
     track: Track,
     branches: BTreeMap<BranchId, Branch>,
+    mix: u8,
+    /// Another version of the track, drawn as outlines behind it.
+    behind: Option<Track>,
 }
 
 #[wasm_bindgen]
@@ -33,12 +36,22 @@ impl PianoRoll {
             scroll_ticks: 0.0,
             track: Track::default(),
             branches: BTreeMap::new(),
+            mix: 0,
+            behind: None,
         }
     }
 
-    pub fn set_track(&mut self, track: &JsValue, branches: &JsValue) {
+    /// Draws `track`, playing the option of each branch that proximity mix `mix` chooses. If `behind` isn't null,
+    /// it's another version of the track to draw behind it.
+    pub fn set_track(&mut self, track: &JsValue, branches: &JsValue, mix: u8, behind: &JsValue) {
         self.track = crate::from_js(track);
         self.branches = crate::from_js(branches);
+        self.mix = mix;
+        self.behind = if behind.is_null() || behind.is_undefined() {
+            None
+        } else {
+            Some(crate::from_js(behind))
+        };
     }
 
     pub fn set_viewport(&mut self, width_css_px: f64, height_css_px: f64, dpr: f64) {
@@ -98,75 +111,85 @@ impl PianoRoll {
             self.beat_width() * 4.0,
         );
 
-        let played = self.track.commands.playback(&self.branches);
-
-        // Mark where branches play, because their notes aren't drawn
-        ctx.set_fill_style_str("rgb(249 226 175 / 8%)"); // Catppuccin Mocha yellow
-        for event in &played {
-            if let Command::Branch { branch } = event.event.command {
-                let length = self.branches.get(&branch).map_or(0, Branch::len_time);
-                self.draw_span(ctx, event.time, event.time + length, 0.0, self.vh);
+        if let Some(behind) = &self.behind {
+            ctx.set_stroke_style_str("rgb(29 128 245 / 45%)");
+            for (time, pitch, length) in self.notes(behind) {
+                self.draw_note(ctx, time, pitch, length, false);
             }
         }
 
-        // Mark where detours play along the top
-        ctx.set_fill_style_str("#cba6f7"); // Catppuccin Mocha mauve
-        let mut detour_start = None;
-        for (index, event) in played.iter().enumerate() {
-            if event.in_detour && detour_start.is_none() {
-                detour_start = Some(event.time);
-            }
-            let detour_ends = played.get(index + 1).is_none_or(|next| !next.in_detour);
-            if let (Some(start), true) = (detour_start, detour_ends) {
-                let end = event.time
-                    + match event.event.command {
-                        Command::Delay(delay) => delay,
-                        _ => 0,
-                    };
-                self.draw_span(ctx, start, end, 0.0, 3.0);
-                detour_start = None;
+        // Dashed lines where each branch can switch to another mix's option
+        ctx.set_stroke_style_str("rgb(249 226 175 / 35%)"); // Catppuccin Mocha yellow
+        let _ = ctx.set_line_dash(&js_sys::Array::of2(&4.0.into(), &4.0.into()));
+        ctx.set_line_width(1.0);
+        for (time, event) in self.track.commands.playback(&self.branches) {
+            if let Command::Branch { .. } = event.command {
+                let x = self.time_to_x(time as f64);
+                ctx.begin_path();
+                ctx.move_to(x, 0.0);
+                ctx.line_to(x, self.vh);
+                ctx.stroke();
             }
         }
+        let _ = ctx.set_line_dash(&js_sys::Array::new());
+        ctx.set_line_width(2.0);
 
-        // notes, where notes that detours play are copies of the notes they detour to
         ctx.set_stroke_style_str("#1d80f5");
         ctx.set_fill_style_str("#066ce7");
-        for event in &played {
-            if let Command::Note { pitch, length, .. } = event.event.command {
-                let x = self.time_to_x(event.time as f64);
-                let Some(y) = self.pitch_to_y(pitch) else { continue };
-                let w = self.time_to_x(length as f64);
-                let h = self.note_height();
-
-                if x + w < 0.0 || x > self.vw {
-                    continue;
-                }
-
-                ctx.save();
-                if event.in_detour {
-                    ctx.set_global_alpha(0.5);
-                }
-
-                ctx.begin_path();
-                let _ = ctx.round_rect_with_f64(x, y, w, h, 1.0);
-                ctx.fill();
-
-                ctx.clip();
-                let _ = ctx.round_rect_with_f64(x, y, w, h, 1.0);
-                ctx.stroke();
-
-                ctx.restore(); // restore unclipped state
-            }
+        for (time, pitch, length) in self.notes(&self.track) {
+            self.draw_note(ctx, time, pitch, length, true);
         }
 
         ctx.restore();
         Ok(())
     }
 
-    fn draw_span(&self, ctx: &web_sys::CanvasRenderingContext2d, start: usize, end: usize, y: f64, h: f64) {
-        let x = self.time_to_x(start as f64);
-        let w = self.time_to_x(end as f64) - x;
-        ctx.fill_rect(x, y, w, h);
+    /// The notes `track` plays, as (time, pitch, length), with each branch playing the option for the current mix.
+    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16)> {
+        let mut notes = Vec::new();
+        for (time, event) in track.commands.playback(&self.branches) {
+            match event.command {
+                Command::Note { pitch, length, .. } => notes.push((time, pitch, length)),
+                Command::Branch { branch } => {
+                    let Some(branch) = self.branches.get(&branch) else {
+                        continue;
+                    };
+                    let option = branch.options.get(self.mix as usize).or(branch.options.first());
+                    for (offset, event) in option
+                        .map(|option| option.commands.playback(&self.branches))
+                        .unwrap_or_default()
+                    {
+                        if let Command::Note { pitch, length, .. } = event.command {
+                            notes.push((time + offset, pitch, length));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        notes
+    }
+
+    fn draw_note(&self, ctx: &web_sys::CanvasRenderingContext2d, time: usize, pitch: u8, length: u16, fill: bool) {
+        let x = self.time_to_x(time as f64);
+        let Some(y) = self.pitch_to_y(pitch) else { return };
+        let w = self.time_to_x(length as f64) - self.time_to_x(0.0);
+        let h = self.note_height();
+
+        if x + w < 0.0 || x > self.vw {
+            return;
+        }
+
+        ctx.save();
+        ctx.begin_path();
+        let _ = ctx.round_rect_with_f64(x, y, w, h, 1.0);
+        if fill {
+            ctx.fill();
+        }
+        ctx.clip();
+        let _ = ctx.round_rect_with_f64(x, y, w, h, 1.0);
+        ctx.stroke();
+        ctx.restore(); // restore unclipped state
     }
 
     fn time_to_x(&self, time: f64) -> f64 {

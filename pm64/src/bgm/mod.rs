@@ -49,6 +49,16 @@ pub struct Bgm {
     /// Beats in each bar, for editors to show bars with. The game doesn't use it. None means the editor's default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beats_per_bar: Option<u8>,
+
+    /// What the song calls its [alternate parts](Track::alternate_for), such as "Oasis parts". The game doesn't use
+    /// it. None means the editor's default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alternate_parts_name: Option<String>,
+
+    /// What the song calls each proximity mix its [branches](Command::Branch) choose between, such as "Near the
+    /// station". The game doesn't use them.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub mix_names: BTreeMap<u8, String>,
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
@@ -383,10 +393,16 @@ pub struct Track {
     pub is_disabled: bool,
     pub polyphony: Polyphony,
     pub is_drum_track: bool,
+
+    /// The index of the earlier track this one is an alternate part for. It plays in step with that track, using its
+    /// voices, and the game plays one or the other: the alternate part when it sets linked mode on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alternate_for: Option<u8>,
+
     pub commands: CommandSeq,
 
-    /// Where the commands were decoded from. Tracks in a track list decoded from the same place share one copy of
-    /// their commands when encoded, as long as the commands are still equal.
+    /// Where the commands were decoded from, or None once they're edited. Decoded commands are encoded as they are,
+    /// and tracks in a track list decoded from the same place share one copy of them. Other commands are compressed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pos: Option<FilePos>,
 }
@@ -398,6 +414,7 @@ impl Default for Track {
             is_disabled: true,
             polyphony: Polyphony::Automatic,
             is_drum_track: false,
+            alternate_for: None,
             commands: Default::default(),
             pos: None,
         }
@@ -406,12 +423,15 @@ impl Default for Track {
 
 impl Track {
     pub fn split_at(&mut self, time: usize) -> Track {
+        let commands = self.commands.split_at(time);
+        self.pos = None;
         Track {
             name: self.name.clone(),
             is_disabled: self.is_disabled,
             polyphony: self.polyphony,
             is_drum_track: self.is_drum_track,
-            commands: self.commands.split_at(time),
+            alternate_for: self.alternate_for,
+            commands,
             pos: None,
         }
     }
@@ -460,18 +480,11 @@ pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
 pub enum Polyphony {
     Automatic,
     Manual { voices: u8 },
-    Link { parent: u8 },
     Other { priority: u8 },
 }
 
 impl Polyphony {
-    pub fn from_raw(raw_priority: u8, raw_parent_track_idx: u8) -> Self {
-        if raw_parent_track_idx > 0 {
-            return Self::Link {
-                parent: raw_parent_track_idx - 1,
-            };
-        }
-
+    pub fn from_raw(raw_priority: u8) -> Self {
         match raw_priority {
             0 => Self::Manual { voices: 0 },
             1 => Self::Manual { voices: 1 },
@@ -493,15 +506,7 @@ impl Polyphony {
                 4 => 7,
                 _ => 0,
             },
-            Polyphony::Link { parent: _ } => 0,
             Polyphony::Other { priority } => priority,
-        }
-    }
-
-    pub fn to_parent_idx(self) -> u8 {
-        match self {
-            Polyphony::Automatic | Polyphony::Manual { .. } | Polyphony::Other { .. } => 0,
-            Polyphony::Link { parent } => parent + 1,
         }
     }
 }

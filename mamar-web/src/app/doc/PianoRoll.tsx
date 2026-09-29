@@ -2,7 +2,8 @@ import { type Bgm, type Track } from "pm64-typegen"
 import { useEffect, useRef } from "react"
 
 import Bridge from "../bridge"
-import { useBgm } from "../store"
+import { useBgm, useLocation } from "../store"
+import { alternatePartOf } from "../store/bgm"
 import { useSize } from "../util/hooks/useSize"
 
 export interface Props {
@@ -12,14 +13,25 @@ export interface Props {
 
 export default function PianoRoll({ trackListId, trackIndex }: Props) {
     const [bgm] = useBgm()
-    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
+    const [location] = useLocation()
+    const trackList = bgm?.track_lists[trackListId]
+    const track = trackList?.tracks[trackIndex]
 
-    if (!bgm || !track) return null
+    if (!bgm || !trackList || !track) return null
 
-    return <Canvas track={track} branches={bgm.branches} />
+    // The track's other version: the track an alternate part is for, or a track's alternate part
+    const otherIndex = track.alternate_for ?? alternatePartOf(trackList, trackIndex)
+    const behind = otherIndex !== undefined ? trackList.tracks[otherIndex] : null
+
+    return <Canvas track={track} branches={bgm.branches} mix={location.mix} behind={behind} />
 }
 
-function Canvas({ track, branches }: { track: Track, branches: Bgm["branches"] }) {
+function Canvas({ track, branches, mix, behind }: {
+    track: Track
+    branches: Bgm["branches"]
+    mix: number
+    behind: Track | null
+}) {
     const canvas = useSize<HTMLCanvasElement>()
     const containerRef = useRef<HTMLDivElement | null>(null)
     type Renderer = InstanceType<typeof Bridge.PianoRoll>
@@ -73,13 +85,13 @@ function Canvas({ track, branches }: { track: Track, branches: Bgm["branches"] }
         const r = rendererRef.current
         if (!r) return
 
-        r.set_track(track, branches)
+        r.set_track(track, branches, mix, behind)
 
         containerRef.current!.style.height = `${r.scroll_height()}px`
 
         const scrollParent = containerRef.current!.parentElement!
         scrollParent.scrollTop = r.central_scroll_y() / window.devicePixelRatio
-    }, [track, branches])
+    }, [track, branches, mix, behind])
 
     return <div ref={containerRef}>
         <canvas ref={canvas.ref} style={{ width: "100%", height: "100%", display: "block" }} />

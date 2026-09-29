@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::iter;
 use std::ops::Range;
@@ -265,46 +265,223 @@ impl CommandSeq {
         None
     }
 
-    /// Returns the commands the game plays before the first [Command::End], in the order it plays them, following
-    /// [detours](Command::Detour). [Branches](Command::Branch) are not followed, but the time they play is counted.
-    pub fn playback<'a>(&'a self, branches: &BTreeMap<BranchId, Branch>) -> Vec<PlayedEvent<'a>> {
+    /// Returns the commands the game plays before the first [Command::End], with [detours](Command::Detour)
+    /// replaced by the commands they play. Each copy's ID is derived from the detour's and the original's, so the
+    /// same sequence always gives the same IDs.
+    pub fn without_detours(&self) -> CommandSeq {
+        if !self
+            .vec
+            .iter()
+            .any(|event| matches!(event.command, Command::Detour { .. }))
+        {
+            return self.clone();
+        }
+
         let marker_index = |label: &MarkerId| {
             self.vec
                 .iter()
                 .position(|event| matches!(&event.command, Command::Marker { label: l } if l == label))
         };
+        let detour_labels: HashSet<&MarkerId> = self
+            .vec
+            .iter()
+            .flat_map(|event| match &event.command {
+                Command::Detour { start_label, end_label } => vec![start_label, end_label],
+                _ => vec![],
+            })
+            .collect();
+        let is_plain = |command: &Command| match command {
+            Command::Marker { label } => !detour_labels.contains(label),
+            Command::Detour { .. } | Command::End => false,
+            _ => true,
+        };
 
-        let mut played = Vec::new();
-        let mut time = 0;
+        let mut vec = Vec::new();
         for event in &self.vec {
-            played.push(PlayedEvent {
-                time,
-                event,
-                in_detour: false,
-            });
             match &event.command {
-                Command::End => break,
-                Command::Delay(delay) => time += delay,
-                Command::Branch { branch } => time += branches.get(branch).map_or(0, Branch::len_time),
+                Command::End => {
+                    vec.push(event.clone());
+                    break;
+                }
                 Command::Detour { start_label, end_label } => {
                     let (Some(start), Some(end)) = (marker_index(start_label), marker_index(end_label)) else {
                         continue;
                     };
-                    for event in self.vec.get(start..end).unwrap_or_default() {
-                        played.push(PlayedEvent {
-                            time,
-                            event,
-                            in_detour: true,
-                        });
-                        if let Command::Delay(delay) = event.command {
-                            time += delay;
+                    for source in self.vec.get(start..end).unwrap_or_default() {
+                        if is_plain(&source.command) {
+                            vec.push(Event {
+                                id: copy_id(event.id, source.id),
+                                command: source.command.clone(),
+                            });
                         }
                     }
                 }
+                command if is_plain(command) => vec.push(event.clone()),
                 _ => {}
             }
         }
-        played
+        CommandSeq { vec }
+    }
+
+    /// Returns the commands the game plays before the first [Command::End], each with the time it plays at.
+    /// [Detours](Command::Detour) are followed, and the time [branches](Command::Branch) play is counted.
+    pub fn playback(&self, branches: &BTreeMap<BranchId, Branch>) -> Vec<(usize, Event)> {
+        let mut time = 0;
+        self.without_detours()
+            .vec
+            .into_iter()
+            .map(|event| {
+                let played = (time, event);
+                match &played.1.command {
+                    Command::Delay(delay) => time += delay,
+                    Command::Branch { branch } => time += branches.get(branch).map_or(0, Branch::len_time),
+                    _ => {}
+                }
+                played
+            })
+            .collect()
+    }
+
+    /// Returns a sequence that plays the same as this one, with passages it plays more than once stored as
+    /// [detours](Command::Detour) where that makes it smaller. Passages start and end on beats, and a detour can't
+    /// contain another detour or a [branch](Command::Branch), which the game can't return from.
+    pub fn with_detours(&self) -> CommandSeq {
+        let plain = self.without_detours();
+        let end = plain
+            .vec
+            .iter()
+            .position(|event| event.command == Command::End)
+            .unwrap_or(plain.vec.len());
+        let (main, tail) = plain.vec.split_at(end);
+
+        let sizes: Vec<usize> = main.iter().map(|event| encoded_size(&event.command)).collect();
+        let can_repeat = |event: &Event| {
+            !matches!(
+                event.command,
+                Command::Marker { .. } | Command::Detour { .. } | Command::Branch { .. } | Command::End
+            )
+        };
+
+        // Positions a passage can start or end at: after a delay that reaches a beat
+        let mut boundaries = vec![0];
+        let mut time = 0;
+        for (index, event) in main.iter().enumerate() {
+            if let Command::Delay(delay) = event.command {
+                time += delay;
+                if time % TICKS_PER_BEAT == 0 {
+                    boundaries.push(index + 1);
+                }
+            }
+        }
+
+        // Each item is a command of `main`, or a detour to a passage in `passages`
+        let mut items: Vec<Result<usize, usize>> = (0..main.len()).map(Ok).collect();
+        let mut passages: Vec<std::ops::Range<usize>> = Vec::new();
+        loop {
+            // Index of each boundary in `items`, which changes as passages are replaced
+            let item_boundaries: Vec<usize> = {
+                let mut item_index_of = vec![usize::MAX; main.len() + 1];
+                for (item_index, item) in items.iter().enumerate() {
+                    if let Ok(index) = item {
+                        item_index_of[*index] = item_index;
+                    }
+                }
+                item_index_of[main.len()] = items.len();
+                boundaries
+                    .iter()
+                    .map(|&index| item_index_of[index])
+                    .filter(|&index| index != usize::MAX)
+                    .collect()
+            };
+
+            let mut occurrences: HashMap<Vec<&Command>, Vec<std::ops::Range<usize>>> = HashMap::new();
+            for (i, &start) in item_boundaries.iter().enumerate() {
+                for &end in &item_boundaries[i + 1..] {
+                    let Some(passage) = items[start..end]
+                        .iter()
+                        .map(|item| item.ok().filter(|&index| can_repeat(&main[index])))
+                        .collect::<Option<Vec<usize>>>()
+                    else {
+                        break;
+                    };
+                    if passage.iter().map(|&index| sizes[index]).sum::<usize>() > MAX_DETOUR_SIZE {
+                        break;
+                    }
+                    let key = passage.iter().map(|&index| &main[index].command).collect();
+                    occurrences.entry(key).or_default().push(start..end);
+                }
+            }
+
+            // Choose the passage that saves the most
+            let best = occurrences
+                .into_iter()
+                .filter_map(|(key, ranges)| {
+                    let size: usize = ranges[0].clone().map(|i| sizes[items[i].unwrap()]).sum();
+                    let mut chosen: Vec<std::ops::Range<usize>> = Vec::new();
+                    for range in ranges {
+                        if chosen.last().is_none_or(|last| last.end <= range.start) {
+                            chosen.push(range);
+                        }
+                    }
+                    let count = chosen.len();
+                    let saving = (count * size).checked_sub(size + DETOUR_SIZE * count)?;
+                    (count >= 2 && saving > 0).then_some((saving, key.len(), chosen))
+                })
+                .max_by_key(|(saving, len, chosen)| (*saving, *len, std::cmp::Reverse(chosen[0].start)));
+            let Some((_, _, chosen)) = best else {
+                break;
+            };
+
+            let first = &chosen[0];
+            let passage = items[first.start].unwrap()..items[first.end - 1].unwrap() + 1;
+            let passage_index = passages.len();
+            passages.push(passage);
+            for range in chosen.iter().rev() {
+                items.splice(range.clone(), std::iter::once(Err(passage_index)));
+            }
+        }
+
+        if passages.is_empty() {
+            return plain;
+        }
+
+        // Labels that no marker in the sequence already uses
+        let taken: HashSet<&MarkerId> = main
+            .iter()
+            .filter_map(|event| match &event.command {
+                Command::Marker { label } => Some(label),
+                _ => None,
+            })
+            .collect();
+        let mut labels = (0..)
+            .map(|n| format!("Repeat {n}"))
+            .filter(|label| !taken.contains(label));
+        let passage_labels: Vec<(MarkerId, MarkerId)> = passages
+            .iter()
+            .map(|_| (labels.next().unwrap(), labels.next().unwrap()))
+            .collect();
+
+        let mut vec: Vec<Event> = items
+            .iter()
+            .map(|item| match item {
+                Ok(index) => main[*index].clone(),
+                Err(passage) => Command::Detour {
+                    start_label: passage_labels[*passage].0.clone(),
+                    end_label: passage_labels[*passage].1.clone(),
+                }
+                .into(),
+            })
+            .collect();
+        vec.extend(tail.iter().cloned());
+        if tail.is_empty() {
+            vec.push(Command::End.into());
+        }
+        for (passage, (start_label, end_label)) in passages.iter().zip(passage_labels) {
+            vec.push(Command::Marker { label: start_label }.into());
+            vec.extend(main[passage.clone()].iter().cloned());
+            vec.push(Command::Marker { label: end_label }.into());
+        }
+        CommandSeq { vec }
     }
 
     /// Returns the relative-time after the last [Command]. Does not account for any final command which extends the
@@ -598,6 +775,9 @@ impl CommandSeq {
     /// sequence is the 'after `time`' sequence. Adjusts Wait commands on the boundaries to keep the sum len_time
     /// the same as before this was called.
     pub fn split_at(&mut self, time: usize) -> CommandSeq {
+        // Times below don't follow detours
+        *self = self.without_detours();
+
         // insert_start has all the logic for finding and adjusting Wait commands
         self.insert_start(time, Command::End);
 
@@ -945,13 +1125,27 @@ impl From<Command> for Event {
     }
 }
 
-/// A command the game plays, and when. See [CommandSeq::playback].
-#[derive(Debug, Clone, Copy)]
-pub struct PlayedEvent<'a> {
-    pub time: usize,
-    pub event: &'a Event,
-    /// Whether a [detour](Command::Detour) plays this command.
-    pub in_detour: bool,
+/// Ticks in a beat. Songs don't store it, but the game's tempo is in beats per minute of this many ticks.
+pub const TICKS_PER_BEAT: usize = 48;
+
+/// Longest passage a [Command::Detour] can play and return from.
+const MAX_DETOUR_SIZE: usize = 0xFF;
+
+/// Size of a [Command::Detour] when encoded.
+const DETOUR_SIZE: usize = 4;
+
+/// The ID of the copy a detour plays of the event with ID `source`.
+fn copy_id(detour: Id, source: Id) -> Id {
+    detour.wrapping_mul(0x9E37_79B1) ^ source.rotate_left(16)
+}
+
+/// Bytes `command` takes up when encoded, or 0 if it can't be encoded on its own.
+fn encoded_size(command: &Command) -> usize {
+    let seq = CommandSeq {
+        vec: vec![command.clone().into()],
+    };
+    let mut f = std::io::Cursor::new(Vec::new());
+    seq.encode(&mut f, &mut Vec::new()).map_or(0, |_| f.into_inner().len())
 }
 
 #[derive(Clone)]
@@ -1131,16 +1325,16 @@ mod test {
             Command::Marker { label: "B".to_string() },
         ]);
 
-        let notes: Vec<(usize, u8, bool)> = seq
+        let notes: Vec<(usize, u8)> = seq
             .playback(&BTreeMap::new())
             .into_iter()
-            .filter_map(|played| match played.event.command {
-                Command::Note { pitch, .. } => Some((played.time, pitch, played.in_detour)),
+            .filter_map(|(time, event)| match event.command {
+                Command::Note { pitch, .. } => Some((time, pitch)),
                 _ => None,
             })
             .collect();
 
-        assert_eq!(notes, vec![(0, 1, false), (10, 2, true), (30, 3, false)]);
+        assert_eq!(notes, vec![(0, 1), (10, 2), (30, 3)]);
     }
 
     #[test]

@@ -35,6 +35,8 @@ export interface SongPlayer {
     setPaused(paused: boolean): void | Promise<void>
     setAmbientSound(sound: number): void
     setTrackMute(track: number, mute: TrackMute): void
+    /** Sets the proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */
+    setLocation(proximityMix: number, alternateParts: boolean): void
     /** Calls `listener` with the player's status every frame until disposed. */
     onStatus(listener: (status: PlayerStatus) => void): () => void
     /**

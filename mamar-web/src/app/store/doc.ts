@@ -12,6 +12,28 @@ export type PanelContent = {
     segment: number
 }
 
+/** How loudly a proximity mix plays: outside its area, inside it, or as loud as the game's scripts can make it. */
+export type MixLevel = "off" | "near" | "full"
+
+/** Where in the game the song is heard, which decides the parts it plays. */
+export interface Location {
+    /** The proximity mix, which chooses the option each branch plays. */
+    mix: number
+    level: MixLevel
+    /** Whether alternate parts play instead of the tracks they're for. */
+    alternateParts: boolean
+}
+
+export const DEFAULT_LOCATION: Location = { mix: 0, level: "off", alternateParts: false }
+
+/** Volume of each level, as snd_song_set_proximity_mix_far, _near, and _full set it. */
+const MIX_LEVEL_VOLUMES: Record<MixLevel, number> = { off: 0, near: 87, full: 127 }
+
+/** The value au_bgm_set_proximity_mix takes for `location`: the mix in bits 0-7, and its volume in bits 24-30. */
+export function proximityMixValue({ mix, level }: Location): number {
+    return ((MIX_LEVEL_VOLUMES[level] << 24) | (mix & 0xFF)) >>> 0
+}
+
 export interface Doc {
     id: string
     bgm: Bgm
@@ -20,6 +42,7 @@ export interface Doc {
     isSaved: boolean
     activeVariation: number
     panelContent: PanelContent
+    location: Location
 }
 
 export type DocAction = {
@@ -34,6 +57,9 @@ export type DocAction = {
 } | {
     type: "set_variation"
     index: number
+} | {
+    type: "set_location"
+    location: Partial<Location>
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -61,7 +87,17 @@ export function docReducer(state: Doc, action: DocAction): Doc {
             ...state,
             activeVariation: action.index,
         }
+    case "set_location":
+        return {
+            ...state,
+            location: { ...(state.location ?? DEFAULT_LOCATION), ...action.location },
+        }
     }
+}
+
+export const useLocation = (): [Location, (location: Partial<Location>) => void] => {
+    const [doc, dispatch] = useDoc()
+    return [doc?.location ?? DEFAULT_LOCATION, location => dispatch({ type: "set_location", location })]
 }
 
 export const useDoc = (id?: string): [Doc | undefined, (action: DocAction) => void] => {

@@ -352,3 +352,57 @@ fn ron_round_trip() {
     pad_to_16(&mut encoded);
     assert!(encoded.into_inner() == original);
 }
+
+/// What a track plays, ignoring event IDs, detour labels, and branch IDs.
+fn played(bgm: &Bgm, commands: &CommandSeq) -> Vec<(usize, Command)> {
+    commands
+        .playback(&bgm.branches)
+        .into_iter()
+        .filter(|(_, event)| !matches!(event.command, Command::Marker { .. }))
+        .map(|(time, event)| match event.command {
+            Command::Branch { branch } => (time, Command::Delay(bgm.branches[&branch].len_time())),
+            command => (time, command),
+        })
+        .collect()
+}
+
+/// Songs whose tracks have all been edited are compressed, and must still play the same and fit in the game.
+#[test]
+fn compress_edited_tracks() {
+    let bin_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("bin");
+    let mut songs = 0;
+    for entry in std::fs::read_dir(bin_dir).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        if !name.ends_with(".bin") || name == "sbn.bin" || name.contains("nonmatching") {
+            continue;
+        }
+        songs += 1;
+
+        let original = Bgm::from_bytes(&std::fs::read(&path).unwrap()).unwrap();
+        let mut edited = original.clone();
+        for track_list in edited.track_lists.values_mut() {
+            for track in &mut track_list.tracks {
+                track.pos = None;
+            }
+        }
+        let encoded = edited.as_bytes().unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(
+            encoded.len() <= 0x5000,
+            "{name} is {:#X} bytes when compressed",
+            encoded.len()
+        );
+        let decoded = Bgm::from_bytes(&encoded).unwrap();
+
+        for (id, track_list) in &original.track_lists {
+            for (track_no, track) in track_list.tracks.iter().enumerate() {
+                assert_eq!(
+                    played(&original, &track.commands),
+                    played(&decoded, &decoded.track_lists[id].tracks[track_no].commands),
+                    "{name}: track list {id} track {track_no} plays differently",
+                );
+            }
+        }
+    }
+    assert!(songs > 100);
+}

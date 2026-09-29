@@ -1,6 +1,6 @@
 import classNames from "classnames"
 import * as pm64 from "pm64-typegen"
-import { ReactNode, CSSProperties, createContext, useContext } from "react"
+import { ReactNode, CSSProperties, createContext, useContext, useMemo } from "react"
 import {
     Droppable,
     Draggable,
@@ -14,6 +14,7 @@ import { FixedSizeList, areEqual } from "react-window"
 
 import styles from "./Tracker.module.scss"
 
+import Bridge from "../bridge"
 import InstrumentInput, { PatchInput } from "../InstrumentInput"
 import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
@@ -427,24 +428,6 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 />
             </InputBox>
         </div>
-    } else if ("Detour" in command) {
-        // TODO: draggable jump arrow block like human resource machine
-        return <div className={classNames(styles.command, styles.track)}>
-            detour
-            <InputBox>
-                <StringInput
-                    value={command.Detour.start_label}
-                    onChange={start_label => mutate({ ...command, Detour: { ...command.Detour, start_label } })}
-                />
-            </InputBox>
-            to
-            <InputBox>
-                <StringInput
-                    value={command.Detour.end_label}
-                    onChange={end_label => mutate({ ...command, Detour: { ...command.Detour, end_label } })}
-                />
-            </InputBox>
-        </div>
     } else if ("StereoDelay" in command) {
         return <div className={classNames(styles.command, styles.master)}>
             delay one stereo channel of effect
@@ -613,7 +596,8 @@ function CommandList({ width, height }: {
     const [bgm] = useBgm()
     const { trackListId, trackIndex } = useContext(trackListCtx)!
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
-    const commands: pm64.Event[] = track?.commands ?? []
+    // Detours are how songs are stored, not something to edit, so list the commands they play instead
+    const commands: pm64.Event[] = useMemo(() => Bridge.commands_without_detours(track?.commands ?? []), [track?.commands])
 
     return <Droppable
         droppableId="droppable"

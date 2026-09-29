@@ -3,13 +3,15 @@ import { Bgm } from "pm64-typegen"
 import { useCallback, useEffect, useId, useRef, useContext } from "react"
 import { Play, SkipBack } from "react-feather"
 
+import LocationControls from "./LocationControls"
 import styles from "./PlaybackControls.module.scss"
 import useSongPlayer, { PlayerStatus, SongPosition } from "./SongPlayer"
 
 import Bridge from "../bridge"
 import { CONTEXT as PLAYHEAD_CONTEXT, PlayheadPosition, useTimeline } from "../doc/Playhead"
 import { DEFAULT_BEATS_PER_BAR } from "../doc/Ruler"
-import { useDoc } from "../store"
+import { useDoc, useLocation } from "../store"
+import { proximityMixValue } from "../store/doc"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 function encodeBgm(bgm: Bgm): Uint8Array {
@@ -76,6 +78,12 @@ export default function PlaybackControls() {
     }, [player, playing])
 
     useEffect(() => player.onStop?.(stop), [player, stop])
+
+    const [location] = useLocation()
+    const proximityMix = proximityMixValue(location)
+    useEffect(() => {
+        player.setLocation(proximityMix, location.alternateParts)
+    }, [player, proximityMix, location.alternateParts])
 
     useEffect(() => {
         if (!bgm) {
@@ -192,5 +200,6 @@ export default function PlaybackControls() {
                 />
             </div>
         </div>
+        <LocationControls />
     </View>
 }

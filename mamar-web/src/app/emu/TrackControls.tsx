@@ -5,14 +5,20 @@ import { VolumeX, Headphones } from "react-feather"
 import useSongPlayer from "./SongPlayer"
 import styles from "./TrackControls.module.scss"
 
-export default function TrackControls({ trackIndex }: { trackIndex: number }) {
+/** Mutes or solos track `trackIndex`, along with the tracks in `alternateParts` that are alternate parts for it. */
+export default function TrackControls({ trackIndex, alternateParts = [] }: { trackIndex: number, alternateParts?: number[] }) {
     const player = useSongPlayer()
     const [isMute, setIsMute] = useState(false)
     const [isSolo, setIsSolo] = useState(false)
+    const alternatePartsKey = alternateParts.join()
 
     useEffect(() => {
-        player.setTrackMute(trackIndex, isMute ? "mute" : (isSolo ? "solo" : "none"))
-    }, [player, isMute, isSolo, trackIndex])
+        const mute = isMute ? "mute" : (isSolo ? "solo" : "none")
+        player.setTrackMute(trackIndex, mute)
+        for (const slot of alternatePartsKey ? alternatePartsKey.split(",").map(Number) : []) {
+            player.setTrackMute(slot, mute)
+        }
+    }, [player, isMute, isSolo, trackIndex, alternatePartsKey])
 
     return <View colorVersion={6} UNSAFE_className={styles.controls}>
         <TooltipTrigger>

@@ -60,6 +60,7 @@ impl Bgm {
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
         let mut metadata = mamar::Metadata::default();
         metadata.set_beats_per_bar(self.beats_per_bar);
+        metadata.set_names(self.alternate_parts_name.clone(), self.mix_names.clone());
 
         f.seek(SeekFrom::Start(0))?;
 
@@ -226,17 +227,13 @@ impl Bgm {
                 let polyphonic_idx = match *polyphony {
                     Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
                     Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
-                    Polyphony::Link { parent: _ } => {
-                        // Dry Dry Desert (only song that uses Link) happens to use this value
-                        5
-                    }
                     Polyphony::Other { priority } => priority,
                 };
 
                 let flags = (*is_disabled as u16) << 8
                     | (polyphonic_idx as u16) << 0xD
                     | if *is_drum_track { 0x0080 } else { 0 }
-                    | (polyphony.to_parent_idx() as u16) << 9;
+                    | (track.alternate_for.map_or(0, |index| index + 1) as u16 & 0xF) << 9;
                 f.write_u16_be(flags)?;
             }
 
@@ -328,7 +325,7 @@ impl Bgm {
 
 /// Writes the commands of each `(offset field position, track list start, track)` and points the offset field at them.
 /// Tracks in the same track list that were decoded from the same place share one copy, as long as their commands are
-/// still equal.
+/// still equal. Tracks that weren't decoded, or were edited since, are compressed into detours.
 fn encode_tracks<W: Write + Seek>(
     f: &mut W,
     tracks: Vec<(u64, u64, &Track)>,
@@ -346,7 +343,10 @@ fn encode_tracks<W: Write + Seek>(
             Some((_, _, pos)) => *pos,
             None => {
                 let pos = f.pos()?;
-                track.commands.encode(f, branch_refs)?;
+                match track.pos {
+                    Some(_) => track.commands.encode(f, branch_refs)?,
+                    None => track.commands.with_detours().encode(f, branch_refs)?,
+                }
                 encoded.push((track_list_start, track, pos));
                 pos
             }

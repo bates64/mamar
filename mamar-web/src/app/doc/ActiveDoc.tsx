@@ -8,13 +8,20 @@ import SubsegDetails from "./SubsegDetails"
 import TimeProvider from "./TimeProvider"
 
 import { useDoc } from "../store"
+import { playingTrack } from "../store/bgm"
+import { DEFAULT_LOCATION } from "../store/doc"
 
 export default function ActiveDoc() {
     const [doc, dispatch] = useDoc()
 
     const trackListId = doc?.panelContent.type === "tracker" ? doc?.panelContent.trackList : null
-    const trackIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.track : null
+    const mainIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.track : null
     const segmentIndex = doc?.panelContent.type === "tracker" ? doc?.panelContent.segment : null
+    const openTrackList = trackListId !== null ? doc?.bgm.track_lists[trackListId] : undefined
+    // Edits go to the version of the track that's showing
+    const trackIndex = openTrackList && mainIndex !== null
+        ? playingTrack(openTrackList, mainIndex, (doc?.location ?? DEFAULT_LOCATION).alternateParts)
+        : mainIndex
 
     function onDragEnd(result: DropResult) {
         if (trackListId === null || trackIndex === null || segmentIndex === null) {
@@ -82,7 +89,7 @@ export default function ActiveDoc() {
                                 borderTopWidth="thin"
                                 UNSAFE_style={{ zIndex: "1" }}
                             >
-                                {doc.panelContent.type === "tracker" && <SubsegDetails key={`${trackListId}_${trackIndex}`} trackListId={trackListId!} trackIndex={trackIndex!} segmentIndex={segmentIndex!} />}
+                                {doc.panelContent.type === "tracker" && <SubsegDetails key={`${trackListId}_${mainIndex}`} trackListId={trackListId!} trackIndex={mainIndex!} segmentIndex={segmentIndex!} />}
                             </View>}
                         </div>
                     )}

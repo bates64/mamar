@@ -1,4 +1,4 @@
-import { Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, TextField } from "@adobe/react-spectrum"
+import { ActionButton, Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, TextField } from "@adobe/react-spectrum"
 import { Bgm, Polyphony } from "pm64-typegen"
 import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
@@ -9,8 +9,9 @@ import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 
-import { useBgm } from "../store"
-import { BgmAction } from "../store/bgm"
+import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
+import { useBgm, useLocation, useVariation } from "../store"
+import { alternatePartOf, BgmAction, canAddAlternatePart, playingTrack } from "../store/bgm"
 
 export interface Props {
     trackListId: number
@@ -18,10 +19,14 @@ export interface Props {
     segmentIndex: number
 }
 
-export default function SubsegDetails({ trackListId, trackIndex, segmentIndex }: Props) {
+export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segmentIndex }: Props) {
     const hid = useId()
     const [bgm, dispatch]: [Bgm | undefined, (action: BgmAction) => void] = useBgm()
-    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
+    const [location] = useLocation()
+    const trackList = bgm?.track_lists[trackListId]
+    // Shows the alternate part when it's the one that plays
+    const trackIndex = trackList ? playingTrack(trackList, mainIndex, location.alternateParts) : mainIndex
+    const track = trackList?.tracks[trackIndex]
 
     // Track name editing is debounced to prevent dispatch spam when typing
     const [name, setName] = useState(track?.name)
@@ -52,9 +57,10 @@ export default function SubsegDetails({ trackListId, trackIndex, segmentIndex }:
                 <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 {trackIndex !== 0 ? <>
                     <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
-                    <PolyphonyForm {...track} maxParentTrackIdx={trackIndex - 1} onChange={polyphony => {
+                    {track.alternate_for == null && <PolyphonyForm polyphony={track.polyphony} onChange={polyphony => {
                         dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphony })
-                    }} />
+                    }} />}
+                    <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
                 </> : <></>}
                 <View paddingTop="size-300">
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
@@ -74,7 +80,7 @@ export default function SubsegDetails({ trackListId, trackIndex, segmentIndex }:
     </Grid>
 }
 
-function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: Polyphony, maxParentTrackIdx: number, onChange: (polyphony: Polyphony) => void }) {
+function PolyphonyForm({ polyphony, onChange }: { polyphony: Polyphony, onChange: (polyphony: Polyphony) => void }) {
     const polyphonyLabel = <Flex width="100%" alignItems="center">
         <Text flexGrow={1}>Polyphony</Text>
         <ContextualHelp variant="help" placement="right">
@@ -95,44 +101,8 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
         </ContextualHelp>
     </Flex>
 
-    const takeoverLabel = <Flex width="100%" alignItems="center">
-        <Text flexGrow={1}>Track to link against</Text>
-        <ContextualHelp variant="help" placement="right">
-            <Heading>Linking Tracks</Heading>
-            <Content>
-                <Text>
-                    <b>This track is silent by default.</b> Call <code>bgm_set_linked_mode</code> for <b>this track to fade in to replace the selected track</b>, which becomes silent.
-                    Tracks can only link with tracks that are above them.
-                </Text>
-            </Content>
-            <Footer>
-                <Text>
-                    Use linked tracks to <b>swap musical parts that serve the same role</b>. For example,
-                    in <a href="https://github.com/bates64/papermario-dx/blob/main/src/world/area_sbk/sbk_56/main.c">Dry Dry Desert - S2E3 Oasis</a>,
-                    four oasis-specific tracks are linked to four normal tracks, and fade in when Mario is near the oasis.
-                </Text>
-            </Footer>
-        </ContextualHelp>
-    </Flex>
-
-    let state: "auto" | "manual" | "parent" = "manual"
-    let parentTrackIdx = 0
-    let voiceCount = 1
-
-    if (polyphony === "Automatic") {
-        state = "auto"
-    } else if ("Link" in polyphony) {
-        state = "parent"
-        parentTrackIdx = polyphony.Link.parent
-    } else if ("Manual" in polyphony) {
-        voiceCount = polyphony.Manual.voices
-    }
-
-    // Store parent track between states, e.g. so that parent->manual->parent doesn't forget which track it was
-    const [recentNonZeroParentTrackIdx, setRecentNonZeroParentTrackIdx] = useState(1)
-    if (parentTrackIdx !== 0 && recentNonZeroParentTrackIdx !== parentTrackIdx) {
-        setRecentNonZeroParentTrackIdx(parentTrackIdx)
-    }
+    const state = polyphony === "Automatic" ? "auto" : "manual"
+    const voiceCount = typeof polyphony === "object" && "Manual" in polyphony ? polyphony.Manual.voices : 1
 
     return <View>
         <RadioGroup
@@ -142,16 +112,10 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
                 if (state === newState) return
                 if (newState === "auto") {
                     onChange("Automatic")
-                } else if (newState === "manual") {
+                } else {
                     onChange({
                         Manual: {
                             voices: 1,
-                        },
-                    })
-                } else if (newState === "parent") {
-                    onChange({
-                        Link: {
-                            parent: Math.min(recentNonZeroParentTrackIdx, maxParentTrackIdx),
                         },
                     })
                 }
@@ -159,7 +123,6 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
         >
             <Radio value="auto">Automatic</Radio>
             <Radio value="manual">Manual</Radio>
-            <Radio value="parent" isDisabled={maxParentTrackIdx <= 0}>Link</Radio>
         </RadioGroup>
         {state === "manual" ? <NumberField
             label="Number of voices"
@@ -173,18 +136,62 @@ function PolyphonyForm({ polyphony, maxParentTrackIdx, onChange }: { polyphony: 
                 },
             })}
         /> : <></>}
-        {state === "parent" ? <NumberField
-            label={takeoverLabel}
-            description="The track this one will replace."
-            value={parentTrackIdx}
-            minValue={1}
-            maxValue={maxParentTrackIdx}
-            step={1}
-            onChange={parentTrackIdx => onChange({
-                Link: {
-                    parent: parentTrackIdx,
-                },
-            })}
-        /> : <></>}
+    </View>
+}
+
+/** Adds or removes the alternate part for track `trackIndex` of track list `trackListId`. */
+function AlternatePartForm({ trackListId, trackIndex, segmentIndex }: Props) {
+    const [bgm, dispatch] = useBgm()
+    const [variation] = useVariation()
+    const trackList = bgm?.track_lists[trackListId]
+
+    if (!bgm || !trackList) {
+        return null
+    }
+
+    const name = bgm.alternate_parts_name ?? DEFAULT_ALTERNATE_PARTS_NAME
+    const variationTrackLists = (variation?.segments ?? [])
+        .flatMap(segment => ("Subseg" in segment ? [segment.Subseg.track_list] : []))
+
+    const label = <Flex width="100%" alignItems="center">
+        <Text flexGrow={1}>{name}</Text>
+        <ContextualHelp variant="help" placement="right">
+            <Heading>Alternate parts</Heading>
+            <Content>
+                <Text>
+                    An alternate part plays <b>instead of this track</b> when the game turns alternate parts on, such as
+                    near the oasis in Dry Dry Desert. It plays in step with this track and uses its voices.
+                </Text>
+            </Content>
+        </ContextualHelp>
+    </Flex>
+
+    if (alternatePartOf(trackList, trackIndex) !== undefined) {
+        return <View>
+            <Text>{label}</Text>
+            <ActionButton onPress={() => dispatch({ type: "remove_alternate_part", trackList: trackListId, track: trackIndex })}>
+                Remove alternate part
+            </ActionButton>
+        </View>
+    }
+
+    const canAdd = canAddAlternatePart(trackList, trackIndex)
+    return <View>
+        <Text>{label}</Text>
+        <Flex direction="column" gap="size-50" marginTop="size-50">
+            <ActionButton
+                isDisabled={!canAdd}
+                onPress={() => dispatch({ type: "add_alternate_part", trackLists: [trackListId], track: trackIndex })}
+            >
+                Add in this segment
+            </ActionButton>
+            <ActionButton
+                isDisabled={!canAdd}
+                onPress={() => dispatch({ type: "add_alternate_part", trackLists: variationTrackLists, track: trackIndex })}
+            >
+                Add in every segment
+            </ActionButton>
+            {!canAdd && <Text UNSAFE_style={{ fontSize: "0.85em" }}>No free track after this one in segment {segmentIndex + 1}.</Text>}
+        </Flex>
     </View>
 }

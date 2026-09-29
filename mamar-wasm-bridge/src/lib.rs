@@ -103,6 +103,32 @@ pub fn bgm_add_voice(bgm: &JsValue) -> JsValue {
     to_js(&bgm)
 }
 
+/// Returns `commands` with detours replaced by the commands they play. See [CommandSeq::without_detours].
+#[wasm_bindgen]
+pub fn commands_without_detours(commands: &JsValue) -> JsValue {
+    let commands: CommandSeq = from_js(commands);
+    to_js(&commands.without_detours())
+}
+
+/// Returns `commands` with `command` inserted at the start of `time`.
+#[wasm_bindgen]
+pub fn commands_insert(commands: &JsValue, time: usize, command: &JsValue) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    commands.insert_start(time, from_js::<Command>(command));
+    to_js(&commands)
+}
+
+/// Returns a copy of `commands` with new IDs.
+#[wasm_bindgen]
+pub fn commands_copy(commands: &JsValue) -> JsValue {
+    let commands: CommandSeq = from_js(commands);
+    let copy: CommandSeq = commands
+        .iter()
+        .map(|event| Event::from(event.command.clone()))
+        .collect();
+    to_js(&copy)
+}
+
 #[wasm_bindgen]
 pub fn bgm_split_variation_at(bgm: &JsValue, variation: usize, time: usize) -> JsValue {
     let mut bgm: Bgm = from_js(bgm);

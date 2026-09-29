@@ -412,7 +412,7 @@ impl Track {
             is_disabled,
             polyphony: {
                 // If the polyphony matches what would be automatically calculated, use Automatic
-                let actual = Polyphony::from_raw(polyphonic_idx, parent_track_idx);
+                let actual = Polyphony::from_raw(polyphonic_idx);
                 let calculated = Polyphony::Manual {
                     voices: commands.max_polyphony(),
                 };
@@ -423,6 +423,7 @@ impl Track {
                 }
             },
             is_drum_track,
+            alternate_for: parent_track_idx.checked_sub(1),
             commands,
             pos,
         })

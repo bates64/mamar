@@ -21,7 +21,14 @@ export const MAMAR_SYMBOL_NAMES = [
     "MamarNotesStarted",
 ] as const
 
+/** Globals that newer papermario-dx builds have. Without them, the game plays songs as if in no particular place. */
+export const OPTIONAL_MAMAR_SYMBOL_NAMES = [
+    "MamarProximityMix",
+    "MamarAlternateParts",
+] as const
+
 export type MamarSymbols = Record<(typeof MAMAR_SYMBOL_NAMES)[number], number>
+    & Partial<Record<(typeof OPTIONAL_MAMAR_SYMBOL_NAMES)[number], number>>
 
 /** An emulated game's memory, in the order bytes appear in the game's own address space. */
 export interface EmulatorMemory {
@@ -106,6 +113,16 @@ export default class DxMamar {
 
     setAmbientSound(sound: number) {
         writeU32(this.memory, this.symbols.MamarAmbience, sound)
+    }
+
+    /** Sets the proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */
+    setLocation(proximityMix: number, alternateParts: boolean) {
+        if (this.symbols.MamarProximityMix !== undefined) {
+            writeU32(this.memory, this.symbols.MamarProximityMix, proximityMix)
+        }
+        if (this.symbols.MamarAlternateParts !== undefined) {
+            writeU32(this.memory, this.symbols.MamarAlternateParts, alternateParts ? 1 : 0)
+        }
     }
 
     setTrackMutes(mutes: readonly TrackMute[]) {

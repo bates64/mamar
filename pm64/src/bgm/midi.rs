@@ -209,6 +209,7 @@ fn midi_track_to_bgm_track(
                 is_disabled: false,
                 polyphony: Polyphony::Automatic,
                 is_drum_track: false,
+                alternate_for: None,
                 commands: CommandSeq::new(),
                 pos: None,
             };

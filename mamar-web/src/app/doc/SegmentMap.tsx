@@ -1,31 +1,35 @@
 import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import type { Event } from "pm64-typegen"
-import { Track } from "pm64-typegen"
-import { useId, useDeferredValue, memo, startTransition } from "react"
+import { useId, useDeferredValue, useMemo, memo, startTransition } from "react"
 
 import { PlayheadLine } from "./Playhead"
 import styles from "./SegmentMap.module.scss"
 import TimeGrid from "./TimeGrid"
 
+import Bridge from "../bridge"
+import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
 import TrackControls from "../emu/TrackControls"
-import { useBgm, useDoc, useVariation } from "../store"
+import { useBgm, useDoc, useLocation, useVariation } from "../store"
+import { alternatePartOf, playingTrack } from "../store/bgm"
 import { getSegmentId } from "../store/segment"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
-
-function hasParentTrack({ polyphony }: Track): boolean {
-    return typeof polyphony === "object" && "Link" in polyphony
-}
 
 function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trackIndex: number, trackListIndex: number, segmentIndex: number }) {
     const [doc, dispatch] = useDoc()
     const [bgm] = useBgm()
-    const track = bgm?.track_lists[trackListIndex]?.tracks[trackIndex]
+    const [location] = useLocation()
+    const trackList = bgm?.track_lists[trackListIndex]
+    const hasAlternatePart = trackList !== undefined && alternatePartOf(trackList, trackIndex) !== undefined
+    const isAlternatePart = trackList?.tracks[trackIndex]?.alternate_for != null
+    const shownIndex = trackList ? playingTrack(trackList, trackIndex, location.alternateParts) : trackIndex
+    const track = trackList?.tracks[shownIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
     const commands = useDeferredValue(track?.commands)
 
-    if (!track || track.commands.length === 0) {
+    // Alternate parts show in the row of the track they're for
+    if (!track || track.commands.length === 0 || isAlternatePart) {
         return <></>
     } else {
         const handlePress = (evt: any) => {
@@ -51,7 +55,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trac
                 [styles.pianoRollThumbnail]: true,
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
-                [styles.hasInterestingParentTrack]: hasParentTrack(track),
+                [styles.showsAlternatePart]: shownIndex !== trackIndex,
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
@@ -62,7 +66,12 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trac
             }}
         >
             {commands && <Thumbnail commands={commands} />}
-            <div id={nameId} className={styles.segmentName}>{track.name}</div>
+            <div id={nameId} className={styles.segmentName}>
+                {track.name}
+                {hasAlternatePart && <span className={styles.versionTag}>
+                    {shownIndex !== trackIndex ? bgm?.alternate_parts_name ?? DEFAULT_ALTERNATE_PARTS_NAME : "Main"}
+                </span>}
+            </div>
         </div>
     }
 }
@@ -73,7 +82,9 @@ function TrackName({ index }: { index: number }) {
     </div>
 }
 
-const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
+const Thumbnail = memo(({ commands: stored }: { commands: Event[] }) => {
+    const commands: Event[] = useMemo(() => Bridge.commands_without_detours(stored), [stored])
+
     // Preferred musical range so segments can be compared by their pitch range
     const c2 = 107 + 36
     const c5 = 107 + 72
@@ -134,9 +145,17 @@ const Thumbnail = memo(({ commands }: { commands: Event[] }) => {
 
 function Container() {
     const [variation] = useVariation()
+    const [bgm] = useBgm()
     const selection = useSelection()
 
-    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // TODO: don't show track 0
+    // Rows used only by alternate parts are hidden, as they show in the rows of the tracks they're for.
+    const trackLists = (variation?.segments ?? [])
+        .map(segment => ("Subseg" in segment ? bgm?.track_lists[segment.Subseg.track_list] : undefined))
+        .filter(trackList => trackList !== undefined)
+    const isAlternatePartsRow = (i: number) =>
+        trackLists.some(trackList => trackList.tracks[i].alternate_for != null) &&
+        trackLists.every(trackList => trackList.tracks[i].alternate_for != null || trackList.tracks[i].commands.length === 0)
+    const tracks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].filter(i => !isAlternatePartsRow(i)) // TODO: don't show track 0
 
     return (
         <div
@@ -149,7 +168,10 @@ function Container() {
                 {tracks.map(i => <div key={i} className={styles.track}>
                     {<div className={styles.trackHead}>
                         <TrackName index={i} />
-                        {i > 0 && <TrackControls trackIndex={i} />}
+                        {i > 0 && <TrackControls
+                            trackIndex={i}
+                            alternateParts={[...new Set(trackLists.map(trackList => alternatePartOf(trackList, i)).filter(slot => slot !== undefined))]}
+                        />}
                     </div>}
                 </div>)}
             </View>

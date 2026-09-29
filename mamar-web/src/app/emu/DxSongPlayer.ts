@@ -14,6 +14,7 @@ export default class DxSongPlayer implements SongPlayer {
     private paused = true
     private ambientSound = DEFAULT_AMBIENT_SOUND
     private readonly trackMutes: TrackMute[] = new Array(16).fill("none")
+    private location = { proximityMix: 0, alternateParts: false }
     private readonly listeners = new Set<(status: PlayerStatus) => void>()
     private statusTimer?: ReturnType<typeof setInterval>
     private latencyMeter?: AudioLatencyMeter
@@ -60,6 +61,11 @@ export default class DxSongPlayer implements SongPlayer {
         this.apply(false)
     }
 
+    setLocation(proximityMix: number, alternateParts: boolean) {
+        this.location = { proximityMix, alternateParts }
+        this.apply(false)
+    }
+
     onStatus(listener: (status: PlayerStatus) => void): () => void {
         this.listeners.add(listener)
         this.statusTimer ??= setInterval(() => this.pollStatus(), STATUS_POLL_MS)
@@ -80,6 +86,7 @@ export default class DxSongPlayer implements SongPlayer {
         mamar.setPaused(this.paused)
         mamar.setAmbientSound(this.ambientSound)
         mamar.setTrackMutes(this.trackMutes)
+        mamar.setLocation(this.location.proximityMix, this.location.alternateParts)
         if (song && this.song) {
             mamar.play(this.song.bgm, this.song.variation, this.bankSong, this.song.start)
             this.measureLatency(mamar)

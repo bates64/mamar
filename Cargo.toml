@@ -11,3 +11,7 @@ lto = true
 #codegen-units = 1 # slow compile, but makes more optimisations possible
 opt-level = 3 # could also use "s" to optimise for code size
 panic = "abort"
+
+# Compressing songs into detours is too slow to do on every edit without optimisation.
+[profile.dev.package.pm64]
+opt-level = 3
