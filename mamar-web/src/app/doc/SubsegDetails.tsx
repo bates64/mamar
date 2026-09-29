@@ -4,14 +4,13 @@ import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
 import Inspector from "./Inspector"
-import LaneMenu from "./LaneMenu"
 import PianoRoll from "./PianoRoll"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
-import TrackLanes, { useTrackLanes } from "./TrackLanes"
+import TrackLanes from "./TrackLanes"
 
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
 import { useBgm, useLocation, useVariation } from "../store"
@@ -71,7 +70,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
                 </View>
             </Form>
-            <TrackLaneMenu trackListId={trackListId} trackIndex={trackIndex} />
             <Inspector trackListId={trackListId} trackIndex={trackIndex} />
         </View>
         {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
@@ -92,13 +90,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             <PlayheadLine />
         </TimeGrid>}
     </Grid>
-}
-
-function TrackLaneMenu({ trackListId, trackIndex }: { trackListId: number, trackIndex: number }) {
-    const { options } = useTrackLanes(trackListId, trackIndex)
-    return <View paddingTop="size-100">
-        <LaneMenu lanes={options} />
-    </View>
 }
 
 function PolyphonyForm({ polyphony, onChange }: { polyphony: Polyphony, onChange: (polyphony: Polyphony) => void }) {

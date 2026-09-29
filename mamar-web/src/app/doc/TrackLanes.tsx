@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import AutomationLane from "./AutomationLane"
 import styles from "./AutomationLane.module.scss"
 import CommandMarkers from "./CommandMarkers"
-import { LaneOption, useLaneShown } from "./LaneMenu"
+import LaneMenu, { LaneOption, useLaneShown } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, timeline, trackLanes } from "./lanes"
 import useLaneEditing from "./useLaneEditing"
 import VelocityLane from "./VelocityLane"
@@ -64,6 +64,10 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
     }
 
     return <div>
+        {/* Stays at the left edge while the timeline scrolls */}
+        <div style={{ position: "sticky", left: 0, width: "fit-content" }}>
+            <LaneMenu lanes={options} />
+        </div>
         {showVelocity && <div style={{ height: 50 }}>
             <VelocityLane trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />
         </div>}
