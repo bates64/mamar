@@ -7,7 +7,7 @@ import Inspector from "./Inspector"
 import LaneMenu, { useLaneShown } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, lastValue, MASTER_LANES, MASTER_VOLUME_LANE, TEMPO_LANE, timeline, TRANSPOSE_LANE } from "./lanes"
 import { PlayheadLine } from "./Playhead"
-import { useSegmentLengths } from "./Ruler"
+import { usePickup, useSegmentLengths, useTicksPerBar } from "./Ruler"
 import styles from "./SongLanes.module.scss"
 import TimeGrid from "./TimeGrid"
 import useLaneEditing from "./useLaneEditing"
@@ -29,6 +29,8 @@ export default function SongLanes() {
     const [bgm] = useBgm()
     const [variation] = useVariation()
     const segmentLengths = useSegmentLengths()
+    const ticksPerBar = useTicksPerBar()
+    const pickup = usePickup()
     const isShown = useLaneShown()
     const [doc] = useDoc()
     const selection = doc?.selection
@@ -62,10 +64,13 @@ export default function SongLanes() {
             : kind === MASTER_VOLUME_LANE || pointsOf(kind).length > 0,
     }))
     const shownLanes = SONG_LANES.filter((_, i) => isShown(laneOptions[i]))
+    // A line at each bar, which starts after the pickup, as the ruler's bars do
+    const barLines = { "--bar": `${ticksPerBar}px`, "--pickup": `${pickup}px` } as React.CSSProperties
 
     const row = (kind: LaneKind, className: string, label: React.ReactNode = kind.name) => <div key={kind.key} className={`${styles.row} ${className}`}>
         <div className={styles.label}>{label}</div>
-        <TimeGrid>
+        {pointsOf(kind).length === 0 && <span className={styles.hint}>Click to add a {kind.name.toLowerCase()} change</span>}
+        <TimeGrid className={styles.bars} style={barLines}>
             {segments.map((segment, i) => {
                 if (!segment.trackList || segment.trackListId === undefined) {
                     return <div key={segment.key} />
@@ -87,7 +92,7 @@ export default function SongLanes() {
     return <div className={styles.lanes}>
         <div className={`${styles.row} ${styles.masterHeading}`}>
             <div className={styles.label}>
-                <LaneMenu lanes={laneOptions} />
+                <LaneMenu name="Song lanes" lanes={laneOptions} />
             </div>
             <div />
         </div>
@@ -97,7 +102,7 @@ export default function SongLanes() {
         {shownLanes.map(kind => row(kind, styles.master))}
         {masterTimelines.some(commands => commands.some(({ event }) => !inLane(event, SONG_LANES))) && <div className={`${styles.row} ${styles.master}`}>
             <div className={styles.label}><span>Other</span></div>
-            <TimeGrid>
+            <TimeGrid className={styles.bars} style={barLines}>
                 {segments.map((segment, i) => (segment.trackListId === undefined
                     ? <div key={segment.key} />
                     : <CommandMarkers

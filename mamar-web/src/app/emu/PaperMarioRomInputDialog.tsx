@@ -18,9 +18,8 @@ export default function PaperMarioRomInput({ onChange }: Props) {
         <Divider />
         <Content>
             <Text>
-                Mamar plays songs with the instruments in a Paper Mario (US) ROM in z64 format.
-                The ROM of a mod works too, and plays with its instruments.<br />
-                Select a ROM file to continue.
+                Mamar plays songs with the instruments in your Paper Mario (US) ROM, in z64 format. A mod's ROM
+                works too.
             </Text>
             <Flex marginTop="size-200" width="100%" height="size-400" alignItems="center">
                 <input

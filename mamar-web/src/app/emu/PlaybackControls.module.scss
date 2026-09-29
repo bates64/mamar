@@ -131,8 +131,10 @@
     }
 }
 
+// Spectrum only pads an action button around its own icon and text slots
 .snap {
     gap: 6px;
+    padding-inline: 8px 10px;
 }
 
 // A letter Q for "quantize", in a rounded square like the other icons.

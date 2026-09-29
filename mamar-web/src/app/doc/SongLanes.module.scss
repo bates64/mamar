@@ -4,6 +4,7 @@
 }
 
 .row {
+    position: relative;
     display: grid;
     grid-template-columns: 225px 1fr;
     height: 30px;
@@ -32,9 +33,32 @@
     height: 30px;
     background: var(--spectrum-gray-100);
 }
-
 .inspector {
     padding: 0 16px 8px 16px;
     background: var(--spectrum-gray-100);
     border-bottom: 1px solid var(--spectrum-gray-300);
+}
+
+
+// A line at each bar
+.bars > * {
+    background-image: repeating-linear-gradient(
+        to right,
+        var(--spectrum-gray-200) 0 1px,
+        transparent 1px calc(var(--bar) / var(--ruler-zoom))
+    );
+    background-position-x: calc(var(--pickup) / var(--ruler-zoom));
+}
+
+// Says what to do in a lane that's shown but empty. Clicks pass through it to the lane.
+.hint {
+    position: absolute;
+    top: 3px;
+    left: calc(225px + 8px);
+    z-index: 1;
+
+    color: var(--spectrum-gray-700);
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
 }
