@@ -41,6 +41,13 @@ export default class DxSongPlayer implements SongPlayer {
     setPaused(paused: boolean) {
         this.paused = paused
         this.apply(false)
+
+        // Browsers suspend audio until the user interacts with the page. The emulator resumes it on the first key or
+        // mouse press, but a keyboard shortcut that plays can keep that press from reaching it.
+        const context = this.audio?.()?.context
+        if (!paused && context?.state === "suspended") {
+            context.resume()
+        }
     }
 
     setAmbientSound(sound: number) {
