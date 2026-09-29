@@ -1,0 +1,18 @@
+{
+  "name": "mamar-wasm-bridge",
+  "type": "module",
+  "collaborators": [
+    "Alex Bates <alex@bates64.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "mamar_wasm_bridge_bg.wasm",
+    "mamar_wasm_bridge.js",
+    "mamar_wasm_bridge.d.ts"
+  ],
+  "main": "mamar_wasm_bridge.js",
+  "types": "mamar_wasm_bridge.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
