@@ -1,5 +1,5 @@
 import produce, { current, setAutoFreeze } from "immer"
-import { Bgm, Command, Event, Instrument, Polyphony, Track, TrackList } from "pm64-typegen"
+import { Bgm, Command, Event, Instrument, Track, TrackList } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -38,7 +38,6 @@ export type BgmAction = {
     track: number
     name?: string
     isDisabled?: boolean
-    polyphony?: Polyphony
     isDrumTrack?: boolean
 } | {
     type: "update_instrument"
@@ -187,9 +186,6 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             if (action.isDisabled !== undefined) {
                 track.is_disabled = action.isDisabled
             }
-            if (action.polyphony !== undefined) {
-                track.polyphony = action.polyphony
-            }
             if (action.isDrumTrack !== undefined) {
                 track.is_drum_track = action.isDrumTrack
             }
@@ -257,7 +253,6 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                 trackList.tracks[slot] = {
                     name: main.name,
                     is_disabled: false,
-                    polyphony: current(main).polyphony,
                     is_drum_track: main.is_drum_track,
                     alternate_for: action.track,
                     commands: Bridge.commands_copy(Bridge.commands_without_detours(current(main).commands)),
@@ -272,7 +267,6 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                 trackList.tracks[slot] = {
                     name: "",
                     is_disabled: true,
-                    polyphony: "Automatic",
                     is_drum_track: false,
                     commands: [],
                 }

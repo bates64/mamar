@@ -134,6 +134,14 @@ pub fn commands_place(commands: &JsValue, id: u32, time: usize, command: &JsValu
     to_js(&commands)
 }
 
+/// Returns the voices each track of `track_list` needs and gets. See [TrackList::voices].
+#[wasm_bindgen]
+pub fn track_list_voices(track_list: &JsValue, branches: &JsValue) -> JsValue {
+    let track_list: TrackList = from_js(track_list);
+    let branches: std::collections::BTreeMap<BranchId, Branch> = from_js(branches);
+    to_js(&track_list.voices(&branches))
+}
+
 /// Returns a copy of `commands` with new IDs.
 #[wasm_bindgen]
 pub fn commands_copy(commands: &JsValue) -> JsValue {

@@ -1,5 +1,5 @@
-import { ActionButton, Grid, View, Form, Switch, NumberField, ContextualHelp, Heading, Content, Text, Footer, Flex, RadioGroup, Radio, TextField } from "@adobe/react-spectrum"
-import { Bgm, Polyphony } from "pm64-typegen"
+import { ActionButton, Grid, View, Form, Switch, ContextualHelp, Heading, Content, Text, Flex, TextField } from "@adobe/react-spectrum"
+import { Bgm } from "pm64-typegen"
 import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
@@ -11,6 +11,7 @@ import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 import TrackLanes from "./TrackLanes"
+import { MAX_VOICES, total, useVoices } from "./voices"
 
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
 import { useBgm, useLocation, useVariation } from "../store"
@@ -61,9 +62,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                 <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                 {trackIndex !== 0 ? <>
                     <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
-                    {track.alternate_for == null && <PolyphonyForm polyphony={track.polyphony} onChange={polyphony => {
-                        dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, polyphony })
-                    }} />}
+                    <VoicesInfo trackListId={trackListId} trackIndex={trackIndex} />
                     <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
                 </> : <></>}
                 <View paddingTop="size-300">
@@ -92,62 +91,46 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     </Grid>
 }
 
-function PolyphonyForm({ polyphony, onChange }: { polyphony: Polyphony, onChange: (polyphony: Polyphony) => void }) {
-    const polyphonyLabel = <Flex width="100%" alignItems="center">
-        <Text flexGrow={1}>Polyphony</Text>
+/** How many voices the track gets, which pm64 chooses from its notes, and whether that cuts any off. */
+function VoicesInfo({ trackListId, trackIndex }: { trackListId: number, trackIndex: number }) {
+    const [bgm] = useBgm()
+    const voices = useVoices(trackListId)
+    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
+    if (!voices || !track) {
+        return null
+    }
+
+    const label = <Flex width="100%" alignItems="center">
+        <Text flexGrow={1}>Voices</Text>
         <ContextualHelp variant="help" placement="right">
-            <Heading>Understanding Polyphony</Heading>
+            <Heading>Voices</Heading>
             <Content>
                 <Text>
-                    Polyphony controls <b>how many notes a region can play at the same time</b>.
-                    Each note requires a voice.
-                    For example, if a region has <i>1 voice</i>, playing a new note will cut off any held one.
+                    Each note the game plays uses a voice. A track gets a voice for each note it plays at once, up to 4, so
+                    none are cut off. The game has {MAX_VOICES} voices for a segment&apos;s tracks, which sound effects
+                    also use.
                 </Text>
             </Content>
-            <Footer>
-                <Text>
-                    The game can run up to 24 voices at once. If there are too many notes playing, regions with higher voice counts
-                    might stop shorter notes in <i>other</i> regions to keep things running smoothly.
-                </Text>
-            </Footer>
         </ContextualHelp>
     </Flex>
 
-    const state = polyphony === "Automatic" ? "auto" : "manual"
-    const voiceCount = typeof polyphony === "object" && "Manual" in polyphony ? polyphony.Manual.voices : 1
+    if (track.alternate_for != null) {
+        return <View>
+            {label}
+            <Text>Uses the voices of Track {track.alternate_for}.</Text>
+        </View>
+    }
 
+    const needed = voices.needed[trackIndex]
+    const given = voices.given[trackIndex]
+    const segmentNeeds = total(voices.needed)
     return <View>
-        <RadioGroup
-            label={polyphonyLabel}
-            value={state}
-            onChange={newState => {
-                if (state === newState) return
-                if (newState === "auto") {
-                    onChange("Automatic")
-                } else {
-                    onChange({
-                        Manual: {
-                            voices: 1,
-                        },
-                    })
-                }
-            }}
-        >
-            <Radio value="auto">Automatic</Radio>
-            <Radio value="manual">Manual</Radio>
-        </RadioGroup>
-        {state === "manual" ? <NumberField
-            label="Number of voices"
-            value={voiceCount}
-            minValue={0}
-            maxValue={4}
-            step={1}
-            onChange={voices => onChange({
-                Manual: {
-                    voices,
-                },
-            })}
-        /> : <></>}
+        {label}
+        <Text>{given}</Text>
+        {given < needed && <Text UNSAFE_className={styles.warning}>
+            This track plays up to {needed} notes at once, but gets {given} voices, so some notes are cut off.
+            Its segment needs {segmentNeeds} voices, and the game has {MAX_VOICES}.
+        </Text>}
     </View>
 }
 

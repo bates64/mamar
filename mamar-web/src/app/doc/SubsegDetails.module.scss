@@ -1,3 +1,10 @@
 .regionName {
     margin: 0;
 }
+
+.warning {
+    display: block;
+    margin-top: 4px;
+    color: var(--spectrum-orange-700);
+    font-size: 12px;
+}

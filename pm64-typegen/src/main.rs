@@ -1,8 +1,8 @@
-use pm64::bgm::Bgm;
+use pm64::bgm::{Bgm, Voices};
 use pm64::sbn::Sbn;
 use typescript_type_def::*;
 
-type Api = (Bgm, Sbn);
+type Api = (Bgm, Sbn, Voices);
 
 fn main() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/pm64.d.ts");

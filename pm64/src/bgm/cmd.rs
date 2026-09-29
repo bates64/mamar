@@ -805,27 +805,29 @@ impl CommandSeq {
         self.vec.into_iter().map(|e| e.command).collect()
     }
 
-    /// Calculate the maximum number of notes that play at once.
-    pub fn max_polyphony(&self) -> u8 {
-        let mut polyphony = 0;
-        let mut notes = [0; u8::MAX as usize]; // Maps pitch->end_time of played notes
-        for (time, event) in self.iter_time() {
-            let time = time as u16;
-
-            if let Event {
-                command: Command::Note { pitch, length, .. },
-                ..
-            } = event
-            {
-                notes[*pitch as usize] = *length + time;
-
-                let current_polyphony = notes.iter().filter(|end_time| **end_time > time).count() as u8;
-                if current_polyphony > polyphony {
-                    polyphony = current_polyphony;
+    /// When each note this sequence plays holds a voice, as (start, end) ticks. Detours are followed, and each branch
+    /// plays option `option`, or its first if it has no such option.
+    pub fn note_spans(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, usize)> {
+        let mut spans = Vec::new();
+        for (time, event) in self.playback(branches) {
+            match event.command {
+                Command::Note { length, .. } => spans.push((time, time + length as usize)),
+                Command::Branch { branch } => {
+                    let options = branches.get(&branch).map(|branch| &branch.options);
+                    if let Some(chosen) = options.and_then(|options| options.get(option).or(options.first())) {
+                        spans.extend(
+                            chosen
+                                .commands
+                                .note_spans(branches, option)
+                                .into_iter()
+                                .map(|(start, end)| (time + start, time + end)),
+                        );
+                    }
                 }
+                _ => {}
             }
         }
-        polyphony
+        spans
     }
 
     /// Splits this sequence at the given time such that self is the 'before `time`' sequence and the returned
@@ -1380,67 +1382,6 @@ mod test {
                 Command::Delay(5),
             ]
         );
-    }
-
-    #[test]
-    fn max_polyphony() {
-        let seq = CommandSeq::new();
-        assert_eq!(seq.max_polyphony(), 0);
-
-        let seq: CommandSeq = vec![Command::Note {
-            pitch: 100,
-            velocity: 100,
-            length: 10,
-        }]
-        .into();
-        assert_eq!(seq.max_polyphony(), 1);
-
-        let seq: CommandSeq = vec![
-            Command::Note {
-                pitch: 100,
-                velocity: 100,
-                length: 10,
-            },
-            Command::Delay(15),
-            Command::Note {
-                pitch: 100, // same pitch
-                velocity: 100,
-                length: 10,
-            },
-        ]
-        .into();
-        assert_eq!(seq.max_polyphony(), 1);
-
-        let seq: CommandSeq = vec![
-            Command::Note {
-                pitch: 100,
-                velocity: 100,
-                length: 10,
-            },
-            Command::Note {
-                pitch: 200,
-                velocity: 100,
-                length: 10,
-            },
-        ]
-        .into();
-        assert_eq!(seq.max_polyphony(), 2);
-
-        let seq: CommandSeq = vec![
-            Command::Note {
-                pitch: 100,
-                velocity: 100,
-                length: 10,
-            },
-            Command::Delay(10), // note should finish
-            Command::Note {
-                pitch: 200,
-                velocity: 100,
-                length: 10,
-            },
-        ]
-        .into();
-        assert_eq!(seq.max_polyphony(), 1);
     }
 
     #[test]

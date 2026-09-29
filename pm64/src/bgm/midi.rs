@@ -207,7 +207,7 @@ fn midi_track_to_bgm_track(
             let mut track = Track {
                 name: "".into(),
                 is_disabled: false,
-                polyphony: Polyphony::Automatic,
+                polyphonic_idx: None,
                 is_drum_track: false,
                 alternate_for: None,
                 commands: CommandSeq::new(),
@@ -432,18 +432,6 @@ fn midi_track_to_bgm_track(
 
                                         started_notes.clear();
                                     }
-                                    // Poly[phonic] mode on/off
-                                    126 => {
-                                        if value == 0 {
-                                            track.polyphony = Polyphony::Manual { voices: 0 };
-                                        } else {
-                                            track.polyphony = Polyphony::Manual { voices: 1 };
-                                        }
-                                    }
-                                    // Poly[phonic] mode on
-                                    127 => {
-                                        track.polyphony = Polyphony::Automatic;
-                                    }
                                     _ => {
                                         pitch_range_cmd_state = PitchRangeCommandState::None;
                                     }
@@ -497,7 +485,11 @@ fn midi_track_to_bgm_track(
                 return Track::default();
             }
 
-            if track.commands.max_polyphony() > 0 {
+            if track
+                .commands
+                .iter()
+                .any(|event| matches!(event.command, Command::Note { .. }))
+            {
                 // Required else the game crashes D:
                 track.commands.insert_many_start(
                     0,

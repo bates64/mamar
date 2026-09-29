@@ -386,6 +386,14 @@ fn compress_edited_tracks() {
                 track.pos = None;
             }
         }
+        for (id, track_list) in &edited.track_lists {
+            let voices = track_list.voices(&edited.branches);
+            assert!(
+                voices.total_given() <= MAX_VOICES,
+                "{name}: track list {id} is given {} voices",
+                voices.total_given()
+            );
+        }
         let encoded = edited.as_bytes().unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(
             encoded.len() <= 0x5000,

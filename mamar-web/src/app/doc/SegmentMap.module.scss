@@ -91,6 +91,12 @@ $trackHeight: 70px;
         background: #00000033;
     }
 
+    // Some of its notes are cut off, as its segment needs more voices than the game has
+    &.shortOfVoices {
+        outline: 2px solid var(--spectrum-orange-600);
+        outline-offset: -2px;
+    }
+
     &.showsAlternatePart {
         --color-500: var(--spectrum-indigo-700);
         --color-400: var(--spectrum-indigo-600);

@@ -196,12 +196,12 @@ impl Bgm {
             }
 
             // Write flags
+            let voices = track_list.voices(&self.branches);
             let mut todo_commands = Vec::new();
             for (track_no, track) in track_list.tracks.iter().enumerate() {
                 let Track {
                     name,
                     is_disabled,
-                    polyphony,
                     is_drum_track,
                     commands,
                     ..
@@ -224,10 +224,12 @@ impl Bgm {
                 }
                 f.write_u16_be(0)?; // Replaced later if !null
 
-                let polyphonic_idx = match *polyphony {
-                    Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
-                    Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
-                    Polyphony::Other { priority } => priority,
+                // Tracks as decoded keep their polyphony, and alternate parts use the voices of the track they're for
+                let polyphonic_idx = match (track.pos, track.polyphonic_idx) {
+                    (Some(_), Some(idx)) => idx,
+                    _ => super::polyphonic_idx(
+                        voices.given[track.alternate_for.map_or(track_no, |index| index as usize)],
+                    ),
                 };
 
                 let flags = (*is_disabled as u16) << 8
@@ -669,16 +671,5 @@ impl CommandSeq {
 
         f.seek(end_pos)?;
         Ok(())
-    }
-}
-
-/// Performs the inverse of `player->unk_22A[polyphony]`
-fn polyphony_to_polyphonic_idx(polyphony: u8) -> u8 {
-    match polyphony {
-        0 => 0,
-        1 => 1,
-        2 => 5,
-        3 => 6,
-        _ => 7,
     }
 }

@@ -21,6 +21,10 @@ use typescript_type_def::TypeDef;
 mod cmd;
 pub use cmd::*;
 
+pub mod mix;
+mod voices;
+pub use voices::*;
+
 use crate::id::{Id, gen_id};
 
 /// Constant signature string which appears at the start of every binary BGM file.
@@ -402,8 +406,12 @@ pub struct Track {
     #[serde(default)]
     pub name: String,
     pub is_disabled: bool,
-    pub polyphony: Polyphony,
     pub is_drum_track: bool,
+
+    /// The polyphony index the track was stored with, encoded while the track is as decoded. Otherwise the encoder
+    /// chooses its voices from its notes. See [TrackList::voices].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub polyphonic_idx: Option<u8>,
 
     /// The index of the earlier track this one is an alternate part for. It plays in step with that track, using its
     /// voices, and the game plays one or the other: the alternate part when it sets linked mode on.
@@ -423,8 +431,8 @@ impl Default for Track {
         Self {
             name: "".to_owned(),
             is_disabled: true,
-            polyphony: Polyphony::Automatic,
             is_drum_track: false,
+            polyphonic_idx: None,
             alternate_for: None,
             commands: Default::default(),
             pos: None,
@@ -439,8 +447,8 @@ impl Track {
         Track {
             name: self.name.clone(),
             is_disabled: self.is_disabled,
-            polyphony: self.polyphony,
             is_drum_track: self.is_drum_track,
+            polyphonic_idx: None,
             alternate_for: self.alternate_for,
             commands,
             pos: None,
@@ -482,44 +490,6 @@ pub struct BranchOption {
     /// when encoded, as long as the commands are still equal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pos: Option<FilePos>,
-}
-
-/// 255 is never used in vanilla songs so we can repurpose it to mean 'please calculate a good polyphonic_idx for me'
-pub const POLYPHONIC_IDX_AUTO_MAMAR: u8 = 255;
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, TypeDef)]
-pub enum Polyphony {
-    Automatic,
-    Manual { voices: u8 },
-    Other { priority: u8 },
-}
-
-impl Polyphony {
-    pub fn from_raw(raw_priority: u8) -> Self {
-        match raw_priority {
-            0 => Self::Manual { voices: 0 },
-            1 => Self::Manual { voices: 1 },
-            5 => Self::Manual { voices: 2 },
-            6 => Self::Manual { voices: 3 },
-            7 => Self::Manual { voices: 4 },
-            POLYPHONIC_IDX_AUTO_MAMAR => Self::Automatic,
-            _ => Self::Other { priority: raw_priority },
-        }
-    }
-
-    pub fn to_polyphonic_idx(self) -> u8 {
-        match self {
-            Polyphony::Automatic => POLYPHONIC_IDX_AUTO_MAMAR,
-            Polyphony::Manual { voices } => match voices {
-                1 => 1,
-                2 => 5,
-                3 => 6,
-                4 => 7,
-                _ => 0,
-            },
-            Polyphony::Other { priority } => priority,
-        }
-    }
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]

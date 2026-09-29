@@ -9,6 +9,7 @@ import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
+import { useVoices } from "./voices"
 
 import Bridge from "../bridge"
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
@@ -26,6 +27,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trac
     const hasAlternatePart = trackList !== undefined && alternatePartOf(trackList, trackIndex) !== undefined
     const isAlternatePart = trackList?.tracks[trackIndex]?.alternate_for != null
     const shownIndex = trackList ? playingTrack(trackList, trackIndex, location.alternateParts) : trackIndex
+    const voices = useVoices(trackListIndex)
     const track = trackList?.tracks[shownIndex]
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex && doc?.panelContent.track === trackIndex
     const nameId = useId()
@@ -59,6 +61,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trac
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
                 [styles.showsAlternatePart]: shownIndex !== trackIndex,
+                [styles.shortOfVoices]: voices !== undefined && voices.given[trackIndex] < voices.needed[trackIndex],
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
