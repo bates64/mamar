@@ -1,0 +1,46 @@
+// The lane is a panel of its own under the piano roll, lighter than the roll's background so it's easy to find.
+.trackLanes {
+    border-top: 2px solid var(--spectrum-gray-300);
+    background: var(--spectrum-gray-100);
+}
+
+// A strip across the timeline naming the lane, whose menu stays at the left edge while the timeline scrolls
+.header {
+    height: 28px;
+    display: flex;
+    align-items: center;
+
+    background: var(--spectrum-gray-200);
+    border-bottom: 1px solid var(--spectrum-gray-300);
+}
+
+.menu {
+    position: sticky;
+    left: 0;
+    padding: 0 8px;
+}
+
+// Lines at each beat and bar, and across the lane at each quarter of its range, like the piano roll's
+.body {
+    position: relative;
+    --beat: calc(var(--ticks-per-beat) / var(--ruler-zoom));
+    --bar: calc(var(--beat) * var(--beats-per-bar));
+
+    background-image:
+        repeating-linear-gradient(to right, var(--spectrum-gray-300) 0 2px, transparent 2px var(--bar)),
+        repeating-linear-gradient(to right, var(--spectrum-gray-200) 0 1px, transparent 1px var(--beat)),
+        repeating-linear-gradient(to bottom, transparent 0 calc(25% - 1px), var(--spectrum-gray-200) calc(25% - 1px) 25%);
+}
+
+// Says what to do in an empty lane. Clicks pass through it to the lane.
+.hint {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+
+    color: var(--spectrum-gray-700);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}

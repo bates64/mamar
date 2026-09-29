@@ -95,9 +95,13 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
             read: command => ("SetTrackVoice" in command ? { value: (command.SetTrackVoice as Fields).index } : undefined),
             set: index => ({ SetTrackVoice: { index } }),
         },
+        // Tremolo bends each note's pitch up and down in a triangle wave, once the note has played for its delay.
+        // Vanilla songs use depths up to about 44, speeds up to about 40, and delays up to 2 beats, so the ranges
+        // leave room past those without squashing them.
         {
-            key: "tremolo", name: "Tremolo", min: 0, max: 255, display: "spans",
-            format: depth => (depth === 0 ? "Off" : `Depth ${depth}`),
+            key: "tremolo", name: "Tremolo depth", min: 0, max: 127, display: "line",
+            // The peak of the wave, in cents
+            format: depth => (depth === 0 ? "Off" : `±${depth} cents`),
             read: command => {
                 if ("TrackTremolo" in command) {
                     return { value: (command.TrackTremolo as Fields).depth }
@@ -113,7 +117,9 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
                 : (depth === 0 ? "TrackTremoloStop" : { TrackTremoloDepth: { depth } })) as Command,
         },
         {
-            key: "tremoloSpeed", name: "Tremolo speed", min: 0, max: 255, display: "spans",
+            key: "tremoloSpeed", name: "Tremolo speed", min: 0, max: 64, display: "line",
+            // The wave advances by the speed each tick, out of 256 for a whole wave
+            format: speed => `${+(speed * TICKS_PER_BEAT / 256).toFixed(2)} per beat`,
             read: command => {
                 if ("TrackTremoloSpeed" in command) {
                     return { value: command.TrackTremoloSpeed as number }
@@ -127,11 +133,12 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
                 : { TrackTremoloSpeed: speed }) as Command,
         },
         {
-            // Only a full tremolo command has a delay, so a new point starts one with a gentle speed and depth
-            key: "tremoloDelay", name: "Tremolo delay", min: 0, max: 255, display: "spans",
+            // Only a full tremolo command has a delay, so a new point starts one with the speed and depth vanilla songs
+            // use most
+            key: "tremoloDelay", name: "Tremolo delay", min: 0, max: TICKS_PER_BEAT * 4, display: "line",
             format: formatBeats,
             read: command => ("TrackTremolo" in command ? { value: (command.TrackTremolo as Fields).delay } : undefined),
-            set: delay => ({ TrackTremolo: { delay, speed: 64, depth: 32 } }),
+            set: delay => ({ TrackTremolo: { delay, speed: 15, depth: 10 } }),
             update: (command, delay) => ({ TrackTremolo: { ...(command.TrackTremolo as Fields), delay } }) as Command,
         },
         {

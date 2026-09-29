@@ -51,7 +51,15 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
         columns="225px 1fr"
         height="100%"
     >
-        <View padding="size-200" borderEndColor="gray-100" borderEndWidth="thin" UNSAFE_style={{ userSelect: "none" }}>
+        {/* Scrolls when its settings are taller than the piano roll */}
+        <View
+            padding="size-150"
+            borderEndColor="gray-100"
+            borderEndWidth="thin"
+            overflow="auto"
+            minHeight={0}
+            UNSAFE_style={{ userSelect: "none" }}
+        >
             <h3 id={hid} className={styles.regionName}>Region Settings</h3>
             <Form maxWidth="size-2000" aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
                 <TextField
@@ -59,9 +67,11 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     value={name}
                     onChange={setName}
                 />
-                <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
+                <Flex wrap columnGap="size-200">
+                    <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
+                    {trackIndex !== 0 && <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}
+                </Flex>
                 {trackIndex !== 0 ? <>
-                    <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>
                     <VoicesInfo trackListId={trackListId} trackIndex={trackIndex} />
                     <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
                 </> : <></>}

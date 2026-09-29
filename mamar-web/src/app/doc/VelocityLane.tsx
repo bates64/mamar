@@ -31,7 +31,6 @@ export default function VelocityLane({ trackListId, trackIndex, length, played }
     }
 
     return <div ref={ref} className={styles.lane} aria-label="Velocity">
-        <span className={styles.name}>Velocity</span>
         {notes.map(({ time, event }) => {
             const velocity = drag?.id === event.id ? drag.velocity : event.Note.velocity
             return <span

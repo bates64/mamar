@@ -17,8 +17,10 @@ const DRAG_THRESHOLD = 4
  * Commands as labeled markers. Click one to edit it in a popup, drag it to move it, and double-click it to delete it. Clicking
  * empty space calls `onAddAt`, if given. Markers snap to the grid unless Shift is held.
  */
-export default function CommandMarkers({ name, trackListId, trackIndex, length, events, label, onAddAt, children }: {
+export default function CommandMarkers({ name, showName = true, trackListId, trackIndex, length, events, label, onAddAt, children }: {
     name: string
+    /** Whether to label the lane inside it, for lanes without a label beside them. */
+    showName?: boolean
     trackListId: number
     trackIndex: number
     length: number
@@ -53,7 +55,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
             }
         }}
     >
-        <span className={styles.name}>{name}</span>
+        {showName && <span className={styles.name}>{name}</span>}
         {events.map(({ time, event }) => {
             const shownTime = drag?.id === event.id ? drag.time : time
             return <span

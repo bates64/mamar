@@ -58,8 +58,10 @@ export interface Doc {
     location: Location
     snap: Snap
     selection?: Selection | null
-    /** Lanes chosen to be shown or hidden, by key. Others are shown if they have commands. */
+    /** Song lanes chosen to be shown or hidden, by key. Others are shown if they have commands. */
     shownLanes?: Record<string, boolean>
+    /** The key of the lane chosen for each track under the piano roll, by track index. */
+    trackLanes?: Record<number, string>
     /** Ticks per pixel along the timeline. */
     zoom?: number
     /** The part of the active variation that playback repeats, if one has been marked. */
@@ -107,6 +109,10 @@ export type DocAction = {
     type: "set_lane_shown"
     lane: string
     shown: boolean
+} | {
+    type: "set_track_lane"
+    track: number
+    lane: string
 } | {
     type: "set_cycle"
     cycle: Cycle | null
@@ -158,6 +164,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             snap: action.snap,
+        }
+    case "set_track_lane":
+        return {
+            ...state,
+            trackLanes: { ...state.trackLanes, [action.track]: action.lane },
         }
     case "set_cycle":
         return {

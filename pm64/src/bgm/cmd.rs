@@ -241,15 +241,20 @@ impl CommandSeq {
         CommandSeq { vec }
     }
 
-    /// Inserts `command` after the commands already at `time`, keeping the time of every other command.
+    /// Inserts `command` after the commands already at `time`, keeping the time of every other command. Unless it's a
+    /// note, it goes before the notes at `time`, so a setting applies to the notes that start with it.
     pub fn insert_after(&mut self, time: usize, command: Command) {
         self.insert_event_after(time, command.into());
     }
 
-    /// Inserts `event` after the commands already at `time`, keeping the time of every other command.
+    /// Inserts `event` after the commands already at `time`, keeping the time of every other command. Unless it's a
+    /// note, it goes before the notes at `time`, so a setting applies to the notes that start with it.
     pub fn insert_event_after(&mut self, time: usize, event: Event) {
-        let index = self.iter_time().position(|(event_time, event)| {
-            event_time == time && matches!(event.command, Command::Delay(_) | Command::End)
+        let is_note = matches!(event.command, Command::Note { .. });
+        let index = self.iter_time().position(|(event_time, other)| {
+            event_time == time
+                && (matches!(other.command, Command::Delay(_) | Command::End)
+                    || (!is_note && matches!(other.command, Command::Note { .. })))
         });
         match index {
             Some(index) => self.vec.insert(index, event),
@@ -1367,16 +1372,24 @@ mod test {
         seq.insert_after(0, Command::MasterTempo(1));
         seq.insert_after(10, Command::MasterTempo(2));
         seq.insert_after(15, Command::MasterTempo(3));
+        let late_note = Command::Note {
+            pitch: 1,
+            velocity: 0,
+            length: 0,
+        };
+        seq.insert_after(0, late_note.clone());
 
+        // Settings go before the notes they start with, and notes go after them
         let commands = seq.to_command_vec();
         assert_eq!(
             commands,
             vec![
-                note(),
                 Command::MasterTempo(1),
-                Command::Delay(10),
                 note(),
+                late_note,
+                Command::Delay(10),
                 Command::MasterTempo(2),
+                note(),
                 Command::Delay(5),
                 Command::MasterTempo(3),
                 Command::Delay(5),
