@@ -328,8 +328,15 @@ pub struct TrackList {
 }
 
 impl TrackList {
+    /// The game ends a phrase when any enabled track reaches an [End](Command::End). Tracks without one play into
+    /// whatever follows them, so the master track's length stands in when no track has one.
     pub fn len_time(&self) -> usize {
-        self.tracks[0].commands.len_time()
+        self.tracks
+            .iter()
+            .filter(|track| !track.is_disabled)
+            .filter_map(|track| track.commands.end_time())
+            .min()
+            .unwrap_or_else(|| self.tracks[0].commands.len_time())
     }
 
     pub fn split_at(&mut self, time: usize) -> TrackList {

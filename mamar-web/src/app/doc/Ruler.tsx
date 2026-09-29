@@ -1,6 +1,6 @@
 import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
-import { Event, Segment } from "pm64-typegen"
+import { Event, Segment, TrackList } from "pm64-typegen"
 import { useState } from "react"
 import { usePress } from "react-aria"
 
@@ -117,20 +117,72 @@ export function useSegmentLengths(): number[] {
 
     return segments.map(segment => {
         if (bgm && "Subseg" in segment) {
-            const master = bgm.track_lists[segment.Subseg.track_list].tracks[0]
-            const commands = master.commands as unknown as Event[]
-
-            return commands.reduce((totalDelay, event) => {
-                if ("Delay" in event) {
-                    return totalDelay + event.Delay
-                } else {
-                    return totalDelay
-                }
-            }, 0)
+            return trackListLength(bgm.track_lists[segment.Subseg.track_list])
         } else {
             return 0
         }
     })
+}
+
+/**
+ * The game ends a segment when any enabled track reaches an End. Tracks without one play into whatever follows them,
+ * so the master track's length stands in when no track has one. See TrackList::len_time in pm64.
+ */
+function trackListLength(trackList: TrackList): number {
+    let length: number | undefined
+    for (const track of trackList.tracks) {
+        if (track.is_disabled) {
+            continue
+        }
+        const end = endTime(track.commands as unknown as Event[])
+        if (end !== undefined && (length === undefined || end < length)) {
+            length = end
+        }
+    }
+    return length ?? sumDelays(trackList.tracks[0].commands as unknown as Event[])
+}
+
+/**
+ * How long the commands play before their first End, including the time their detours play, or undefined if they have
+ * no End or jump somewhere this can't follow before one. See CommandSeq::end_time.
+ */
+function endTime(commands: Event[]): number | undefined {
+    const markerTimes = new Map<string, number>()
+    let linearTime = 0
+    for (const event of commands) {
+        if ("Delay" in event) {
+            linearTime += event.Delay
+        } else if ("Marker" in event && !markerTimes.has(event.Marker.label)) {
+            markerTimes.set(event.Marker.label, linearTime)
+        }
+    }
+
+    let time = 0
+    for (const event of commands) {
+        if ("End" in event) {
+            return time
+        } else if ("Jump" in event) {
+            return undefined
+        } else if ("Delay" in event) {
+            time += event.Delay
+        } else if ("Detour" in event) {
+            const start = markerTimes.get(event.Detour.start_label)
+            const end = markerTimes.get(event.Detour.end_label)
+            if (start !== undefined && end !== undefined) {
+                time += Math.max(0, end - start)
+            }
+        }
+    }
+}
+
+function sumDelays(commands: Event[]): number {
+    let time = 0
+    for (const event of commands) {
+        if ("Delay" in event) {
+            time += event.Delay
+        }
+    }
+    return time
 }
 
 export default function Ruler() {

@@ -238,6 +238,33 @@ impl CommandSeq {
         }
     }
 
+    /// Returns how long the sequence plays before its first [Command::End], including the time its
+    /// [detours](Command::Detour) play, or None if it has no End or [jumps](Command::Jump) somewhere it can't follow
+    /// before one.
+    pub fn end_time(&self) -> Option<usize> {
+        let marker_time = |label: &MarkerId| {
+            self.iter_time()
+                .find(|(_, event)| matches!(&event.command, Command::Marker { label: l } if l == label))
+                .map(|(time, _)| time)
+        };
+
+        let mut time = 0;
+        for event in self.vec.iter() {
+            match &event.command {
+                Command::Delay(delay) => time += delay,
+                Command::Detour { start_label, end_label } => {
+                    if let (Some(start), Some(end)) = (marker_time(start_label), marker_time(end_label)) {
+                        time += end.saturating_sub(start);
+                    }
+                }
+                Command::End => return Some(time),
+                Command::Jump { .. } => return None,
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// Returns the relative-time after the last [Command]. Does not account for any final command which extends the
     /// *playback* time (not the relative-time), that is, [Command::Note] (use [CommandSeq::playback_time] to find
     /// this value).
