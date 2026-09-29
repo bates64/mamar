@@ -287,7 +287,7 @@ export default function Ruler() {
         <TimeGrid
             className={styles.bars}
             style={{ "--beat-offset": `${pickup % TICKS_PER_BEAT}px` } as React.CSSProperties}
-            dragToScroll={{ axis: "none", button: 0, thresholdPx: 0 }}
+            dragToScroll={{ axis: "x", button: 0, thresholdPx: 0 }}
         >
             <Playhead />
             {bars}

@@ -198,6 +198,7 @@ export default function Playhead() {
                 e.stopPropagation()
             }}
             title="Drag to change where playback starts"
+            data-no-drag-scroll
         >
 
         </div>

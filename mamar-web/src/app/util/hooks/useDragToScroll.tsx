@@ -100,6 +100,8 @@ export default function useDragToScroll<T extends HTMLElement>(
         (e: React.PointerEvent) => {
             if (axis === "none") return
             if (e.button !== button) return
+            // Elements with their own drag gesture, such as the playhead, keep it.
+            if ((e.target as Element).closest("[data-no-drag-scroll]")) return
 
             const el = ref.current
             if (!el) return
@@ -215,7 +217,7 @@ export default function useDragToScroll<T extends HTMLElement>(
 
     const onMouseDownCapture = useCallback(
         (e: React.MouseEvent) => {
-            if (axis !== "none" && e.button === button) e.preventDefault()
+            if (axis !== "none" && e.button === button && !(e.target as Element).closest("[data-no-drag-scroll]")) e.preventDefault()
         },
         [axis, button],
     )
