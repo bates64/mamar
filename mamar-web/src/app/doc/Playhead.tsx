@@ -2,7 +2,7 @@ import classNames from "classnames"
 import { useEffect, useRef, useState, useContext, createContext, useCallback } from "react"
 
 import styles from "./Playhead.module.scss"
-import { useSegmentLengths } from "./Ruler"
+import { TICKS_PER_BEAT, usePickup, useSegmentLengths } from "./Ruler"
 import { useTime } from "./TimeProvider"
 
 import useSongPlayer, { PlayerStatus, SongPosition } from "../emu/SongPlayer"
@@ -133,12 +133,14 @@ export function useTimeline() {
     }
 }
 
-function snapToBeat(ticks: number): number {
-    return Math.round(ticks / 48) * 48
+/** Rounds to the nearest beat, counting beats from bar 1. */
+function snapToBeat(ticks: number, pickup: number): number {
+    return Math.max(0, pickup + Math.round((ticks - pickup) / TICKS_PER_BEAT) * TICKS_PER_BEAT)
 }
 
 export default function Playhead() {
     const { xToTicks } = useTime()
+    const pickup = usePickup()
     const context = useContext(CONTEXT)!
     const display = useContext(DISPLAY_CONTEXT)!
     const dragPosition = useRef<number | null>(null)
@@ -150,7 +152,7 @@ export default function Playhead() {
             if (dragPosition.current === null) return
             let ticks = xToTicks(e.clientX)
             if (!e.shiftKey) {
-                ticks = snapToBeat(ticks)
+                ticks = snapToBeat(ticks, pickup)
             }
             dragPosition.current = ticks
             display.setDragPosition(ticks)
@@ -174,7 +176,7 @@ export default function Playhead() {
             window.removeEventListener("mousemove", onMouseMove)
             window.removeEventListener("mouseup", onMouseUp)
         }
-    }, [xToTicks, display, context])
+    }, [xToTicks, pickup, display, context])
 
     if (!doc) return null
 

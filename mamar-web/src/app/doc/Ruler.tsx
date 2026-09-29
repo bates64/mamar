@@ -109,6 +109,19 @@ export function ticksToStyle(ticks: number) {
     }
 }
 
+export const TICKS_PER_BEAT = 48
+const BEATS_PER_BAR = 4 // TODO: read time signature from midi
+const TICKS_PER_BAR = TICKS_PER_BEAT * BEATS_PER_BAR
+
+/**
+ * Ticks before bar 1. A variation whose first segment is shorter than a bar starts with it as a pickup, so its bars
+ * line up with what follows.
+ */
+export function usePickup(): number {
+    const first = useSegmentLengths().find(length => length > 0) ?? 0
+    return first < TICKS_PER_BAR ? first : 0
+}
+
 // TODO: cache this better
 export function useSegmentLengths(): number[] {
     const [bgm] = useBgm()
@@ -193,8 +206,7 @@ export default function Ruler() {
     const segmentLengths = useSegmentLengths()
     const [highlightedLoop, setHighlightedLoop] = useState<Loop["id"] | null>(null)
 
-    const TICKS_PER_BEAT = 48
-    const BEATS_PER_BAR = 4 // TODO: read time signature from midi
+    const pickup = usePickup()
 
     const elements = []
     let currentLoop: Loop | null = null
@@ -258,8 +270,11 @@ export default function Ruler() {
     }
 
     const bars = []
-    for (let time = 0, bar = 1; time < totalTime; bar++, time += TICKS_PER_BEAT * BEATS_PER_BAR) {
-        const remaining = Math.min(totalTime - time, TICKS_PER_BEAT * BEATS_PER_BAR)
+    if (pickup > 0) {
+        bars.push(<div key={0} className={styles.bar} style={ticksToStyle(pickup)} />)
+    }
+    for (let time = pickup, bar = 1; time < totalTime; bar++, time += TICKS_PER_BAR) {
+        const remaining = Math.min(totalTime - time, TICKS_PER_BAR)
         bars.push(<div key={bar} className={styles.bar} style={ticksToStyle(remaining)}>
             {bar}
         </div>)
@@ -269,7 +284,11 @@ export default function Ruler() {
         <TimeGrid className={styles.loops}>
             {elements}
         </TimeGrid>
-        <TimeGrid className={styles.bars} dragToScroll={{ axis: "none", button: 0, thresholdPx: 0 }}>
+        <TimeGrid
+            className={styles.bars}
+            style={{ "--beat-offset": `${pickup % TICKS_PER_BEAT}px` } as React.CSSProperties}
+            dragToScroll={{ axis: "none", button: 0, thresholdPx: 0 }}
+        >
             <Playhead />
             {bars}
         </TimeGrid>

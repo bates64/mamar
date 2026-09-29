@@ -94,6 +94,7 @@ $ruler-height: 36px;
         background-image: repeating-linear-gradient(to right, var(--color) 0, var(--color) 1px, transparent 1px, transparent calc(var(--ticks-per-beat) / var(--ruler-zoom)));
         background-size: calc(var(--ticks-per-beat) / var(--ruler-zoom)) 50%;
         background-repeat: repeat no-repeat;
+        background-position-x: calc(var(--beat-offset, 0px) / var(--ruler-zoom));
         background-position-y: calc(var(--ticks-per-beat) / 4);
 
         color: var(--spectrum-global-color-gray-700);
