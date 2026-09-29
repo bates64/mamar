@@ -1,7 +1,7 @@
 import { Sbn } from "pm64-typegen"
 import { useEffect, useState } from "react"
 
-export default function useDecodedSbn(romData: ArrayBuffer): Sbn | null {
+export default function useDecodedSbn(sbnData: ArrayBuffer): Sbn | null {
     const [decodedSbn, setDecodedSbn] = useState<Sbn | Error | null>(null)
 
     useEffect(() => {
@@ -14,7 +14,7 @@ export default function useDecodedSbn(romData: ArrayBuffer): Sbn | null {
                 const data = evt.data as Sbn | string
 
                 if (data === "READY") {
-                    worker.postMessage(romData)
+                    worker.postMessage(sbnData)
                 } else if (typeof data === "string") {
                     resolve(new Error(data))
                 } else {
@@ -24,7 +24,7 @@ export default function useDecodedSbn(romData: ArrayBuffer): Sbn | null {
         }).then(sbn => {
             setDecodedSbn(sbn)
         })
-    }, [romData])
+    }, [sbnData])
 
     if (decodedSbn instanceof Error) {
         throw decodedSbn

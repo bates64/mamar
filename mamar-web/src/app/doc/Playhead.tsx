@@ -89,7 +89,7 @@ function DisplayProvider({ start, playing, children }: {
     const latency = useRef(0)
     const ticksPerMs = useRef(0)
 
-    useSongPlayer(useCallback(({ position, latency: reportedLatency = 0, tempo }: PlayerStatus) => {
+    useSongPlayer(useCallback(({ position, latency: reportedLatency, tempo }: PlayerStatus) => {
         const { playing, timeline } = latest.current
         if (!playing) {
             return
@@ -109,7 +109,7 @@ function DisplayProvider({ start, playing, children }: {
             }
         }
 
-        reports.current.push({ time: now, playing, position: position ?? null })
+        reports.current.push({ time: now, playing, position })
     }, []))
 
     // Moves the playhead every frame while it follows the song, so it moves smoothly and scrolls in step.

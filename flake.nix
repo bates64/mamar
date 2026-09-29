@@ -58,6 +58,8 @@
               rust-analyzer
               nixpkgs-fmt
               wasm-pack
+              llvmPackages.clang-unwrapped
+              lld
             ];
             env = {
               RUST_BACKTRACE = "1";

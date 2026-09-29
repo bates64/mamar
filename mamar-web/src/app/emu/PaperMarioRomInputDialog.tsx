@@ -2,17 +2,11 @@ import { Text, Content, Dialog, Divider, Heading, Flex, useDialogContainer } fro
 import Alert from "@spectrum-icons/workflow/Alert"
 import { useState } from "react"
 
-function getRomName(romData: ArrayBuffer) {
-    const romName = new Uint8Array(romData, 0x20, 20)
-    return String.fromCharCode(...romName)
-}
-
-export function isPaperMario(romData: ArrayBuffer) {
-    return getRomName(romData) === "PAPER MARIO         "
-}
+import { findSoundBank } from "../util/soundBank"
 
 export interface Props {
-    onChange: (romData: ArrayBuffer) => void
+    /** Called with the sound bank (SBN) of the ROM the user selects. */
+    onChange: (sbn: ArrayBuffer) => void
 }
 
 export default function PaperMarioRomInput({ onChange }: Props) {
@@ -24,8 +18,9 @@ export default function PaperMarioRomInput({ onChange }: Props) {
         <Divider />
         <Content>
             <Text>
-                Mamar requires a clean Paper Mario (US) ROM in z64 format.<br />
-                Please select a ROM file to continue.
+                Mamar plays songs with the instruments in a Paper Mario (US) ROM in z64 format.
+                The ROM of a mod works too, and plays with its instruments.<br />
+                Select a ROM file to continue.
             </Text>
             <Flex marginTop="size-200" width="100%" height="size-400" alignItems="center">
                 <input
@@ -36,17 +31,18 @@ export default function PaperMarioRomInput({ onChange }: Props) {
                     onChange={async evt => {
                         const file = (evt.target as HTMLInputElement).files?.[0]
                         const data = await file?.arrayBuffer()
+                        const sbn = data && findSoundBank(data)
 
-                        if (!data || !isPaperMario(data)) {
+                        if (!sbn) {
                             setError(true)
                             return
                         }
 
                         dialog.dismiss()
-                        onChange(data)
+                        onChange(sbn)
                     }}
                 />
-                {error && <div title="The selected file is not Paper Mario (US).">
+                {error && <div title="The selected file isn't a Paper Mario ROM.">
                     <Alert color="negative" />
                 </div>}
             </Flex>

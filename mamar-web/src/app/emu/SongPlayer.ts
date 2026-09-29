@@ -14,36 +14,24 @@ export interface SongPosition {
 export interface PlayerStatus {
     /** Beats per minute. */
     tempo: number
-    /** Where the song playing is, or null if none is. Players that can't tell leave it out. */
-    position?: SongPosition | null
-    /**
-     * How long after the song reaches a position it's heard there, in ms. Players that can't tell leave it out.
-     */
-    latency?: number
+    /** Where the song playing is, or null if none is. */
+    position: SongPosition | null
+    /** How long after the song reaches a position it's heard there, in ms. */
+    latency: number
 }
 
 /**
- * Plays songs in an emulated game. Each method takes effect in the game as
- * soon as it can, which might be after it returns.
+ * Plays songs. Each method takes effect as soon as it can, which might be after it returns.
  */
 export interface SongPlayer {
-    /**
-     * Plays an encoded BGM from `start`, or from its start if not given, replacing whatever is playing. Players that
-     * can't seek play from the start.
-     */
+    /** Plays an encoded BGM from `start`, or from its start if not given, replacing whatever is playing. */
     load(bgm: Uint8Array, variation: number, start?: SongPosition): void | Promise<void>
     setPaused(paused: boolean): void | Promise<void>
-    setAmbientSound(sound: number): void
     setTrackMute(track: number, mute: TrackMute): void
     /** Sets the proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */
     setLocation(proximityMix: number, alternateParts: boolean): void
     /** Calls `listener` with the player's status every frame until disposed. */
     onStatus(listener: (status: PlayerStatus) => void): () => void
-    /**
-     * Calls `listener` when playback stops without a call to setPaused, such
-     * as when another player takes over the emulator.
-     */
-    onStop?(listener: () => void): () => void
 }
 
 export const SongPlayerContext = createContext<SongPlayer | null>(null)

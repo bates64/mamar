@@ -7,7 +7,7 @@ import useDecodedSbn from "./useDecodedSbn"
 
 import { useRoot } from "../store"
 import { openData } from "../store/root"
-import useRomData from "../util/hooks/useRomData"
+import useSoundBank from "../util/hooks/useSoundBank"
 
 import "./BgmFromSbnPicker.scss"
 
@@ -40,8 +40,8 @@ function getRows(sbn: Sbn | null): Item[] {
 export default function BgmFromSbnPicker() {
     const [, dispatch] = useRoot()
     const [loadError, setLoadError] = useState<Error | null>(null)
-    const romData = useRomData()
-    const sbn = useDecodedSbn(romData)
+    const sbnData = useSoundBank()
+    const sbn = useDecodedSbn(sbnData)
     const items = useMemo(() => {
         return getRows(sbn)
     }, [sbn])

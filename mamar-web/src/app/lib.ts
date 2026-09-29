@@ -1,5 +1,5 @@
 export { default as BgmEditor } from "./BgmEditor"
 export type { BgmEditorHandle, BgmEditorProps } from "./BgmEditor"
 export type { PlayerStatus, SongPlayer, SongPosition, TrackMute } from "./emu/SongPlayer"
-export { default as DxMamar, MAMAR_SYMBOL_NAMES, MAX_BGM_SIZE } from "./emu/DxMamar"
-export type { EmulatorMemory, MamarSymbols } from "./emu/DxMamar"
+export { default as WasmSongPlayer } from "./emu/WasmSongPlayer"
+export { findSoundBank } from "./util/soundBank"

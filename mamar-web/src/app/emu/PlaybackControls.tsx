@@ -74,7 +74,7 @@ export default function PlaybackControls() {
         if (bpmRef.current) {
             bpmRef.current.innerText = tempo.toString()
         }
-        songPosition.current = position ?? null
+        songPosition.current = position
     }, [bpmRef]))
     const playhead = useContext(PLAYHEAD_CONTEXT)!
     const { playing, play, stop } = playhead
@@ -90,8 +90,6 @@ export default function PlaybackControls() {
     // timeline and songPosition only matter at the moment playback stops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player, playing])
-
-    useEffect(() => player.onStop?.(stop), [player, stop])
 
     const [location] = useLocation()
     const proximityMix = proximityMixValue(location)

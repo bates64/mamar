@@ -4,11 +4,5 @@
     },
     "installCommand": ". \"${CARGO_HOME:-$HOME/.cargo}/env\" && rustup target add wasm32-unknown-unknown && (curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh -s -- -y) && yarn install --production=false",
     "buildCommand": ". \"${CARGO_HOME:-$HOME/.cargo}/env\" && yarn workspace mamar-web build",
-    "outputDirectory": "mamar-web/dist",
-    "rewrites": [
-        {
-            "source": "/dx/:path*",
-            "destination": "https://fsn1.your-objectstorage.com/starhaven/mamar/:path*"
-        }
-    ]
+    "outputDirectory": "mamar-web/dist"
 }

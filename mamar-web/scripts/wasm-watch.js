@@ -12,16 +12,23 @@ const pm64SrcDir = path.join(pm64Dir, "src")
 const typegenDir = path.resolve(__dirname, "..", "..", "pm64-typegen")
 const typegenSrcDir = path.join(typegenDir, "src")
 
+// papermario-dx's audio engine, which mamar-audio builds from the clone at DX_DIR, relative to the repository's root
+const audioDir = path.resolve(__dirname, "..", "..", "mamar-audio")
+const dxAudioDir = process.env.DX_DIR && path.resolve(__dirname, "..", "..", process.env.DX_DIR, "src", "audio")
+
 const mode = process.argv[2] === "build" ? "build" : "watch"
 
 let wasmBuilding = false
 let wasmQueued = false
 
 let typegenBuilding = false
-
-// In build mode, exit with an error if either build failed.
-let buildFailed = false
 let typegenQueued = false
+
+let audioBuilding = false
+let audioQueued = false
+
+// In build mode, exit with an error if any build failed.
+let buildFailed = false
 
 const runWasmBuild = (reason = "change") => {
     if (wasmBuilding) {
@@ -73,8 +80,38 @@ const runTypegenBuild = (reason = "change") => {
     })
 }
 
+const runAudioBuild = (reason = "change") => {
+    if (audioBuilding) {
+        audioQueued = true
+        return
+    }
+
+    audioBuilding = true
+    const cmd = spawn("sh", ["build.sh"], {
+        cwd: audioDir,
+        stdio: "inherit",
+    })
+
+    cmd.on("close", code => {
+        audioBuilding = false
+        if (audioQueued) {
+            audioQueued = false
+            runAudioBuild("queued")
+        } else if (code !== 0) {
+            console.error(`[mamar-audio] build failed (exit ${code}) after ${reason}`)
+            buildFailed = true
+        }
+    })
+}
+
 runWasmBuild("startup")
 runTypegenBuild("startup")
+if (dxAudioDir) {
+    runAudioBuild("startup")
+} else {
+    // Type checking doesn't need the engine, but the app does
+    console.warn("[mamar-audio] DX_DIR isn't set, so the audio engine won't be built")
+}
 
 if (mode !== "build") {
     chokidar
@@ -88,9 +125,22 @@ if (mode !== "build") {
         .on("all", (_event, filePath) => {
             runTypegenBuild(filePath)
         })
+
+    if (dxAudioDir) {
+        chokidar
+            .watch([
+                path.join(audioDir, "src"),
+                path.join(audioDir, "include"),
+                path.join(audioDir, "rsp-hle"),
+                dxAudioDir,
+            ], { ignoreInitial: true })
+            .on("all", (_event, filePath) => {
+                runAudioBuild(filePath)
+            })
+    }
 } else {
     const maybeExit = setInterval(() => {
-        if (!wasmBuilding && !wasmQueued && !typegenBuilding && !typegenQueued) {
+        if (!wasmBuilding && !wasmQueued && !typegenBuilding && !typegenQueued && !audioBuilding && !audioQueued) {
             clearInterval(maybeExit)
             process.exit(buildFailed ? 1 : 0)
         }

@@ -23,7 +23,6 @@
     "idb-keyval": "^6.2.0",
     "immer": "^9.0.15",
     "mamar-wasm-bridge": "*",
-    "mupen64plus-web": "bates64/mupen64plus-web#mamar",
     "pm64-typegen": "*",
     "react": "^18.2.0",
     "react-aria": "^3.19.0",
@@ -53,7 +52,6 @@
     "sass-embedded": "^1.97.1",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
-    "vite-plugin-static-copy": "^0.17.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0"
   }

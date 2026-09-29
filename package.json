@@ -10,11 +10,5 @@
     "start": "yarn workspace mamar-web dev",
     "lint": "cargo fmt --all --check && cd mamar-web && yarn run lint",
     "fmt": "cargo fmt --all && cd mamar-web && yarn run lint --fix"
-  },
-  "multipleStaticFileCopier": [
-    {
-      "origin": "../node_modules/mupen64plus-web/bin/web",
-      "destination": "dist/mupen64plus-web"
-    }
-  ]
+  }
 }

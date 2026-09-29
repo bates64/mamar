@@ -84,11 +84,8 @@ pub fn ron_encode(bgm: &JsValue) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn sbn_decode(rom: &[u8]) -> JsValue {
-    const SBN_START: usize = 0xF00000;
-    const SBN_END: usize = SBN_START + 0xA42C40;
-
-    let mut f = Cursor::new(&rom[SBN_START..SBN_END]);
+pub fn sbn_decode(sbn: &[u8]) -> JsValue {
+    let mut f = Cursor::new(sbn);
     match Sbn::decode(&mut f) {
         Ok(sbn) => to_js(&sbn),
         Err(e) => to_js(&e.to_string()),

@@ -14,7 +14,7 @@ Paper Mario music editor.
 Architecture
 ============
 
-Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, [C patches](/patches) over [the Paper Mario decompilation](https://github.com/pmret/papermario), and [a custom build of mupen64plus-web](https://github.com/bates64/mupen64plus-web/tree/mamar). The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
+Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, and [the game's audio engine](/mamar-audio) from [papermario-dx](https://github.com/bates64/papermario-dx), also compiled to WebAssembly. The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
 
 Why are some parts Rust? Mamar used to be a desktop application written entirely in Rust! It's also a more suitable language for the kind of encoding/decoding of binary data that Mamar needs to do.
 
@@ -59,12 +59,12 @@ This is some fairly trivial glue code that enables interesting parts of the `pm6
 
 This is an emscripten port of n64sums, a tool for calculating the CRC checksum of N64 ROMs. It's unused currently but I'm keeping it around in case I need it in the future, for example for a 'save SBN to ROM' feature.
 
-`patches`
----------
+`mamar-audio`
+-------------
 
-This module contains C functions that are compiled and linked with the Paper Mario decompilation, then the resulting binary for each function is converted to JS by a Python script. Also, RAM addresses for symbols from decomp are converted into JS too. The output is left in the repo because building requires the decomp toolchain, which can be a pain to set up.
+This builds papermario-dx's audio engine, the C code that plays music in the game, to WebAssembly with clang, along with [mupen64plus's emulation](https://github.com/mupen64plus/mupen64plus-rsp-hle) of the RSP microcode the engine drives. `mamar-web` runs it in an [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet), so songs play on the audio thread using the instruments in the user's ROM.
 
-This module is then used in `mamar-web`, functions in the emulator's console memory are overwritten with the custom code. Functions that compile to a bigger blob than the original are not patched, instead the original code is replaced with a stub that immediately calls a custom function placed in `0x8040000` memory space, which goes unused by the game. Data is also placed here, but it is not initialized because that would require more complex objdump parsing in the Python script.
+The engine is built straight from a papermario-dx checkout, with `MAMAR_WASM` defined. `mamar-audio` provides stand-ins for the game's headers and the N64 hardware the engine uses, and swaps the ROM's big-endian data to WebAssembly's little-endian order as the engine reads it.
 
 Development
 ===========
@@ -75,34 +75,13 @@ Enter the Nix devshell (`nix develop`), or make sure you have:
 - [Yarn](https://yarnpkg.com/getting-started/install) (rather than npm)
 - [Rust](https://rust-lang.org/tools/install)
 - [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+- clang and lld, version 18 or later
+- a [papermario-dx](https://github.com/bates64/papermario-dx) clone
 
 Then run:
 
 1. `yarn install`
-2. `yarn start`
-
-Working on `papermario-dx`
---------------------------
-
-Mamar plays songs in a [papermario-dx](https://github.com/bates64/papermario-dx) build, which it downloads from dx's CI. To play songs in your own clone of dx instead, set `DX_DIR` to it, relative to this repository:
-
-```sh
-DX_DIR=../papermario-dx yarn start
-```
-
-Each time you load the app, it builds the clone with `nix develop --command ninja`, so reloading picks up your changes to dx.
-
-Working on `mupen64plus-web`
-----------------------------
-
-- In [mupen64plus-web](https://github.com/bates64/mupen64plus-web):
-    1. Switch the Mamar branch: `git checkout mamar`
-    2. Run `yarn link`
-    3. Setup emscripten 3.1.8
-    4. Compile mupen64plus-web: `make -j config=release`
-- In mamar:
-    1. Run: `yarn link mupen64plus-web`
-    2. Restart the dev server in `mamar-web`; you may need to clear the cache (`rm -rf .parcel-cache`)
+2. `DX_DIR=../papermario-dx yarn start`, where `DX_DIR` is the papermario-dx clone relative to this repository
 
 Deployment
 ==========
@@ -121,3 +100,5 @@ License
 =======
 
 Mamar is licensed under the [BSD Zero Clause License](https://opensource.org/licenses/0BSD). This is a very permissive license, and you can do whatever you want with the code. If you do use Mamar to make a mod or other project, I'd appreciate a mention somewhere, but it's not required.
+
+`mamar-audio/rsp-hle` is from mupen64plus and is licensed under the [GPL, version 2](mamar-audio/rsp-hle/LICENSES), so builds of `mamar-audio` are too.

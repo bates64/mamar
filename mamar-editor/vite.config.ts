@@ -10,6 +10,15 @@ export default defineConfig({
     define: {
         "process.env.NODE_ENV": JSON.stringify("production"),
     },
+    // The audio engine's worklet is a separate file, found relative to the library so it loads wherever the host puts
+    // the package. Host bundlers also recognise this pattern and copy the file.
+    experimental: {
+        renderBuiltUrl(filename, { hostType }) {
+            if (hostType === "js") {
+                return { runtime: `new URL(${JSON.stringify(filename)}, import.meta.url).href` }
+            }
+        },
+    },
     build: {
         outDir: path.resolve(__dirname, "dist"),
         emptyOutDir: true,
