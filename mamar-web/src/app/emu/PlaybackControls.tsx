@@ -5,7 +5,7 @@ import { Play, SkipBack } from "react-feather"
 
 import LocationControls from "./LocationControls"
 import styles from "./PlaybackControls.module.scss"
-import SnapControl from "./SnapControl"
+import SnapControl, { ZoomControls } from "./SnapControl"
 import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
 
 import Bridge from "../bridge"
@@ -216,6 +216,7 @@ export default function PlaybackControls() {
             </div>
         </div>
         <SnapControl />
+        <ZoomControls />
         <LocationControls />
     </View>
 }

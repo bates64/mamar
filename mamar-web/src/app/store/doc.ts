@@ -60,7 +60,13 @@ export interface Doc {
     selection?: Selection | null
     /** Lanes chosen to be shown or hidden, by key. Others are shown if they have commands. */
     shownLanes?: Record<string, boolean>
+    /** Ticks per pixel along the timeline. */
+    zoom?: number
 }
+
+export const DEFAULT_ZOOM = 2
+export const MIN_ZOOM = 0.25
+export const MAX_ZOOM = 16
 
 export type DocAction = {
     type: "bgm"
@@ -83,6 +89,9 @@ export type DocAction = {
 } | {
     type: "set_selection"
     selection: Selection | null
+} | {
+    type: "set_zoom"
+    zoom: number
 } | {
     type: "set_lane_shown"
     lane: string
@@ -113,6 +122,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeVariation: action.index,
+        }
+    case "set_zoom":
+        return {
+            ...state,
+            zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, action.zoom)),
         }
     case "set_lane_shown":
         return {
