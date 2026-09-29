@@ -11,11 +11,14 @@ export const SNAP_NAMES: Record<Snap, string> = {
     off: "Off",
 }
 
-/** The snap setting, and a function that snaps a time in ticks to it. Pass `free` to place without snapping. */
-export function useSnap(): [Snap, (ticks: number, free?: boolean) => number] {
+/**
+ * The snap setting, a function that snaps a time in ticks to it, and the grid's size in ticks. Pass `free` to place
+ * without snapping.
+ */
+export function useSnap(): [Snap, (ticks: number, free?: boolean) => number, number] {
     const [doc] = useDoc()
     const ticksPerBar = useTicksPerBar()
     const snap = doc?.snap ?? DEFAULT_SNAP
     const grid = { bar: ticksPerBar, beat: TICKS_PER_BEAT, eighth: TICKS_PER_BEAT / 2, sixteenth: TICKS_PER_BEAT / 4, off: 1 }[snap]
-    return [snap, (ticks, free = false) => Math.max(0, Math.round(ticks / (free ? 1 : grid)) * (free ? 1 : grid))]
+    return [snap, (ticks, free = false) => Math.max(0, Math.round(ticks / (free ? 1 : grid)) * (free ? 1 : grid)), grid]
 }

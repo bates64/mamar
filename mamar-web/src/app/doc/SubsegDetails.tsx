@@ -3,6 +3,7 @@ import { Bgm, Polyphony } from "pm64-typegen"
 import { useEffect, useId, useState } from "react"
 import { useDebounce } from "use-debounce"
 
+import Inspector from "./Inspector"
 import PianoRoll from "./PianoRoll"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
@@ -69,6 +70,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
                 </View>
             </Form>
+            <Inspector trackListId={trackListId} trackIndex={trackIndex} />
         </View>
         {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
             "backgroundColor": "var(--spectrum-gray-75)",

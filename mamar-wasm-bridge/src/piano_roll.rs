@@ -23,6 +23,10 @@ pub struct PianoRoll {
     mix: u8,
     /// Another version of the track, drawn as outlines behind it.
     behind: Option<Track>,
+    /// IDs of the selected notes.
+    selection: Vec<u32>,
+    /// Ticks per CSS pixel.
+    zoom: f64,
 }
 
 #[wasm_bindgen]
@@ -38,6 +42,8 @@ impl PianoRoll {
             branches: BTreeMap::new(),
             mix: 0,
             behind: None,
+            selection: Vec::new(),
+            zoom: 2.0,
         }
     }
 
@@ -58,6 +64,15 @@ impl PianoRoll {
         self.vw = width_css_px.max(0.0);
         self.vh = height_css_px.max(0.0);
         self.dpr = dpr.max(1.0);
+    }
+
+    pub fn set_selection(&mut self, ids: Vec<u32>) {
+        self.selection = ids;
+    }
+
+    /// Sets how many ticks each CSS pixel is.
+    pub fn set_zoom(&mut self, ticks_per_px: f64) {
+        self.zoom = ticks_per_px.max(0.01);
     }
 
     pub fn set_scroll_x(&mut self, scroll_left_css_px: f64) {
@@ -113,7 +128,7 @@ impl PianoRoll {
 
         if let Some(behind) = &self.behind {
             ctx.set_stroke_style_str("rgb(29 128 245 / 45%)");
-            for (time, pitch, length) in self.notes(behind) {
+            for (time, pitch, length, _) in self.notes(behind) {
                 self.draw_note(ctx, time, pitch, length, false);
             }
         }
@@ -136,20 +151,30 @@ impl PianoRoll {
 
         ctx.set_stroke_style_str("#1d80f5");
         ctx.set_fill_style_str("#066ce7");
-        for (time, pitch, length) in self.notes(&self.track) {
+        for (time, pitch, length, id) in self.notes(&self.track) {
+            let selected = id.is_some_and(|id| self.selection.contains(&id));
+            if selected {
+                ctx.set_fill_style_str("#f9e2af"); // Catppuccin Mocha yellow
+                ctx.set_stroke_style_str("#fab387"); // Catppuccin Mocha peach
+            }
             self.draw_note(ctx, time, pitch, length, true);
+            if selected {
+                ctx.set_stroke_style_str("#1d80f5");
+                ctx.set_fill_style_str("#066ce7");
+            }
         }
 
         ctx.restore();
         Ok(())
     }
 
-    /// The notes `track` plays, as (time, pitch, length), with each branch playing the option for the current mix.
-    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16)> {
+    /// The notes `track` plays, as (time, pitch, length, ID), with each branch playing the option for the current mix.
+    /// Notes in branches have no ID, as they aren't the track's own.
+    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16, Option<u32>)> {
         let mut notes = Vec::new();
         for (time, event) in track.commands.playback(&self.branches) {
             match event.command {
-                Command::Note { pitch, length, .. } => notes.push((time, pitch, length)),
+                Command::Note { pitch, length, .. } => notes.push((time, pitch, length, Some(event.id))),
                 Command::Branch { branch } => {
                     let Some(branch) = self.branches.get(&branch) else {
                         continue;
@@ -160,7 +185,7 @@ impl PianoRoll {
                         .unwrap_or_default()
                     {
                         if let Command::Note { pitch, length, .. } = event.command {
-                            notes.push((time + offset, pitch, length));
+                            notes.push((time + offset, pitch, length, None));
                         }
                     }
                 }
@@ -193,8 +218,7 @@ impl PianoRoll {
     }
 
     fn time_to_x(&self, time: f64) -> f64 {
-        let ruler_zoom = 2.0; // TODO: acquire css var --ruler-zoom
-        (time - self.scroll_ticks) / ruler_zoom
+        (time - self.scroll_ticks) / self.zoom
     }
 
     fn beat_width(&self) -> f64 {

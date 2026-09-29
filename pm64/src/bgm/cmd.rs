@@ -243,13 +243,28 @@ impl CommandSeq {
 
     /// Inserts `command` after the commands already at `time`, keeping the time of every other command.
     pub fn insert_after(&mut self, time: usize, command: Command) {
+        self.insert_event_after(time, command.into());
+    }
+
+    /// Inserts `event` after the commands already at `time`, keeping the time of every other command.
+    pub fn insert_event_after(&mut self, time: usize, event: Event) {
         let index = self.iter_time().position(|(event_time, event)| {
             event_time == time && matches!(event.command, Command::Delay(_) | Command::End)
         });
         match index {
-            Some(index) => self.vec.insert(index, command.into()),
-            None => self.insert_start(time, command),
+            Some(index) => self.vec.insert(index, event),
+            None => self.insert_many_start(time, iter::once(event)),
         }
+    }
+
+    /// Moves the event with ID `id` to `time`, replacing its command with `command`. Adds it if there's no such event.
+    /// Moving a delay would change the time of the commands after it, so delays can't be placed.
+    pub fn place(&mut self, id: Id, time: usize, command: Command) {
+        if matches!(command, Command::Delay(_)) {
+            return;
+        }
+        self.vec.retain(|event| event.id != id);
+        self.insert_event_after(time, Event { id, command });
     }
 
     /// Returns the commands occurring at the given time, including the terminating Delay command if there is one.
@@ -1310,6 +1325,31 @@ mod test {
         assert_eq!(
             seq.with_end_at(10).to_command_vec(),
             vec![note(), Command::Delay(10), Command::End]
+        );
+    }
+
+    #[test]
+    fn place() {
+        let note = |pitch| Command::Note {
+            pitch,
+            velocity: 0,
+            length: 0,
+        };
+        let mut seq = CommandSeq::from(vec![note(1), Command::Delay(10), note(2), Command::Delay(10)]);
+        let id = seq.vec[0].id;
+
+        seq.place(id, 15, note(3));
+
+        assert_eq!(seq.vec.iter().find(|event| event.id == id).unwrap().command, note(3));
+        assert_eq!(
+            seq.to_command_vec(),
+            vec![
+                Command::Delay(10),
+                note(2),
+                Command::Delay(5),
+                note(3),
+                Command::Delay(5)
+            ]
         );
     }
 

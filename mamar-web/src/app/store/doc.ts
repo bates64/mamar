@@ -39,6 +39,14 @@ export type Snap = "bar" | "beat" | "eighth" | "sixteenth" | "off"
 
 export const DEFAULT_SNAP: Snap = "eighth"
 
+/** A command selected for editing. */
+export interface Selection {
+    trackList: number
+    track: number
+    /** The event's ID, in the track's commands with detours written out. */
+    event: number
+}
+
 export interface Doc {
     id: string
     bgm: Bgm
@@ -49,6 +57,7 @@ export interface Doc {
     panelContent: PanelContent
     location: Location
     snap: Snap
+    selection?: Selection | null
 }
 
 export type DocAction = {
@@ -69,6 +78,9 @@ export type DocAction = {
 } | {
     type: "set_snap"
     snap: Snap
+} | {
+    type: "set_selection"
+    selection: Selection | null
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -95,6 +107,11 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             activeVariation: action.index,
+        }
+    case "set_selection":
+        return {
+            ...state,
+            selection: action.selection,
         }
     case "set_snap":
         return {

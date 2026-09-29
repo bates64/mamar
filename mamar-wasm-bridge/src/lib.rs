@@ -126,6 +126,14 @@ pub fn track_list_set_length(track_list: &JsValue, time: usize) -> JsValue {
     to_js(&track_list)
 }
 
+/// Returns `commands` with the event with ID `id` moved to `time` and given `command`. See [CommandSeq::place].
+#[wasm_bindgen]
+pub fn commands_place(commands: &JsValue, id: u32, time: usize, command: &JsValue) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    commands.place(id, time, from_js::<Command>(command));
+    to_js(&commands)
+}
+
 /// Returns a copy of `commands` with new IDs.
 #[wasm_bindgen]
 pub fn commands_copy(commands: &JsValue) -> JsValue {

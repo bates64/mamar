@@ -58,6 +58,14 @@ export type BgmAction = {
     time: number
     command: Command
 } | {
+    type: "place_track_command"
+    trackList: number
+    track: number
+    /** The event's ID, in the track's commands with detours written out. */
+    id: number
+    time: number
+    command: Command
+} | {
     type: "add_alternate_part"
     trackLists: number[]
     track: number
@@ -183,6 +191,12 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             const track = draft.track_lists[action.trackList].tracks[action.track]
             editCommands(track)
             track.commands = Bridge.commands_insert(current(track).commands, action.time, action.command)
+        })
+    case "place_track_command":
+        return produce(bgm, draft => {
+            const track = draft.track_lists[action.trackList].tracks[action.track]
+            editCommands(track)
+            track.commands = Bridge.commands_place(current(track).commands, action.id, action.time, action.command)
         })
     case "add_alternate_part":
         return produce(bgm, draft => {
