@@ -3,9 +3,15 @@ use std::collections::BTreeMap;
 use std::f64;
 use wasm_bindgen::prelude::*;
 
-const MIDI_PITCH_0: u8 = 107;
-const LOWEST_PITCH: u8 = 0; //MIDI_PITCH_0 + 13; // C1
-const HIGHEST_PITCH: u8 = 255; //MIDI_PITCH_0 + 120;
+/// The pitches the engine plays as notes, which are the piano roll's rows: 0x80, C2 in the octaves the instruments are
+/// named in, to 0xD3, B8. The engine plays the low 7 bits as semitones from the instrument's base key.
+const LOWEST_PITCH: u8 = 0x80;
+const HIGHEST_PITCH: u8 = 0xD3;
+
+/// Whether `pitch` is a black key, counting 0x80 as C.
+fn is_black_key(pitch: u8) -> bool {
+    matches!(pitch.wrapping_sub(0x80) % 12, 1 | 3 | 6 | 8 | 10)
+}
 
 const TICKS_PER_BEAT: f64 = 48.0;
 
@@ -27,6 +33,10 @@ pub struct PianoRoll {
     branch_times: Vec<usize>,
     /// IDs of the selected notes.
     selection: Vec<u32>,
+    /// The highest pitch the track's instrument plays at its own pitch, above which the engine plays notes lower than
+    /// they should be, from each time the instrument or its tuning changes until the next, in time order. None is no
+    /// limit.
+    pitch_limits: Vec<(usize, Option<u8>)>,
     /// Ticks per CSS pixel.
     zoom: f64,
     /// Whether anything drawn has changed since the last render. The canvas keeps what was drawn until then.
@@ -51,6 +61,7 @@ impl PianoRoll {
             behind_notes: Vec::new(),
             branch_times: Vec::new(),
             selection: Vec::new(),
+            pitch_limits: Vec::new(),
             zoom: 2.0,
             dirty: true,
         }
@@ -88,6 +99,17 @@ impl PianoRoll {
 
     pub fn set_selection(&mut self, ids: Vec<u32>) {
         self.selection = ids;
+        self.dirty = true;
+    }
+
+    /// Sets the highest pitch the track's instrument plays at its own pitch from each of `times`, in time order, until
+    /// the next. A limit of 0 is no limit, as 0 isn't a pitch the engine plays.
+    pub fn set_pitch_limits(&mut self, times: Vec<u32>, limits: Vec<u8>) {
+        self.pitch_limits = times
+            .into_iter()
+            .zip(limits)
+            .map(|(time, limit)| (time as usize, (limit != 0).then_some(limit)))
+            .collect();
         self.dirty = true;
     }
 
@@ -130,10 +152,28 @@ impl PianoRoll {
         ctx.set_fill_style_str("#181825"); // gray-75, Catppuccin Mocha mantle
         ctx.fill_rect(0.0, 0.0, self.vw, self.vh);
 
-        // horizontal note stripes
+        // Rows of black keys are darker, as on the keyboard beside the roll
         ctx.set_fill_style_str("#11111b"); // gray-50, Catppuccin Mocha crust
-        for y in (0..self.vh as i32).step_by(self.note_height() as usize * 2) {
-            ctx.fill_rect(0.0, y as f64, self.vw, self.note_height());
+        for pitch in LOWEST_PITCH..=HIGHEST_PITCH {
+            if let (true, Some(y)) = (is_black_key(pitch), self.pitch_to_y(pitch)) {
+                ctx.fill_rect(0.0, y, self.vw, self.note_height());
+            }
+        }
+
+        // Rows above the instrument's limit are red while it plays, as notes there don't play at their own pitch
+        for (i, &(start, limit)) in self.pitch_limits.iter().enumerate() {
+            let Some(limit) = limit else { continue };
+            let x = self.time_to_x(start as f64).max(0.0);
+            let end = self
+                .pitch_limits
+                .get(i + 1)
+                .map_or(self.vw, |&(end, _)| self.time_to_x(end as f64));
+            for pitch in limit.saturating_add(1).max(LOWEST_PITCH)..=HIGHEST_PITCH {
+                if let Some(y) = self.pitch_to_y(pitch) {
+                    ctx.set_fill_style_str(if is_black_key(pitch) { "#2b1620" } else { "#351b27" });
+                    ctx.fill_rect(x, y, (end.min(self.vw) - x).max(0.0), self.note_height());
+                }
+            }
         }
 
         // beat lines
@@ -251,7 +291,7 @@ impl PianoRoll {
         if range.is_empty() {
             return self.scroll_height() / 2.0;
         }
-        let middle = (range.start + range.end) / 2;
+        let middle = range.start + (range.end - range.start) / 2;
         self.pitch_to_y(middle).unwrap_or(0.0) + self.note_height() / 2.0
     }
 }

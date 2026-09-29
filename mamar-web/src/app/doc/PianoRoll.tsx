@@ -1,8 +1,10 @@
 import { type Bgm, type Event, type Track } from "pm64-typegen"
-import { useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { getUntrackedObject } from "react-tracked"
 
 import { timeline } from "./lanes"
+import { HIGHEST_PITCH, LOWEST_PITCH, NOTE_HEIGHT } from "./pitches"
+import { PitchLimit } from "./pitchLimit"
 import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
 import { useSnap } from "./snap"
 
@@ -11,12 +13,6 @@ import { useBgm, useDoc, useLocation } from "../store"
 import { alternatePartOf } from "../store/bgm"
 import { useSelectedIds } from "../store/doc"
 import { useSize } from "../util/hooks/useSize"
-
-/** Height of a note's row, in CSS pixels. Matches the renderer. */
-const NOTE_HEIGHT = 12
-
-/** The highest pitch, at the top of the roll. Matches the renderer. */
-const HIGHEST_PITCH = 255
 
 /** Pixels from a note's end that resize it rather than move it. */
 const RESIZE_EDGE = 6
@@ -28,9 +24,11 @@ export interface Props {
     trackIndex: number
     /** Where the segment starts on the timeline. */
     segmentStart: number
+    /** The highest pitch the track's instrument plays at its own pitch through the segment. */
+    pitchLimits: PitchLimit[]
 }
 
-export default function PianoRoll({ trackListId, trackIndex, segmentStart }: Props) {
+export default function PianoRoll({ trackListId, trackIndex, segmentStart, pitchLimits }: Props) {
     const [bgm] = useBgm()
     const [location] = useLocation()
     const trackList = bgm?.track_lists[trackListId]
@@ -50,6 +48,7 @@ export default function PianoRoll({ trackListId, trackIndex, segmentStart }: Pro
         mix={location.mix}
         behind={behind}
         segmentStart={segmentStart}
+        pitchLimits={pitchLimits}
     />
 }
 
@@ -87,7 +86,7 @@ let clipboard: { offset: number, pitch: number, velocity: number, length: number
  * or their ends to resize them. Delete removes the selected notes, Q snaps them to the grid, and the usual shortcuts
  * copy, paste, duplicate, and select all. Notes snap to the grid unless Shift is held.
  */
-function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segmentStart }: {
+function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segmentStart, pitchLimits }: {
     trackListId: number
     trackIndex: number
     track: Track
@@ -96,6 +95,7 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
     behind: Track | null
     /** Where the segment starts on the timeline, for pasting at the playback start point. */
     segmentStart: number
+    pitchLimits: PitchLimit[]
 }) {
     const canvas = useSize<HTMLCanvasElement>()
     const containerRef = useRef<HTMLDivElement | null>(null)
@@ -147,8 +147,8 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
         return copied.map(note => ({ ...note.event.Note, offset: note.time - start }))
     }
 
-    // init once (after canvas exists)
-    useEffect(() => {
+    // init once (after canvas exists), and before the roll is centred on its notes
+    useLayoutEffect(() => {
         const el = canvas.ref.current
         if (!el) return
 
@@ -189,24 +189,33 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
         }
     }, [canvas.ref])
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         // The renderer's methods aren't unwrapped by the bridge, so pass the objects under react-tracked's proxies
         const untracked = <T extends object>(value: T | null) => (value && getUntrackedObject(value)) ?? value
         rendererRef.current?.set_track(untracked(track), untracked(branches), mix, untracked(behind))
     }, [track, branches, mix, behind])
+
+    useEffect(() => {
+        // 0 is no limit, as it isn't a pitch the engine plays
+        rendererRef.current?.set_pitch_limits(
+            new Uint32Array(pitchLimits.map(({ time }) => time)),
+            new Uint8Array(pitchLimits.map(({ limit }) => limit ?? 0)),
+        )
+    }, [pitchLimits])
 
     const selectedKey = selectedIds.join()
     useEffect(() => {
         rendererRef.current?.set_selection(new Uint32Array(selectedKey ? selectedKey.split(",").map(Number) : []))
     }, [selectedKey])
 
-    // Centre on the notes when a track opens, but not when it's edited
-    useEffect(() => {
+    // Centre on the notes when a track opens, but not when it's edited, before the roll is first shown
+    useLayoutEffect(() => {
         const r = rendererRef.current
         if (!r) return
         containerRef.current!.style.height = `${r.scroll_height()}px`
         const scrollParent = containerRef.current!.parentElement!
-        scrollParent.scrollTop = r.central_scroll_y() / window.devicePixelRatio
+        // The renderer works in CSS pixels, and gives where the notes' middle pitch is
+        scrollParent.scrollTop = r.central_scroll_y() - scrollParent.clientHeight / 2
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [trackListId, trackIndex])
 
@@ -219,7 +228,7 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
             const length = Math.max(1, note.event.Note.length + drag.length)
             previews.push({
                 left: time / z,
-                top: (HIGHEST_PITCH - Math.min(HIGHEST_PITCH, Math.max(0, note.event.Note.pitch + drag.pitch))) * NOTE_HEIGHT,
+                top: (HIGHEST_PITCH - Math.min(HIGHEST_PITCH, Math.max(LOWEST_PITCH, note.event.Note.pitch + drag.pitch))) * NOTE_HEIGHT,
                 width: Math.max(2, length / z),
                 height: NOTE_HEIGHT,
             })
@@ -335,7 +344,7 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
                             id: note.event.id,
                             time: note.time + drag.time,
                             command: noteCommand(note, {
-                                pitch: Math.min(HIGHEST_PITCH, Math.max(0, note.event.Note.pitch + drag.pitch)),
+                                pitch: Math.min(HIGHEST_PITCH, Math.max(LOWEST_PITCH, note.event.Note.pitch + drag.pitch)),
                                 length: Math.max(1, note.event.Note.length + drag.length),
                             }),
                         })),

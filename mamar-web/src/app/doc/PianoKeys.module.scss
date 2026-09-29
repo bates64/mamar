@@ -1,0 +1,93 @@
+.column {
+    background: var(--spectrum-gray-75);
+    border-right: 1px solid var(--spectrum-gray-300);
+}
+
+// Scrolls only as the piano roll does
+.keys {
+    overflow: hidden;
+}
+
+.key {
+    position: relative;
+    box-sizing: border-box;
+    background: var(--grey-8);
+
+    &.gap {
+        border-bottom: 1px solid var(--grey-5);
+    }
+
+    // Shorter than the white keys, as on a piano
+    &.black {
+        background: linear-gradient(to right, var(--grey-0) 62%, var(--grey-8) 62%);
+    }
+
+    // Too high for the track's instrument to play at its own pitch
+    &.limited {
+        background: #e4a3b6;
+
+        &.black {
+            background: linear-gradient(to right, #4a2432 62%, #e4a3b6 62%);
+        }
+    }
+
+}
+
+.label {
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    color: var(--grey-1);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.key {
+    // Drums have no black and white keys, so their rows only alternate
+    &.drum {
+        background: var(--grey-7);
+
+        &.alternate {
+            background: var(--grey-6);
+        }
+
+        &.unplayable {
+            background: var(--grey-1);
+        }
+    }
+}
+
+// Sticks to the left of the visible timeline, over every segment, as the timeline scrolls
+.drumLabels {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: start;
+    align-self: start;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 160px;
+    pointer-events: none;
+}
+
+.drumLabelsScroll {
+    overflow: hidden;
+}
+
+.drumLabel {
+    position: absolute;
+    left: 6px;
+    right: 0;
+
+    color: var(--grey-8);
+    font-size: 9.5px;
+    line-height: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 3px var(--grey-0), 0 0 2px var(--grey-0);
+}

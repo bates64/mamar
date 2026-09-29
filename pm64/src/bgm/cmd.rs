@@ -627,8 +627,9 @@ impl CommandSeq {
         self.vec.len() == 0 || (self.vec.len() == 1 && self.vec[0].command == Command::End)
     }
 
+    /// The pitches of the notes, from the lowest to one above the highest, or an empty range if there are none.
     pub fn pitch_range(&self) -> Range<u8> {
-        let mut range = 0..0;
+        let mut range: Option<Range<u8>> = None;
 
         for cmd in self.iter() {
             if let Event {
@@ -636,19 +637,13 @@ impl CommandSeq {
                 ..
             } = cmd
             {
-                let pitch = *pitch;
-
-                if pitch < range.start {
-                    range.start = pitch;
-                }
-
-                if pitch >= range.end {
-                    range.end = pitch.saturating_add(1);
-                }
+                let range = range.get_or_insert(*pitch..*pitch);
+                range.start = range.start.min(*pitch);
+                range.end = range.end.max(pitch.saturating_add(1));
             }
         }
 
-        range
+        range.unwrap_or(0..0)
     }
 
     pub fn clear_command(&mut self, idx: usize) {
@@ -1358,6 +1353,18 @@ mod test {
                 Command::Delay(5)
             ]
         );
+    }
+
+    #[test]
+    fn pitch_range() {
+        let note = |pitch| Command::Note {
+            pitch,
+            velocity: 0,
+            length: 0,
+        };
+        let seq = CommandSeq::from(vec![note(160), Command::Delay(10), note(150), note(170)]);
+        assert_eq!(seq.pitch_range(), 150..171);
+        assert!(CommandSeq::from(vec![Command::Delay(10)]).pitch_range().is_empty());
     }
 
     #[test]

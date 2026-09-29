@@ -4,7 +4,9 @@ import { useEffect, useId, useRef, useState } from "react"
 import { useDebounce } from "use-debounce"
 
 import Inspector from "./Inspector"
+import PianoKeys, { DrumLabels } from "./PianoKeys"
 import PianoRoll from "./PianoRoll"
+import { usePitchLimits } from "./pitchLimit"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
 import { SegmentTrack, useSegmentTracks } from "./segmentTracks"
@@ -45,13 +47,18 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     const [showTracker, setShowTracker] = useState(true)
     const segmentLengths = useSegmentLengths()
     const segments = useSegmentTracks(mainIndex)
+    const pitchLimits = usePitchLimits(trackListId, trackIndex, mainIndex, segmentIndex)
 
     if (!track) {
         return <div>Track not found</div>
     }
 
     return <Grid
-        columns="225px 1fr"
+        // The settings and keyboard together are as wide as the track names above, so the timeline lines up with theirs
+        columns="189px 36px 1fr"
+        UNSAFE_className={styles.region}
+        // One row as tall as the panel, so the piano roll is fitted to it from the start and opens on its notes
+        UNSAFE_style={{ gridTemplateRows: "minmax(0, 1fr)" }}
         height="100%"
     >
         <View
@@ -84,6 +91,8 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             </Form>
             <Inspector trackListId={trackListId} trackIndex={trackIndex} />
         </View>
+        {/* Follows the selected segment's piano roll, so it starts again when another opens */}
+        <PianoKeys key={segmentIndex} region={styles.region} isDrumTrack={track.is_drum_track} pitchLimit={pitchLimits[0]?.limit} />
         {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
             "backgroundColor": "var(--spectrum-gray-75)",
             // The piano roll is dark whatever the theme.
@@ -103,6 +112,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     <PianoRoll
                         trackListId={trackListId}
                         trackIndex={trackIndex}
+                        pitchLimits={pitchLimits}
                         segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
                     />
                 </div>
@@ -114,6 +124,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     length={segmentLengths[segmentIndex] ?? 0}
                 />
             </div>
+            {track.is_drum_track && <DrumLabels key={segmentIndex} region={styles.region} />}
             <PlayheadLine />
         </TimeGrid>}
     </Grid>
@@ -139,6 +150,7 @@ function GreyedSegment({ segment, mainIndex, segmentIndex, segmentStart, length 
 }) {
     const [, docDispatch] = useDoc()
     const roll = useRef<HTMLDivElement>(null)
+    const pitchLimits = usePitchLimits(segment.trackListId, segment.trackIndex, mainIndex, segmentIndex)
 
     // Line up with the selected segment's pitches once this one has centred itself on its own notes
     useEffect(() => {
@@ -152,7 +164,7 @@ function GreyedSegment({ segment, mainIndex, segmentIndex, segmentStart, length 
         {/* Inert, so none of it can be pressed, focused, or edited */}
         <div className={styles.greyedContent} {...{ inert: "" }}>
             <div ref={roll} style={{ flex: 1, overflow: "hidden", minHeight: 0 }} data-greyed-roll>
-                <PianoRoll trackListId={segment.trackListId} trackIndex={segment.trackIndex} segmentStart={segmentStart} />
+                <PianoRoll trackListId={segment.trackListId} trackIndex={segment.trackIndex} segmentStart={segmentStart} pitchLimits={pitchLimits} />
             </div>
             <TrackLanes
                 trackListId={segment.trackListId}

@@ -62,3 +62,8 @@ export default function useSoundBank(): ArrayBuffer {
 
     return value
 }
+
+/** The sound bank of the user's ROM, or null where there's none, such as in a host that plays songs itself. */
+export function useOptionalSoundBank(): ArrayBuffer | null {
+    return useContext(soundBank)
+}

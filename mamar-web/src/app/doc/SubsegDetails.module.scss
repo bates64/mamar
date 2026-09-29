@@ -47,3 +47,8 @@
         background: rgb(255 255 255 / 4%);
     }
 }
+
+// The region's settings, keyboard, and piano rolls, which the keyboard finds the selected roll within
+.region {
+    position: relative;
+}
