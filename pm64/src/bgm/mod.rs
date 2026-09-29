@@ -44,12 +44,11 @@ pub struct Bgm {
 
     pub track_lists: BTreeMap<TrackListId, TrackList>,
 
+    pub branches: BTreeMap<BranchId, Branch>,
+
     /// Beats in each bar, for editors to show bars with. The game doesn't use it. None means the editor's default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beats_per_bar: Option<u8>,
-
-    #[serde(skip)]
-    pub unknowns: Vec<Unknown>,
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
@@ -109,6 +108,19 @@ impl Bgm {
         id
     }
 
+    pub fn find_branch_with_pos(&self, pos: FilePos) -> Option<BranchId> {
+        self.branches
+            .iter()
+            .find(|(_, branch)| branch.pos == Some(pos))
+            .map(|(id, _)| *id)
+    }
+
+    pub fn add_branch(&mut self, branch: Branch) -> BranchId {
+        let id = self.branches.keys().next_back().map_or(1, |id| id + 1);
+        self.branches.insert(id, branch);
+        id
+    }
+
     /// Finds the segment playing at time `time` in variation `variation`, and splits it in two at `time`.
     /// If a segment already starts/ends at `time`, does nothing.
     pub fn split_variation_at(&mut self, variation: usize, time: usize) {
@@ -129,7 +141,7 @@ impl Bgm {
             let duration = self
                 .track_lists
                 .get(track_list)
-                .map(|tl| tl.len_time())
+                .map(|tl| tl.len_time(&self.branches))
                 .unwrap_or_default();
 
             let seg_start = current_time;
@@ -273,13 +285,19 @@ pub enum Segment {
         label_index: u8,
         iter_count: u8,
     },
-    Unknown6 {
+    /// Loops back to the [StartLoop](Segment::StartLoop) with the same `label_index` unless the game has set the
+    /// conditional loop flag. The game never sets it, so this always loops.
+    #[serde(alias = "Unknown6")]
+    EndCondLoopFalse {
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<Id>,
         label_index: u8,
         iter_count: u8,
     },
-    Unknown7 {
+    /// Loops back to the [StartLoop](Segment::StartLoop) with the same `label_index` if the game has set the
+    /// conditional loop flag. The game never sets it, so this never loops.
+    #[serde(alias = "Unknown7")]
+    EndCondLoopTrue {
         #[serde(skip_serializing_if = "Option::is_none")]
         id: Option<Id>,
         label_index: u8,
@@ -294,8 +312,8 @@ impl Segment {
             Segment::StartLoop { id, .. } => *id = Some(gen_id()),
             Segment::Wait { id } => *id = Some(gen_id()),
             Segment::EndLoop { id, .. } => *id = Some(gen_id()),
-            Segment::Unknown6 { id, .. } => *id = Some(gen_id()),
-            Segment::Unknown7 { id, .. } => *id = Some(gen_id()),
+            Segment::EndCondLoopFalse { id, .. } => *id = Some(gen_id()),
+            Segment::EndCondLoopTrue { id, .. } => *id = Some(gen_id()),
         }
     }
 
@@ -305,8 +323,8 @@ impl Segment {
             Segment::StartLoop { id, .. } => *id = None,
             Segment::Wait { id } => *id = None,
             Segment::EndLoop { id, .. } => *id = None,
-            Segment::Unknown6 { id, .. } => *id = None,
-            Segment::Unknown7 { id, .. } => *id = None,
+            Segment::EndCondLoopFalse { id, .. } => *id = None,
+            Segment::EndCondLoopTrue { id, .. } => *id = None,
         }
     }
 }
@@ -317,8 +335,8 @@ mod segment_commands {
     pub const START_LOOP: u32 = 3 << 16;
     pub const WAIT: u32 = 4 << 16;
     pub const END_LOOP: u32 = 5 << 16;
-    pub const UNKNOWN_6: u32 = 6 << 16;
-    pub const UNKNOWN_7: u32 = 7 << 16;
+    pub const END_COND_LOOP_FALSE: u32 = 6 << 16;
+    pub const END_COND_LOOP_TRUE: u32 = 7 << 16;
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
@@ -334,11 +352,11 @@ pub struct TrackList {
 impl TrackList {
     /// The game ends a phrase when any enabled track reaches an [End](Command::End). Tracks without one play into
     /// whatever follows them, so the master track's length stands in when no track has one.
-    pub fn len_time(&self) -> usize {
+    pub fn len_time(&self, branches: &BTreeMap<BranchId, Branch>) -> usize {
         self.tracks
             .iter()
             .filter(|track| !track.is_disabled)
-            .filter_map(|track| track.commands.end_time())
+            .filter_map(|track| track.commands.end_time(branches))
             .min()
             .unwrap_or_else(|| self.tracks[0].commands.len_time())
     }
@@ -366,6 +384,11 @@ pub struct Track {
     pub polyphony: Polyphony,
     pub is_drum_track: bool,
     pub commands: CommandSeq,
+
+    /// Where the commands were decoded from. Tracks in a track list decoded from the same place share one copy of
+    /// their commands when encoded, as long as the commands are still equal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pos: Option<FilePos>,
 }
 
 impl Default for Track {
@@ -376,6 +399,7 @@ impl Default for Track {
             polyphony: Polyphony::Automatic,
             is_drum_track: false,
             commands: Default::default(),
+            pos: None,
         }
     }
 }
@@ -388,8 +412,45 @@ impl Track {
             polyphony: self.polyphony,
             is_drum_track: self.is_drum_track,
             commands: self.commands.split_at(time),
+            pos: None,
         }
     }
+}
+
+pub type BranchId = u64;
+
+/// Passages a track can play at the same point, one of which the game picks by its proximity mix. See
+/// [Command::Branch].
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
+#[serde(default)]
+pub struct Branch {
+    /// Encode/decode file position.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pos: Option<FilePos>,
+
+    /// Indexed by proximity mix. The game plays the first option when the mix has no option.
+    pub options: Vec<BranchOption>,
+}
+
+impl Branch {
+    /// How long the first option plays. Options are expected to play for the same time.
+    pub fn len_time(&self) -> usize {
+        self.options.first().map_or(0, |option| option.commands.len_time())
+    }
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Debug, Serialize, Deserialize, TypeDef)]
+#[serde(default)]
+pub struct BranchOption {
+    /// Sets whether the track plays drums, from this option onward.
+    pub is_drum_track: bool,
+
+    pub commands: CommandSeq,
+
+    /// Where the commands were decoded from. Options decoded from the same place share one copy of their commands
+    /// when encoded, as long as the commands are still equal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pos: Option<FilePos>,
 }
 
 /// 255 is never used in vanilla songs so we can repurpose it to mean 'please calculate a good polyphonic_idx for me'
@@ -486,12 +547,6 @@ pub struct Instrument {
 
     #[serde(skip_serializing_if = "is_default")]
     pub pad_07: u8,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
-pub struct Unknown {
-    pub range: Range<u64>,
-    pub data: Vec<u8>,
 }
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {

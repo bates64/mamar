@@ -1,4 +1,4 @@
-import { type Track } from "pm64-typegen"
+import { type Bgm, type Track } from "pm64-typegen"
 import { useEffect, useRef } from "react"
 
 import Bridge from "../bridge"
@@ -14,12 +14,12 @@ export default function PianoRoll({ trackListId, trackIndex }: Props) {
     const [bgm] = useBgm()
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
 
-    if (!track) return null
+    if (!bgm || !track) return null
 
-    return <Canvas track={track} />
+    return <Canvas track={track} branches={bgm.branches} />
 }
 
-function Canvas({ track }: { track: Track }) {
+function Canvas({ track, branches }: { track: Track, branches: Bgm["branches"] }) {
     const canvas = useSize<HTMLCanvasElement>()
     const containerRef = useRef<HTMLDivElement | null>(null)
     type Renderer = InstanceType<typeof Bridge.PianoRoll>
@@ -73,13 +73,13 @@ function Canvas({ track }: { track: Track }) {
         const r = rendererRef.current
         if (!r) return
 
-        r.set_track(track)
+        r.set_track(track, branches)
 
         containerRef.current!.style.height = `${r.scroll_height()}px`
 
         const scrollParent = containerRef.current!.parentElement!
         scrollParent.scrollTop = r.central_scroll_y() / window.devicePixelRatio
-    }, [track])
+    }, [track, branches])
 
     return <div ref={containerRef}>
         <canvas ref={canvas.ref} style={{ width: "100%", height: "100%", display: "block" }} />

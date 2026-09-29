@@ -3,7 +3,7 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io::{self, SeekFrom};
 
-use log::{debug, info, warn};
+use log::{debug, warn};
 
 use super::*;
 use crate::rw::*;
@@ -14,6 +14,7 @@ pub enum Error {
     MissingEndMarker(MarkerId),
     UnorderedMarkers(MarkerId),
     EndMarkerTooFarAway(MarkerId),
+    MissingBranch(BranchId),
     TooBig,
     Io(io::Error),
 }
@@ -33,6 +34,7 @@ impl fmt::Display for Error {
                 write!(f, "Start marker comes after end marker {:?}", id)
             }
             Error::EndMarkerTooFarAway(id) => write!(f, "End marker '{:?}' is too far away from start marker", id,),
+            Error::MissingBranch(id) => write!(f, "Cannot find branch {}", id),
             Error::TooBig => write!(f, "Encoded BGM data is too large for game engine to handle"),
             Error::Io(source) => write!(f, "{}", source),
         }
@@ -127,17 +129,13 @@ impl Bgm {
         tracks        [for subseg1]
         sequences
         ...
+        sequences     [of tracks that branch]
+        branch tables
+        branch options
         */
 
-        enum ToWrite {
-            TrackList {
-                track_list_id: TrackListId,
-                tracks_pos: u64,
-                segment_start: u64,
-            },
-            Unknown(Unknown),
-        }
-        let mut to_write: Vec<ToWrite> = self.unknowns.iter().map(|unk| ToWrite::Unknown(unk.clone())).collect();
+        // Where each track list's offset needs writing, and what it is relative to
+        let mut track_list_refs: HashMap<TrackListId, Vec<(u64, u64)>> = HashMap::new();
 
         // Write segments
         for (offset, segment) in segment_offsets.into_iter().zip(self.variations.iter()) {
@@ -155,11 +153,10 @@ impl Bgm {
                     debug!("subsegment {:#X}", f.pos()?);
                     if let Some((tracks_pos, track_list_id)) = subsegment.encode(f)? {
                         // Need to write track data after the header
-                        to_write.push(ToWrite::TrackList {
-                            track_list_id,
-                            tracks_pos,
-                            segment_start,
-                        });
+                        track_list_refs
+                            .entry(track_list_id)
+                            .or_default()
+                            .push((tracks_pos, segment_start));
                     }
                 }
                 f.write_all(&[0, 0, 0, 0])?; // Terminator
@@ -168,137 +165,144 @@ impl Bgm {
             }
         }
 
-        // Write track lists
+        // Write track lists, including those no segment plays
+        let mut track_list_ids: Vec<&TrackListId> = self.track_lists.keys().collect();
+        track_list_ids.sort_by_key(|id| (self.track_lists[id].pos.unwrap_or(u64::MAX), **id));
 
-        to_write.sort_by_key(|w| match w {
-            ToWrite::TrackList { track_list_id, .. } => self.track_lists[track_list_id].pos.unwrap_or_default(),
-            ToWrite::Unknown(unk) => unk.range.start,
-        });
+        let mut branch_refs = Vec::new();
+        let mut branching_tracks = Vec::new();
 
-        let mut encoded_tracks: HashMap<TrackListId, u64> = HashMap::new();
+        for (track_list_no, track_list_id) in track_list_ids.into_iter().enumerate() {
+            let track_list = &self.track_lists[track_list_id];
 
-        for w in to_write.into_iter() {
-            match w {
-                ToWrite::TrackList {
-                    segment_start,
-                    track_list_id,
-                    tracks_pos,
-                } => {
-                    let track_list = &self.track_lists[&track_list_id];
+            f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
-                    // If we've encoded this track list already, just point to that instead.
-                    if let Some(track_data_start) = encoded_tracks.get(&track_list_id) {
-                        info!("sharing tracks at {:#X}", track_data_start);
+            // For matching, write the track list where it was decoded from, unless that would overwrite something
+            let track_data_start = match track_list.pos {
+                Some(pos) if pos >= f.pos()? => {
+                    f.seek(SeekFrom::Start(pos))?;
+                    pos
+                }
+                _ => f.pos()?,
+            };
 
-                        // Write offset in header
-                        let pos = ((track_data_start - segment_start) >> 2) as u16;
-                        f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
+            debug!("tracks start = {:#X}", track_data_start);
 
-                        continue;
-                    }
+            // Write offset in segment headers
+            for (tracks_pos, segment_start) in track_list_refs.remove(track_list_id).unwrap_or_default() {
+                let pos = ((track_data_start - segment_start) >> 2) as u16;
+                f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
+            }
 
-                    f.align(4)?; // This position needs to be right-shifted by 2 without loss
+            // Write flags
+            let mut todo_commands = Vec::new();
+            for (track_no, track) in track_list.tracks.iter().enumerate() {
+                let Track {
+                    name,
+                    is_disabled,
+                    polyphony,
+                    is_drum_track,
+                    commands,
+                    ..
+                } = track;
 
-                    // For matching
-                    let track_data_start = if let Some(pos) = track_list.pos {
-                        // TODO: turn track_list.pos into a range and make sure this will fit there
-                        f.seek(SeekFrom::Start(pos))?;
-                        pos
-                    } else {
-                        f.pos()?
-                    };
+                if track_no != 0 {
+                    metadata.add_track_name(track_list_no as u16 + 1, name.clone());
+                }
 
-                    debug!(
-                        "tracks start = {:#X} (offset = {:#X})",
-                        track_data_start,
-                        track_data_start - segment_start
-                    );
-
-                    let track_list_no = encoded_tracks.len();
-
-                    // Write offset in header
-                    let pos = ((track_data_start - segment_start) >> 2) as u16;
-                    f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
-                    encoded_tracks.insert(track_list_id, track_data_start);
-
-                    // Write flags
-                    let mut todo_commands = Vec::new();
-                    for (
-                        track_no,
-                        Track {
-                            name,
-                            is_disabled,
-                            polyphony,
-                            is_drum_track,
-                            commands,
-                            ..
-                        },
-                    ) in track_list.tracks.iter().enumerate()
+                if !commands.is_empty() {
+                    // Need to write command data after the track list. Tracks that branch go after every track list.
+                    if commands
+                        .iter()
+                        .any(|event| matches!(event.command, Command::Branch { .. }))
                     {
-                        if track_no != 0 {
-                            metadata.add_track_name(track_list_no as u16 + 1, name.clone());
-                        }
-
-                        if !commands.is_empty() {
-                            // Need to write command data after the track
-                            todo_commands.push((f.pos()?, commands));
-                        }
-                        f.write_u16_be(0)?; // Replaced later if !null
-
-                        let polyphonic_idx = match *polyphony {
-                            Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
-                            Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
-                            Polyphony::Link { parent: _ } => {
-                                // Dry Dry Desert (only song that uses Link) happens to use this value
-                                5
-                            }
-                            Polyphony::Other { priority } => priority,
-                        };
-
-                        let flags = (*is_disabled as u16) << 8
-                            | (polyphonic_idx as u16) << 0xD
-                            | if *is_drum_track { 0x0080 } else { 0 }
-                            | (polyphony.to_parent_idx() as u16) << 9;
-                        f.write_u16_be(flags)?;
-                    }
-
-                    // Write command sequences
-                    for (offset, seq) in todo_commands.into_iter() {
-                        //debug!("commandseq = {:#X} (offset = {:#X})", f.pos()?, f.pos()? - track_data_start);
-
-                        // Write pointer to here
-                        let pos = f.pos()? - track_data_start; // Notice no shift
-                        f.write_u16_be_at(pos as u16, SeekFrom::Start(offset))?;
-
-                        seq.encode(f)?;
+                        branching_tracks.push((f.pos()?, track_data_start, track));
+                    } else {
+                        todo_commands.push((f.pos()?, track_data_start, track));
                     }
                 }
-                ToWrite::Unknown(unk) => {
-                    f.seek(SeekFrom::Start(unk.range.start))?;
-                    debug!(
-                        "write unknown {:X}..{:X} @ {:X}",
-                        unk.range.start,
-                        unk.range.end,
-                        f.pos()?
-                    );
-                    f.write_all(&unk.data)?;
-                    f.seek(SeekFrom::Start(unk.range.end))?;
-                }
+                f.write_u16_be(0)?; // Replaced later if !null
+
+                let polyphonic_idx = match *polyphony {
+                    Polyphony::Automatic => polyphony_to_polyphonic_idx(commands.max_polyphony()),
+                    Polyphony::Manual { voices } => polyphony_to_polyphonic_idx(voices),
+                    Polyphony::Link { parent: _ } => {
+                        // Dry Dry Desert (only song that uses Link) happens to use this value
+                        5
+                    }
+                    Polyphony::Other { priority } => priority,
+                };
+
+                let flags = (*is_disabled as u16) << 8
+                    | (polyphonic_idx as u16) << 0xD
+                    | if *is_drum_track { 0x0080 } else { 0 }
+                    | (polyphony.to_parent_idx() as u16) << 9;
+                f.write_u16_be(flags)?;
+            }
+
+            encode_tracks(f, todo_commands, &mut branch_refs)?;
+        }
+
+        encode_tracks(f, branching_tracks, &mut branch_refs)?;
+
+        // Write branch tables
+        let mut branch_ids: Vec<&BranchId> = self.branches.keys().collect();
+        branch_ids.sort_by_key(|id| (self.branches[id].pos.unwrap_or(u64::MAX), **id));
+
+        let mut table_positions = HashMap::new();
+        for &branch_id in &branch_ids {
+            table_positions.insert(branch_id, f.pos()?);
+            for option in &self.branches[branch_id].options {
+                f.write_u16_be(0)?; // Replaced later
+                f.write_u8(option.is_drum_track as u8)?;
             }
         }
 
-        // Write file size
-        let mut file_size = f.pos()? as u32;
+        // Write branch options, every table's first option before any second option
+        let mut encoded_options: Vec<(&BranchOption, u64)> = Vec::new();
+        let max_options = self
+            .branches
+            .values()
+            .map(|branch| branch.options.len())
+            .max()
+            .unwrap_or(0);
+        for option_no in 0..max_options {
+            for &branch_id in &branch_ids {
+                let Some(option) = self.branches[branch_id].options.get(option_no) else {
+                    continue;
+                };
 
-        // Matching: file size overrides (!)
-        if self.name.as_str() == "117 " && file_size == 0x19A0 {
-            // Battle Fanfare's file size does not include the junk unknown at the end of it.
-            file_size = 0x1998;
-        } else if self.name.as_str() == "322 " && file_size == 0x0D70 {
-            // Bowser's Castle Explodes
-            file_size = 0x0D64;
+                let shared = encoded_options.iter().find(|(encoded, _)| {
+                    encoded.pos.is_some() && encoded.pos == option.pos && encoded.commands.commands_eq(&option.commands)
+                });
+                let commands_pos = match shared {
+                    Some((_, pos)) => *pos,
+                    None => {
+                        let pos = f.pos()?;
+                        option.commands.encode(f, &mut branch_refs)?;
+                        encoded_options.push((option, pos));
+                        pos
+                    }
+                };
+
+                let entry_pos = table_positions[branch_id] + option_no as u64 * 3;
+                f.write_u16_be_at(commands_pos as u16, SeekFrom::Start(entry_pos))?;
+            }
         }
 
+        // Point branch commands at their tables
+        for (pos, branch_id) in branch_refs {
+            let table_pos = *table_positions.get(&branch_id).ok_or(Error::MissingBranch(branch_id))?;
+            let option_count = self.branches[&branch_id].options.len() as u8;
+            f.write_u16_be_at(table_pos as u16, SeekFrom::Start(pos))?;
+            let end = f.pos()?;
+            f.seek(SeekFrom::Start(pos + 2))?;
+            f.write_u8(option_count)?;
+            f.seek(SeekFrom::Start(end))?;
+        }
+
+        // Write file size
+        let file_size = f.pos()? as u32;
         f.write_u32_be_at(file_size, file_size_offset)?;
 
         debug!("end = {:#X}", f.pos()?);
@@ -320,6 +324,36 @@ impl Bgm {
             Err(Error::TooBig) // TODO: make into warning and surface to caller somehow
         }
     }
+}
+
+/// Writes the commands of each `(offset field position, track list start, track)` and points the offset field at them.
+/// Tracks in the same track list that were decoded from the same place share one copy, as long as their commands are
+/// still equal.
+fn encode_tracks<W: Write + Seek>(
+    f: &mut W,
+    tracks: Vec<(u64, u64, &Track)>,
+    branch_refs: &mut Vec<(u64, BranchId)>,
+) -> Result<(), Error> {
+    let mut encoded: Vec<(u64, &Track, u64)> = Vec::new();
+    for (offset_pos, track_list_start, track) in tracks {
+        let shared = encoded.iter().find(|(start, encoded, _)| {
+            *start == track_list_start
+                && encoded.pos.is_some()
+                && encoded.pos == track.pos
+                && encoded.commands.commands_eq(&track.commands)
+        });
+        let commands_pos = match shared {
+            Some((_, _, pos)) => *pos,
+            None => {
+                let pos = f.pos()?;
+                track.commands.encode(f, branch_refs)?;
+                encoded.push((track_list_start, track, pos));
+                pos
+            }
+        };
+        f.write_u16_be_at((commands_pos - track_list_start) as u16, SeekFrom::Start(offset_pos))?;
+    }
+    Ok(())
 }
 
 impl Drum {
@@ -390,23 +424,21 @@ impl Segment {
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown6 {
+            Segment::EndCondLoopFalse {
                 label_index,
                 iter_count,
                 ..
             } => {
-                f.write_u16_be((segment_commands::UNKNOWN_6 >> 4) as u16)?;
-                f.seek(SeekFrom::Current(-2))?;
+                f.write_u16_be((segment_commands::END_COND_LOOP_FALSE >> 4) as u16)?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
-            Segment::Unknown7 {
+            Segment::EndCondLoopTrue {
                 label_index,
                 iter_count,
                 ..
             } => {
-                f.write_u16_be((segment_commands::UNKNOWN_7 >> 4) as u16)?;
-                f.seek(SeekFrom::Current(-2))?;
+                f.write_u16_be((segment_commands::END_COND_LOOP_TRUE >> 4) as u16)?;
                 f.write_u16_be((*label_index as u16 & 0x1F) | ((*iter_count as u16 & 0x7F) << 5))?;
                 Ok(None)
             }
@@ -415,7 +447,8 @@ impl Segment {
 }
 
 impl CommandSeq {
-    pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
+    /// Adds the position of each [Command::Branch]'s table offset to `branch_refs`, for the caller to write.
+    pub fn encode<W: Write + Seek>(&self, f: &mut W, branch_refs: &mut Vec<(u64, BranchId)>) -> Result<(), Error> {
         let mut marker_to_offset = HashMap::new();
         let mut todo_detours = Vec::new();
 
@@ -435,11 +468,7 @@ impl CommandSeq {
                             f.write_u8(0x78 | mask_low_extra as u8)?;
                             delay -= mask_low_extra << 8;
 
-                            let extra_byte = match delay {
-                                d if d > 0x78 => 0x78,
-                                d if d > 0x00 => d,
-                                _ => 0,
-                            };
+                            let extra_byte = delay.min(0xFF);
                             f.write_u8(extra_byte as u8)?;
                             delay -= extra_byte;
                         }
@@ -473,9 +502,9 @@ impl CommandSeq {
                     f.write_u8(0xE1)?;
                     f.write_u8(*volume)?;
                 }
-                Command::MasterPitchShift { cent: shift } => {
+                Command::MasterPitchShift { semitones } => {
                     f.write_u8(0xE2)?;
-                    f.write_u8(*shift)?;
+                    f.write_i8(*semitones)?;
                 }
                 Command::MasterTempoFade { time, value: bpm } => {
                     f.write_u8(0xE4)?;
@@ -514,22 +543,18 @@ impl CommandSeq {
                 }
                 Command::SubTrackCoarseTune(a) => {
                     f.write_u8(0xED)?;
-                    f.write_u8(*a)?;
+                    f.write_i8(*a)?;
                 }
                 Command::SubTrackFineTune(a) => {
                     f.write_u8(0xEE)?;
-                    f.write_u8(*a)?;
+                    f.write_i8(*a)?;
                 }
                 Command::SegTrackTune { bend } => {
                     f.write_u8(0xEF)?;
                     f.write_i16_be(*bend)?;
                 }
-                Command::TrackTremolo {
-                    amount,
-                    speed,
-                    time: unknown,
-                } => {
-                    f.write_all(&[0xF0, *amount, *speed, *unknown])?;
+                Command::TrackTremolo { delay, speed, depth } => {
+                    f.write_all(&[0xF0, *delay, *speed, *depth])?;
                 }
                 Command::TrackTremoloStop => f.write_u8(0xF3)?,
                 Command::SetTrackVoice { index: a } => {
@@ -563,7 +588,7 @@ impl CommandSeq {
                 }
 
                 Command::End => f.write_u8(0)?,
-                Command::UnkCmdE3 { effect_type } => {
+                Command::BusEffect { effect_type } => {
                     f.write_u8(0xE3)?;
                     f.write_u8(*effect_type)?;
                 }
@@ -571,30 +596,33 @@ impl CommandSeq {
                     f.write_u8(0xF1)?;
                     f.write_u8(*value)?;
                 }
-                Command::TrackTremoloTime { time } => {
+                Command::TrackTremoloDepth { depth } => {
                     f.write_u8(0xF2)?;
-                    f.write_u8(*time)?;
+                    f.write_u8(*depth)?;
                 }
-                Command::UnkCmdF4 { pan0, pan1 } => {
+                Command::SubTrackRandomPan { pan, amount } => {
                     f.write_u8(0xF4)?;
-                    f.write_u8(*pan0)?;
-                    f.write_u8(*pan1)?;
+                    f.write_u8(*pan)?;
+                    f.write_u8(*amount)?;
                 }
-                Command::Jump { unk_00, unk_02 } => {
-                    f.write_u8(0xF8)?;
-                    f.write_u16_be(*unk_00)?;
-                    f.write_u8(*unk_02)?;
+                Command::Branch { branch } => {
+                    f.write_u8(0xFC)?;
+                    branch_refs.push((f.pos()?, *branch));
+
+                    // Overwritten once the branch table is written
+                    f.write_u16_be(0)?;
+                    f.write_u8(0)?;
                 }
                 Command::EventTrigger { event_info } => {
-                    f.write_u8(0xF9)?;
-                    f.write_u32_be(*event_info)?;
+                    f.write_u8(0xFD)?;
+                    f.write_all(&event_info.to_be_bytes()[1..])?;
                 }
-                Command::UnkCmdFF { unk_00, unk_01, unk_02 } => {
-                    f.write_u8(0xFF)?;
-                    f.write_u8(*unk_00)?;
-                    f.write_u8(*unk_01)?;
-                    f.write_u8(*unk_02)?;
-                }
+                Command::StereoDelay { index, delay } => f.write_all(&[0xFF, 1, *index, *delay])?,
+                Command::SeekCustomEnvelope { index } => f.write_all(&[0xFF, 2, *index, 0])?,
+                Command::WriteCustomEnvelope { time, value } => f.write_all(&[0xFF, 3, *time, *value])?,
+                Command::UseCustomEnvelope { index } => f.write_all(&[0xFF, 4, *index, 0])?,
+                Command::TriggerSound { sound } => f.write_all(&[0xFF, 5, *sound, 0])?,
+                Command::ProxMixOverride { volume1, volume2 } => f.write_all(&[0xFF, 6, *volume1, *volume2])?,
             }
         }
 
@@ -622,9 +650,14 @@ impl CommandSeq {
                 .checked_sub(start_offset)
                 .ok_or_else(|| Error::UnorderedMarkers(end.clone()))?;
 
-            // Convert the length to a u8 if possible.
-            if length > u8::MAX as u16 {
+            // Convert the length to a u8 if possible. A length of 256 is written as 0, like the original tools did.
+            if length > 0x100 {
                 return Err(Error::EndMarkerTooFarAway(end.clone()));
+            } else if length == 0x100 {
+                warn!(
+                    "detour to {:?} is 256 bytes long, so the game will not return from it",
+                    start
+                );
             }
             let length = length as u8;
 

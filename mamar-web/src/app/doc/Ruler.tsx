@@ -1,6 +1,6 @@
 import { Button, ButtonGroup, Content, Dialog, DialogTrigger, Divider, Form, Heading, NumberField, Switch } from "@adobe/react-spectrum"
 import classNames from "classnames"
-import { Event, Segment, TrackList } from "pm64-typegen"
+import { Bgm, Branch, Event, Segment, TrackList } from "pm64-typegen"
 import { useState } from "react"
 import { usePress } from "react-aria"
 
@@ -135,7 +135,7 @@ export function useSegmentLengths(): number[] {
 
     return segments.map(segment => {
         if (bgm && "Subseg" in segment) {
-            return trackListLength(bgm.track_lists[segment.Subseg.track_list])
+            return trackListLength(bgm.track_lists[segment.Subseg.track_list], bgm.branches)
         } else {
             return 0
         }
@@ -146,13 +146,13 @@ export function useSegmentLengths(): number[] {
  * The game ends a segment when any enabled track reaches an End. Tracks without one play into whatever follows them,
  * so the master track's length stands in when no track has one. See TrackList::len_time in pm64.
  */
-function trackListLength(trackList: TrackList): number {
+function trackListLength(trackList: TrackList, branches: Bgm["branches"]): number {
     let length: number | undefined
     for (const track of trackList.tracks) {
         if (track.is_disabled) {
             continue
         }
-        const end = endTime(track.commands as unknown as Event[])
+        const end = endTime(track.commands as unknown as Event[], branches)
         if (end !== undefined && (length === undefined || end < length)) {
             length = end
         }
@@ -161,10 +161,10 @@ function trackListLength(trackList: TrackList): number {
 }
 
 /**
- * How long the commands play before their first End, including the time their detours play, or undefined if they have
- * no End or jump somewhere this can't follow before one. See CommandSeq::end_time.
+ * How long the commands play before their first End, including the time their detours and branches play, or undefined
+ * if they have no End. See CommandSeq::end_time.
  */
-function endTime(commands: Event[]): number | undefined {
+function endTime(commands: Event[], branches: Bgm["branches"]): number | undefined {
     const markerTimes = new Map<string, number>()
     let linearTime = 0
     for (const event of commands) {
@@ -179,8 +179,9 @@ function endTime(commands: Event[]): number | undefined {
     for (const event of commands) {
         if ("End" in event) {
             return time
-        } else if ("Jump" in event) {
-            return undefined
+        } else if ("Branch" in event) {
+            const branch = branches[event.Branch.branch]
+            time += branch ? branchLength(branch) : 0
         } else if ("Delay" in event) {
             time += event.Delay
         } else if ("Detour" in event) {
@@ -191,6 +192,12 @@ function endTime(commands: Event[]): number | undefined {
             }
         }
     }
+}
+
+/** How long the first option plays. See Branch::len_time. */
+function branchLength(branch: Branch): number {
+    const first = branch.options[0]
+    return first ? sumDelays(first.commands as unknown as Event[]) : 0
 }
 
 function sumDelays(commands: Event[]): number {

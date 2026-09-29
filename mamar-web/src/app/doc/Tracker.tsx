@@ -103,26 +103,26 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("MasterPitchShift" in command) {
         return <div className={classNames(styles.command, styles.master)}>
-            pitch shift master
+            transpose master by
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.MasterPitchShift.cent}
-                    minValue={0}
-                    maxValue={0xff}
-                    onChange={cent => mutate({ ...command, MasterPitchShift: { ...command.MasterPitchShift, cent } })}
+                    value={command.MasterPitchShift.semitones}
+                    minValue={-128}
+                    maxValue={127}
+                    onChange={semitones => mutate({ ...command, MasterPitchShift: { ...command.MasterPitchShift, semitones } })}
                 />
             </InputBox>
-            cents
+            semitones
         </div>
-    } else if ("UnkCmdE3" in command) {
+    } else if ("BusEffect" in command) {
         return <div className={classNames(styles.command, styles.master)}>
-            unk command E3 effect type
+            set bus effect to
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.UnkCmdE3.effect_type}
+                    value={command.BusEffect.effect_type}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={effect_type => mutate({ ...command, UnkCmdE3: { ...command.UnkCmdE3, effect_type } })}
+                    onChange={effect_type => mutate({ ...command, BusEffect: { ...command.BusEffect, effect_type } })}
                 />
             </InputBox>
         </div>
@@ -222,7 +222,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.SubTrackPan}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, SubTrackPan: value })}
                 />
             </InputBox>
@@ -257,11 +257,12 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.SubTrackCoarseTune}
-                    minValue={0}
-                    maxValue={0xFF}
+                    minValue={-128}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, SubTrackCoarseTune: value })}
                 />
             </InputBox>
+            semitones
         </div>
     } else if ("SubTrackFineTune" in command) {
         return <div className={classNames(styles.command, styles.track)}>
@@ -269,11 +270,12 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             <InputBox>
                 <VerticalDragNumberInput
                     value={command.SubTrackFineTune}
-                    minValue={0}
-                    maxValue={0xFF}
+                    minValue={-128}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, SubTrackFineTune: value })}
                 />
             </InputBox>
+            cents
         </div>
     } else if ("SegTrackTune" in command) {
         return <div className={classNames(styles.command, styles.seg)}>
@@ -289,13 +291,13 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("TrackTremolo" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            tremolo for
+            tremolo after
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.TrackTremolo.time}
+                    value={command.TrackTremolo.delay}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={time => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, time } })}
+                    onChange={delay => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, delay } })}
                 />
             </InputBox>
             ticks at speed
@@ -310,10 +312,10 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             with
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.TrackTremolo.amount}
+                    value={command.TrackTremolo.depth}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={amount => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, amount } })}
+                    onChange={depth => mutate({ ...command, TrackTremolo: { ...command.TrackTremolo, depth } })}
                 />
             </InputBox>
             wobble
@@ -328,23 +330,40 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 onChange={value => mutate({ ...command, TrackTremoloSpeed: value })}
             />
         </div>
-    } else if ("TrackTremoloTime" in command) {
+    } else if ("TrackTremoloDepth" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            set tremolo duration to
+            set tremolo wobble to
             <VerticalDragNumberInput
-                value={command.TrackTremoloTime.time}
+                value={command.TrackTremoloDepth.depth}
                 minValue={0}
                 maxValue={0xFF}
-                onChange={time => mutate({ ...command, TrackTremoloTime: { ...command.TrackTremoloTime, time } })}
+                onChange={depth => mutate({ ...command, TrackTremoloDepth: { ...command.TrackTremoloDepth, depth } })}
             />
         </div>
     } else if ("TrackTremoloStop" in command) {
         return <div className={classNames(styles.command, styles.track)}>
             stop tremolo
         </div>
-    } else if ("UnkCmdF4" in command) {
-        return <div className={styles.command}>
-            unknown command F4
+    } else if ("SubTrackRandomPan" in command) {
+        return <div className={classNames(styles.command, styles.track)}>
+            pan notes randomly around
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.SubTrackRandomPan.pan}
+                    minValue={0}
+                    maxValue={127}
+                    onChange={pan => mutate({ ...command, SubTrackRandomPan: { ...command.SubTrackRandomPan, pan } })}
+                />
+            </InputBox>
+            by up to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.SubTrackRandomPan.amount}
+                    minValue={0}
+                    maxValue={127}
+                    onChange={amount => mutate({ ...command, SubTrackRandomPan: { ...command.SubTrackRandomPan, amount } })}
+                />
+            </InputBox>
         </div>
     } else if ("SetTrackVoice" in command) {
         return <div className={classNames(styles.command, styles.track)}>
@@ -390,27 +409,11 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 />
             </InputBox>
         </div>
-    } else if ("Jump" in command) {
+    } else if ("Branch" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            jump
-            {!(command.Jump.unk_00 === 0 && command.Jump.unk_02 === 0) ? <>
-                <InputBox>
-                    <VerticalDragNumberInput
-                        value={command.Jump.unk_00}
-                        minValue={0}
-                        maxValue={0xFF}
-                        onChange={unk_00 => mutate({ ...command, Jump: { ...command.Jump, unk_00 } })}
-                    />
-                </InputBox>
-                <InputBox>
-                    <VerticalDragNumberInput
-                        value={command.Jump.unk_02}
-                        minValue={0}
-                        maxValue={0xFF}
-                        onChange={unk_02 => mutate({ ...command, Jump: { ...command.Jump, unk_02 } })}
-                    />
-                </InputBox>
-            </> : null}
+            play the option for the proximity mix, from
+            <BranchOptionCount branch={command.Branch.branch} />
+            options
         </div>
     } else if ("EventTrigger" in command) {
         return <div className={classNames(styles.command, styles.track)}>
@@ -419,7 +422,7 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.EventTrigger.event_info}
                     minValue={0}
-                    maxValue={0xFFFFFFFF}
+                    maxValue={0xFFFFFF}
                     onChange={event_info => mutate({ ...command, EventTrigger: { ...command.EventTrigger, event_info } })}
                 />
             </InputBox>
@@ -442,34 +445,106 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 />
             </InputBox>
         </div>
-    } else if ("UnkCmdFF" in command) {
-        return <div className={styles.command}>
-            unknown command FF
-            0
+    } else if ("StereoDelay" in command) {
+        return <div className={classNames(styles.command, styles.master)}>
+            delay one stereo channel of effect
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.UnkCmdFF.unk_00}
+                    value={command.StereoDelay.index}
                     minValue={0}
-                    maxValue={0xFF}
-                    onChange={unk_00 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_00 } })}
+                    maxValue={3}
+                    onChange={index => mutate({ ...command, StereoDelay: { ...command.StereoDelay, index } })}
                 />
             </InputBox>
-            1
+            by
             <InputBox>
                 <VerticalDragNumberInput
-                    value={command.UnkCmdFF.unk_01}
+                    value={command.StereoDelay.delay}
                     minValue={0}
                     maxValue={0xFF}
-                    onChange={unk_01 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_01 } })}
+                    onChange={delay => mutate({ ...command, StereoDelay: { ...command.StereoDelay, delay } })}
                 />
             </InputBox>
-            2
-            <VerticalDragNumberInput
-                value={command.UnkCmdFF.unk_02}
-                minValue={0}
-                maxValue={0xFF}
-                onChange={unk_02 => mutate({ ...command, UnkCmdFF: { ...command.UnkCmdFF, unk_02 } })}
-            />
+        </div>
+    } else if ("SeekCustomEnvelope" in command) {
+        return <div className={classNames(styles.command, styles.master)}>
+            start writing custom envelope
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.SeekCustomEnvelope.index}
+                    minValue={1}
+                    maxValue={8}
+                    onChange={index => mutate({ ...command, SeekCustomEnvelope: { ...command.SeekCustomEnvelope, index } })}
+                />
+            </InputBox>
+        </div>
+    } else if ("WriteCustomEnvelope" in command) {
+        return <div className={classNames(styles.command, styles.master)}>
+            add envelope step
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.WriteCustomEnvelope.time}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={time => mutate({ ...command, WriteCustomEnvelope: { ...command.WriteCustomEnvelope, time } })}
+                />
+            </InputBox>
+            to
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.WriteCustomEnvelope.value}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={value => mutate({ ...command, WriteCustomEnvelope: { ...command.WriteCustomEnvelope, value } })}
+                />
+            </InputBox>
+        </div>
+    } else if ("UseCustomEnvelope" in command) {
+        return <div className={classNames(styles.command, styles.track)}>
+            use custom envelope
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.UseCustomEnvelope.index}
+                    minValue={0}
+                    maxValue={8}
+                    onChange={index => mutate({ ...command, UseCustomEnvelope: { ...command.UseCustomEnvelope, index } })}
+                />
+            </InputBox>
+        </div>
+    } else if ("TriggerSound" in command) {
+        return <div className={classNames(styles.command, styles.playback)}>
+            play sound effect
+            <InputBox>
+                <VerticalDragNumberInput
+                    value={command.TriggerSound.sound}
+                    minValue={0}
+                    maxValue={0xFF}
+                    onChange={sound => mutate({ ...command, TriggerSound: { ...command.TriggerSound, sound } })}
+                />
+            </InputBox>
+        </div>
+    } else if ("ProxMixOverride" in command) {
+        return <div className={classNames(styles.command, styles.track)}>
+            {command.ProxMixOverride.volume1 === 0 ? "apply proximity mix volumes" : <>
+                on proximity mix, fade to
+                <InputBox>
+                    <VerticalDragNumberInput
+                        value={command.ProxMixOverride.volume1}
+                        minValue={1}
+                        maxValue={0xFF}
+                        onChange={volume1 => mutate({ ...command, ProxMixOverride: { ...command.ProxMixOverride, volume1 } })}
+                    />
+                </InputBox>
+                at full mix, otherwise
+                <InputBox>
+                    <VerticalDragNumberInput
+                        value={command.ProxMixOverride.volume2}
+                        minValue={0}
+                        maxValue={0xFF}
+                        onChange={volume2 => mutate({ ...command, ProxMixOverride: { ...command.ProxMixOverride, volume2 } })}
+                    />
+                </InputBox>
+            </>}
         </div>
     } else if ("Marker" in command) {
         return <div className={styles.command}>
@@ -488,6 +563,11 @@ function Command({ command: rawCommand }:{ command: pm64.Event }) {
             unknown command
         </div>
     }
+}
+
+function BranchOptionCount({ branch }: { branch: number }) {
+    const [bgm] = useBgm()
+    return <>{bgm?.branches[branch]?.options.length ?? 0}</>
 }
 
 const ListItem = memo(({ data: commands, index, style }: { data: pm64.Event[], index: number, style: CSSProperties }) => {

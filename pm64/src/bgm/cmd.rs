@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::iter;
 use std::ops::Range;
@@ -6,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
 use crate::{
-    bgm::PatchAddress,
+    bgm::{Branch, BranchId, PatchAddress},
     id::{Id, gen_id},
 };
 
@@ -239,9 +240,8 @@ impl CommandSeq {
     }
 
     /// Returns how long the sequence plays before its first [Command::End], including the time its
-    /// [detours](Command::Detour) play, or None if it has no End or [jumps](Command::Jump) somewhere it can't follow
-    /// before one.
-    pub fn end_time(&self) -> Option<usize> {
+    /// [detours](Command::Detour) and [branches](Command::Branch) play, or None if it has no End.
+    pub fn end_time(&self, branches: &BTreeMap<BranchId, Branch>) -> Option<usize> {
         let marker_time = |label: &MarkerId| {
             self.iter_time()
                 .find(|(_, event)| matches!(&event.command, Command::Marker { label: l } if l == label))
@@ -257,12 +257,54 @@ impl CommandSeq {
                         time += end.saturating_sub(start);
                     }
                 }
+                Command::Branch { branch } => time += branches.get(branch).map_or(0, Branch::len_time),
                 Command::End => return Some(time),
-                Command::Jump { .. } => return None,
                 _ => {}
             }
         }
         None
+    }
+
+    /// Returns the commands the game plays before the first [Command::End], in the order it plays them, following
+    /// [detours](Command::Detour). [Branches](Command::Branch) are not followed, but the time they play is counted.
+    pub fn playback<'a>(&'a self, branches: &BTreeMap<BranchId, Branch>) -> Vec<PlayedEvent<'a>> {
+        let marker_index = |label: &MarkerId| {
+            self.vec
+                .iter()
+                .position(|event| matches!(&event.command, Command::Marker { label: l } if l == label))
+        };
+
+        let mut played = Vec::new();
+        let mut time = 0;
+        for event in &self.vec {
+            played.push(PlayedEvent {
+                time,
+                event,
+                in_detour: false,
+            });
+            match &event.command {
+                Command::End => break,
+                Command::Delay(delay) => time += delay,
+                Command::Branch { branch } => time += branches.get(branch).map_or(0, Branch::len_time),
+                Command::Detour { start_label, end_label } => {
+                    let (Some(start), Some(end)) = (marker_index(start_label), marker_index(end_label)) else {
+                        continue;
+                    };
+                    for event in self.vec.get(start..end).unwrap_or_default() {
+                        played.push(PlayedEvent {
+                            time,
+                            event,
+                            in_detour: true,
+                        });
+                        if let Command::Delay(delay) = event.command {
+                            time += delay;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        played
     }
 
     /// Returns the relative-time after the last [Command]. Does not account for any final command which extends the
@@ -520,6 +562,11 @@ impl CommandSeq {
     }
     */
 
+    /// Whether both sequences have the same commands, ignoring event IDs.
+    pub fn commands_eq(&self, other: &CommandSeq) -> bool {
+        self.vec.len() == other.vec.len() && self.vec.iter().zip(&other.vec).all(|(a, b)| a.command == b.command)
+    }
+
     pub fn to_command_vec(self) -> Vec<Command> {
         self.vec.into_iter().map(|e| e.command).collect()
     }
@@ -541,7 +588,6 @@ impl CommandSeq {
                 let current_polyphony = notes.iter().filter(|end_time| **end_time > time).count() as u8;
                 if current_polyphony > polyphony {
                     polyphony = current_polyphony;
-                    dbg!(current_polyphony, time);
                 }
             }
         }
@@ -635,12 +681,11 @@ pub struct Event {
     pub command: Command,
 }
 
-/// See audio.h union SeqArgs
-/// TODO: rename to use "Variant" and "Seg" prefixes rather than "Seg" and "Sub"; same in audio.h
+/// See audio.h union SeqArgs.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
 pub enum Command {
     /// Stops playback on this track. Note that it is valid to have commands after an `End`; they can be executed
-    /// via a [`Detour`](Command::Detour).
+    /// via a [`Detour`](Command::Detour). Inside a [branch option](BranchOption), returns to the track that branched.
     End,
 
     /// Sleeps for however many ticks before continuing playback on this track.
@@ -656,19 +701,22 @@ pub enum Command {
     /// Sets the beats-per-minute of the composition.
     MasterTempo(u16),
 
-    /// Sets the composition volume.
+    /// Sets the composition volume, from 0 to 127.
     MasterVolume(u8),
 
-    /// Sets the composition transpose value.
+    /// Transposes every non-drum note by this many semitones.
     MasterPitchShift {
-        cent: u8,
+        #[serde(alias = "cent", deserialize_with = "de_i8_or_u8")]
+        semitones: i8,
     },
 
-    UnkCmdE3 {
+    /// Sets the effect type of the bus the song plays on.
+    #[serde(alias = "UnkCmdE3")]
+    BusEffect {
         effect_type: u8,
     },
 
-    /// Fades the tempo to `bpm` across `time` ticks.
+    /// Fades the tempo to `value` beats-per-minute across `time` ticks.
     MasterTempoFade {
         time: u16,
         value: u16,
@@ -680,7 +728,8 @@ pub enum Command {
         volume: u8,
     },
 
-    /// Applies the given effect to the entire composition.
+    /// Sets the effect type of effect slot `index`, from 0 to 3. Tracks choose a slot with
+    /// [SubTrackReverbType](Command::SubTrackReverbType).
     MasterEffect {
         index: u8,
         value: u8,
@@ -690,91 +739,133 @@ pub enum Command {
     /// Sets the patch of this track, overriding its [super::Instrument].
     TrackOverridePatch(PatchAddress),
 
-    /// Sets the volume for this track only. Resets at the end of the [super::Subsegment].
+    /// Sets the instrument volume for this track, from 0 to 127.
     SubTrackVolume(u8),
 
-    /// Left = (+/-)0.
-    /// Middle = (+/-)64.
-    /// Right = (+/-)127.
+    /// Sets the instrument pan for this track, and stops [random panning](Command::SubTrackRandomPan).
+    /// Left = 0.
+    /// Middle = 64.
+    /// Right = 127.
     SubTrackPan(i8),
 
+    /// Sets the instrument reverb for this track, from 0 to 127.
     SubTrackReverb(u8),
 
-    /// Sets the volume for this track only. Resets at the end of the [super::Segment].
+    /// Sets the volume for this track, from 0 to 127.
     SegTrackVolume(u8),
 
-    SubTrackCoarseTune(u8),
+    /// Transposes the instrument by this many semitones.
+    SubTrackCoarseTune(#[serde(deserialize_with = "de_i8_or_u8")] i8),
 
-    SubTrackFineTune(u8),
+    /// Detunes the instrument by this many cents.
+    SubTrackFineTune(#[serde(deserialize_with = "de_i8_or_u8")] i8),
 
+    /// Detunes this track by `bend` cents.
     SegTrackTune {
         bend: i16,
     },
 
-    // TODO: figure out whether Seg or Sub
+    /// Wobbles the pitch of each note this track plays, starting `delay` ticks into the note.
     TrackTremolo {
-        amount: u8,
+        #[serde(alias = "amount")]
+        delay: u8,
         speed: u8,
-        time: u8,
+        #[serde(alias = "time")]
+        depth: u8,
     },
 
     TrackTremoloSpeed(u8),
 
-    TrackTremoloTime {
-        time: u8,
+    #[serde(alias = "TrackTremoloTime")]
+    TrackTremoloDepth {
+        #[serde(alias = "time")]
+        depth: u8,
     },
 
     TrackTremoloStop,
 
-    UnkCmdF4 {
-        pan0: u8,
-        pan1: u8,
+    /// Pans each note this track plays up to `amount` either side of `pan`, at random.
+    #[serde(alias = "UnkCmdF4")]
+    SubTrackRandomPan {
+        #[serde(alias = "pan0")]
+        pan: u8,
+        #[serde(alias = "pan1")]
+        amount: u8,
     },
 
+    /// Uses the [instrument](super::Instrument) at `index`, resetting every `Sub*` setting to the instrument's.
     SetTrackVoice {
         index: u8,
     },
 
+    /// Fades the instrument volume for this track to `value` across `time` ticks.
     TrackVolumeFade {
         time: u16,
         value: u8,
     },
 
+    /// Sends this track to the bus of effect slot `index`.
     SubTrackReverbType {
         index: u8,
     },
 
     // commands F8-FB unused
-    Jump {
-        unk_00: u16,
-        unk_02: u8,
+    /// Plays one of the [options](Branch::options) of a [Branch], chosen by the game's proximity mix, then continues.
+    /// Resets the track's tuning, tremolo, random pan, volume fade, custom envelope, and bus.
+    Branch {
+        branch: BranchId,
     },
 
+    /// Queues a music event for the game to read. Only the lower 24 bits are stored.
     EventTrigger {
         event_info: u32,
     },
 
     /// Jumps to the start label and executes until the end label is found.
+    ///
+    /// The file stores the distance between the labels as a byte, so a detour of 256 bytes is stored as 0. The game
+    /// treats 0 as a detour that never returns.
     Detour {
         start_label: MarkerId,
         end_label: MarkerId, // Must come after
     },
 
-    UnkCmdFF {
-        // mode 1: sets effect idx arg1's channel delay to arg2
-        // mode 2: resets unk_174 (cmdListPress override data) for id arg1 and sets channel unk_211 (idx of override
-        // for mode 3)=arg1
-        // mode 3: pushes a cmdListPress command arg1,arg2. if arg1<40 then it looks up opcode in D_80078558
-        // mode 4: use override idx arg1
-        // mode 5: sets bgmSounds[*].unk_0 = arg1
+    /// Delays one stereo channel of effect slot `index`'s bus. `delay` bits 0-3 are the delay time, and bit 4 chooses
+    /// the right channel rather than the left. A `delay` of 0 turns the delay off.
+    StereoDelay {
+        index: u8,
+        delay: u8,
+    },
 
-        // mode 6 is for proximity fade, e.g. the tunnel pipe in toad town
-        // mode 6 arg1==0: for all tracks, fades vol to its unk_4F or unk_50 (former if proxMixVolume==127)
-        // mode 6 arg1!=0: sets this track's unk_4F=arg1 and unk_50=arg2
-        // see also MonitorMusicProximityTrigger api func
-        unk_00: u8, // mode
-        unk_01: u8,
-        unk_02: u8,
+    /// Clears custom envelope `index`, from 1 to 8, and makes it the one that
+    /// [WriteCustomEnvelope](Command::WriteCustomEnvelope) writes to. Other values stop writing.
+    SeekCustomEnvelope {
+        index: u8,
+    },
+
+    /// Appends a step to the custom envelope being written. A `time` below 40 is an index into the engine's table of
+    /// step durations, and the step moves to `value`. Otherwise `time` is an envelope command, such as 0xFC to start a
+    /// loop, with `value` as its argument.
+    WriteCustomEnvelope {
+        time: u8,
+        value: u8,
+    },
+
+    /// Uses custom envelope `index`, from 1 to 8, when this track presses a note. 0 uses the instrument's envelope.
+    UseCustomEnvelope {
+        index: u8,
+    },
+
+    /// Plays sound effect `sound` from the song's sound list.
+    TriggerSound {
+        sound: u8,
+    },
+
+    /// Sets the volumes this track fades to when the proximity mix is applied: `volume1` when the mix volume is 127,
+    /// and `volume2` otherwise. If `volume1` is 0, fades every track to its volumes instead.
+    ProxMixOverride {
+        volume1: u8,
+        volume2: u8,
     },
 
     /// Markers don't actually exist in the BGM binary format (rather, it uses command offsets); we use this
@@ -782,6 +873,15 @@ pub enum Command {
     Marker {
         label: MarkerId,
     },
+}
+
+/// Accepts values saved before these fields were signed, when they were stored as 0 to 255.
+fn de_i8_or_u8<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<i8, D::Error> {
+    use serde::Deserialize;
+    let value = i16::deserialize(deserializer)?;
+    i8::try_from(value)
+        .or_else(|_| u8::try_from(value).map(|value| value as i8))
+        .map_err(serde::de::Error::custom)
 }
 
 use Command::Delay;
@@ -843,6 +943,15 @@ impl From<Command> for Event {
     fn from(command: Command) -> Event {
         Event { id: gen_id(), command }
     }
+}
+
+/// A command the game plays, and when. See [CommandSeq::playback].
+#[derive(Debug, Clone, Copy)]
+pub struct PlayedEvent<'a> {
+    pub time: usize,
+    pub event: &'a Event,
+    /// Whether a [detour](Command::Detour) plays this command.
+    pub in_detour: bool,
 }
 
 #[derive(Clone)]
@@ -998,6 +1107,65 @@ mod test {
         ]
         .into();
         assert_eq!(seq.max_polyphony(), 1);
+    }
+
+    #[test]
+    fn playback_follows_detours() {
+        let note = |pitch| Command::Note {
+            pitch,
+            velocity: 100,
+            length: 5,
+        };
+        let seq = CommandSeq::from(vec![
+            note(1),
+            Command::Delay(10),
+            Command::Detour {
+                start_label: "A".to_string(),
+                end_label: "B".to_string(),
+            },
+            note(3),
+            Command::End,
+            Command::Marker { label: "A".to_string() },
+            note(2),
+            Command::Delay(20),
+            Command::Marker { label: "B".to_string() },
+        ]);
+
+        let notes: Vec<(usize, u8, bool)> = seq
+            .playback(&BTreeMap::new())
+            .into_iter()
+            .filter_map(|played| match played.event.command {
+                Command::Note { pitch, .. } => Some((played.time, pitch, played.in_detour)),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(notes, vec![(0, 1, false), (10, 2, true), (30, 3, false)]);
+    }
+
+    #[test]
+    fn deserialize_previous_names() {
+        let commands: Vec<Command> = ron::from_str(
+            "[MasterPitchShift(cent: 254), UnkCmdE3(effect_type: 1), SubTrackCoarseTune(244), \
+             TrackTremolo(amount: 1, speed: 2, time: 3), TrackTremoloTime(time: 4), UnkCmdF4(pan0: 5, pan1: 6)]",
+        )
+        .unwrap();
+
+        assert_eq!(
+            commands,
+            vec![
+                Command::MasterPitchShift { semitones: -2 },
+                Command::BusEffect { effect_type: 1 },
+                Command::SubTrackCoarseTune(-12),
+                Command::TrackTremolo {
+                    delay: 1,
+                    speed: 2,
+                    depth: 3,
+                },
+                Command::TrackTremoloDepth { depth: 4 },
+                Command::SubTrackRandomPan { pan: 5, amount: 6 },
+            ]
+        );
     }
 
     #[test]

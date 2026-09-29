@@ -210,6 +210,7 @@ fn midi_track_to_bgm_track(
                 polyphony: Polyphony::Automatic,
                 is_drum_track: false,
                 commands: CommandSeq::new(),
+                pos: None,
             };
 
             let voice_idx = instruments.len();
@@ -351,9 +352,9 @@ fn midi_track_to_bgm_track(
                                         track.commands.insert_end(
                                             time_cvt,
                                             Command::TrackTremolo {
-                                                amount: 8,
+                                                delay: 8,
                                                 speed: value,
-                                                time: 8,
+                                                depth: 8,
                                             },
                                         );
                                     }

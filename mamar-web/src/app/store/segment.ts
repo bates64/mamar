@@ -33,10 +33,10 @@ export function getSegmentId(segment: Segment): number | undefined {
         return segment.Wait.id
     } else if ("EndLoop" in segment) {
         return segment.EndLoop.id
-    } else if ("Unknown6" in segment) {
-        return segment.Unknown6.id
-    } else if ("Unknown7" in segment) {
-        return segment.Unknown7.id
+    } else if ("EndCondLoopFalse" in segment) {
+        return segment.EndCondLoopFalse.id
+    } else if ("EndCondLoopTrue" in segment) {
+        return segment.EndCondLoopTrue.id
     }
 }
 

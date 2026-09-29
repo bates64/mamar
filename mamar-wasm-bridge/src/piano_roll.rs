@@ -1,4 +1,5 @@
-use pm64::bgm::{Command, Track};
+use pm64::bgm::{Branch, BranchId, Command, Track};
+use std::collections::BTreeMap;
 use std::f64;
 use wasm_bindgen::prelude::*;
 
@@ -18,6 +19,7 @@ pub struct PianoRoll {
 
     // state
     track: Track,
+    branches: BTreeMap<BranchId, Branch>,
 }
 
 #[wasm_bindgen]
@@ -30,11 +32,13 @@ impl PianoRoll {
             dpr: 1.0,
             scroll_ticks: 0.0,
             track: Track::default(),
+            branches: BTreeMap::new(),
         }
     }
 
-    pub fn set_track(&mut self, track: &JsValue) {
+    pub fn set_track(&mut self, track: &JsValue, branches: &JsValue) {
         self.track = crate::from_js(track);
+        self.branches = crate::from_js(branches);
     }
 
     pub fn set_viewport(&mut self, width_css_px: f64, height_css_px: f64, dpr: f64) {
@@ -94,12 +98,42 @@ impl PianoRoll {
             self.beat_width() * 4.0,
         );
 
-        // notes
+        let played = self.track.commands.playback(&self.branches);
+
+        // Mark where branches play, because their notes aren't drawn
+        ctx.set_fill_style_str("rgb(249 226 175 / 8%)"); // Catppuccin Mocha yellow
+        for event in &played {
+            if let Command::Branch { branch } = event.event.command {
+                let length = self.branches.get(&branch).map_or(0, Branch::len_time);
+                self.draw_span(ctx, event.time, event.time + length, 0.0, self.vh);
+            }
+        }
+
+        // Mark where detours play along the top
+        ctx.set_fill_style_str("#cba6f7"); // Catppuccin Mocha mauve
+        let mut detour_start = None;
+        for (index, event) in played.iter().enumerate() {
+            if event.in_detour && detour_start.is_none() {
+                detour_start = Some(event.time);
+            }
+            let detour_ends = played.get(index + 1).is_none_or(|next| !next.in_detour);
+            if let (Some(start), true) = (detour_start, detour_ends) {
+                let end = event.time
+                    + match event.event.command {
+                        Command::Delay(delay) => delay,
+                        _ => 0,
+                    };
+                self.draw_span(ctx, start, end, 0.0, 3.0);
+                detour_start = None;
+            }
+        }
+
+        // notes, where notes that detours play are copies of the notes they detour to
         ctx.set_stroke_style_str("#1d80f5");
         ctx.set_fill_style_str("#066ce7");
-        for (time, event) in self.track.commands.iter_time() {
-            if let Command::Note { pitch, length, .. } = event.command {
-                let x = self.time_to_x(time as f64);
+        for event in &played {
+            if let Command::Note { pitch, length, .. } = event.event.command {
+                let x = self.time_to_x(event.time as f64);
                 let Some(y) = self.pitch_to_y(pitch) else { continue };
                 let w = self.time_to_x(length as f64);
                 let h = self.note_height();
@@ -109,6 +143,9 @@ impl PianoRoll {
                 }
 
                 ctx.save();
+                if event.in_detour {
+                    ctx.set_global_alpha(0.5);
+                }
 
                 ctx.begin_path();
                 let _ = ctx.round_rect_with_f64(x, y, w, h, 1.0);
@@ -124,6 +161,12 @@ impl PianoRoll {
 
         ctx.restore();
         Ok(())
+    }
+
+    fn draw_span(&self, ctx: &web_sys::CanvasRenderingContext2d, start: usize, end: usize, y: f64, h: f64) {
+        let x = self.time_to_x(start as f64);
+        let w = self.time_to_x(end as f64) - x;
+        ctx.fill_rect(x, y, w, h);
     }
 
     fn time_to_x(&self, time: f64) -> f64 {
