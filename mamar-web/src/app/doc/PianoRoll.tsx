@@ -1,13 +1,15 @@
 import { type Bgm, type Event, type Track } from "pm64-typegen"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useContext, useEffect, useMemo, useRef, useState } from "react"
 import { getUntrackedObject } from "react-tracked"
 
 import { timeline } from "./lanes"
+import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
 import { useSnap } from "./snap"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
 import { alternatePartOf } from "../store/bgm"
+import { useSelectedIds } from "../store/doc"
 import { useSize } from "../util/hooks/useSize"
 
 /** Height of a note's row, in CSS pixels. Matches the renderer. */
@@ -24,9 +26,11 @@ const DEFAULT_VELOCITY = 100
 export interface Props {
     trackListId: number
     trackIndex: number
+    /** Where the segment starts on the timeline. */
+    segmentStart: number
 }
 
-export default function PianoRoll({ trackListId, trackIndex }: Props) {
+export default function PianoRoll({ trackListId, trackIndex, segmentStart }: Props) {
     const [bgm] = useBgm()
     const [location] = useLocation()
     const trackList = bgm?.track_lists[trackListId]
@@ -45,6 +49,7 @@ export default function PianoRoll({ trackListId, trackIndex }: Props) {
         branches={bgm.branches}
         mix={location.mix}
         behind={behind}
+        segmentStart={segmentStart}
     />
 }
 
@@ -53,36 +58,54 @@ interface NoteAt {
     time: number
 }
 
-interface Drag {
-    note: NoteAt
+type Drag = {
     mode: "move" | "resize"
+    /** The note the drag started on, which the others follow. */
+    note: NoteAt
     startX: number
     startY: number
+    /** How far the notes move in time and pitch, or how much longer they get. */
     time: number
     pitch: number
     length: number
+} | {
+    mode: "select"
+    startX: number
+    startY: number
+    x: number
+    y: number
+    /** Whether the notes in the box are added to the selection, rather than replacing it. */
+    add: boolean
 }
 
+/** Notes copied from a track, relative to the first one's time. */
+let clipboard: { offset: number, pitch: number, velocity: number, length: number }[] = []
+
 /**
- * Draws the track's notes. Click empty space to add a note, click a note to select it, drag it to move it or its end to
- * resize it, and double-click it or press Delete to delete it. Notes snap to the grid unless Shift is held.
+ * Draws the track's notes and edits them. Double-click empty space to add a note. Click a note to select it, Shift-click
+ * to add it to the selection, or drag across empty space to select the notes in a box. Drag selected notes to move them,
+ * or their ends to resize them. Delete removes the selected notes, Q snaps them to the grid, and the usual shortcuts
+ * copy, paste, duplicate, and select all. Notes snap to the grid unless Shift is held.
  */
-function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
+function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segmentStart }: {
     trackListId: number
     trackIndex: number
     track: Track
     branches: Bgm["branches"]
     mix: number
     behind: Track | null
+    /** Where the segment starts on the timeline, for pasting at the playback start point. */
+    segmentStart: number
 }) {
     const canvas = useSize<HTMLCanvasElement>()
     const containerRef = useRef<HTMLDivElement | null>(null)
     type Renderer = InstanceType<typeof Bridge.PianoRoll>
     const rendererRef = useRef<Renderer | null>(null)
     const rafRef = useRef<number>(0)
-    const [doc, docDispatch] = useDoc()
+    const [, docDispatch] = useDoc()
     const [, dispatch] = useBgm()
     const [, snap, grid] = useSnap()
+    const playhead = useContext(PLAYHEAD_CONTEXT)
     const [drag, setDrag] = useState<Drag | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
 
@@ -90,23 +113,38 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
         () => timeline(track.commands).filter((played): played is NoteAt => "Note" in played.event),
         [track.commands],
     )
-    const selection = doc?.selection
-    const selectedId = selection?.trackList === trackListId && selection.track === trackIndex ? selection.event : undefined
-    const selectedNote = notes.find(note => note.event.id === selectedId)
+    const selectedIds = useSelectedIds(trackListId, trackIndex)
+    const selectedNotes = notes.filter(note => selectedIds.includes(note.event.id))
+    const select = (ids: number[]) => docDispatch({ type: "set_selection", selection: ids.length > 0 ? { ...target, events: ids } : null })
 
     const zoom = () => parseFloat(getComputedStyle(canvas.ref.current!).getPropertyValue("--ruler-zoom")) || 2
+    const pitchAt = (y: number) => HIGHEST_PITCH - Math.floor(y / NOTE_HEIGHT)
     const noteAt = (x: number, y: number) => {
         const ticks = x * zoom()
-        const pitch = HIGHEST_PITCH - Math.floor(y / NOTE_HEIGHT)
+        const pitch = pitchAt(y)
         return [...notes].reverse().find(note => note.event.Note.pitch === pitch &&
             ticks >= note.time && ticks <= note.time + Math.max(note.event.Note.length, RESIZE_EDGE * zoom()))
     }
-    const deleteNote = (note: NoteAt) => {
-        const index = Bridge.commands_without_detours(track.commands).findIndex((event: Event) => event.id === note.event.id)
-        if (index >= 0) {
-            dispatch({ type: "delete_track_command", ...target, index })
-            docDispatch({ type: "set_selection", selection: null })
-        }
+    const localPoint = (event: React.PointerEvent | React.MouseEvent) => {
+        const rect = canvas.ref.current!.getBoundingClientRect()
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+    }
+    const noteCommand = (note: NoteAt, changes: Partial<NoteAt["event"]["Note"]>) => ({ Note: { ...note.event.Note, ...changes } })
+
+    const deleteNotes = (ids: number[]) => {
+        dispatch({ type: "delete_track_commands", ...target, ids })
+        select([])
+    }
+    const paste = (time: number, copied = clipboard) => {
+        dispatch({
+            type: "insert_track_commands",
+            ...target,
+            inserts: copied.map(({ offset, ...note }) => ({ time: time + offset, command: { Note: note } })),
+        })
+    }
+    const copy = (copied: NoteAt[]) => {
+        const start = Math.min(...copied.map(note => note.time))
+        return copied.map(note => ({ ...note.event.Note, offset: note.time - start }))
     }
 
     // init once (after canvas exists)
@@ -157,9 +195,10 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
         rendererRef.current?.set_track(untracked(track), untracked(branches), mix, untracked(behind))
     }, [track, branches, mix, behind])
 
+    const selectedKey = selectedIds.join()
     useEffect(() => {
-        rendererRef.current?.set_selection(new Uint32Array(selectedId !== undefined ? [selectedId] : []))
-    }, [selectedId])
+        rendererRef.current?.set_selection(new Uint32Array(selectedKey ? selectedKey.split(",").map(Number) : []))
+    }, [selectedKey])
 
     // Centre on the notes when a track opens, but not when it's edited
     useEffect(() => {
@@ -171,13 +210,19 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [trackListId, trackIndex])
 
-    const previewStyle = (d: Drag): React.CSSProperties => {
+    // Where the dragged notes would go, as boxes over the canvas
+    const previews: React.CSSProperties[] = []
+    if (drag && drag.mode !== "select") {
         const z = zoom()
-        return {
-            left: d.time / z,
-            top: (HIGHEST_PITCH - d.pitch) * NOTE_HEIGHT,
-            width: Math.max(2, d.length / z),
-            height: NOTE_HEIGHT,
+        for (const note of selectedNotes) {
+            const time = note.time + drag.time
+            const length = Math.max(1, note.event.Note.length + drag.length)
+            previews.push({
+                left: time / z,
+                top: (HIGHEST_PITCH - Math.min(HIGHEST_PITCH, Math.max(0, note.event.Note.pitch + drag.pitch))) * NOTE_HEIGHT,
+                width: Math.max(2, length / z),
+                height: NOTE_HEIGHT,
+            })
         }
     }
 
@@ -186,95 +231,160 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind }: {
         tabIndex={0}
         style={{ position: "relative", outline: "none" }}
         onKeyDown={event => {
-            if ((event.key === "Delete" || event.key === "Backspace") && selectedNote) {
-                deleteNote(selectedNote)
-                event.preventDefault()
+            const command = event.metaKey || event.ctrlKey
+            if (event.key === "Delete" || event.key === "Backspace") {
+                if (selectedNotes.length > 0) {
+                    deleteNotes(selectedNotes.map(note => note.event.id))
+                }
+            } else if (command && event.key === "a") {
+                select(notes.map(note => note.event.id))
+            } else if (command && event.key === "c") {
+                if (selectedNotes.length > 0) {
+                    clipboard = copy(selectedNotes)
+                }
+            } else if (command && event.key === "v") {
+                const start = (playhead?.start ?? segmentStart) - segmentStart
+                paste(Math.max(0, start))
+            } else if (command && event.key === "d") {
+                if (selectedNotes.length > 0) {
+                    const end = Math.max(...selectedNotes.map(note => note.time + note.event.Note.length))
+                    paste(end, copy(selectedNotes))
+                }
+            } else if (!command && event.key === "q") {
+                dispatch({
+                    type: "place_track_commands",
+                    ...target,
+                    places: selectedNotes.map(note => ({ id: note.event.id, time: snap(note.time), command: noteCommand(note, {}) })),
+                })
+            } else {
+                return
             }
+            event.preventDefault()
         }}
     >
         <canvas
             ref={canvas.ref}
             style={{ width: "100%", height: "100%", display: "block", touchAction: "none", cursor: "crosshair" }}
-            title="Click to add a note. Drag a note to move it, or its end to resize it. Double-click a note, or select it and press Delete, to delete it. Hold Shift to place freely."
+            title="Double-click to add a note. Click a note to select it, or drag across notes to select them. Drag selected notes to move them, or their ends to resize them. Press Delete to delete them, or Q to snap them to the grid. Hold Shift to place freely."
             data-no-drag-scroll
             onPointerDown={event => {
                 if (event.button !== 0) return
-                const x = event.nativeEvent.offsetX
-                const y = event.nativeEvent.offsetY
+                containerRef.current!.focus()
+                event.currentTarget.setPointerCapture(event.pointerId)
+                const { x, y } = localPoint(event)
                 const note = noteAt(x, y)
-                if (note) {
-                    docDispatch({ type: "set_selection", selection: { ...target, event: note.event.id } })
-                    const end = (note.time + note.event.Note.length) / zoom()
-                    event.currentTarget.setPointerCapture(event.pointerId)
-                    setDrag({
-                        note,
-                        mode: end - x <= RESIZE_EDGE ? "resize" : "move",
-                        startX: event.clientX,
-                        startY: event.clientY,
-                        time: note.time,
-                        pitch: note.event.Note.pitch,
-                        length: note.event.Note.length,
-                    })
-                } else {
-                    const pitch = HIGHEST_PITCH - Math.floor(y / NOTE_HEIGHT)
-                    dispatch({
-                        type: "insert_track_command",
-                        ...target,
-                        time: snap(x * zoom(), event.shiftKey),
-                        command: {
-                            Note: {
-                                pitch,
-                                velocity: selectedNote?.event.Note.velocity ?? DEFAULT_VELOCITY,
-                                length: selectedNote?.event.Note.length ?? grid,
-                            },
-                        },
-                    })
+                if (!note) {
+                    setDrag({ mode: "select", startX: x, startY: y, x, y, add: event.shiftKey })
+                    return
                 }
+                if (event.shiftKey) {
+                    const ids = selectedIds.includes(note.event.id)
+                        ? selectedIds.filter(id => id !== note.event.id)
+                        : [...selectedIds, note.event.id]
+                    select(ids)
+                    return
+                }
+                if (!selectedIds.includes(note.event.id)) {
+                    select([note.event.id])
+                }
+                const end = (note.time + note.event.Note.length) / zoom()
+                setDrag({
+                    mode: end - x <= RESIZE_EDGE ? "resize" : "move",
+                    note,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    time: 0,
+                    pitch: 0,
+                    length: 0,
+                })
             }}
             onPointerMove={event => {
                 if (!drag) return
+                if (drag.mode === "select") {
+                    const { x, y } = localPoint(event)
+                    setDrag({ ...drag, x, y })
+                    return
+                }
                 const dx = (event.clientX - drag.startX) * zoom()
                 const dy = event.clientY - drag.startY
                 if (drag.mode === "move") {
                     setDrag({
                         ...drag,
-                        time: snap(drag.note.time + dx, event.shiftKey),
-                        pitch: Math.min(HIGHEST_PITCH, Math.max(0, drag.note.event.Note.pitch - Math.round(dy / NOTE_HEIGHT))),
+                        time: Math.max(-Math.min(...selectedNotes.map(note => note.time)), snap(drag.note.time + dx, event.shiftKey) - drag.note.time),
+                        pitch: -Math.round(dy / NOTE_HEIGHT),
                     })
                 } else {
                     const end = snap(drag.note.time + drag.note.event.Note.length + dx, event.shiftKey)
-                    setDrag({ ...drag, length: Math.max(1, end - drag.note.time) })
+                    setDrag({ ...drag, length: Math.max(1, end - drag.note.time) - drag.note.event.Note.length })
                 }
             }}
             onPointerUp={() => {
                 if (!drag) return
-                const { note } = drag
-                if (drag.time !== note.time || drag.pitch !== note.event.Note.pitch || drag.length !== note.event.Note.length) {
+                if (drag.mode === "select") {
+                    const z = zoom()
+                    const [left, right] = [Math.min(drag.startX, drag.x) * z, Math.max(drag.startX, drag.x) * z]
+                    const [top, bottom] = [pitchAt(Math.min(drag.startY, drag.y)), pitchAt(Math.max(drag.startY, drag.y))]
+                    const boxed = notes.filter(note => note.time <= right && note.time + note.event.Note.length >= left &&
+                        note.event.Note.pitch <= top && note.event.Note.pitch >= bottom).map(note => note.event.id)
+                    select(drag.add ? [...new Set([...selectedIds, ...boxed])] : boxed)
+                } else if (drag.time !== 0 || drag.pitch !== 0 || drag.length !== 0) {
                     dispatch({
-                        type: "place_track_command",
+                        type: "place_track_commands",
                         ...target,
-                        id: note.event.id,
-                        time: drag.time,
-                        command: { Note: { ...note.event.Note, pitch: drag.pitch, length: drag.length } },
+                        places: selectedNotes.map(note => ({
+                            id: note.event.id,
+                            time: note.time + drag.time,
+                            command: noteCommand(note, {
+                                pitch: Math.min(HIGHEST_PITCH, Math.max(0, note.event.Note.pitch + drag.pitch)),
+                                length: Math.max(1, note.event.Note.length + drag.length),
+                            }),
+                        })),
                     })
                 }
                 setDrag(null)
             }}
             onDoubleClick={event => {
-                const note = noteAt(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
+                const { x, y } = localPoint(event)
+                const note = noteAt(x, y)
                 if (note) {
-                    deleteNote(note)
+                    deleteNotes([note.event.id])
+                    return
                 }
+                dispatch({
+                    type: "insert_track_command",
+                    ...target,
+                    time: snap(x * zoom(), event.shiftKey),
+                    command: {
+                        Note: {
+                            pitch: pitchAt(y),
+                            velocity: selectedNotes[0]?.event.Note.velocity ?? DEFAULT_VELOCITY,
+                            length: selectedNotes[0]?.event.Note.length ?? grid,
+                        },
+                    },
+                })
             }}
         />
-        {drag && <div
+        {previews.map((style, i) => <div
+            key={i}
             style={{
                 position: "absolute",
                 boxSizing: "border-box",
                 border: "1px dashed #f9e2af",
                 borderRadius: 2,
                 pointerEvents: "none",
-                ...previewStyle(drag),
+                ...style,
+            }}
+        />)}
+        {drag?.mode === "select" && <div
+            style={{
+                position: "absolute",
+                left: Math.min(drag.startX, drag.x),
+                top: Math.min(drag.startY, drag.y),
+                width: Math.abs(drag.x - drag.startX),
+                height: Math.abs(drag.y - drag.startY),
+                border: "1px solid #f9e2af",
+                background: "rgb(249 226 175 / 12%)",
+                pointerEvents: "none",
             }}
         />}
     </div>

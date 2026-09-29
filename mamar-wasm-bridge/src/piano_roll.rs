@@ -128,7 +128,7 @@ impl PianoRoll {
 
         if let Some(behind) = &self.behind {
             ctx.set_stroke_style_str("rgb(29 128 245 / 45%)");
-            for (time, pitch, length, _) in self.notes(behind) {
+            for (time, pitch, length, _, _) in self.notes(behind) {
                 self.draw_note(ctx, time, pitch, length, false);
             }
         }
@@ -151,13 +151,16 @@ impl PianoRoll {
 
         ctx.set_stroke_style_str("#1d80f5");
         ctx.set_fill_style_str("#066ce7");
-        for (time, pitch, length, id) in self.notes(&self.track) {
+        for (time, pitch, length, velocity, id) in self.notes(&self.track) {
             let selected = id.is_some_and(|id| self.selection.contains(&id));
             if selected {
                 ctx.set_fill_style_str("#f9e2af"); // Catppuccin Mocha yellow
                 ctx.set_stroke_style_str("#fab387"); // Catppuccin Mocha peach
             }
+            // Quieter notes are fainter
+            ctx.set_global_alpha(0.35 + 0.65 * (velocity.min(127) as f64 / 127.0));
             self.draw_note(ctx, time, pitch, length, true);
+            ctx.set_global_alpha(1.0);
             if selected {
                 ctx.set_stroke_style_str("#1d80f5");
                 ctx.set_fill_style_str("#066ce7");
@@ -168,13 +171,17 @@ impl PianoRoll {
         Ok(())
     }
 
-    /// The notes `track` plays, as (time, pitch, length, ID), with each branch playing the option for the current mix.
-    /// Notes in branches have no ID, as they aren't the track's own.
-    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16, Option<u32>)> {
+    /// The notes `track` plays, as (time, pitch, length, velocity, ID), with each branch playing the option for the
+    /// current mix. Notes in branches have no ID, as they aren't the track's own.
+    fn notes(&self, track: &Track) -> Vec<(usize, u8, u16, u8, Option<u32>)> {
         let mut notes = Vec::new();
         for (time, event) in track.commands.playback(&self.branches) {
             match event.command {
-                Command::Note { pitch, length, .. } => notes.push((time, pitch, length, Some(event.id))),
+                Command::Note {
+                    pitch,
+                    length,
+                    velocity,
+                } => notes.push((time, pitch, length, velocity, Some(event.id))),
                 Command::Branch { branch } => {
                     let Some(branch) = self.branches.get(&branch) else {
                         continue;
@@ -184,8 +191,13 @@ impl PianoRoll {
                         .map(|option| option.commands.playback(&self.branches))
                         .unwrap_or_default()
                     {
-                        if let Command::Note { pitch, length, .. } = event.command {
-                            notes.push((time + offset, pitch, length, None));
+                        if let Command::Note {
+                            pitch,
+                            length,
+                            velocity,
+                        } = event.command
+                        {
+                            notes.push((time + offset, pitch, length, velocity, None));
                         }
                     }
                 }

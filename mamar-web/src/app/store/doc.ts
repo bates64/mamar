@@ -39,12 +39,12 @@ export type Snap = "bar" | "beat" | "eighth" | "sixteenth" | "off"
 
 export const DEFAULT_SNAP: Snap = "eighth"
 
-/** A command selected for editing. */
+/** Commands selected in one track. */
 export interface Selection {
     trackList: number
     track: number
-    /** The event's ID, in the track's commands with detours written out. */
-    event: number
+    /** The events' IDs, in the track's commands with detours written out. */
+    events: number[]
 }
 
 export interface Doc {
@@ -135,6 +135,13 @@ export function docReducer(state: Doc, action: DocAction): Doc {
             location: { ...(state.location ?? DEFAULT_LOCATION), ...action.location },
         }
     }
+}
+
+/** IDs of the selected events in track `trackIndex` of track list `trackListId`. */
+export const useSelectedIds = (trackListId: number, trackIndex: number): number[] => {
+    const [doc] = useDoc()
+    const selection = doc?.selection
+    return selection?.trackList === trackListId && selection.track === trackIndex ? selection.events : []
 }
 
 export const useLocation = (): [Location, (location: Partial<Location>) => void] => {

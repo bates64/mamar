@@ -81,7 +81,11 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
         } as React.CSSProperties}>
             <div style={{ gridColumn: segmentIndex + 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-                    <PianoRoll trackListId={trackListId} trackIndex={trackIndex} />
+                    <PianoRoll
+                        trackListId={trackListId}
+                        trackIndex={trackIndex}
+                        segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
+                    />
                 </div>
                 <TrackLanes trackListId={trackListId} trackIndex={trackIndex} length={segmentLengths[segmentIndex] ?? 0} />
             </div>

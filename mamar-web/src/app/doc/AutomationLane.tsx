@@ -25,8 +25,8 @@ export interface Props {
     showName?: boolean
     /** Called when a point is clicked without dragging, to inspect it. */
     onSelect?(point: LanePoint): void
-    /** The ID of the selected event, if it's in this lane. */
-    selectedId?: number
+    /** IDs of the selected events. */
+    selectedIds?: number[]
 }
 
 interface Drag {
@@ -45,7 +45,7 @@ interface Drag {
  * the grid unless Shift is held.
  */
 export default function AutomationLane({
-    kind, length, points, initial, onAdd, onChange, onMove, onDelete, onToggleFade, showName = true, onSelect, selectedId,
+    kind, length, points, initial, onAdd, onChange, onMove, onDelete, onToggleFade, showName = true, onSelect, selectedIds = [],
 }: Props) {
     const ref = useRef<HTMLDivElement>(null)
     const [dragging, setDragging] = useState<Drag | null>(null)
@@ -122,7 +122,7 @@ export default function AutomationLane({
             key={point.event.id}
             className={styles.point}
             data-fade={point.fade !== undefined}
-            data-selected={point.event.id === selectedId}
+            data-selected={selectedIds.includes(point.event.id)}
             style={{
                 left: leftOf(point.time + (point.fade ?? 0)),
                 top: kind.display === "line" ? `${yOf(point.value)}%` : "50%",

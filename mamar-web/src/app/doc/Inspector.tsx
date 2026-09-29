@@ -19,7 +19,8 @@ export default function Inspector({ trackListId, trackIndex }: { trackListId: nu
     if (!commands || selection?.trackList !== trackListId || selection.track !== trackIndex) {
         return null
     }
-    const selected = played.find(({ event }) => event.id === selection.event)
+    // One command at a time
+    const selected = selection.events.length === 1 ? played.find(({ event }) => event.id === selection.events[0]) : undefined
     if (!selected) {
         return null
     }

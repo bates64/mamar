@@ -5,6 +5,7 @@ import { LaneKind, lanePoints, LanePoint, timeline } from "./lanes"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc } from "../store"
+import { useSelectedIds } from "../store/doc"
 
 /** `command` as an event with ID `id`. Commands without fields, like "End", are keys whose value is null in events. */
 export function toEvent(command: Command, id: number): Event {
@@ -16,12 +17,12 @@ export default function useLaneEditing(
     trackListId: number,
     trackIndex: number,
     kind: LaneKind,
-): Pick<LaneProps, "onAdd" | "onChange" | "onMove" | "onDelete" | "onToggleFade" | "onSelect" | "selectedId"> {
+): Pick<LaneProps, "onAdd" | "onChange" | "onMove" | "onDelete" | "onToggleFade" | "onSelect" | "selectedIds"> {
     const [bgm, dispatch] = useBgm()
-    const [doc, docDispatch] = useDoc()
+    const [, docDispatch] = useDoc()
+    const selectedIds = useSelectedIds(trackListId, trackIndex)
     const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands ?? []
     const target = { trackList: trackListId, track: trackIndex }
-    const selection = doc?.selection
     const commandOf = (point: LanePoint, value: number) => {
         const current = point.event as unknown as Record<string, unknown>
         if (point.fade !== undefined && kind.fade) {
@@ -75,7 +76,7 @@ export default function useLaneEditing(
                 }
             }
         }),
-        onSelect: point => docDispatch({ type: "set_selection", selection: { ...target, event: point.event.id } }),
-        selectedId: selection?.trackList === trackListId && selection.track === trackIndex ? selection.event : undefined,
+        onSelect: point => docDispatch({ type: "set_selection", selection: { ...target, events: [point.event.id] } }),
+        selectedIds,
     }
 }

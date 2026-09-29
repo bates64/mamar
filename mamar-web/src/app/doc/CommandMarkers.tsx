@@ -8,6 +8,7 @@ import { useSnap } from "./snap"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc } from "../store"
+import { useSelectedIds } from "../store/doc"
 
 /** Pixels a marker moves before a drag moves it. */
 const DRAG_THRESHOLD = 4
@@ -28,7 +29,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
     children?: ReactNode
 }) {
     const [bgm, dispatch] = useBgm()
-    const [doc, docDispatch] = useDoc()
+    const [, docDispatch] = useDoc()
     const [, snap] = useSnap()
     const ref = useRef<HTMLDivElement>(null)
     const [drag, setDrag] = useState<{ id: number, startX: number, time: number, moved: boolean } | null>(null)
@@ -36,8 +37,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
     const [editing, setEditing] = useState<number | null>(null)
     const editingElement = useRef<HTMLElement | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
-    const selection = doc?.selection
-    const selectedId = selection?.trackList === trackListId && selection.track === trackIndex ? selection.event : undefined
+    const selectedIds = useSelectedIds(trackListId, trackIndex)
 
     const ticksAt = (clientX: number) => {
         const rect = ref.current!.getBoundingClientRect()
@@ -60,7 +60,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
             return <span
                 key={event.id}
                 className={styles.marker}
-                data-selected={event.id === selectedId}
+                data-selected={selectedIds.includes(event.id)}
                 style={{ left: `${(shownTime / length) * 100}%` }}
                 title="Click to edit, drag to move, double-click to delete"
                 onPointerDown={e => {
@@ -89,7 +89,7 @@ export default function CommandMarkers({ name, trackListId, trackIndex, length, 
                             command: (fields[variant] === null ? variant : { [variant]: fields[variant] }) as never,
                         })
                     } else if (!drag.moved) {
-                        docDispatch({ type: "set_selection", selection: { ...target, event: event.id } })
+                        docDispatch({ type: "set_selection", selection: { ...target, events: [event.id] } })
                         editingElement.current = e.currentTarget
                         setEditing(event.id)
                     }

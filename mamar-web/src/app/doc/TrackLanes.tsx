@@ -7,10 +7,12 @@ import CommandMarkers from "./CommandMarkers"
 import { LaneOption, useLaneShown } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, timeline, trackLanes } from "./lanes"
 import useLaneEditing from "./useLaneEditing"
+import VelocityLane from "./VelocityLane"
 
 import { useBgm } from "../store"
 
 const EVENTS_LANE = "events"
+const VELOCITY_LANE = "velocity"
 
 function isEvent(event: Event): boolean {
     return "EventTrigger" in event || "TriggerSound" in event
@@ -33,6 +35,7 @@ export function useTrackLanes(trackListId: number, trackIndex: number) {
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
     const events = played.filter(({ event }) => isEvent(event))
     const options: LaneOption[] = [
+        { key: VELOCITY_LANE, name: "Velocity", hasCommands: played.some(({ event }) => "Note" in event) },
         ...kinds.map(kind => ({ key: kind.key, name: kind.name, hasCommands: lanePoints(kind, played).length > 0 })),
         { key: EVENTS_LANE, name: "Events", hasCommands: events.length > 0 },
     ]
@@ -48,8 +51,10 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
 
     // Commands no lane is for, whether or not the lane is shown
     const others = played.filter(({ event }) => !isEvent(event) && !inLane(event, kinds))
-    const shownLanes = kinds.filter((_, i) => isShown(options[i]))
-    const showEvents = isShown(options[options.length - 1])
+    const option = (key: string) => options.find(o => o.key === key)!
+    const shownLanes = kinds.filter(kind => isShown(option(kind.key)))
+    const showVelocity = isShown(option(VELOCITY_LANE))
+    const showEvents = isShown(option(EVENTS_LANE))
 
     const add = (command: object) => {
         if (adding !== null) {
@@ -59,6 +64,9 @@ export default function TrackLanes({ trackListId, trackIndex, length }: { trackL
     }
 
     return <div>
+        {showVelocity && <div style={{ height: 50 }}>
+            <VelocityLane trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />
+        </div>}
         {shownLanes.map(kind => <div key={kind.key} style={{ height: kind.display === "line" ? 44 : 30 }}>
             <TrackLane kind={kind} trackListId={trackListId} trackIndex={trackIndex} length={length} played={played} />
         </div>)}

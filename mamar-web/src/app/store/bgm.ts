@@ -66,6 +66,23 @@ export type BgmAction = {
     time: number
     command: Command
 } | {
+    type: "place_track_commands"
+    trackList: number
+    track: number
+    /** Each event's ID, in the track's commands with detours written out, and where it goes. */
+    places: { id: number, time: number, command: Command }[]
+} | {
+    type: "insert_track_commands"
+    trackList: number
+    track: number
+    inserts: { time: number, command: Command }[]
+} | {
+    type: "delete_track_commands"
+    trackList: number
+    track: number
+    /** The events' IDs, in the track's commands with detours written out. */
+    ids: number[]
+} | {
     type: "add_alternate_part"
     trackLists: number[]
     track: number
@@ -197,6 +214,33 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             const track = draft.track_lists[action.trackList].tracks[action.track]
             editCommands(track)
             track.commands = Bridge.commands_place(current(track).commands, action.id, action.time, action.command)
+        })
+    case "place_track_commands":
+        return produce(bgm, draft => {
+            const track = draft.track_lists[action.trackList].tracks[action.track]
+            editCommands(track)
+            let commands = current(track).commands
+            for (const { id, time, command } of action.places) {
+                commands = Bridge.commands_place(commands, id, time, command)
+            }
+            track.commands = commands
+        })
+    case "insert_track_commands":
+        return produce(bgm, draft => {
+            const track = draft.track_lists[action.trackList].tracks[action.track]
+            editCommands(track)
+            let commands = current(track).commands
+            for (const { time, command } of action.inserts) {
+                commands = Bridge.commands_insert(commands, time, command)
+            }
+            track.commands = commands
+        })
+    case "delete_track_commands":
+        return produce(bgm, draft => {
+            const track = draft.track_lists[action.trackList].tracks[action.track]
+            editCommands(track)
+            // Deleting a delay would move everything after it
+            track.commands = track.commands.filter(event => "Delay" in event || !action.ids.includes(event.id))
         })
     case "add_alternate_part":
         return produce(bgm, draft => {

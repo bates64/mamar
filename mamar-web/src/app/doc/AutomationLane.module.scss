@@ -137,3 +137,30 @@
     opacity: 0;
     pointer-events: none;
 }
+
+// A note's velocity, as a bar up from the bottom of the lane with a handle on top.
+.velocity {
+    position: absolute;
+    bottom: 0;
+    width: 3px;
+    margin-left: -1px;
+    background: var(--spectrum-blue-600);
+    cursor: ns-resize;
+    touch-action: none;
+
+    &::before {
+        content: "";
+        position: absolute;
+        top: -3px;
+        left: -2px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--spectrum-blue-700);
+    }
+
+    &[data-selected="true"],
+    &[data-selected="true"]::before {
+        background: var(--spectrum-yellow-400);
+    }
+}
