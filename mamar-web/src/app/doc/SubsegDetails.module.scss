@@ -8,8 +8,11 @@
     user-select: none;
 }
 
+// The region's name, as the heading of its settings
 .regionName {
-    margin: 0;
+    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: bold;
 }
 
 .warning {

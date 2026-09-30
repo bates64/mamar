@@ -5,6 +5,7 @@ import { getUntrackedObject } from "react-tracked"
 import { LaneKind, lanePoints, lastValue, timeline, trackLanes } from "./lanes"
 
 import Bridge from "../bridge"
+import * as instruments from "../instruments"
 import { useBgm, useLocation, useVariation } from "../store"
 import { branchesPlayedBy, playingTrack, variesByMix } from "../store/bgm"
 
@@ -124,4 +125,35 @@ export function useCarriedValues(mainIndex: number, segmentIndex: number): { val
         const patch = lastInstrument && "TrackOverridePatch" in lastInstrument ? lastInstrument.TrackOverridePatch : null
         return { values, patch }
     }, [bgm, segments, segmentIndex])
+}
+
+/**
+ * The name of the instrument track `mainIndex` plays its first note of segment `segmentIndex` with, from `commands`,
+ * its commands there, or what it has from earlier segments, without the pitch the instrument was recorded at, as
+ * Mamar treats an instrument's recordings as one. A track that plays drums, `isDrumTrack`, plays them whatever its
+ * instrument, so it's called Drums. Regions without names of their own are called this.
+ */
+export function useInstrumentName(commands: Event[] | undefined, isDrumTrack: boolean, mainIndex: number, segmentIndex: number): string | undefined {
+    const [bgm] = useBgm()
+    const played = useMixCommands(commands)
+    const carried = useCarriedValues(mainIndex, segmentIndex)
+
+    return useMemo(() => {
+        if (!bgm) return undefined
+        if (isDrumTrack) return "Drums"
+        const events = cachedTimeline(played ?? [])
+        const firstNote = events.find(({ event }) => "Note" in event)?.time ?? Infinity
+        const chosen = events.filter(({ time, event }) => time <= firstNote && ("SetTrackVoice" in event || "TrackOverridePatch" in event))
+        const last = chosen[chosen.length - 1]?.event
+        const carriedInstrument = carried.values.find(value => value.kind.key === "instrument")?.value
+        let patch: PatchAddress | undefined
+        if (last && "TrackOverridePatch" in last) {
+            patch = last.TrackOverridePatch
+        } else if (last && "SetTrackVoice" in last) {
+            patch = bgm.instruments[last.SetTrackVoice.index]?.patch
+        } else {
+            patch = carried.patch ?? (carriedInstrument !== undefined ? bgm.instruments[carriedInstrument]?.patch : undefined)
+        }
+        return patch && instruments.familyName(instruments.getName(patch))
+    }, [bgm, isDrumTrack, played, carried])
 }

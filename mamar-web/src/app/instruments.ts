@@ -447,3 +447,8 @@ export function getName({ bank_set, bank, instrument }: PatchAddress): string {
     const instrumentHex = instrument.toString(16).toUpperCase()
     return `[${bank_set} ${bankHex}/${instrumentHex}]`
 }
+
+/** An instrument's name without the pitch its sample was recorded at, which its recordings at other pitches share. */
+export function familyName(name: string): string {
+    return name.replace(/ [A-G]#?\d$/, "")
+}

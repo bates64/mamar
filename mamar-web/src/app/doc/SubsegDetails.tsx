@@ -1,15 +1,15 @@
-import { Grid, View, Form, Switch, Flex, TextField } from "@adobe/react-spectrum"
+import { Grid, View, Form, Switch, Flex } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
-import { useEffect, useId, useRef, useState } from "react"
-import { useDebounce } from "use-debounce"
+import { useEffect, useId, useRef } from "react"
 
+import EditableName from "./EditableName"
 import Inspector from "./Inspector"
 import PianoKeys, { DrumLabels } from "./PianoKeys"
 import PianoRoll from "./PianoRoll"
 import { usePitchLimits } from "./pitchLimit"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
-import { SegmentTrack, useSegmentTracks } from "./segmentTracks"
+import { SegmentTrack, useInstrumentName, useSegmentTracks } from "./segmentTracks"
 import { SegmentStart } from "./snap"
 import StartingValues from "./StartingValues"
 import styles from "./SubsegDetails.module.scss"
@@ -35,19 +35,12 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     const trackIndex = trackList ? playingTrack(trackList, mainIndex, location.alternateParts) : mainIndex
     const track = trackList?.tracks[trackIndex]
 
-    // Track name editing is debounced to prevent dispatch spam when typing
-    const [name, setName] = useState(track?.name)
-    const [debouncedName] = useDebounce(name, 500)
-    useEffect(() => {
-        if (track?.name !== debouncedName)
-            dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name: debouncedName })
-    }, [debouncedName, dispatch, trackIndex, trackListId, track?.name])
-
     const [showTracker, setShowTracker] = useState(true)
     const segmentLengths = useSegmentLengths()
     const segmentStart = segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)
     const segments = useSegmentTracks(mainIndex)
     const pitchLimits = usePitchLimits(trackListId, trackIndex, mainIndex, segmentIndex)
+    const instrumentName = useInstrumentName(track?.commands, track && bgm ? playsDrums(bgm, track, location.mix) : false, mainIndex, segmentIndex)
 
     if (!track || !bgm) {
         return <div>Track not found</div>
@@ -68,15 +61,16 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             borderEndWidth="thin"
             UNSAFE_className={styles.panel}
         >
-            <h3 id={hid} className={styles.regionName}>Region Settings</h3>
+            <EditableName
+                id={hid}
+                name={track.name ?? ""}
+                placeholder={instrumentName ?? "Unnamed region"}
+                label="Region"
+                className={styles.regionName}
+                onRename={name => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, name })}
+            />
             {/* Spectrum gives forms a minimum width wider than the panel */}
             <Form width="100%" UNSAFE_style={{ minWidth: 0 }} aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
-                <TextField
-                    width="100%"
-                    label="Name"
-                    value={name}
-                    onChange={setName}
-                />
                 <Flex wrap columnGap="size-200">
                     <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                     {trackIndex !== 0 && <Switch isSelected={isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}

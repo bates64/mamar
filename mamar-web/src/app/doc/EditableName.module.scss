@@ -1,0 +1,54 @@
+.head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+
+    // Renaming and deleting are offered on hover, so they don't crowd the names
+    &:hover .action,
+    .action:focus-visible {
+        opacity: 1;
+    }
+}
+
+.name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// Shown for an empty name
+.placeholder {
+    color: var(--spectrum-gray-600);
+    font-style: italic;
+}
+
+.action {
+    display: grid;
+    place-items: center;
+    flex: none;
+    padding: 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-700);
+    cursor: pointer;
+    opacity: 0;
+
+    &:hover {
+        background: var(--spectrum-gray-200);
+        color: var(--spectrum-gray-900);
+    }
+}
+
+// Edited in place, marked with an outline so the name keeps its size
+.renaming {
+    outline: 1px solid var(--spectrum-blue-700);
+    outline-offset: 2px;
+    border-radius: 2px;
+    text-overflow: clip;
+    cursor: text;
+}

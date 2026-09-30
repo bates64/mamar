@@ -2,13 +2,14 @@ import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import type { Event } from "pm64-typegen"
 import { useId, useDeferredValue, useMemo, memo, startTransition, useState } from "react"
-import { ChevronDown, ChevronRight, Edit2, Plus, Trash2 } from "react-feather"
+import { ChevronDown, ChevronRight, Plus } from "react-feather"
 
+import EditableName from "./EditableName"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths, useTicksPerBar } from "./Ruler"
 import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
-import { commandsForMix, commandsVaryByMix } from "./segmentTracks"
+import { commandsForMix, commandsVaryByMix, useInstrumentName } from "./segmentTracks"
 import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
@@ -17,7 +18,7 @@ import { MAX_VOICES, total, useVoices } from "./voices"
 import Bridge from "../bridge"
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useLocation, useRoot, useVariation } from "../store"
-import { ALTERNATE_PART_NAME, alternatePartOf, MAIN_PART_NAME, mixCount, mixName } from "../store/bgm"
+import { ALTERNATE_PART_NAME, alternatePartOf, MAIN_PART_NAME, mixCount, mixName, playsDrums } from "../store/bgm"
 import { getSegmentId } from "../store/segment"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
@@ -46,6 +47,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
         doc?.panelContent.track === trackIndex && location.alternateParts === isAlternatePart &&
         (mix === undefined || location.mix === mix)
     const nameId = useId()
+    const instrumentName = useInstrumentName(track?.commands, track && bgm ? playsDrums(bgm, track, mix ?? location.mix) : false, trackIndex, segmentIndex)
     const commands = useDeferredValue(track && bgm ? commandsForMix(track.commands, bgm.branches, mix ?? location.mix) : undefined)
 
     // Tracks that are alternate parts show in the rows under the tracks they're for
@@ -81,7 +83,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
         return <div
             tabIndex={0}
             aria-labelledby={isVersion ? undefined : nameId}
-            aria-label={isVersion ? track.name : undefined}
+            aria-label={isVersion ? track.name || instrumentName : undefined}
             className={classNames({
                 [styles.pianoRollThumbnail]: true,
                 [styles.drumRegion]: track.is_drum_track,
@@ -102,8 +104,9 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
         >
             {commands && <Thumbnail commands={commands} />}
             {/* A version's row is under the track's, which names the region */}
-            {!isVersion && <div id={nameId} className={styles.segmentName}>
-                {track.name}
+            {!isVersion && <div id={nameId} className={classNames(styles.segmentName, { [styles.instrumentName]: !track.name })}>
+                {/* A region without a name of its own is called after its instrument */}
+                {track.name || instrumentName}
             </div>}
         </div>
     }
@@ -187,60 +190,21 @@ type Row = { trackIndex: number } & (
     | { kind: "add" }
 )
 
-/**
- * A name for a version of a track. A mix can be renamed or deleted, which renames or deletes it across the song, as
- * each mix is one of the song's.
- */
+/** The name of a version of a track, under the track. See {@link EditableName}. */
 function VersionName({ name, isPlaying, onRename, onDelete }: {
     name: string
     isPlaying: boolean
     onRename?(name: string): void
     onDelete?(): void
 }) {
-    const [isRenaming, setIsRenaming] = useState(false)
-    if (isRenaming && onRename) {
-        return <input
-            className={styles.versionRename}
-            aria-label="Mix name"
-            defaultValue={name}
-            autoFocus
-            onClick={event => event.stopPropagation()}
-            onBlur={event => {
-                onRename(event.currentTarget.value)
-                setIsRenaming(false)
-            }}
-            onKeyDown={event => {
-                if (event.key === "Enter") {
-                    event.currentTarget.blur()
-                } else if (event.key === "Escape") {
-                    setIsRenaming(false)
-                }
-            }}
-        />
-    }
-    return <div className={styles.versionHead}>
-        <div className={classNames(styles.versionName, { [styles.playingVersion]: isPlaying })}>{name}</div>
-        {onRename && <button
-            className={styles.versionAction}
-            aria-label={`Rename ${name}`}
-            onClick={event => {
-                event.stopPropagation()
-                setIsRenaming(true)
-            }}
-        >
-            <Edit2 size={12} />
-        </button>}
-        {onDelete && <button
-            className={styles.versionAction}
-            aria-label={`Delete ${name}`}
-            onClick={event => {
-                event.stopPropagation()
-                onDelete()
-            }}
-        >
-            <Trash2 size={12} />
-        </button>}
-    </div>
+    return <EditableName
+        name={name}
+        label="Mix"
+        className={styles.versionHead}
+        nameClassName={classNames(styles.versionName, { [styles.playingVersion]: isPlaying })}
+        onRename={onRename}
+        onDelete={onDelete}
+    />
 }
 
 function Container() {

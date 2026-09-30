@@ -64,25 +64,20 @@ export function sampleOf(sbn: ArrayBuffer, patch: PatchAddress): Sample | null {
     return null
 }
 
-/** An instrument's name without the pitch its sample was recorded at, which its recordings at other pitches share. */
-function family(name: string): string {
-    return name.replace(/ [A-G]#?\d$/, "")
-}
-
 /**
  * The recordings of the same instrument as `patch`, including `patch`, with their samples, from the lowest to the
  * highest. Each plays a note at the same pitch, as its base key is the pitch it was recorded at.
  */
 export function recordingsOf(sbn: ArrayBuffer, patch: PatchAddress): { patch: PatchAddress, sample: Sample }[] {
     const name = instruments.getName(patch)
-    if (patch.bank_set !== "Music" || family(name) === name) {
+    if (patch.bank_set !== "Music" || instruments.familyName(name) === name) {
         const sample = sampleOf(sbn, patch)
         return sample ? [{ patch, sample }] : []
     }
     const recordings = []
     for (const category of instruments.categories) {
         for (const other of category.instruments) {
-            if (family(other.name) === family(name) && other.name !== family(other.name)) {
+            if (instruments.familyName(other.name) === instruments.familyName(name) && other.name !== instruments.familyName(other.name)) {
                 const otherPatch = { ...patch, bank: other.bank, instrument: other.instrument }
                 const sample = sampleOf(sbn, otherPatch)
                 if (sample) {
