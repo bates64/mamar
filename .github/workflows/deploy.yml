@@ -1,0 +1,37 @@
+name: Deploy
+
+# Deploys mamar-web to Vercel when main is pushed. Vercel's own builds can't build mamar-audio, which needs a
+# papermario-dx checkout and the flake's WebAssembly toolchain, so this builds the site here and uploads the output.
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  DX_DIR: papermario-dx
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: bates64/papermario-dx
+          ref: mamar-wasm
+          path: papermario-dx
+      - uses: cachix/install-nix-action@v31
+
+      - name: Install dependencies
+        run: nix develop --command yarn install --frozen-lockfile
+
+      - name: Build
+        run: |
+          nix develop --command npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          nix develop --command npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        run: nix develop --command npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
