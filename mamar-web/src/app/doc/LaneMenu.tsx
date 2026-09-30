@@ -16,15 +16,15 @@ export function useLaneShown(): (lane: LaneOption) => boolean {
     return lane => doc?.shownLanes?.[lane.key] ?? lane.hasCommands
 }
 
-/** Chooses which of `lanes` are shown, with a checkmark on each shown lane. */
-export default function LaneMenu({ name, lanes }: { name: string, lanes: LaneOption[] }) {
+/** Chooses which of `lanes` are shown, with a checkmark on each shown lane. Its button is only an icon if `isIconOnly`. */
+export default function LaneMenu({ name, lanes, isIconOnly = false }: { name: string, lanes: LaneOption[], isIconOnly?: boolean }) {
     const [, dispatch] = useDoc()
     const isShown = useLaneShown()
 
     return <MenuTrigger>
         <ActionButton isQuiet aria-label={`Choose ${name.toLowerCase()}`}>
-            <Layers size={14} style={{ margin: "0 6px 0 10px" }} />
-            <Text>{name}</Text>
+            <Layers size={14} style={{ margin: isIconOnly ? "0 8px" : "0 6px 0 10px" }} />
+            {!isIconOnly && <Text>{name}</Text>}
         </ActionButton>
         <Menu
             items={lanes}

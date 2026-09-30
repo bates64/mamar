@@ -3,7 +3,6 @@ import { useMemo } from "react"
 
 import AutomationLane from "./AutomationLane"
 import CommandMarkers from "./CommandMarkers"
-import Inspector from "./Inspector"
 import LaneMenu, { useLaneShown } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, lastValue, MASTER_LANES, MASTER_VOLUME_LANE, TEMPO_LANE, timeline, TRANSPOSE_LANE } from "./lanes"
 import { PlayheadLine } from "./Playhead"
@@ -13,7 +12,7 @@ import styles from "./SongLanes.module.scss"
 import TimeGrid from "./TimeGrid"
 import useLaneEditing from "./useLaneEditing"
 
-import { useBgm, useDoc, useVariation } from "../store"
+import { useBgm, useVariation } from "../store"
 import { getSegmentId } from "../store/segment"
 
 /** Every lane of the master track's commands. */
@@ -25,17 +24,13 @@ interface SegmentTrack {
     trackList: TrackList
 }
 
-/** The master track's commands, which are song-wide, as lanes across the variation. */
-export default function SongLanes() {
+/**
+ * The variation's segments with their track lists, the master track's commands in each with the time each plays at,
+ * and the song lanes, each with whether it's shown by default.
+ */
+function useSongLanes() {
     const [bgm] = useBgm()
     const [variation] = useVariation()
-    const segmentLengths = useSegmentLengths()
-    const segmentStarts = segmentLengths.map((_, i) => segmentLengths.slice(0, i).reduce((sum, length) => sum + length, 0))
-    const ticksPerBar = useTicksPerBar()
-    const pickup = usePickup()
-    const isShown = useLaneShown()
-    const [doc] = useDoc()
-    const selection = doc?.selection
 
     const segments = useMemo(() => (variation?.segments ?? []).map((segment, i) => {
         const key = getSegmentId(segment) ?? i
@@ -51,10 +46,6 @@ export default function SongLanes() {
         [segments],
     )
 
-    if (!bgm || !variation) {
-        return null
-    }
-
     const pointsOf = (kind: LaneKind) => masterTimelines.flatMap(commands => lanePoints(kind, commands))
 
     // Effects that never change are the song's settings, so only effect lanes whose value changes are shown by default
@@ -65,6 +56,29 @@ export default function SongLanes() {
             ? new Set(pointsOf(kind).map(point => point.value)).size > 1
             : kind === MASTER_VOLUME_LANE || pointsOf(kind).length > 0,
     }))
+    return { segments, masterTimelines, pointsOf, laneOptions }
+}
+
+/** Chooses which song lanes are shown. */
+export function SongLaneMenu() {
+    const { laneOptions } = useSongLanes()
+    return <LaneMenu name="Song lanes" lanes={laneOptions} isIconOnly />
+}
+
+/** The master track's commands, which are song-wide, as lanes across the variation. */
+export default function SongLanes() {
+    const [bgm] = useBgm()
+    const [variation] = useVariation()
+    const segmentLengths = useSegmentLengths()
+    const segmentStarts = segmentLengths.map((_, i) => segmentLengths.slice(0, i).reduce((sum, length) => sum + length, 0))
+    const ticksPerBar = useTicksPerBar()
+    const pickup = usePickup()
+    const isShown = useLaneShown()
+    const { segments, masterTimelines, pointsOf, laneOptions } = useSongLanes()
+
+    if (!bgm || !variation) {
+        return null
+    }
     const shownLanes = SONG_LANES.filter((_, i) => isShown(laneOptions[i]))
     // A line at each bar, which starts after the pickup, as the ruler's bars do
     const barLines = { "--bar": `${ticksPerBar}px`, "--pickup": `${pickup}px` } as React.CSSProperties
@@ -93,15 +107,6 @@ export default function SongLanes() {
     </div>
 
     return <div className={styles.lanes}>
-        <div className={`${styles.row} ${styles.masterHeading}`}>
-            <div className={styles.label}>
-                <LaneMenu name="Song lanes" lanes={laneOptions} />
-            </div>
-            <div />
-        </div>
-        {selection?.track === 0 && segments.some(segment => segment.trackListId === selection.trackList) && <div className={styles.inspector}>
-            <Inspector trackListId={selection.trackList} trackIndex={0} />
-        </div>}
         {shownLanes.map(kind => row(kind, styles.master))}
         {masterTimelines.some(commands => commands.some(({ event }) => !inLane(event, SONG_LANES))) && <div className={`${styles.row} ${styles.master}`}>
             <div className={styles.label}><span>Other</span></div>

@@ -29,17 +29,6 @@
 }
 
 
-.masterHeading {
-    height: 30px;
-    background: var(--spectrum-gray-100);
-}
-.inspector {
-    padding: 0 16px 8px 16px;
-    background: var(--spectrum-gray-100);
-    border-bottom: 1px solid var(--spectrum-gray-300);
-}
-
-
 // A line at each bar
 .bars > * {
     background-image: repeating-linear-gradient(

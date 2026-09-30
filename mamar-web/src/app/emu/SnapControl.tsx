@@ -18,13 +18,13 @@ export function ZoomControls() {
 
     return <div className={styles.zoom} role="group" aria-label="Zoom">
         <TooltipTrigger>
-            <ActionButton aria-label="Zoom out" isDisabled={zoom >= MAX_ZOOM} onPress={() => zoomTimeline(dispatch, zoom, zoom * BUTTON_ZOOM_STEP)}>
+            <ActionButton isQuiet aria-label="Zoom out" isDisabled={zoom >= MAX_ZOOM} onPress={() => zoomTimeline(dispatch, zoom, zoom * BUTTON_ZOOM_STEP)}>
                 <ZoomOut size={16} />
             </ActionButton>
             <Tooltip>Zoom out (Ctrl or Cmd with the mouse wheel)</Tooltip>
         </TooltipTrigger>
         <TooltipTrigger>
-            <ActionButton aria-label="Zoom in" isDisabled={zoom <= MIN_ZOOM} onPress={() => zoomTimeline(dispatch, zoom, zoom / BUTTON_ZOOM_STEP)}>
+            <ActionButton isQuiet aria-label="Zoom in" isDisabled={zoom <= MIN_ZOOM} onPress={() => zoomTimeline(dispatch, zoom, zoom / BUTTON_ZOOM_STEP)}>
                 <ZoomIn size={16} />
             </ActionButton>
             <Tooltip>Zoom in (Ctrl or Cmd with the mouse wheel)</Tooltip>
@@ -39,7 +39,7 @@ export default function SnapControl() {
 
     return <MenuTrigger>
         <TooltipTrigger>
-            <ActionButton aria-label={`Snap to grid: ${SNAP_NAMES[snap]}`} UNSAFE_className={styles.snap}>
+            <ActionButton isQuiet aria-label={`Snap to grid: ${SNAP_NAMES[snap]}`} UNSAFE_className={styles.snap}>
                 <span className={styles.snapIcon} aria-hidden="true">Q</span>
                 <span>{SNAP_NAMES[snap]}</span>
             </ActionButton>

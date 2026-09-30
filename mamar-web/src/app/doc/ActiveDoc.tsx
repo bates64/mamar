@@ -3,6 +3,7 @@ import { Flex, View } from "@adobe/react-spectrum"
 import styles from "./ActiveDoc.module.scss"
 import Ruler from "./Ruler"
 import SegmentMap from "./SegmentMap"
+import { SongLaneMenu } from "./SongLanes"
 import SubsegDetails from "./SubsegDetails"
 import TimeProvider from "./TimeProvider"
 
@@ -28,7 +29,11 @@ export default function ActiveDoc() {
                 }}
             >
                 <Flex direction="column" UNSAFE_style={{ overflowX: "hidden" }}>
-                    <div style={{ paddingLeft: "225px" }}>
+                    {/* The song lanes' menu goes in the corner beside the ruler, above the track names */}
+                    <div className={styles.rulerRow}>
+                        <div className={styles.corner}>
+                            <SongLaneMenu />
+                        </div>
                         <Ruler />
                     </div>
                     <SegmentMap />

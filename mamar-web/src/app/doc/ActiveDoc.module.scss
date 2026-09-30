@@ -3,3 +3,16 @@
     overflow: hidden;
     display: grid;
 }
+
+// The ruler, beside a corner as wide as the track names under it
+.rulerRow {
+    display: grid;
+    grid-template-columns: 225px minmax(0, 1fr);
+}
+
+.corner {
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    background: var(--spectrum-gray-100);
+}

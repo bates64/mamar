@@ -301,7 +301,10 @@ export default function PlaybackControls() {
                 />
             </div>
         </div>
-        <SnapControl />
-        <ZoomControls />
+        <div className={styles.tools}>
+            <SnapControl />
+            <span className={styles.divider} aria-hidden="true" />
+            <ZoomControls />
+        </div>
     </View>
 }
