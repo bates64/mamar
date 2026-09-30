@@ -77,3 +77,16 @@
         background: var(--spectrum-gray-200);
     }
 }
+
+// Labeled as a Spectrum field is, above the field and its buttons
+.transpose {
+    display: flex;
+    flex-direction: column;
+
+    label {
+        padding: var(--spectrum-global-dimension-size-50) 0 var(--spectrum-global-dimension-size-65);
+        font-size: var(--spectrum-global-dimension-font-size-75);
+        line-height: var(--spectrum-global-font-line-height-small);
+        color: var(--spectrum-fieldlabel-text-color, var(--spectrum-gray-700));
+    }
+}

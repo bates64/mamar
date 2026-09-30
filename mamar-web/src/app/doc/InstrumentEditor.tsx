@@ -1,5 +1,6 @@
-import { ComboBox, Item, NumberField, Picker, Section } from "@adobe/react-spectrum"
+import { ActionButton, ComboBox, Flex, Item, NumberField, Picker, Section } from "@adobe/react-spectrum"
 import { Bgm, Event, Instrument, PatchAddress } from "pm64-typegen"
+import { useId } from "react"
 
 import styles from "./InstrumentEditor.module.scss"
 import { formatPan } from "./lanes"
@@ -157,6 +158,15 @@ export function EnvelopeSelect({ patch, onChange }: { patch: PatchAddress, onCha
 
 /** Fields that edit what `instrument` sounds like: its sample, articulation, volume, pan, reverb, and tuning. */
 export function InstrumentFields({ instrument, onChange: update }: { instrument: Instrument, onChange(partial: Partial<Instrument>): void }) {
+    // Tuning in semitones and in cents, which the engine adds together, as one number of semitones
+    const transposeId = useId()
+    const semitones = signed(instrument.coarse_tune) + signed(instrument.fine_tune) / 100
+    const transpose = (semitones: number) => {
+        const cents = Math.round(Math.min(127, Math.max(-128, semitones)) * 100)
+        const coarse = Math.trunc(cents / 100)
+        update({ coarse_tune: coarse & 0xFF, fine_tune: (cents - coarse * 100) & 0xFF })
+    }
+
     return <>
         <SampleSelect patch={instrument.patch} onChange={patch => update({ patch })} />
         <EnvelopeSelect patch={instrument.patch} onChange={patch => update({ patch })} />
@@ -164,23 +174,26 @@ export function InstrumentFields({ instrument, onChange: update }: { instrument:
         <ValueSlider label="Volume" value={instrument.volume} min={0} max={127} format={formatVolume} onChange={volume => update({ volume })} />
         <ValueSlider label="Pan" value={instrument.pan} min={0} max={127} format={formatPan} fillOffset={64} onChange={pan => update({ pan })} />
         <ValueSlider label="Reverb" value={instrument.reverb} min={0} max={127} onChange={reverb => update({ reverb })} />
-        <NumberField
-            label="Tune (semitones)"
-            // Tuning in semitones and in cents, which the engine adds together, as one number of semitones
-            value={signed(instrument.coarse_tune) + signed(instrument.fine_tune) / 100}
-            minValue={-128}
-            maxValue={127}
-            step={0.01}
-            formatOptions={{ signDisplay: "exceptZero", maximumFractionDigits: 2 }}
-            width="100%"
-            hideStepper
-            onChange={semitones => {
-                if (Number.isNaN(semitones)) return
-                const cents = Math.round(semitones * 100)
-                const coarse = Math.trunc(cents / 100)
-                update({ coarse_tune: coarse & 0xFF, fine_tune: (cents - coarse * 100) & 0xFF })
-            }}
-        />
+        {/* One label across the field and its buttons, as the field's own would be squeezed to its width */}
+        <div className={styles.transpose}>
+            <label htmlFor={transposeId}>Transpose (semitones)</label>
+            <Flex gap="size-100">
+                <NumberField
+                    id={transposeId}
+                    value={semitones}
+                    minValue={-128}
+                    maxValue={127}
+                    step={0.01}
+                    formatOptions={{ signDisplay: "exceptZero", maximumFractionDigits: 2 }}
+                    flex={1}
+                    minWidth={0}
+                    hideStepper
+                    onChange={semitones => !Number.isNaN(semitones) && transpose(semitones)}
+                />
+                <ActionButton aria-label="Down an octave" onPress={() => transpose(semitones - 12)}>−12</ActionButton>
+                <ActionButton aria-label="Up an octave" onPress={() => transpose(semitones + 12)}>+12</ActionButton>
+            </Flex>
+        </div>
     </>
 }
 
