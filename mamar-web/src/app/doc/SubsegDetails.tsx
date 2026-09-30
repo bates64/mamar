@@ -15,7 +15,6 @@ import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 import TrackLanes from "./TrackLanes"
-import { MAX_VOICES, total, useVoices } from "./voices"
 
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
 import { useBgm, useDoc, useLocation, useVariation } from "../store"
@@ -82,7 +81,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                 </Flex>
                 <StartingValues trackListId={trackListId} trackIndex={trackIndex} mainIndex={mainIndex} segmentIndex={segmentIndex} />
                 {trackIndex !== 0 ? <>
-                    <VoicesInfo trackListId={trackListId} trackIndex={trackIndex} />
                     <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
                 </> : <></>}
                 <View paddingTop="size-300">
@@ -184,49 +182,6 @@ function GreyedSegment({ segment, mainIndex, segmentIndex, segmentStart, length 
             })}
         />
     </div>
-}
-
-/** How many voices the track gets, which pm64 chooses from its notes, and whether that cuts any off. */
-function VoicesInfo({ trackListId, trackIndex }: { trackListId: number, trackIndex: number }) {
-    const [bgm] = useBgm()
-    const voices = useVoices(trackListId)
-    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
-    if (!voices || !track) {
-        return null
-    }
-
-    const label = <Flex width="100%" alignItems="center">
-        <Text flexGrow={1}>Voices</Text>
-        <ContextualHelp variant="help" placement="right">
-            <Heading>Voices</Heading>
-            <Content>
-                <Text>
-                    Each note the game plays uses a voice. A track gets a voice for each note it plays at once, up to 4, so
-                    none are cut off. The game has {MAX_VOICES} voices for a segment&apos;s tracks, which sound effects
-                    also use.
-                </Text>
-            </Content>
-        </ContextualHelp>
-    </Flex>
-
-    if (track.alternate_for != null) {
-        return <View>
-            {label}
-            <Text>Uses the voices of Track {track.alternate_for}.</Text>
-        </View>
-    }
-
-    const needed = voices.needed[trackIndex]
-    const given = voices.given[trackIndex]
-    const segmentNeeds = total(voices.needed)
-    return <View>
-        {label}
-        <Text>{given}</Text>
-        {given < needed && <Text UNSAFE_className={styles.warning}>
-            This track plays up to {needed} notes at once, but gets {given} voices, so some notes are cut off.
-            Its segment needs {segmentNeeds} voices, and the game has {MAX_VOICES}.
-        </Text>}
-    </View>
 }
 
 /** Adds or removes the alternate part for track `trackIndex` of track list `trackListId`. */

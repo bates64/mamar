@@ -9,7 +9,7 @@ import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
-import { useVoices } from "./voices"
+import { MAX_VOICES, total, useVoices } from "./voices"
 
 import Bridge from "../bridge"
 import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
@@ -61,7 +61,10 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex }: { trac
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
                 [styles.showsAlternatePart]: shownIndex !== trackIndex,
-                [styles.shortOfVoices]: voices !== undefined && voices.given[trackIndex] < voices.needed[trackIndex],
+                // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one
+                // before, so this only warns when the segment needs more voices than the game has
+                [styles.shortOfVoices]: voices !== undefined && total(voices.needed) > MAX_VOICES &&
+                    voices.given[trackIndex] < voices.needed[trackIndex],
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
