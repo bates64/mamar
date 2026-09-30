@@ -95,7 +95,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             {/* Spectrum gives forms a minimum width wider than the panel */}
             <Form width="100%" UNSAFE_style={{ minWidth: 0 }} aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
                 <Flex wrap columnGap="size-200">
-                    <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                     {trackIndex !== 0 && <Switch isSelected={isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}
                     <Switch isSelected={showBlocks} onChange={setShowBlocks}>Blocks</Switch>
                 </Flex>

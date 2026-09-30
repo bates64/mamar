@@ -33,7 +33,6 @@ export type BgmAction = {
     trackList: number
     track: number
     name?: string
-    isDisabled?: boolean
     isDrumTrack?: boolean
 } | {
     type: "update_instrument"
@@ -302,9 +301,6 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
             const track = draft.track_lists[action.trackList].tracks[action.track]
             if (action.name !== undefined) {
                 track.name = action.name
-            }
-            if (action.isDisabled !== undefined) {
-                track.is_disabled = action.isDisabled
             }
             if (action.isDrumTrack !== undefined && !isMixPercussion) {
                 track.is_drum_track = action.isDrumTrack
