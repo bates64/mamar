@@ -85,10 +85,10 @@ export default class WasmSongPlayer implements SongPlayer {
         return () => this.listeners.delete(listener)
     }
 
-    private onEngineStatus({ tempo, position, heardAt }: AudioEngineStatus) {
+    private onEngineStatus({ tempo, position, heardAt, levels }: AudioEngineStatus) {
         const latency = this.heardAt(heardAt) - performance.now()
         for (const listener of this.listeners) {
-            listener({ tempo, position, latency })
+            listener({ tempo, position, latency, levels })
         }
     }
 

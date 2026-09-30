@@ -42,5 +42,12 @@ void HleProcessRdpList(void* user_defined);
 void HleShowCFB(void* user_defined);
 int HleForwardTask(void* user_defined);
 
+/* How many samples of each envelope mixer's output the host is given to meter, which is at least as many as it mixes */
+#define ENVMIX_METER_SAMPLES 256
+
+/* Called with the `count` samples an envelope mixer adds to the left and right dry outputs, and the address of its
+ * state, which tells voices apart. The host uses it to meter each voice. */
+void HleEnvMixed(uint32_t address, const int32_t* left, const int32_t* right, int count);
+
 #endif
 

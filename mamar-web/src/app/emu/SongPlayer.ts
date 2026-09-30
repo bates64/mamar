@@ -24,6 +24,11 @@ export interface PlayerStatus {
     position: SongPosition | null
     /** How long after the song reaches a position it's heard there, in ms. */
     latency: number
+    /**
+     * The loudest each track has played since the last status, from 0 to 1, as its left and then right channel, for
+     * each of the song's 16 tracks in turn. It's heard `latency` ms from now.
+     */
+    levels: Float32Array
 }
 
 /**

@@ -31,6 +31,11 @@ export interface AudioEngineStatus {
     position: SongPosition | null
     /** The audio context time when `position` is heard. */
     heardAt: number
+    /**
+     * The loudest each track has played since the last status, from 0 to 1, as its left and then right channel, for
+     * each of the song's 16 tracks in turn.
+     */
+    levels: Float32Array
 }
 
 interface Exports {
@@ -46,6 +51,7 @@ interface Exports {
     mamar_audio_segment(): number
     mamar_audio_tick(): number
     mamar_audio_tempo(): number
+    mamar_audio_track_levels(): number
 }
 
 /** How often to report the song's position, in seconds. */
@@ -182,6 +188,7 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
             tempo: this.engine.mamar_audio_tempo() / 100,
             position: segment < 0 ? null : { segment, tick: this.engine.mamar_audio_tick() },
             heardAt: currentTime + delay,
+            levels: Float32Array.from(new Uint16Array(this.engine.memory.buffer, this.engine.mamar_audio_track_levels(), 32), level => level / 0x8000),
         }
         this.port.postMessage(status)
     }

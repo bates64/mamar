@@ -1,0 +1,37 @@
+// Two thin channels, left and right, side by side
+.meter {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    right: 6px;
+    display: flex;
+    gap: 1px;
+    pointer-events: none;
+}
+
+.channel {
+    position: relative;
+    width: 3px;
+    border-radius: 1.5px;
+    overflow: hidden;
+    background: var(--spectrum-gray-200);
+}
+
+// Shades of one colour, lighter towards the loudest at the top, of which the level shows the part up to the channel's
+// level. Only the whole song clips, so a track's meter doesn't warn of it.
+.level {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--spectrum-seafoam-700), var(--spectrum-seafoam-500) 70%, var(--spectrum-seafoam-300));
+    clip-path: inset(100% 0 0 0);
+}
+
+// The channel's recent peak, which holds a moment before it falls
+.peak {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--spectrum-gray-800);
+    opacity: 0;
+}

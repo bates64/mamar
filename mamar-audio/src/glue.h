@@ -19,4 +19,5 @@ void mamar_swap_sbn_read(u32 addr, u8* buf, u32 size);
 void mamar_update_song(void);
 void mamar_audio_stop(void);
 void mamar_swap_bgm(const u8* bgm, u32 size, u8* out);
+void mamar_finish_mix(void);
 #endif

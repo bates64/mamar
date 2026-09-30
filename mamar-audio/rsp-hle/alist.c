@@ -478,6 +478,9 @@ void alist_envmix_lin(
         ramps[1].value  = *(int32_t *)(save_buffer + 18); /* 16-17 */
     }
 
+    /* What this voice adds to the dry outputs, for the host to meter it */
+    int32_t added_l[ENVMIX_METER_SAMPLES], added_r[ENVMIX_METER_SAMPLES];
+
     count >>= 1;
     for(k = 0; k < count; ++k) {
         int16_t  gains[4];
@@ -496,7 +499,13 @@ void alist_envmix_lin(
         gains[3] = clamp_s16((r_vol * wet + 0x4000) >> 15);
 
         alist_envmix_mix(4, buffers, gains, in[k^S]);
+
+        if (k < ENVMIX_METER_SAMPLES) {
+            added_l[k] = (in[k^S] * gains[0]) >> 15;
+            added_r[k] = (in[k^S] * gains[1]) >> 15;
+        }
     }
+    HleEnvMixed(address, added_l, added_r, count < ENVMIX_METER_SAMPLES ? count : ENVMIX_METER_SAMPLES);
 
     *(int16_t *)(save_buffer +  0) = wet;            /* 0-1 */
     *(int16_t *)(save_buffer +  2) = dry;            /* 2-3 */

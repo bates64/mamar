@@ -13,6 +13,7 @@ import { commandsForMix, commandsVaryByMix, useInstrumentName } from "./segmentT
 import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
+import TrackMeter from "./TrackMeter"
 import { MAX_VOICES, total, useVoices } from "./voices"
 
 import Bridge from "../bridge"
@@ -309,6 +310,7 @@ function Container() {
                     trackIndex={i}
                     alternateParts={[...new Set(trackLists.map(id => alternatePartOf(bgm!.track_lists[id], i)).filter(slot => slot !== undefined))]}
                 />
+                <TrackMeter trackIndex={i} />
             </>
         }
         }

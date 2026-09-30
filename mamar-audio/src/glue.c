@@ -261,6 +261,7 @@ s32 mamar_audio_render_frame(void) {
     *(u32*)&Dmem[0xFF0] = (u32)CmdList; // TASK_DATA_PTR
     *(u32*)&Dmem[0xFF4] = (cmdEnd - CmdList) * sizeof(Acmd); // TASK_DATA_SIZE
     alist_process_naudio(&Hle);
+    mamar_finish_mix();
     nuAuCleanDMABuffers();
     return samples;
 }
