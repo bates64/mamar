@@ -43,3 +43,29 @@
     width: 1em;
     color: var(--spectrum-blue-700);
 }
+
+.choice:disabled {
+    color: var(--spectrum-gray-500);
+    cursor: default;
+
+    &:hover {
+        background: transparent;
+    }
+}
+
+.menuLabel {
+    flex: 1;
+}
+
+.shortcut {
+    padding-left: 16px;
+    color: var(--spectrum-gray-600);
+    font: inherit;
+    font-size: 12px;
+}
+
+.separator {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--spectrum-gray-300);
+}

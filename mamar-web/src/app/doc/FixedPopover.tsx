@@ -75,3 +75,28 @@ export function ChoiceList({ label, choices, value, onChoose }: {
         </button>)}
     </div>
 }
+
+/** An action in a {@link MenuList}, with the keys that also do it, or a line between groups of actions. */
+export type MenuItem = { label: string, shortcut?: string, isDisabled?: boolean, onAction(): void } | "separator"
+
+/** A list of actions, such as a context menu's. */
+export function MenuList({ label, items, onClose }: { label: string, items: MenuItem[], onClose(): void }) {
+    return <div role="menu" aria-label={label} className={styles.choices}>
+        {items.map((item, i) => (item === "separator"
+            ? <div key={i} role="separator" className={styles.separator} />
+            : <button
+                key={item.label}
+                role="menuitem"
+                className={styles.choice}
+                autoFocus={i === 0}
+                disabled={item.isDisabled}
+                onClick={() => {
+                    item.onAction()
+                    onClose()
+                }}
+            >
+                <span className={styles.menuLabel}>{item.label}</span>
+                {item.shortcut && <kbd className={styles.shortcut}>{item.shortcut}</kbd>}
+            </button>))}
+    </div>
+}
