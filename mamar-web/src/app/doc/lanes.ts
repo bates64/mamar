@@ -67,6 +67,21 @@ export function formatPan(value: number): string {
     return value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`
 }
 
+/** How far tremolo bends a note's pitch either way, the peak of its wave, in cents. */
+export function formatTremoloDepth(depth: number): string {
+    return depth === 0 ? "Off" : `±${depth} cents`
+}
+
+/** How often tremolo's wave repeats, as it advances by the speed each tick, out of 256 for a whole wave. */
+export function formatTremoloSpeed(speed: number): string {
+    return `${+(speed * TICKS_PER_BEAT / 256).toFixed(2)} per beat`
+}
+
+/** How far each note is panned at random, up to that far either side of the track's pan. */
+export function formatRandomPan(amount: number): string {
+    return amount === 0 ? "Off" : `Up to ${amount} either side`
+}
+
 const signed = (unit: string) => (value: number) => `${value > 0 ? "+" : ""}${value} ${unit}`
 
 export const TRACK_LANES: LaneKind[] = [
@@ -123,8 +138,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
         // leave room past those without squashing them.
         {
             key: "tremolo", name: "Tremolo depth", min: 0, max: 127, display: "line", defaultValue: 10,
-            // The peak of the wave, in cents
-            format: depth => (depth === 0 ? "Off" : `±${depth} cents`),
+            format: formatTremoloDepth,
             read: command => {
                 if ("TrackTremolo" in command) {
                     return { value: (command.TrackTremolo as Fields).depth }
@@ -141,8 +155,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
         },
         {
             key: "tremoloSpeed", name: "Tremolo speed", min: 0, max: 64, display: "line", defaultValue: 15,
-            // The wave advances by the speed each tick, out of 256 for a whole wave
-            format: speed => `${+(speed * TICKS_PER_BEAT / 256).toFixed(2)} per beat`,
+            format: formatTremoloSpeed,
             read: command => {
                 if ("TrackTremoloSpeed" in command) {
                     return { value: command.TrackTremoloSpeed as number }
@@ -165,7 +178,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
             update: (command, delay) => ({ TrackTremolo: { ...(command.TrackTremolo as Fields), delay } }) as Command,
         },
         {
-            key: "randomPan", name: "Random pan", min: 0, max: 127, display: "line",
+            key: "randomPan", name: "Random pan", min: 0, max: 127, display: "line", format: formatRandomPan,
             read: command => ("SubTrackRandomPan" in command ? { value: (command.SubTrackRandomPan as Fields).amount } : undefined),
             set: amount => ({ SubTrackRandomPan: { pan: 64, amount } }),
             update: (command, amount) => ({ SubTrackRandomPan: { ...(command.SubTrackRandomPan as Fields), amount } }) as Command,

@@ -3,7 +3,8 @@ import { Event } from "pm64-typegen"
 
 import styles from "./CommandPopup.module.scss"
 import { EnvelopeSelect, SampleSelect } from "./InstrumentEditor"
-import { commandName, formatPan } from "./lanes"
+import { commandName, formatBeats, formatPan, formatRandomPan, formatTremoloDepth, formatTremoloSpeed } from "./lanes"
+import { TICKS_PER_BEAT } from "./Ruler"
 import { toEvent } from "./useLaneEditing"
 import ValueSlider from "./ValueSlider"
 
@@ -40,6 +41,17 @@ const FIELDS: Record<string, Field[]> = {
     TrackVolumeFade: [volume(["value"]), fadeTime],
     SubTrackPan: [{ path: [], label: "Pan", min: 0, max: 127, format: formatPan }],
     SubTrackReverb: [{ path: [], label: "Reverb", min: 0, max: 127, format: String }],
+    TrackTremolo: [
+        { path: ["depth"], label: "Depth", min: 0, max: 127, format: formatTremoloDepth },
+        { path: ["speed"], label: "Speed", min: 0, max: 64, format: formatTremoloSpeed },
+        { path: ["delay"], label: "Delay", min: 0, max: TICKS_PER_BEAT * 4, format: formatBeats },
+    ],
+    TrackTremoloDepth: [{ path: ["depth"], label: "Tremolo depth", min: 0, max: 127, format: formatTremoloDepth }],
+    TrackTremoloSpeed: [{ path: [], label: "Tremolo speed", min: 0, max: 64, format: formatTremoloSpeed }],
+    SubTrackRandomPan: [
+        { path: ["pan"], label: "Pan", min: 0, max: 127, format: formatPan },
+        { path: ["amount"], label: "Random pan", min: 0, max: 127, format: formatRandomPan },
+    ],
     SubTrackCoarseTune: [{ path: [], label: "Tune (semitones)", min: -128, max: 127 }],
     SubTrackFineTune: [{ path: [], label: "Fine tune (cents)", min: -128, max: 127 }],
     SegTrackTune: [{ path: ["bend"], label: "Pitch bend (cents)", min: -0x8000, max: 0x7FFF }],
