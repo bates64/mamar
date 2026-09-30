@@ -84,3 +84,9 @@ $row-height: 27px;
         border-radius: 99px;
     }
 }
+
+// How loud a volume plays, beside the volume
+.decibels {
+    color: var(--spectrum-gray-700);
+    font-variant-numeric: tabular-nums;
+}

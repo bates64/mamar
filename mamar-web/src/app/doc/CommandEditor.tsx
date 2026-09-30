@@ -9,6 +9,7 @@ import InstrumentInput, { PatchInput } from "../InstrumentInput"
 import NoteInput from "../NoteInput"
 import { useBgm } from "../store"
 import StringInput from "../StringInput"
+import { formatVolume } from "../util/volume"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 export const trackListCtx = createContext<null | { trackListId: number, trackIndex: number }>(null)
@@ -84,10 +85,11 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.MasterVolume}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, MasterVolume: value })}
                 />
             </InputBox>
+            <span className={styles.decibels}>{formatVolume(command.MasterVolume)}</span>
         </div>
     } else if ("MasterPitchShift" in command) {
         return <div className={classNames(styles.command, styles.master)}>
@@ -144,10 +146,11 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.MasterVolumeFade.volume}
                     minValue={0}
-                    maxValue={0xFFFF}
+                    maxValue={127}
                     onChange={volume => mutate({ ...command, MasterVolumeFade: { ...command.MasterVolumeFade, volume } })}
                 />
             </InputBox>
+            <span className={styles.decibels}>{formatVolume(command.MasterVolumeFade.volume)}</span>
             over
             <InputBox>
                 <VerticalDragNumberInput
@@ -198,10 +201,11 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.SubTrackVolume}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, SubTrackVolume: value })}
                 />
             </InputBox>
+            <span className={styles.decibels}>{formatVolume(command.SubTrackVolume)}</span>
         </div>
     } else if ("SubTrackPan" in command) {
         // TODO: bespoke input for pan value
@@ -235,10 +239,11 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.SegTrackVolume}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, SegTrackVolume: value })}
                 />
             </InputBox>
+            <span className={styles.decibels}>{formatVolume(command.SegTrackVolume)}</span>
         </div>
     } else if ("SubTrackCoarseTune" in command) {
         return <div className={classNames(styles.command, styles.track)}>
@@ -371,10 +376,11 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                 <VerticalDragNumberInput
                     value={command.TrackVolumeFade.value}
                     minValue={0}
-                    maxValue={0xFF}
+                    maxValue={127}
                     onChange={value => mutate({ ...command, TrackVolumeFade: { ...command.TrackVolumeFade, value } })}
                 />
             </InputBox>
+            <span className={styles.decibels}>{formatVolume(command.TrackVolumeFade.value)}</span>
             over
             <InputBox>
                 <VerticalDragNumberInput
@@ -507,6 +513,7 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                         onChange={volume1 => mutate({ ...command, ProxMixOverride: { ...command.ProxMixOverride, volume1 } })}
                     />
                 </InputBox>
+                <span className={styles.decibels}>{formatVolume(command.ProxMixOverride.volume1)}</span>
                 at full mix, otherwise
                 <InputBox>
                     <VerticalDragNumberInput
@@ -516,6 +523,7 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
                         onChange={volume2 => mutate({ ...command, ProxMixOverride: { ...command.ProxMixOverride, volume2 } })}
                     />
                 </InputBox>
+                <span className={styles.decibels}>{formatVolume(command.ProxMixOverride.volume2)}</span>
             </>}
         </div>
     } else if ("Marker" in command) {

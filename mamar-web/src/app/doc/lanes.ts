@@ -4,6 +4,7 @@ import { TICKS_PER_BEAT } from "./Ruler"
 
 import Bridge from "../bridge"
 import * as instruments from "../instruments"
+import { formatVolume } from "../util/volume"
 
 /** A command in a lane, at `time` ticks from the start of its segment. */
 export interface LanePoint {
@@ -61,11 +62,16 @@ export function formatBeats(ticks: number): string {
     return `${beats} ${beats === 1 ? "beat" : "beats"}`
 }
 
+/** A pan position, such as "Center" or "L34", out of 64 either side. */
+export function formatPan(value: number): string {
+    return value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`
+}
+
 const signed = (unit: string) => (value: number) => `${value > 0 ? "+" : ""}${value} ${unit}`
 
 export const TRACK_LANES: LaneKind[] = [
     {
-        ...simple("volume", "Volume", "SubTrackVolume", 0, 127),
+        ...simple("volume", "Volume", "SubTrackVolume", 0, 127, formatVolume),
         defaultValue: 127,
         read: command => {
             if ("SubTrackVolume" in command) {
@@ -77,11 +83,11 @@ export const TRACK_LANES: LaneKind[] = [
         },
         fade: (value, time) => ({ TrackVolumeFade: { time, value } }),
     },
-    { ...simple("trackVolume", "Track volume", "SegTrackVolume", 0, 127), defaultValue: 127 },
+    { ...simple("trackVolume", "Track volume", "SegTrackVolume", 0, 127, formatVolume), defaultValue: 127 },
     // The volume a track fades to when Mario is at the place of the proximity mix playing, as a track in the band
     // gets quieter while one that varies by mix plays. It fades at the next fade point, which the song has each bar.
     {
-        key: "mixVolume", name: "Volume in a mix", min: 1, max: 127, display: "line", defaultValue: 63,
+        key: "mixVolume", name: "Volume in a mix", min: 1, max: 127, display: "line", defaultValue: 63, format: formatVolume,
         read: command => {
             const override = command.ProxMixOverride as Fields | undefined
             return override && override.volume1 !== 0 ? { value: override.volume1 } : undefined
@@ -90,7 +96,7 @@ export const TRACK_LANES: LaneKind[] = [
         update: (command, volume) => ({ ProxMixOverride: { ...(command.ProxMixOverride as Fields), volume1: volume } }) as Command,
     },
     {
-        ...simple("pan", "Pan", "SubTrackPan", 0, 127, value => (value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`)),
+        ...simple("pan", "Pan", "SubTrackPan", 0, 127, formatPan),
         defaultValue: 64,
     },
     simple("reverb", "Reverb", "SubTrackReverb", 0, 127),
@@ -233,7 +239,7 @@ export const TEMPO_LANE: LaneKind = {
 export const TRANSPOSE_LANE = field("transpose", "Transpose", "MasterPitchShift", "semitones", -12, 12, "spans", signed("st"))
 
 export const MASTER_VOLUME_LANE: LaneKind = {
-    ...simple("masterVolume", "Volume", "MasterVolume", 0, 127),
+    ...simple("masterVolume", "Volume", "MasterVolume", 0, 127, formatVolume),
     read: command => {
         if ("MasterVolume" in command) {
             return { value: command.MasterVolume as number }

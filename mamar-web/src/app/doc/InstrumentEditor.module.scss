@@ -6,12 +6,6 @@
     padding: 4px;
 }
 
-.row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-
 // The instrument the track plays, as the popup's heading: text with a chevron, which reads as a list only on hover
 .heading {
     position: relative;

@@ -3,10 +3,12 @@ import { Event } from "pm64-typegen"
 
 import styles from "./CommandPopup.module.scss"
 import { EnvelopeSelect, SampleSelect } from "./InstrumentEditor"
-import { commandName } from "./lanes"
+import { commandName, formatPan } from "./lanes"
 import { toEvent } from "./useLaneEditing"
+import ValueSlider from "./ValueSlider"
 
 import { useBgm } from "../store"
+import { formatVolume } from "../util/volume"
 
 type Value = number | string | { [key: string]: Value }
 
@@ -17,12 +19,24 @@ interface Field {
     min?: number
     max?: number
     hex?: boolean
+    /** How a value that's dragged to, rather than typed, is shown, such as a volume in decibels. */
+    format?(value: number): string
 }
+
+const volume = (path: string[], label = "Volume", max = 127): Field => ({ path, label, min: 0, max, format: formatVolume })
+const fadeTime: Field = { path: ["time"], label: "Fade time (ticks)", min: 0, max: 0xFFFF }
 
 /** The fields to edit for each kind of command. Others edit every number in the command. */
 const FIELDS: Record<string, Field[]> = {
     EventTrigger: [{ path: ["event_info"], label: "Event", min: 0, max: 0xFFFFFF, hex: true }],
     TriggerSound: [{ path: ["sound"], label: "Sound effect", min: 0, max: 255 }],
+    MasterVolume: [volume([])],
+    MasterVolumeFade: [volume(["volume"]), fadeTime],
+    SubTrackVolume: [volume([])],
+    SegTrackVolume: [volume([], "Track volume")],
+    TrackVolumeFade: [volume(["value"]), fadeTime],
+    SubTrackPan: [{ path: [], label: "Pan", min: 0, max: 127, format: formatPan }],
+    SubTrackReverb: [{ path: [], label: "Reverb", min: 0, max: 127, format: String }],
     TrackOverridePatch: [],
     SeekCustomEnvelope: [{ path: ["index"], label: "Custom envelope to write", min: 1, max: 8 }],
     WriteCustomEnvelope: [
@@ -35,8 +49,8 @@ const FIELDS: Record<string, Field[]> = {
         { path: ["delay"], label: "Delay (0 turns it off)", min: 0, max: 255 },
     ],
     ProxMixOverride: [
-        { path: ["volume1"], label: "Volume when Mario is at a mix's place", min: 1, max: 255 },
-        { path: ["volume2"], label: "Volume away from it", min: 0, max: 255 },
+        { ...volume(["volume1"], "Volume when Mario is at a mix's place", 255), min: 1 },
+        volume(["volume2"], "Volume away from it", 255),
     ],
     Marker: [{ path: ["label"], label: "Label" }],
 }
@@ -95,7 +109,18 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
             {shown.map(field => {
                 const current = get(value, field.path)
                 const key = field.path.join(".") || "value"
-                if (typeof current === "string") {
+                if (field.format) {
+                    return <ValueSlider
+                        key={key}
+                        label={field.label}
+                        value={current as number}
+                        min={field.min ?? 0}
+                        max={field.max ?? 127}
+                        format={field.format}
+                        fillOffset={field.format === formatPan ? 64 : undefined}
+                        onChange={value => update(field.path, value)}
+                    />
+                } else if (typeof current === "string") {
                     return <TextField key={key} label={field.label} value={current} onChange={text => update(field.path, text)} />
                 }
                 return <NumberField

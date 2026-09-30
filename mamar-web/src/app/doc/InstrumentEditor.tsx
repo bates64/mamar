@@ -2,7 +2,9 @@ import { ComboBox, Item, NumberField, Picker, Section } from "@adobe/react-spect
 import { Bgm, Event, Instrument, PatchAddress } from "pm64-typegen"
 
 import styles from "./InstrumentEditor.module.scss"
+import { formatPan } from "./lanes"
 import { toEvent } from "./useLaneEditing"
+import ValueSlider from "./ValueSlider"
 
 import { useAuxBankCount } from "../emu/SongPlayer"
 import * as instruments from "../instruments"
@@ -10,6 +12,7 @@ import { useBgm } from "../store"
 import { auxBankFor } from "../store/bgm"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 import { auxBankFiles, envelopesOf } from "../util/soundBank"
+import { formatVolume } from "../util/volume"
 
 /** A byte the engine reads as signed. */
 function signed(byte: number): number {
@@ -152,6 +155,35 @@ export function EnvelopeSelect({ patch, onChange }: { patch: PatchAddress, onCha
     </Picker>
 }
 
+/** Fields that edit what `instrument` sounds like: its sample, articulation, volume, pan, reverb, and tuning. */
+export function InstrumentFields({ instrument, onChange: update }: { instrument: Instrument, onChange(partial: Partial<Instrument>): void }) {
+    return <>
+        <SampleSelect patch={instrument.patch} onChange={patch => update({ patch })} />
+        <EnvelopeSelect patch={instrument.patch} onChange={patch => update({ patch })} />
+        {/* The engine reads only the low 7 bits of each */}
+        <ValueSlider label="Volume" value={instrument.volume} min={0} max={127} format={formatVolume} onChange={volume => update({ volume })} />
+        <ValueSlider label="Pan" value={instrument.pan} min={0} max={127} format={formatPan} fillOffset={64} onChange={pan => update({ pan })} />
+        <ValueSlider label="Reverb" value={instrument.reverb} min={0} max={127} onChange={reverb => update({ reverb })} />
+        <NumberField
+            label="Tune (semitones)"
+            // Tuning in semitones and in cents, which the engine adds together, as one number of semitones
+            value={signed(instrument.coarse_tune) + signed(instrument.fine_tune) / 100}
+            minValue={-128}
+            maxValue={127}
+            step={0.01}
+            formatOptions={{ signDisplay: "exceptZero", maximumFractionDigits: 2 }}
+            width="100%"
+            hideStepper
+            onChange={semitones => {
+                if (Number.isNaN(semitones)) return
+                const cents = Math.round(semitones * 100)
+                const coarse = Math.trunc(cents / 100)
+                update({ coarse_tune: coarse & 0xFF, fine_tune: (cents - coarse * 100) & 0xFF })
+            }}
+        />
+    </>
+}
+
 /** The other tracks that play instrument `index` somewhere in the song, by their rows. */
 function otherTracksPlaying(bgm: Bgm, index: number, row: number): number[] {
     const rows = new Set<number>()
@@ -193,20 +225,6 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
         event,
     })
     const others = otherTracksPlaying(bgm, index, trackIndex)
-    const number = (label: string, value: number, min: number, max: number, onChange: (value: number) => void) => <NumberField
-        label={label}
-        value={value}
-        minValue={min}
-        maxValue={max}
-        formatOptions={{ maximumFractionDigits: 0 }}
-        width="100%"
-        hideStepper
-        onChange={value => {
-            if (!Number.isNaN(value)) {
-                onChange(Math.round(value))
-            }
-        }}
-    />
 
     return <div className={styles.editor}>
         {/* Which instrument the track plays heads the popup, and the fields below edit that instrument */}
@@ -234,19 +252,7 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
             </select>
         </label>
         {instrument && <>
-            <SampleSelect patch={instrument.patch} onChange={patch => update({ patch })} />
-            <EnvelopeSelect patch={instrument.patch} onChange={patch => update({ patch })} />
-            <div className={styles.row}>
-                {number("Volume", instrument.volume, 0, 255, volume => update({ volume }))}
-                {number("Pan", instrument.pan, 0, 127, pan => update({ pan }))}
-            </div>
-            <div className={styles.row}>
-                {number("Reverb", instrument.reverb, 0, 255, reverb => update({ reverb }))}
-            </div>
-            <div className={styles.row}>
-                {number("Tune (semitones)", signed(instrument.coarse_tune), -128, 127, coarse => update({ coarse_tune: coarse & 0xFF }))}
-                {number("Fine tune (cents)", signed(instrument.fine_tune), -128, 127, fine => update({ fine_tune: fine & 0xFF }))}
-            </div>
+            <InstrumentFields instrument={instrument} onChange={update} />
             {others.length > 0 && <div className={styles.shared}>
                 <span>Changes here also change {others.length === 1 ? "track" : "tracks"} {listOf(others.map(String))}.</span>
                 <button className={styles.copy} onClick={() => addInstrument({ ...instrument, patch: { ...instrument.patch } })}>

@@ -1,5 +1,7 @@
 .popup {
     display: flex;
+    // Room for a slider to drag along
+    min-width: 240px;
     flex-direction: column;
     gap: 8px;
     padding: 4px;

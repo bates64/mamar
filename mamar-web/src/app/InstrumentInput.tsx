@@ -1,7 +1,7 @@
 import { ActionButton, Content, Dialog, DialogTrigger, Flex, Form, Heading, NumberField } from "@adobe/react-spectrum"
 import { PatchAddress } from "pm64-typegen"
 
-import { EnvelopeSelect, SampleSelect } from "./doc/InstrumentEditor"
+import { EnvelopeSelect, InstrumentFields, SampleSelect } from "./doc/InstrumentEditor"
 import styles from "./InstrumentInput.module.scss"
 import * as instruments from "./instruments"
 import { useBgm } from "./store"
@@ -38,19 +38,7 @@ export default function InstrumentInput({ index, onChange }: Props) {
             </Heading>
             <Content>
                 {instrument && <Form isQuiet onSubmit={e => e.preventDefault()}>
-                    <Flex gap="size-150">
-                        <SampleSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
-                        <EnvelopeSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
-                    </Flex>
-                    <Flex gap="size-150">
-                        <NumberField label="Volume" value={instrument.volume} onChange={volume => dispatch({ type: "update_instrument", index, partial: { volume } })} />
-                        <NumberField label="Pan" value={instrument.pan} onChange={pan => dispatch({ type: "update_instrument", index, partial: { pan } })} />
-                        <NumberField label="Reverb" value={instrument.reverb} onChange={reverb => dispatch({ type: "update_instrument", index, partial: { reverb } })} />
-                    </Flex>
-                    <Flex gap="size-150">
-                        <NumberField label="Coarse tune" value={instrument.coarse_tune} onChange={coarse_tune => dispatch({ type: "update_instrument", index, partial: { coarse_tune } })} />
-                        <NumberField label="Fine tune" value={instrument.fine_tune} onChange={fine_tune => dispatch({ type: "update_instrument", index, partial: { fine_tune } })} />
-                    </Flex>
+                    <InstrumentFields instrument={instrument} onChange={partial => dispatch({ type: "update_instrument", index, partial })} />
                 </Form>}
             </Content>
         </Dialog>
