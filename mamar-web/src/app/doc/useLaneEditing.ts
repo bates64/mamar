@@ -2,8 +2,8 @@ import { Command, Event } from "pm64-typegen"
 
 import { Props as LaneProps } from "./AutomationLane"
 import { LaneKind, lanePoints, LanePoint, timeline } from "./lanes"
+import { useMixCommands } from "./segmentTracks"
 
-import Bridge from "../bridge"
 import { useBgm, useDoc } from "../store"
 import { useSelectedIds } from "../store/doc"
 
@@ -21,7 +21,7 @@ export default function useLaneEditing(
     const [bgm, dispatch] = useBgm()
     const [, docDispatch] = useDoc()
     const selectedIds = useSelectedIds(trackListId, trackIndex)
-    const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands ?? []
+    const commands = useMixCommands(bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands) ?? []
     const target = { trackList: trackListId, track: trackIndex }
     const commandOf = (point: LanePoint, value: number) => {
         const current = point.event as unknown as Record<string, unknown>
@@ -34,10 +34,7 @@ export default function useLaneEditing(
     const insert = (time: number, command: Command) =>
         dispatch({ type: "insert_track_command", ...target, time, command })
     const remove = (point: LanePoint) => {
-        const index = Bridge.commands_without_detours(commands).findIndex((event: Event) => event.id === point.event.id)
-        if (index >= 0) {
-            dispatch({ type: "delete_track_command", ...target, index })
-        }
+        dispatch({ type: "delete_track_commands", ...target, ids: [point.event.id] })
     }
 
     const change = (point: LanePoint, value: number) =>

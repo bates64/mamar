@@ -1,6 +1,6 @@
 import { Bgm } from "pm64-typegen"
 
-import { BgmAction, bgmReducer, makeRoomForAlternateParts } from "./bgm"
+import { BgmAction, bgmReducer } from "./bgm"
 import { useRoot } from "./dispatch"
 
 export type PanelContent = {
@@ -12,26 +12,22 @@ export type PanelContent = {
     segment: number
 }
 
-/** How loudly a proximity mix plays: outside its area, inside it, or as loud as the game's scripts can make it. */
-export type MixLevel = "off" | "near" | "full"
-
 /** Where in the game the song is heard, which decides the parts it plays. */
 export interface Location {
     /** The proximity mix, which chooses the option each branch plays. */
     mix: number
-    level: MixLevel
     /** Whether alternate parts play instead of the tracks they're for. */
     alternateParts: boolean
 }
 
-export const DEFAULT_LOCATION: Location = { mix: 0, level: "off", alternateParts: false }
+export const DEFAULT_LOCATION: Location = { mix: 0, alternateParts: false }
 
-/** Volume of each level, as snd_song_set_proximity_mix_far, _near, and _full set it. */
-const MIX_LEVEL_VOLUMES: Record<MixLevel, number> = { off: 0, near: 87, full: 127 }
-
-/** The value au_bgm_set_proximity_mix takes for `location`: the mix in bits 0-7, and its volume in bits 24-30. */
-export function proximityMixValue({ mix, level }: Location): number {
-    return ((MIX_LEVEL_VOLUMES[level] << 24) | (mix & 0xFF)) >>> 0
+/**
+ * The value au_bgm_set_proximity_mix takes for `location`: the mix in bits 0-7, and its volume in bits 24-30. Each mix
+ * plays at full volume, as it does when Mario is at its place, as snd_song_set_proximity_mix_full sets it.
+ */
+export function proximityMixValue({ mix }: Location): number {
+    return ((127 << 24) | (mix & 0xFF)) >>> 0
 }
 
 /** The grid that points placed on the timeline snap to. */
@@ -121,27 +117,9 @@ export type DocAction = {
 export function docReducer(state: Doc, action: DocAction): Doc {
     switch (action.type) {
     case "bgm": {
-        if (action.action.type === "add_alternate_part") {
-            // Adding an alternate part can move its track to another row, which what refers to it follows
-            const from = action.action.track
-            const { bgm, index } = makeRoomForAlternateParts(state.bgm, action.action.trackLists, from)
-            const moved = (row: number) => (row === from ? index : row === index ? from : row)
-            const panelContent = state.panelContent.type === "tracker"
-                ? { ...state.panelContent, track: moved(state.panelContent.track) }
-                : state.panelContent
-            const trackLanes = state.trackLanes && Object.fromEntries(Object.entries(state.trackLanes)
-                .map(([row, lane]) => [moved(Number(row)), lane]))
-            return {
-                ...state,
-                bgm: bgmReducer(bgm, { ...action.action, track: index }),
-                panelContent,
-                trackLanes,
-                isSaved: false,
-            }
-        }
         return {
             ...state,
-            bgm: bgmReducer(state.bgm, action.action),
+            bgm: bgmReducer(state.bgm, action.action, (state.location ?? DEFAULT_LOCATION).mix),
             isSaved: false,
         }
     }

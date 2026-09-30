@@ -18,7 +18,7 @@ export default function SegmentEnd({ trackListId, length }: { trackListId: numbe
         className={styles.segmentEnd}
         data-dragging={drag !== null}
         style={drag ? { transform: `translateX(${(drag.length - length) / drag.ticksPerPx}px)` } : undefined}
-        title="Drag to change where the segment ends. Hold Shift to place freely."
+        title="Drag to change where the region ends. Hold Shift to place freely."
         data-no-drag-scroll
         onClick={event => event.stopPropagation()}
         onPointerDown={event => {

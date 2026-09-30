@@ -2,7 +2,6 @@ import { ActionButton, ToggleButton, Tooltip, TooltipTrigger, View } from "@adob
 import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext, useState } from "react"
 import { Play, Repeat, SkipBack } from "react-feather"
 
-import LocationControls from "./LocationControls"
 import styles from "./PlaybackControls.module.scss"
 import SnapControl, { ZoomControls } from "./SnapControl"
 import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
@@ -304,6 +303,5 @@ export default function PlaybackControls() {
         </div>
         <SnapControl />
         <ZoomControls />
-        <LocationControls />
     </View>
 }

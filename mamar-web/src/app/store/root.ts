@@ -6,6 +6,7 @@ import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./do
 import Bridge from "../bridge"
 import { removeRecordings } from "../util/recordings"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
+import vanillaMixNames from "../util/vanillaMixNames"
 
 function generateId() {
     return Math.random().toString(36).substring(2, 15)
@@ -101,6 +102,9 @@ function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined): { bgm: B
         throw new Error(bgm)
     }
     bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
+    if (Object.keys(bgm.mix_names ?? {}).length === 0) {
+        bgm.mix_names = vanillaMixNames(data) ?? bgm.mix_names
+    }
 
     // "MThd"
     const isMidi = data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64

@@ -18,7 +18,7 @@ const VANILLA_BEATS_PER_BAR: Record<number, number> = {
     0xee38138e: 3, // New Partner (JP)
 }
 
-function fnv1a(data: Uint8Array): number {
+export function fnv1a(data: Uint8Array): number {
     let hash = 0x811c9dc5
     for (const byte of data) {
         hash ^= byte

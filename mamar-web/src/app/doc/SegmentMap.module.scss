@@ -1,5 +1,5 @@
 $trackHeight: 70px;
-$alternatePartHeight: 40px;
+$versionHeight: 40px;
 
 .table {
     width: 100%;
@@ -41,7 +41,6 @@ $alternatePartHeight: 40px;
 
     .trackName {
         color: var(--spectrum-gray-900);
-        margin-bottom: 4px;
     }
 }
 
@@ -88,11 +87,6 @@ $alternatePartHeight: 40px;
     &.shortOfVoices {
         outline: 2px solid var(--spectrum-orange-600);
         outline-offset: -2px;
-    }
-
-    &.showsAlternatePart {
-        --color-500: var(--spectrum-indigo-700);
-        --color-400: var(--spectrum-indigo-600);
     }
 
     &.drumRegion {
@@ -157,17 +151,38 @@ $alternatePartHeight: 40px;
     grid-column: 1 / -1;
 }
 
-// A track's alternate part, in a thinner row under the track
-.alternatePartRow {
-    height: $alternatePartHeight;
+// A version of a track, a mix or its alternate part, or the place to add a mix, in a thinner row under the track
+.versionRow {
+    height: $versionHeight;
 
     .pianoRollThumbnail {
         height: 100%;
     }
+
+    .trackHead {
+        display: flex;
+        align-items: center;
+    }
 }
 
-.alternatePartName {
+.versionHead {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
     padding-left: 12px;
+
+    // Renaming and deleting are offered on hover, so they don't crowd the names
+    &:hover .versionAction,
+    .versionAction:focus-visible {
+        opacity: 1;
+    }
+}
+
+.versionName {
+    flex: 1;
+    min-width: 0;
     color: var(--spectrum-gray-700);
     font-size: 12px;
     white-space: nowrap;
@@ -175,18 +190,118 @@ $alternatePartHeight: 40px;
     text-overflow: ellipsis;
 }
 
-// Adds an alternate part in a segment without one
-.addAlternatePart {
-    flex: 1;
-    margin: 4px;
-    border: 1px dashed var(--spectrum-gray-300);
+// The version that plays, and so the one the track's row shows
+.playingVersion {
+    color: var(--spectrum-gray-900);
+    font-weight: bold;
+}
+
+.versionAction {
+    display: grid;
+    place-items: center;
+    flex: none;
+    padding: 4px;
+    border: 0;
     border-radius: 4px;
     background: transparent;
-    color: var(--spectrum-gray-600);
+    color: var(--spectrum-gray-700);
     cursor: pointer;
     opacity: 0;
 
-    &:hover, &:focus-visible {
+    &:hover {
+        background: var(--spectrum-gray-200);
+        color: var(--spectrum-gray-900);
+    }
+}
+
+.versionRename {
+    width: 100%;
+    min-width: 0;
+    margin-left: 8px;
+    padding: 2px 4px;
+    border: 1px solid var(--spectrum-blue-700);
+    border-radius: 4px;
+    background: var(--spectrum-gray-75);
+    color: var(--spectrum-gray-900);
+    font: inherit;
+    font-size: 12px;
+}
+
+.addMix {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-700);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+        background: var(--spectrum-gray-200);
+        color: var(--spectrum-gray-900);
+    }
+}
+
+// A track's name, and the version of it that plays if it has versions
+.trackTitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-bottom: 4px;
+
+    // A track without versions offers to show where its mixes would go on hover
+    &:hover .versionsToggle {
         opacity: 1;
     }
+}
+
+// Shows and hides the rows of a track's versions
+.versionsToggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 0 4px 0 2px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-700);
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    opacity: 0;
+
+    &:hover {
+        background: var(--spectrum-gray-200);
+    }
+
+    &[aria-expanded="true"] {
+        opacity: 1;
+    }
+
+    &.hasVersions {
+        padding-right: 6px;
+        background: var(--spectrum-purple-400);
+        color: var(--spectrum-gray-50);
+        opacity: 1;
+
+        &:hover {
+            background: var(--spectrum-purple-500);
+        }
+    }
+}
+
+.pianoRollThumbnail.showsVersion {
+    --color-500: var(--spectrum-purple-700);
+    --color-400: var(--spectrum-purple-600);
 }

@@ -4,6 +4,8 @@ import { getUntrackedObject } from "react-tracked"
 import Bridge from "../bridge"
 import { timeline } from "../doc/lanes"
 import { highestPitch, recordingsOf, Sample, sampleOf } from "../doc/pitchLimit"
+import { TICKS_PER_BEAT, trackListLength } from "../doc/Ruler"
+import { branchesPlayedBy, mixCount, variesByMix } from "../store/bgm"
 
 // The engine plays a sample up to about an octave above the pitch it was recorded at, so many instruments are recorded
 // at several pitches, such as "E. Piano 1 C5", "C6", and "C7". Mamar treats an instrument's recordings as one instrument
@@ -194,17 +196,38 @@ function mapTracks(bgm: Bgm, change: (key: TrackKey, track: Track, state: State)
 
 /**
  * Builds the song for the game: each track switches between recordings of its instrument as it needs, apart from those
- * in `kept`, and those still as they were opened when `restore` is set, which are left as they are.
+ * in `kept`, and those still as they were opened when `restore` is set, which are left as they are. A track that varies
+ * by mix switches in each mix's passages, from what it plays as it starts.
  */
 function build(bgm: Bgm, sbn: ArrayBuffer, kept: ReadonlySet<TrackKey>, restore: boolean): Bgm {
-    return mapTracks(bgm, (key, track, state) => {
+    let branches = bgm.branches
+    const built = mapTracks(bgm, (key, track, state) => {
         const original = restore ? opened.get(untracked(track.commands)) : undefined
         if (kept.has(key) || original) {
             follow(bgm, original ?? track, state)
             return original ?? track
         }
-        return addSwitches(bgm, sbn, track, state)
+        if (!variesByMix(track.commands)) {
+            return addSwitches(bgm, sbn, track, state)
+        }
+        let commands = track.commands
+        let first: State | undefined
+        for (let mix = 0; mix < mixCount(bgm); mix++) {
+            const mixState = { ...state }
+            const played: Event[] = Bridge.commands_for_mix(commands, branchesPlayedBy(commands, branches), mix)
+            const switched = addSwitches(bgm, sbn, { ...track, commands: played }, mixState)
+            const written = Bridge.commands_set_for_mix(commands, branches, mix, switched.commands)
+            commands = written.commands
+            branches = written.branches
+            first ??= mixState
+        }
+        // The first mix plays as the song starts, so the tracks after this one carry on from it
+        Object.assign(state, first)
+        const switchedTrack: Track = { ...track, commands }
+        delete switchedTrack.pos
+        return switchedTrack
     })
+    return { ...built, branches }
 }
 
 /** A track's commands without their IDs, to compare them. */
@@ -219,6 +242,15 @@ function commandsOf(track: Track): string {
  */
 export function removeRecordings(bgm: Bgm, sbn: ArrayBuffer): Bgm {
     const kept = new Set<TrackKey>()
+    // Tracks that vary by mix keep their overrides, as working out each mix's switches when a song opens is slow, and
+    // they build as they were until they're edited
+    for (const [id, trackList] of Object.entries(bgm.track_lists)) {
+        trackList.tracks.forEach((track, index) => {
+            if (variesByMix(track.commands)) {
+                kept.add(`${Number(id)}:${index}`)
+            }
+        })
+    }
     let removed = bgm
     // A kept track changes what the tracks after it carry from it, so check again until nothing changes
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -257,12 +289,47 @@ export function addRecordings(bgm: Bgm, sbn: ArrayBuffer): Bgm {
     return build(bgm, sbn, new Set(), true)
 }
 
+/** Whether `event` is a proximity mix override that marks where tracks fade to their volumes in the mix. */
+function isMixFadePoint(event: Event): boolean {
+    return "ProxMixOverride" in event && event.ProxMixOverride.volume1 === 0
+}
+
+/**
+ * `bgm` with a point at the start of each bar of the master track where the tracks fade to their volumes in the
+ * proximity mix, as the game's own songs have, if it has mixes and a track has a volume in a mix to fade to. A song
+ * that places its own is left as it is.
+ */
+function withMixFadePoints(bgm: Bgm): Bgm {
+    const trackLists = Object.values(bgm.track_lists)
+    const played = (track: Track) => Bridge.commands_without_detours(track.commands) as Event[]
+    const hasMixVolumes = trackLists.some(trackList => trackList.tracks.some(track =>
+        played(track).some(event => "ProxMixOverride" in event && !isMixFadePoint(event))))
+    const hasFadePoints = trackLists.some(trackList => played(trackList.tracks[0]).some(isMixFadePoint))
+    if (mixCount(bgm) === 0 || !hasMixVolumes || hasFadePoints) {
+        return bgm
+    }
+
+    const ticksPerBar = TICKS_PER_BEAT * (bgm.beats_per_bar ?? 4)
+    const track_lists: Record<number, TrackList> = {}
+    for (const [id, trackList] of Object.entries(bgm.track_lists)) {
+        const [master, ...others] = trackList.tracks
+        let commands = played(master)
+        for (let time = 0; time < trackListLength(trackList, bgm.branches); time += ticksPerBar) {
+            commands = Bridge.commands_insert(commands, time, { ProxMixOverride: { volume1: 0, volume2: 0 } })
+        }
+        const withFadePoints: Track = { ...master, commands }
+        delete withFadePoints.pos
+        track_lists[Number(id)] = { ...trackList, tracks: [withFadePoints, ...others] as TrackList["tracks"] }
+    }
+    return { ...bgm, track_lists }
+}
+
 /**
  * Encodes the song as the game plays it, switching between recordings of each track's instrument as it needs when the
- * user's sound bank is known.
+ * user's sound bank is known, and with the points where tracks fade to their volumes in a proximity mix.
  */
 export function encodeForGame(bgm: Bgm, sbn: ArrayBuffer | null): Uint8Array {
-    const encoded: Uint8Array | string = Bridge.bgm_encode(sbn ? addRecordings(bgm, sbn) : bgm)
+    const encoded: Uint8Array | string = Bridge.bgm_encode(withMixFadePoints(sbn ? addRecordings(bgm, sbn) : bgm))
     if (typeof encoded === "string") {
         throw new Error(encoded)
     }

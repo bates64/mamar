@@ -3,6 +3,7 @@ mod piano_roll;
 use pm64::bgm::*;
 use pm64::sbn::Sbn;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
@@ -137,6 +138,71 @@ pub fn track_list_voices(track_list: &JsValue, branches: &JsValue) -> JsValue {
     let track_list: TrackList = from_js(track_list);
     let branches: std::collections::BTreeMap<BranchId, Branch> = from_js(branches);
     to_js(&track_list.voices(&branches))
+}
+
+/// Returns what `commands` play in proximity mix `mix`. See [CommandSeq::for_mix].
+#[wasm_bindgen]
+pub fn commands_for_mix(commands: &JsValue, branches: &JsValue, mix: usize) -> JsValue {
+    let commands: CommandSeq = from_js(commands);
+    let branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    to_js(&commands.for_mix(&branches, mix))
+}
+
+/// Commands and the branches they play, as the functions that change both return them.
+#[derive(Serialize, Deserialize)]
+struct Branching {
+    commands: CommandSeq,
+    branches: BTreeMap<BranchId, Branch>,
+}
+
+/// Returns `commands` and `branches` with `played` written back into them for mix `mix`. See
+/// [CommandSeq::set_for_mix].
+#[wasm_bindgen]
+pub fn commands_set_for_mix(commands: &JsValue, branches: &JsValue, mix: usize, played: &JsValue) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    let mut branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    commands.set_for_mix(&mut branches, mix, &from_js(played));
+    to_js(&Branching { commands, branches })
+}
+
+/// Returns `commands` and `branches` with the commands playing a passage of their own in each of `mixes` mixes. See
+/// [CommandSeq::vary_by_mix].
+#[wasm_bindgen]
+pub fn commands_vary_by_mix(
+    commands: &JsValue,
+    branches: &JsValue,
+    interval: usize,
+    mixes: usize,
+    is_drum_track: bool,
+) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    let mut branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    commands.vary_by_mix(&mut branches, interval, mixes, is_drum_track);
+    to_js(&Branching { commands, branches })
+}
+
+/// Returns `bgm` with another proximity mix. See [Bgm::add_mix].
+#[wasm_bindgen]
+pub fn bgm_add_mix(bgm: &JsValue) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+    bgm.add_mix();
+    to_js(&bgm)
+}
+
+/// Returns `bgm` without proximity mix `mix`. See [Bgm::remove_mix].
+#[wasm_bindgen]
+pub fn bgm_remove_mix(bgm: &JsValue, mix: usize) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+    bgm.remove_mix(mix);
+    to_js(&bgm)
+}
+
+/// Returns `bgm` without the branches no track plays.
+#[wasm_bindgen]
+pub fn bgm_remove_unplayed_branches(bgm: &JsValue) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+    bgm.remove_unplayed_branches();
+    to_js(&bgm)
 }
 
 /// Returns a copy of `commands` with new IDs.

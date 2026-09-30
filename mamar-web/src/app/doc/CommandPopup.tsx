@@ -43,8 +43,8 @@ const FIELDS: Record<string, Field[]> = {
         { path: ["delay"], label: "Delay (0 turns it off)", min: 0, max: 255 },
     ],
     ProxMixOverride: [
-        { path: ["volume1"], label: "Volume at full mix (0 applies the volumes)", min: 0, max: 255 },
-        { path: ["volume2"], label: "Volume otherwise", min: 0, max: 255 },
+        { path: ["volume1"], label: "Volume when Mario is at a mix's place", min: 1, max: 255 },
+        { path: ["volume2"], label: "Volume away from it", min: 0, max: 255 },
     ],
     Marker: [{ path: ["label"], label: "Label" }],
 }

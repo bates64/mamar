@@ -6,7 +6,6 @@ import CommandPopup from "./CommandPopup"
 import FixedPopover from "./FixedPopover"
 import { useSnap } from "./snap"
 
-import Bridge from "../bridge"
 import { useBgm, useDoc } from "../store"
 import { useSelectedIds } from "../store/doc"
 
@@ -30,7 +29,7 @@ export default function CommandMarkers({ name, showName = true, trackListId, tra
     /** Shown over the lane, such as a chooser for what to add. */
     children?: ReactNode
 }) {
-    const [bgm, dispatch] = useBgm()
+    const [, dispatch] = useBgm()
     const [, docDispatch] = useDoc()
     const [, snap] = useSnap()
     const ref = useRef<HTMLDivElement>(null)
@@ -96,11 +95,7 @@ export default function CommandMarkers({ name, showName = true, trackListId, tra
                     setDrag(null)
                 }}
                 onDoubleClick={() => {
-                    const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands ?? []
-                    const index = Bridge.commands_without_detours(commands).findIndex((e: Event) => e.id === event.id)
-                    if (index >= 0) {
-                        dispatch({ type: "delete_track_command", ...target, index })
-                    }
+                    dispatch({ type: "delete_track_commands", ...target, ids: [event.id] })
                 }}
             >
                 {label(event)}

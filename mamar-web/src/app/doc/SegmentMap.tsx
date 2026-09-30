@@ -1,13 +1,14 @@
 import { View } from "@adobe/react-spectrum"
 import classNames from "classnames"
 import type { Event } from "pm64-typegen"
-import { useId, useDeferredValue, useMemo, memo, startTransition } from "react"
-import { Plus } from "react-feather"
+import { useId, useDeferredValue, useMemo, memo, startTransition, useState } from "react"
+import { ChevronDown, ChevronRight, Edit2, Plus, Trash2 } from "react-feather"
 
 import { PlayheadLine } from "./Playhead"
-import { useSegmentLengths } from "./Ruler"
+import { useSegmentLengths, useTicksPerBar } from "./Ruler"
 import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
+import { commandsForMix, commandsVaryByMix } from "./segmentTracks"
 import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
@@ -16,22 +17,22 @@ import { MAX_VOICES, total, useVoices } from "./voices"
 import Bridge from "../bridge"
 import TrackControls from "../emu/TrackControls"
 import { useBgm, useDoc, useLocation, useRoot, useVariation } from "../store"
-import { alternatePartOf, canAddAlternatePart } from "../store/bgm"
+import { ALTERNATE_PART_NAME, alternatePartOf, MAIN_PART_NAME, mixCount, mixName } from "../store/bgm"
 import { getSegmentId } from "../store/segment"
 import useSelection, { SelectionProvider } from "../util/hooks/useSelection"
 
-/** The name of a track's alternate part, which plays instead of it when the game turns alternate parts on. */
-const ALTERNATE = "Alternate"
-
 /**
- * Track `trackIndex` in one segment, or its alternate part if `isAlternatePart`. Clicking it opens it in the region
- * view, and plays that version, so the version being edited is the one heard.
+ * Track `trackIndex` in one segment, or its alternate part if `isAlternatePart`, as it plays in proximity mix `mix`,
+ * or the mix being listened to. Clicking it opens it in the region view, and plays that version and mix, so what's
+ * edited is what's heard. In a row of one version of the track, `isVersion`, it's shown as a version is.
  */
-function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAlternatePart = false }: {
+function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAlternatePart = false, mix, isVersion = mix !== undefined }: {
     trackIndex: number
     trackListIndex: number
     segmentIndex: number
     isAlternatePart?: boolean
+    mix?: number
+    isVersion?: boolean
 }) {
     const [doc] = useDoc()
     const [root, rootDispatch] = useRoot()
@@ -42,9 +43,10 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
     const voices = useVoices(trackListIndex)
     const track = shownIndex !== undefined ? trackList?.tracks[shownIndex] : undefined
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex &&
-        doc?.panelContent.track === trackIndex && location.alternateParts === isAlternatePart
+        doc?.panelContent.track === trackIndex && location.alternateParts === isAlternatePart &&
+        (mix === undefined || location.mix === mix)
     const nameId = useId()
-    const commands = useDeferredValue(track?.commands)
+    const commands = useDeferredValue(track && bgm ? commandsForMix(track.commands, bgm.branches, mix ?? location.mix) : undefined)
 
     // Tracks that are alternate parts show in the rows under the tracks they're for
     if (!track || shownIndex === undefined || track.commands.length === 0 || (!isAlternatePart && track.alternate_for != null)) {
@@ -69,7 +71,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                             },
                         },
                     },
-                    { type: "doc", id, action: { type: "set_location", location: { alternateParts: isAlternatePart } } },
+                    { type: "doc", id, action: { type: "set_location", location: { alternateParts: isAlternatePart, ...(mix === undefined ? {} : { mix }) } } },
                 )
             })
             evt.stopPropagation()
@@ -78,12 +80,13 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
 
         return <div
             tabIndex={0}
-            aria-labelledby={nameId}
+            aria-labelledby={isVersion ? undefined : nameId}
+            aria-label={isVersion ? track.name : undefined}
             className={classNames({
                 [styles.pianoRollThumbnail]: true,
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
-                [styles.showsAlternatePart]: isAlternatePart,
+                [styles.showsVersion]: isVersion,
                 // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one
                 // before, so this only warns when the segment needs more voices than the game has
                 [styles.shortOfVoices]: voices !== undefined && total(voices.needed) > MAX_VOICES &&
@@ -98,32 +101,12 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
             }}
         >
             {commands && <Thumbnail commands={commands} />}
-            <div id={nameId} className={styles.segmentName}>
+            {/* A version's row is under the track's, which names the region */}
+            {!isVersion && <div id={nameId} className={styles.segmentName}>
                 {track.name}
-            </div>
+            </div>}
         </div>
     }
-}
-
-/**
- * The place for track `trackIndex`'s alternate part in a segment without one. Clicking it adds one, a copy of the
- * track, if the segment has a free track for it.
- */
-function AddAlternatePart({ trackIndex, trackListIndex }: { trackIndex: number, trackListIndex: number }) {
-    const [bgm, dispatch] = useBgm()
-    const trackList = bgm?.track_lists[trackListIndex]
-    if (!trackList || trackList.tracks[trackIndex].commands.length === 0 || !canAddAlternatePart(bgm, trackListIndex, trackIndex)) {
-        return null
-    }
-    return <button
-        className={styles.addAlternatePart}
-        onClick={event => {
-            event.stopPropagation()
-            dispatch({ type: "add_alternate_part", trackLists: [trackListIndex], track: trackIndex })
-        }}
-    >
-        <Plus size={14} />
-    </button>
 }
 
 function TrackName({ index }: { index: number }) {
@@ -193,25 +176,202 @@ const Thumbnail = memo(({ commands: stored }: { commands: Event[] }) => {
     </svg>
 })
 
+/**
+ * A row of the segment map: a track, one of its versions, which show under it when it's expanded, or the place to add
+ * a mix to it. A track's versions are its mixes, or, in songs that have them, it and its alternate part.
+ */
+type Row = { trackIndex: number } & (
+    | { kind: "track" }
+    | { kind: "mix", mix: number }
+    | { kind: "alternate", isAlternatePart: boolean }
+    | { kind: "add" }
+)
+
+/**
+ * A name for a version of a track. A mix can be renamed or deleted, which renames or deletes it across the song, as
+ * each mix is one of the song's.
+ */
+function VersionName({ name, isPlaying, onRename, onDelete }: {
+    name: string
+    isPlaying: boolean
+    onRename?(name: string): void
+    onDelete?(): void
+}) {
+    const [isRenaming, setIsRenaming] = useState(false)
+    if (isRenaming && onRename) {
+        return <input
+            className={styles.versionRename}
+            aria-label="Mix name"
+            defaultValue={name}
+            autoFocus
+            onClick={event => event.stopPropagation()}
+            onBlur={event => {
+                onRename(event.currentTarget.value)
+                setIsRenaming(false)
+            }}
+            onKeyDown={event => {
+                if (event.key === "Enter") {
+                    event.currentTarget.blur()
+                } else if (event.key === "Escape") {
+                    setIsRenaming(false)
+                }
+            }}
+        />
+    }
+    return <div className={styles.versionHead}>
+        <div className={classNames(styles.versionName, { [styles.playingVersion]: isPlaying })}>{name}</div>
+        {onRename && <button
+            className={styles.versionAction}
+            aria-label={`Rename ${name}`}
+            onClick={event => {
+                event.stopPropagation()
+                setIsRenaming(true)
+            }}
+        >
+            <Edit2 size={12} />
+        </button>}
+        {onDelete && <button
+            className={styles.versionAction}
+            aria-label={`Delete ${name}`}
+            onClick={event => {
+                event.stopPropagation()
+                onDelete()
+            }}
+        >
+            <Trash2 size={12} />
+        </button>}
+    </div>
+}
+
 function Container() {
     const [variation] = useVariation()
-    const [bgm] = useBgm()
+    const [bgm, dispatch] = useBgm()
+    const [location, setLocation] = useLocation()
     const selection = useSelection()
     const segmentLengths = useSegmentLengths()
 
     // Rows used only by alternate parts are hidden, as alternate parts show in rows under the tracks they're for
     const trackLists = (variation?.segments ?? [])
-        .map(segment => ("Subseg" in segment ? bgm?.track_lists[segment.Subseg.track_list] : undefined))
-        .filter(trackList => trackList !== undefined)
+        .flatMap(segment => ("Subseg" in segment ? [segment.Subseg.track_list] : []))
+        .filter(id => bgm?.track_lists[id] !== undefined)
     const isAlternatePartsRow = (i: number) =>
-        trackLists.some(trackList => trackList.tracks[i].alternate_for != null) &&
-        trackLists.every(trackList => trackList.tracks[i].alternate_for != null || trackList.tracks[i].commands.length === 0)
+        trackLists.some(id => bgm!.track_lists[id].tracks[i].alternate_for != null) &&
+        trackLists.every(id => bgm!.track_lists[id].tracks[i].alternate_for != null || bgm!.track_lists[id].tracks[i].commands.length === 0)
     // The master track's commands show as lanes above, and its length as the segment's
     const tracks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].filter(i => !isAlternatePartsRow(i))
-    const hasAlternateParts = (i: number) => trackLists.some(trackList => alternatePartOf(trackList, i) !== undefined)
-    const rows = tracks.flatMap(i => (hasAlternateParts(i)
-        ? [{ trackIndex: i, isAlternatePart: false }, { trackIndex: i, isAlternatePart: true }]
-        : [{ trackIndex: i, isAlternatePart: false }]))
+    const hasAlternateParts = (i: number) => trackLists.some(id => alternatePartOf(bgm!.track_lists[id], i) !== undefined)
+    const variesByMix = (i: number) => bgm !== undefined && trackLists.some(id => commandsVaryByMix(bgm.track_lists[id].tracks[i].commands, bgm.branches))
+    const hasCommands = (i: number) => trackLists.some(id => bgm!.track_lists[id].tracks[i].commands.length > 0)
+    const [expanded, setExpanded] = useState<number[]>([])
+    const ticksPerBar = useTicksPerBar()
+    const mixes = bgm ? mixCount(bgm) : 0
+
+    const rows: Row[] = tracks.flatMap((i): Row[] => {
+        if (!expanded.includes(i)) {
+            return [{ trackIndex: i, kind: "track" }]
+        } else if (hasAlternateParts(i)) {
+            return [
+                { trackIndex: i, kind: "track" },
+                { trackIndex: i, kind: "alternate", isAlternatePart: false },
+                { trackIndex: i, kind: "alternate", isAlternatePart: true },
+            ]
+        }
+        const mixRows: Row[] = variesByMix(i) ? Array.from({ length: mixes }, (_, mix) => ({ trackIndex: i, kind: "mix", mix })) : []
+        return [{ trackIndex: i, kind: "track" }, ...mixRows, { trackIndex: i, kind: "add" }]
+    })
+    // The rows render in a transition, as a track's mixes can be many, so the badge responds at once
+    const toggle = (i: number) => startTransition(() => {
+        setExpanded(open => (open.includes(i) ? open.filter(other => other !== i) : [...open, i]))
+    })
+    const rowKey = (row: Row) => `${row.trackIndex}-${row.kind}-${"mix" in row ? row.mix : "isAlternatePart" in row ? row.isAlternatePart : ""}`
+    // The version of each track that plays, and so the one its row shows
+    const playing = (i: number) => (variesByMix(i) ? mixName(bgm!, location.mix) : hasAlternateParts(i) ? (location.alternateParts ? ALTERNATE_PART_NAME : MAIN_PART_NAME) : undefined)
+
+    // Adds a mix to the song, and makes the track vary by mix if it doesn't, playing the new mix
+    const addMix = (i: number) => {
+        if (variesByMix(i)) {
+            dispatch({ type: "add_mix" })
+            setLocation({ mix: mixes, alternateParts: false })
+        } else {
+            dispatch({ type: "vary_by_mix", trackLists, track: i, interval: ticksPerBar })
+            setLocation({ mix: Math.max(1, mixes - 1), alternateParts: false })
+        }
+    }
+
+    const head = (row: Row) => {
+        const i = row.trackIndex
+        switch (row.kind) {
+        case "mix":
+            return <VersionName
+                name={mixName(bgm!, row.mix)}
+                isPlaying={row.mix === location.mix}
+                onRename={name => dispatch({ type: "set_mix_name", mix: row.mix, name })}
+                onDelete={() => {
+                    dispatch({ type: "remove_mix", mix: row.mix })
+                    // The mixes after it move down, and deleting the one that plays plays the one before it
+                    if (location.mix >= row.mix && location.mix > 0) {
+                        setLocation({ mix: location.mix - 1 })
+                    }
+                }}
+            />
+        case "alternate":
+            return <VersionName name={row.isAlternatePart ? ALTERNATE_PART_NAME : MAIN_PART_NAME} isPlaying={row.isAlternatePart === location.alternateParts} />
+        case "add":
+            return <button className={styles.addMix} onClick={event => {
+                event.stopPropagation()
+                addMix(i)
+            }}>
+                <Plus size={12} /> Add mix
+            </button>
+        case "track": {
+            const version = playing(i)
+            return <>
+                <div className={styles.trackTitle}>
+                    <TrackName index={i} />
+                    {(version !== undefined || hasCommands(i)) && <button
+                        className={classNames(styles.versionsToggle, { [styles.hasVersions]: version !== undefined })}
+                        aria-expanded={expanded.includes(i)}
+                        aria-label={version === undefined ? "Show mixes" : undefined}
+                        onClick={event => {
+                            event.stopPropagation()
+                            toggle(i)
+                        }}
+                    >
+                        {expanded.includes(i) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        {version}
+                    </button>}
+                </div>
+                <TrackControls
+                    trackIndex={i}
+                    alternateParts={[...new Set(trackLists.map(id => alternatePartOf(bgm!.track_lists[id], i)).filter(slot => slot !== undefined))]}
+                />
+            </>
+        }
+        }
+    }
+
+    const cell = (row: Row, trackListId: number, segmentIndex: number) => {
+        const i = row.trackIndex
+        const trackList = bgm!.track_lists[trackListId]
+        const hasAlternatePart = alternatePartOf(trackList, i) !== undefined
+        switch (row.kind) {
+        case "mix":
+            return commandsVaryByMix(trackList.tracks[i].commands, bgm!.branches) &&
+                <PianoRollThumbnail trackIndex={i} trackListIndex={trackListId} segmentIndex={segmentIndex} mix={row.mix} />
+        case "alternate":
+            return (!row.isAlternatePart || hasAlternatePart) &&
+                <PianoRollThumbnail trackIndex={i} trackListIndex={trackListId} segmentIndex={segmentIndex} isAlternatePart={row.isAlternatePart} isVersion />
+        case "add":
+            return null
+        case "track":
+            return <PianoRollThumbnail
+                trackIndex={i}
+                trackListIndex={trackListId}
+                segmentIndex={segmentIndex}
+                isAlternatePart={location.alternateParts && hasAlternatePart}
+            />
+        }
+    }
 
     return (
         <div
@@ -224,21 +384,9 @@ function Container() {
                 <SongLanes />
             </div>
             <View>
-                {rows.map(({ trackIndex: i, isAlternatePart }) => (isAlternatePart
-                    ? <div key={`${i}-alternate`} className={classNames(styles.track, styles.alternatePartRow)}>
-                        <div className={styles.trackHead}>
-                            <div className={styles.alternatePartName}>{ALTERNATE}</div>
-                        </div>
-                    </div>
-                    : <div key={i} className={styles.track}>
-                        <div className={styles.trackHead}>
-                            <TrackName index={i} />
-                            {i > 0 && <TrackControls
-                                trackIndex={i}
-                                alternateParts={[...new Set(trackLists.map(trackList => alternatePartOf(trackList, i)).filter(slot => slot !== undefined))]}
-                            />}
-                        </div>
-                    </div>))}
+                {rows.map(row => <div key={rowKey(row)} className={classNames(styles.track, { [styles.versionRow]: row.kind !== "track" })}>
+                    <div className={styles.trackHead}>{head(row)}</div>
+                </div>)}
             </View>
             {variation && <TimeGrid dragToScroll={{ axis: "both", button: 1 }}>
                 {variation.segments.map((segment, segmentIndex) => {
@@ -248,19 +396,13 @@ function Container() {
                             colorVersion={6}
                             UNSAFE_className={styles.segment}
                         >
-                            {rows.map(({ trackIndex: i, isAlternatePart }) => (isAlternatePart
-                                ? <div
-                                    key={`${i}-alternate`}
-                                    className={classNames(styles.track, styles.alternatePartRow)}
-                                    aria-label={`Track ${i}, ${ALTERNATE}`}
-                                >
-                                    {alternatePartOf(bgm!.track_lists[segment.Subseg.track_list], i) !== undefined
-                                        ? <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} segmentIndex={segmentIndex} isAlternatePart />
-                                        : <AddAlternatePart trackIndex={i} trackListIndex={segment.Subseg.track_list} />}
-                                </div>
-                                : <div key={i} className={styles.track} aria-label={`Track ${i}`}>
-                                    <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} segmentIndex={segmentIndex} />
-                                </div>))}
+                            {rows.map(row => <div
+                                key={rowKey(row)}
+                                className={classNames(styles.track, { [styles.versionRow]: row.kind !== "track" })}
+                                aria-label={`Track ${row.trackIndex}`}
+                            >
+                                {cell(row, segment.Subseg.track_list, segmentIndex)}
+                            </div>)}
                             <SegmentStart.Provider value={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}>
                                 <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
                             </SegmentStart.Provider>

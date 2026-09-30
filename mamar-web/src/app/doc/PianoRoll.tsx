@@ -8,6 +8,7 @@ import { HIGHEST_PITCH, LOWEST_PITCH, NOTE_HEIGHT } from "./pitches"
 import { PitchLimit } from "./pitchLimit"
 import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
 import { usePickup, useTicksPerBar } from "./Ruler"
+import { useMixCommands } from "./segmentTracks"
 import { SNAP_NAMES, useSnap } from "./snap"
 
 import Bridge from "../bridge"
@@ -134,9 +135,11 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
     const lastPress = useRef<{ time: number, x: number, y: number } | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
 
+    // What the track plays in the mix being listened to, which edits change
+    const played = useMixCommands(track.commands) ?? track.commands
     const notes: NoteAt[] = useMemo(
-        () => timeline(track.commands).filter((played): played is NoteAt => "Note" in played.event),
-        [track.commands],
+        () => timeline(played).filter((played): played is NoteAt => "Note" in played.event),
+        [played],
     )
     const selectedIds = useSelectedIds(trackListId, trackIndex)
     const selectedNotes = notes.filter(note => selectedIds.includes(note.event.id))

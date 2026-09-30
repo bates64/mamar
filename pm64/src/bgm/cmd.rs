@@ -1257,7 +1257,7 @@ const MAX_DETOUR_SIZE: usize = 0xFF;
 const DETOUR_SIZE: usize = 4;
 
 /// The ID of the copy a detour plays of the event with ID `source`.
-fn copy_id(detour: Id, source: Id) -> Id {
+pub(super) fn copy_id(detour: Id, source: Id) -> Id {
     detour.wrapping_mul(0x9E37_79B1) ^ source.rotate_left(16)
 }
 

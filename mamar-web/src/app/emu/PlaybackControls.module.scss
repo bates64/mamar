@@ -1,8 +1,14 @@
 .container {
     display: flex;
     align-items: center;
-    justify-content: center;
+    // Controls keep their size, and overflow to the right rather than over the menus when there isn't room
+    justify-content: safe center;
     gap: 14px;
+    min-width: 0;
+
+    > * {
+        flex: none;
+    }
 
     user-select: none;
 }

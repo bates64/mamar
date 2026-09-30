@@ -8,7 +8,7 @@ import CommandMarkers from "./CommandMarkers"
 import { LaneOption } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, startingEvents, timeline, trackLanes } from "./lanes"
 import { TICKS_PER_BEAT, useTicksPerBar } from "./Ruler"
-import { useCarriedValues } from "./segmentTracks"
+import { useCarriedValues, useMixCommands } from "./segmentTracks"
 import laneStyles from "./TrackLanes.module.scss"
 import useLaneEditing from "./useLaneEditing"
 import VelocityLane from "./VelocityLane"
@@ -38,7 +38,7 @@ function eventLabel(event: Event): string {
  */
 function useTrackLanes(trackListId: number, trackIndex: number) {
     const [bgm] = useBgm()
-    const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands
+    const commands = useMixCommands(bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands)
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
     const { played, starting } = useMemo(() => {
         const all = timeline(commands ?? [])

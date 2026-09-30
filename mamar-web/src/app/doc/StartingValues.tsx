@@ -8,11 +8,10 @@ import CommandPopup from "./CommandPopup"
 import FixedPopover, { ChoiceList } from "./FixedPopover"
 import InstrumentEditor from "./InstrumentEditor"
 import { defaultValue, LaneKind, startingEvents, timeline, trackLanes } from "./lanes"
-import { CarriedValue, useCarriedValues } from "./segmentTracks"
+import { CarriedValue, useCarriedValues, useMixCommands } from "./segmentTracks"
 import styles from "./StartingValues.module.scss"
 import { toEvent } from "./useLaneEditing"
 
-import Bridge from "../bridge"
 import * as instruments from "../instruments"
 import { useBgm } from "../store"
 
@@ -92,7 +91,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
     segmentIndex: number
 }) {
     const [bgm, dispatch] = useBgm()
-    const commands = bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands
+    const commands = useMixCommands(bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands)
     const kinds = useMemo(() => (bgm ? trackLanes(bgm) : []), [bgm])
     const values = useMemo(() => startingEvents(kinds, timeline(commands ?? [])).map(({ event }) => ({
         event,
@@ -113,18 +112,15 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
     }
 
     const remove = (event: Event) => {
-        const index = Bridge.commands_without_detours(commands ?? []).findIndex((played: Event) => played.id === event.id)
-        if (index >= 0) {
-            dispatch({ type: "delete_track_command", ...target, index })
-        }
+        dispatch({ type: "delete_track_commands", ...target, ids: [event.id] })
         setOpen(null)
     }
 
     return <div className={styles.values}>
         <div className={styles.heading}>
-            <Text>At segment start</Text>
+            <Text>At region start</Text>
             {unset.length > 0 && <MenuTrigger>
-                <ActionButton isQuiet aria-label="Add a value at segment start">
+                <ActionButton isQuiet aria-label="Add a value at region start">
                     <Plus size={14} />
                 </ActionButton>
                 <Menu
@@ -150,7 +146,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
         </button>)}
         {carriedPatch && <button
             className={classNames(styles.value, styles.carried)}
-            title="From an earlier segment"
+            title="From an earlier region"
             onClick={() => setHere([{ TrackOverridePatch: carriedPatch }])}
         >
             <span className={styles.name}>Patch</span>
@@ -159,7 +155,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
         {carriedGroups.map(group => <button
             key={group.name}
             className={classNames(styles.value, styles.carried)}
-            title="From an earlier segment"
+            title="From an earlier region"
             onClick={() => setHere(commandsFor(group.values))}
         >
             <span className={styles.name}>{group.name}</span>

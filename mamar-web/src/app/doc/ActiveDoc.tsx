@@ -1,4 +1,5 @@
 import { Flex, View } from "@adobe/react-spectrum"
+import { Event } from "pm64-typegen"
 import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd"
 
 import styles from "./ActiveDoc.module.scss"
@@ -7,6 +8,7 @@ import SegmentMap from "./SegmentMap"
 import SubsegDetails from "./SubsegDetails"
 import TimeProvider from "./TimeProvider"
 
+import Bridge from "../bridge"
 import { useDoc } from "../store"
 import { playingTrack } from "../store/bgm"
 import { DEFAULT_LOCATION } from "../store/doc"
@@ -34,13 +36,16 @@ export default function ActiveDoc() {
         }
 
         if (result.destination.droppableId === "trash") {
+            const commands = doc?.bgm.track_lists[trackListId]?.tracks[trackIndex]?.commands ?? []
+            const id = (Bridge.commands_without_detours(commands) as Event[])[result.source.index]?.id
+            if (id === undefined) return
             dispatch({
                 type: "bgm",
                 action: {
-                    type: "delete_track_command",
+                    type: "delete_track_commands",
                     trackList: trackListId,
                     track: trackIndex,
-                    index: result.source.index,
+                    ids: [id],
                 },
             })
         } else {

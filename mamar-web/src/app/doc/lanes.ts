@@ -78,6 +78,17 @@ export const TRACK_LANES: LaneKind[] = [
         fade: (value, time) => ({ TrackVolumeFade: { time, value } }),
     },
     { ...simple("trackVolume", "Track volume", "SegTrackVolume", 0, 127), defaultValue: 127 },
+    // The volume a track fades to when Mario is at the place of the proximity mix playing, as a track in the band
+    // gets quieter while one that varies by mix plays. It fades at the next fade point, which the song has each bar.
+    {
+        key: "mixVolume", name: "Volume in a mix", min: 1, max: 127, display: "line", defaultValue: 63,
+        read: command => {
+            const override = command.ProxMixOverride as Fields | undefined
+            return override && override.volume1 !== 0 ? { value: override.volume1 } : undefined
+        },
+        set: volume => ({ ProxMixOverride: { volume1: volume, volume2: 127 } }),
+        update: (command, volume) => ({ ProxMixOverride: { ...(command.ProxMixOverride as Fields), volume1: volume } }) as Command,
+    },
     {
         ...simple("pan", "Pan", "SubTrackPan", 0, 127, value => (value === 64 ? "Center" : value < 64 ? `L${64 - value}` : `R${value - 64}`)),
         defaultValue: 64,
@@ -180,15 +191,27 @@ export function startingEvents(kinds: LaneKind[], played: { time: number, event:
 /** Commands that aren't shown on their own: notes and the structure of the track. */
 const STRUCTURE = ["Note", "Delay", "End", "Detour"]
 
+/**
+ * Whether `command` only marks where tracks fade to the volumes they have for the proximity mix: a proximity mix
+ * override with no volumes. The game's songs have one every bar.
+ */
+function isMixFadePoint(command: Record<string, unknown>): boolean {
+    const override = command.ProxMixOverride as { volume1: number } | undefined
+    return override?.volume1 === 0
+}
+
 /** Whether any of `lanes` is for `event`, or it's part of the track's structure. */
 export function inLane(event: Event, lanes: LaneKind[]): boolean {
     const command = event as unknown as Record<string, unknown>
-    return STRUCTURE.some(key => key in command) || lanes.some(kind => kind.read(command) !== undefined)
+    return STRUCTURE.some(key => key in command) || isMixFadePoint(command) || lanes.some(kind => kind.read(command) !== undefined)
 }
 
-/** A short name for a command, from its variant: "SubTrackReverb" becomes "Sub track reverb". */
+/** A short name for a command, from its variant: "SubTrackReverb" becomes "Sub track reverb", unless it has its own. */
 export function commandName(event: Event): string {
     const variant = Object.keys(event).find(key => key !== "id") ?? "Command"
+    if (variant === "ProxMixOverride") {
+        return "Volumes in a mix"
+    }
     return variant.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/ ([A-Z])/g, (_, letter) => ` ${letter.toLowerCase()}`)
 }
 

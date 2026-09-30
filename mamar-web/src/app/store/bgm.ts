@@ -28,11 +28,6 @@ export type BgmAction = {
     track: number
     command: Event
 } | {
-    type: "delete_track_command"
-    trackList: number
-    track: number
-    index: number
-} | {
     type: "modify_track_settings"
     trackList: number
     track: number
@@ -89,22 +84,36 @@ export type BgmAction = {
     /** The events' IDs, in the track's commands with detours written out. */
     ids: number[]
 } | {
-    type: "add_alternate_part"
-    trackLists: number[]
-    track: number
-} | {
-    type: "remove_alternate_part"
-    trackList: number
-    track: number
-} | {
     type: "set_segment_length"
     trackList: number
     length: number
+} | {
+    type: "vary_by_mix"
+    trackLists: number[]
+    track: number
+    /** Ticks between the times the track can change to another mix's passage. */
+    interval: number
+} | {
+    type: "stop_varying_by_mix"
+    trackLists: number[]
+    track: number
+} | {
+    type: "add_mix"
+} | {
+    type: "remove_mix"
+    mix: number
 } | {
     type: "set_mix_name"
     mix: number
     name: string
 }
+
+/**
+ * The names of a track and its alternate part, which plays instead of it when the game turns alternate parts on. Only
+ * Dry Dry Desert has alternate parts, which play in the oasis.
+ */
+export const MAIN_PART_NAME = "Desert"
+export const ALTERNATE_PART_NAME = "Oasis"
 
 /** The index of the track that is an alternate part for track `index` of `trackList`, if there is one. */
 export function alternatePartOf(trackList: TrackList, index: number): number | undefined {
@@ -117,100 +126,93 @@ export function playingTrack(trackList: TrackList, index: number, alternateParts
     return (alternateParts ? alternatePartOf(trackList, index) : undefined) ?? index
 }
 
+/** What the song calls proximity mix `mix`. */
+export function mixName(bgm: Bgm, mix: number): string {
+    return bgm.mix_names?.[mix] ?? `Mix ${mix}`
+}
+
+/** How many proximity mixes the song's branches choose between. */
+export function mixCount(bgm: Bgm): number {
+    return Math.max(0, ...Object.values(bgm.branches ?? {}).map(branch => branch.options.length))
+}
+
 /**
- * Whether a track is unused, so it can become an alternate part. The game's own songs leave unused tracks empty
- * without disabling them.
+ * Whether `track` plays drums in proximity mix `mix`. A track that varies by mix plays drums or not in each mix's
+ * passages, as each of its first branch's options says.
  */
-function isFree(track: Track): boolean {
-    return track.commands.length === 0 && track.alternate_for == null
+export function playsDrums(bgm: Bgm, track: Track, mix: number): boolean {
+    const first = track.commands.find(event => "Branch" in event)
+    const options = first && "Branch" in first ? bgm.branches[first.Branch.branch]?.options : undefined
+    return (options?.[mix] ?? options?.[0])?.is_drum_track ?? track.is_drum_track
 }
 
-/** A slot after track `index` of `trackList` that's free for an alternate part. */
-function freeSlotAfter(trackList: TrackList, index: number): number | undefined {
-    const slot = trackList.tracks.findIndex((track, i) => i > index && isFree(track))
-    return slot >= 0 ? slot : undefined
+/** Whether `commands` play a passage of their own in each proximity mix. */
+export function variesByMix(commands: Event[]): boolean {
+    // A detour only plays commands the sequence has, so a branch it plays is one of them
+    return commands.some(event => "Branch" in event)
 }
 
-/** `bgm` with rows `a` and `b` swapped in every track list, and alternate parts still pointing at their tracks. */
-function swapRows(bgm: Bgm, a: number, b: number): Bgm {
-    const moved = (index: number) => (index === a ? b : index === b ? a : index)
-    return {
-        ...bgm,
-        track_lists: Object.fromEntries(Object.entries(bgm.track_lists).map(([id, trackList]) => {
-            const tracks = [...trackList.tracks] as TrackList["tracks"]
-            ;[tracks[a], tracks[b]] = [tracks[b], tracks[a]]
-            return [id, {
-                ...trackList,
-                tracks: tracks.map(track => (track.alternate_for != null
-                    ? { ...track, alternate_for: moved(track.alternate_for) }
-                    : track)) as TrackList["tracks"],
-            }]
-        })),
+/**
+ * The branches of `branches` that `commands` play, which is all that working out what they play needs. Passing only
+ * these to the bridge saves reading every other branch in the song.
+ */
+export function branchesPlayedBy(commands: Event[], branches: Bgm["branches"]): Bgm["branches"] {
+    const played: Bgm["branches"] = {}
+    for (const event of commands) {
+        if ("Branch" in event && branches[event.Branch.branch]) {
+            played[event.Branch.branch] = branches[event.Branch.branch]
+        }
     }
+    return played
 }
 
-/** Whether every alternate part comes after the track it's for, as the game only links it to an earlier track. */
-function alternatePartsFollowTracks(bgm: Bgm): boolean {
-    return Object.values(bgm.track_lists).every(trackList => trackList.tracks.every((track, index) =>
-        track.alternate_for == null || track.is_disabled || track.alternate_for < index))
+/** `bgm` without the branches no track plays. */
+function withoutUnplayedBranches(bgm: Bgm): Bgm {
+    const played = new Set<number>()
+    for (const trackList of Object.values(bgm.track_lists)) {
+        for (const track of trackList.tracks) {
+            for (const event of track.commands) {
+                if ("Branch" in event) {
+                    played.add(event.Branch.branch)
+                }
+            }
+        }
+    }
+    return { ...bgm, branches: Object.fromEntries(Object.entries(bgm.branches).filter(([id]) => played.has(Number(id)))) }
 }
 
-/**
- * The row track `index` moves to so that track list `trackListId` has a free track after it for an alternate part,
- * swapped with a free row before it in every track list, or undefined if there's none to swap with. A row's number
- * only decides the order voices are given out in, and which tracks an alternate part can follow, so it plays the same.
- */
-function rowToMakeRoom(bgm: Bgm, trackListId: number, index: number): number | undefined {
+/** `bgm` with track `index` of track list `trackListId` changed by `change`, which is given its track. */
+function withTrack(bgm: Bgm, trackListId: number, index: number, change: (track: Track) => Track): Bgm {
     const trackList = bgm.track_lists[trackListId]
-    for (let row = 1; row < index; row++) {
-        if (isFree(trackList.tracks[row]) && alternatePartsFollowTracks(swapRows(bgm, row, index))) {
-            return row
-        }
+    const tracks = [...trackList.tracks] as TrackList["tracks"]
+    tracks[index] = change(tracks[index])
+    return { ...bgm, track_lists: { ...bgm.track_lists, [trackListId]: { ...trackList, tracks } } }
+}
+
+/**
+ * `bgm` with the commands of track `index` of track list `trackListId` edited by `edit`, which is given them as they
+ * play in proximity mix `mix`, with detours written out, as the editor shows them. A track that varies by mix has
+ * the edit written back into that mix's passages. The track forgets where it was decoded from, so the encoder
+ * compresses it into detours again.
+ */
+function editTrack(bgm: Bgm, trackListId: number, index: number, mix: number, edit: (commands: Event[]) => Event[]): Bgm {
+    const track = bgm.track_lists[trackListId].tracks[index]
+    if (!variesByMix(track.commands)) {
+        return withTrack(bgm, trackListId, index, ({ pos: _, ...track }) => ({
+            ...track,
+            commands: edit(Bridge.commands_without_detours(track.commands)),
+        }))
     }
-    return undefined
+    const played = edit(Bridge.commands_for_mix(track.commands, branchesPlayedBy(track.commands, bgm.branches), mix))
+    const { commands, branches } = Bridge.commands_set_for_mix(track.commands, bgm.branches, mix, played)
+    return withoutUnplayedBranches(withTrack({ ...bgm, branches }, trackListId, index, ({ pos: _, ...track }) => ({ ...track, commands })))
 }
 
 /**
- * Whether an alternate part can be added for track `index` of track list `trackListId`: it has none, and there's a
- * free track after it, or one before it to swap rows with.
+ * Applies `action` to `bgm`. Edits to a track's commands edit them as they play in proximity mix `mix`, the one
+ * being listened to.
  */
-export function canAddAlternatePart(bgm: Bgm, trackListId: number, index: number): boolean {
-    const trackList = bgm.track_lists[trackListId]
-    return index > 0 && alternatePartOf(trackList, index) === undefined &&
-        (freeSlotAfter(trackList, index) !== undefined || rowToMakeRoom(bgm, trackListId, index) !== undefined)
-}
-
-/**
- * `bgm` with rows moved so that each of `trackListIds` has a free track after track `index` for an alternate part,
- * where it can, and the row the track ends up in. The rows move in every track list, so each track keeps its row
- * through the song.
- */
-export function makeRoomForAlternateParts(bgm: Bgm, trackListIds: number[], index: number): { bgm: Bgm, index: number } {
-    for (const id of trackListIds) {
-        const trackList = bgm.track_lists[id]
-        if (!trackList || trackList.tracks[index].commands.length === 0 || alternatePartOf(trackList, index) !== undefined ||
-            freeSlotAfter(trackList, index) !== undefined) {
-            continue
-        }
-        const row = rowToMakeRoom(bgm, id, index)
-        if (row !== undefined) {
-            bgm = swapRows(bgm, row, index)
-            index = row
-        }
-    }
-    return { bgm, index }
-}
-
-/**
- * Prepares a track's commands to be edited: writes out its detours, which the editor doesn't show, and forgets where
- * it was decoded from, so the encoder compresses it into detours again.
- */
-function editCommands(track: Track) {
-    track.commands = Bridge.commands_without_detours(current(track).commands)
-    delete track.pos
-}
-
-export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
+export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
     switch (action.type) {
     case "variation": {
         const applyVariation = (index: number) => {
@@ -239,22 +241,12 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             track.commands = arrayMove(track.commands, action.oldIndex, action.newIndex)
         })
     case "update_track_command":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            for (let i = 0; i < track.commands.length; i++) {
-                if (track.commands[i].id === action.command.id) {
-                    track.commands[i] = action.command
-                }
-            }
-        })
-    case "delete_track_command":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            track.commands.splice(action.index, 1)
-        })
-    case "modify_track_settings":
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            commands.map(event => (event.id === action.command.id ? action.command : event)))
+    case "modify_track_settings": {
+        const track = bgm.track_lists[action.trackList].tracks[action.track]
+        // A track that varies by mix plays drums or not in each mix's passages
+        const isMixPercussion = action.isDrumTrack !== undefined && variesByMix(track.commands)
         return produce(bgm, draft => {
             const track = draft.track_lists[action.trackList].tracks[action.track]
             if (action.name !== undefined) {
@@ -263,10 +255,23 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             if (action.isDisabled !== undefined) {
                 track.is_disabled = action.isDisabled
             }
-            if (action.isDrumTrack !== undefined) {
+            if (action.isDrumTrack !== undefined && !isMixPercussion) {
                 track.is_drum_track = action.isDrumTrack
             }
+            if (isMixPercussion) {
+                for (const event of Bridge.commands_without_detours(current(track).commands) as Event[]) {
+                    const branch = "Branch" in event ? draft.branches[event.Branch.branch] : undefined
+                    if (!branch) continue
+                    while (branch.options.length <= mix) {
+                        const first = current(branch.options[0])
+                        branch.options.push({ is_drum_track: first.is_drum_track, commands: Bridge.commands_copy(first.commands) })
+                    }
+                    branch.options[mix].is_drum_track = action.isDrumTrack!
+                    delete branch.pos
+                }
+            }
         })
+    }
     case "update_instrument":
         return produce(bgm, draft => {
             const instrument = draft.instruments[action.index]
@@ -278,85 +283,59 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
             trackList: action.trackList,
             track: action.track,
             command: { id: action.event.id, SetTrackVoice: { index: bgm.instruments.length } } as unknown as Event,
-        })
+        }, mix)
     case "split_variation":
         return Bridge.bgm_split_variation_at(bgm, action.variation, action.time)
     case "set_beats_per_bar":
         return { ...bgm, beats_per_bar: action.beatsPerBar }
     case "insert_track_command":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            track.commands = Bridge.commands_insert(current(track).commands, action.time, action.command)
-        })
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            Bridge.commands_insert(commands, action.time, action.command))
     case "place_track_command":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            track.commands = Bridge.commands_place(current(track).commands, action.id, action.time, action.command)
-        })
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            Bridge.commands_place(commands, action.id, action.time, action.command))
     case "place_track_commands":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            let commands = current(track).commands
-            for (const { id, time, command } of action.places) {
-                commands = Bridge.commands_place(commands, id, time, command)
-            }
-            track.commands = commands
-        })
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            action.places.reduce((commands, { id, time, command }) => Bridge.commands_place(commands, id, time, command), commands))
     case "insert_track_commands":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            let commands = current(track).commands
-            for (const { time, command } of action.inserts) {
-                commands = Bridge.commands_insert(commands, time, command)
-            }
-            track.commands = commands
-        })
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            action.inserts.reduce((commands, { time, command }) => Bridge.commands_insert(commands, time, command), commands))
     case "delete_track_commands":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            // Deleting a delay would move everything after it
-            track.commands = track.commands.filter(event => "Delay" in event || !action.ids.includes(event.id))
-        })
-    case "add_alternate_part":
-        return produce(bgm, draft => {
-            for (const id of action.trackLists) {
-                const trackList = draft.track_lists[id]
-                if (!trackList || alternatePartOf(current(trackList), action.track) !== undefined ||
-                    freeSlotAfter(current(trackList), action.track) === undefined) {
-                    continue
-                }
-                const main = trackList.tracks[action.track]
-                if (main.commands.length === 0) {
-                    continue
-                }
-                const slot = freeSlotAfter(current(trackList), action.track)!
-                trackList.tracks[slot] = {
-                    name: main.name,
-                    is_disabled: false,
-                    is_drum_track: main.is_drum_track,
-                    alternate_for: action.track,
-                    commands: Bridge.commands_copy(Bridge.commands_without_detours(current(main).commands)),
-                }
-            }
-        })
-    case "remove_alternate_part":
-        return produce(bgm, draft => {
-            const trackList = draft.track_lists[action.trackList]
-            const slot = alternatePartOf(current(trackList), action.track)
-            if (slot !== undefined) {
-                trackList.tracks[slot] = {
-                    name: "",
-                    is_disabled: true,
-                    is_drum_track: false,
-                    commands: [],
-                }
-            }
-        })
+        // Deleting a delay would move everything after it
+        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+            commands.filter(event => "Delay" in event || !action.ids.includes(event.id)))
+    case "vary_by_mix": {
+        const mixes = Math.max(2, mixCount(bgm))
+        let changed = bgm
+        for (const id of action.trackLists) {
+            const track = changed.track_lists[id]?.tracks[action.track]
+            if (!track || track.commands.length === 0 || variesByMix(track.commands)) continue
+            const { commands, branches } = Bridge.commands_vary_by_mix(track.commands, changed.branches, action.interval, mixes, track.is_drum_track)
+            changed = withTrack({ ...changed, branches }, id, action.track, ({ pos: _, ...track }) => ({ ...track, commands }))
+        }
+        return changed
+    }
+    case "stop_varying_by_mix": {
+        let changed = bgm
+        for (const id of action.trackLists) {
+            const track = changed.track_lists[id]?.tracks[action.track]
+            if (!track || !variesByMix(track.commands)) continue
+            // The track plays drums if the mix's passages do
+            const first = (Bridge.commands_without_detours(track.commands) as Event[]).find(event => "Branch" in event)
+            const options = first && "Branch" in first ? bgm.branches[first.Branch.branch]?.options : undefined
+            const isDrumTrack = (options?.[mix] ?? options?.[0])?.is_drum_track ?? track.is_drum_track
+            changed = withTrack(changed, id, action.track, ({ pos: _, ...track }) => ({
+                ...track,
+                is_drum_track: isDrumTrack,
+                commands: Bridge.commands_for_mix(track.commands, branchesPlayedBy(track.commands, bgm.branches), mix),
+            }))
+        }
+        return withoutUnplayedBranches(changed)
+    }
+    case "add_mix":
+        return Bridge.bgm_add_mix(bgm)
+    case "remove_mix":
+        return Bridge.bgm_remove_mix(bgm, action.mix)
     case "set_segment_length":
         return {
             ...bgm,

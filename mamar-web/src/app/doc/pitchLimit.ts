@@ -3,7 +3,7 @@ import { useMemo } from "react"
 
 import { timeline } from "./lanes"
 import { LOWEST_PITCH } from "./pitches"
-import { useCarriedValues } from "./segmentTracks"
+import { useCarriedValues, useMixCommands } from "./segmentTracks"
 
 import * as instruments from "../instruments"
 import { useBgm } from "../store"
@@ -132,6 +132,7 @@ export function usePitchLimits(trackListId: number, trackIndex: number, mainInde
     const sbn = useOptionalSoundBank()
     const carried = useCarriedValues(mainIndex, segmentIndex)
     const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
+    const commands = useMixCommands(track?.commands)
 
     return useMemo(() => {
         if (!bgm || !sbn || !track || track.is_drum_track) {
@@ -158,7 +159,7 @@ export function usePitchLimits(trackListId: number, trackIndex: number, mainInde
             }
         }
         update(0)
-        for (const { time, event } of timeline(track.commands)) {
+        for (const { time, event } of timeline(commands ?? [])) {
             if ("SetTrackVoice" in event) {
                 // Choosing an instrument sets the track's tuning to the instrument's
                 const instrument = bgm.instruments[event.SetTrackVoice.index]
@@ -177,5 +178,5 @@ export function usePitchLimits(trackListId: number, trackIndex: number, mainInde
             update(time)
         }
         return limits.every(({ limit }) => limit === undefined) ? [] : limits
-    }, [bgm, sbn, track, carried])
+    }, [bgm, sbn, track, commands, carried])
 }

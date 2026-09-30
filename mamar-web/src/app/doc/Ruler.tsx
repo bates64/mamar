@@ -164,7 +164,7 @@ export function useSegmentLengths(): number[] {
  * The game ends a segment when any enabled track reaches an End. Tracks without one play into whatever follows them,
  * so the master track's length stands in when no track has one. See TrackList::len_time in pm64.
  */
-function trackListLength(trackList: TrackList, branches: Bgm["branches"]): number {
+export function trackListLength(trackList: TrackList, branches: Bgm["branches"]): number {
     let length: number | undefined
     for (const track of trackList.tracks) {
         if (track.is_disabled) {
