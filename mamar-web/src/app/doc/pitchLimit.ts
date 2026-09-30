@@ -8,6 +8,7 @@ import { useCarriedValues, useMixCommands } from "./segmentTracks"
 import * as instruments from "../instruments"
 import { useBgm } from "../store"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
+import { instrumentOffset } from "../util/soundBank"
 
 /** The rate the engine outputs at, which each instrument's sample rate is relative to, in Hz. */
 const OUTPUT_RATE = 32000
@@ -17,9 +18,6 @@ const MAX_RATIO = 1.99996
 
 /** The most a note can be tuned up by, in cents, as the engine's table of pitch ratios goes no higher. */
 const MAX_TUNING = 4095
-
-/** The BankSet each patch's bank set is loaded as, from the INIT file's list of banks, or undefined if it isn't. */
-const BANK_SETS: Partial<Record<PatchAddress["bank_set"], number>> = { Set2: 2, Music: 3, Set4: 4, Set5: 5, Set6: 6 }
 
 /** An instrument's sample: the key it plays at its own pitch, in cents, and its sample rate. */
 export interface Sample {
@@ -32,36 +30,15 @@ export interface Sample {
  * those, such as a song's own.
  */
 export function sampleOf(sbn: ArrayBuffer, patch: PatchAddress): Sample | null {
-    const view = new DataView(sbn)
-    const fileCount = view.getUint32(0x14)
-    const init = view.getUint32(0x24)
-    const bankSet = BANK_SETS[patch.bank_set]
-    if (init === 0 || bankSet === undefined) {
+    const instrument = instrumentOffset(sbn, patch)
+    if (instrument === null) {
         return null
     }
-
-    const bankList = init + view.getUint16(init + 0x08)
-    const bankListSize = view.getUint16(init + 0x0A)
-    for (let entry = bankList; entry + 4 <= bankList + bankListSize; entry += 4) {
-        const fileIndex = view.getUint16(entry)
-        if (fileIndex === 0xFFFF || fileIndex >= fileCount) {
-            break
-        }
-        if (view.getUint8(entry + 2) !== patch.bank || view.getUint8(entry + 3) !== bankSet) {
-            continue
-        }
-
-        const bk = view.getUint32(0x40 + fileIndex * 8) & 0xFFFFFF
-        const instrument = view.getUint16(bk + 0x12 + patch.instrument * 2)
-        if (instrument === 0) {
-            return null
-        }
-        return {
-            keyBase: view.getUint16(bk + instrument + 0x1E),
-            sampleRate: view.getInt32(bk + instrument + 0x20),
-        }
+    const view = new DataView(sbn)
+    return {
+        keyBase: view.getUint16(instrument + 0x1E),
+        sampleRate: view.getInt32(instrument + 0x20),
     }
-    return null
 }
 
 /**

@@ -1,7 +1,7 @@
 import { ActionButton, Content, Dialog, DialogTrigger, Flex, Form, Heading, NumberField } from "@adobe/react-spectrum"
 import { PatchAddress } from "pm64-typegen"
 
-import { SoundSelect } from "./doc/InstrumentEditor"
+import { EnvelopeSelect, SoundSelect } from "./doc/InstrumentEditor"
 import styles from "./InstrumentInput.module.scss"
 import * as instruments from "./instruments"
 import { useBgm } from "./store"
@@ -40,7 +40,7 @@ export default function InstrumentInput({ index, onChange }: Props) {
                 {instrument && <Form isQuiet onSubmit={e => e.preventDefault()}>
                     <Flex gap="size-150">
                         <SoundSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
-                        <NumberField label="Envelope" value={instrument.patch.envelope} minValue={0} maxValue={3} onChange={envelope => dispatch({ type: "update_instrument", index, partial: { patch: { ...instrument.patch, envelope } } })} />
+                        <EnvelopeSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
                     </Flex>
                     <Flex gap="size-150">
                         <NumberField label="Volume" value={instrument.volume} onChange={volume => dispatch({ type: "update_instrument", index, partial: { volume } })} />
@@ -70,7 +70,7 @@ export function PatchInput({ patch, onChange }: { patch: PatchAddress, onChange:
                 <Form isQuiet onSubmit={e => e.preventDefault()}>
                     <Flex gap="size-150">
                         <SoundSelect patch={patch} onChange={patch => onChange(patch)} />
-                        <NumberField label="Envelope" value={patch.envelope} minValue={0} maxValue={3} onChange={envelope => onChange({ ...patch, envelope })} />
+                        <EnvelopeSelect patch={patch} onChange={onChange} />
                     </Flex>
                 </Form>
             </Content>

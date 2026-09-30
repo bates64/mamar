@@ -2,7 +2,7 @@ import { Flex, NumberField, Text, TextField } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 
 import styles from "./CommandPopup.module.scss"
-import { SoundSelect } from "./InstrumentEditor"
+import { EnvelopeSelect, SoundSelect } from "./InstrumentEditor"
 import { commandName } from "./lanes"
 import { toEvent } from "./useLaneEditing"
 
@@ -17,21 +17,13 @@ interface Field {
     min?: number
     max?: number
     hex?: boolean
-    options?: string[]
 }
-
-const BANK_SETS = ["Aux", "Set2", "Default", "Music", "Set4", "Set5", "Set6", "AuxCopy"]
 
 /** The fields to edit for each kind of command. Others edit every number in the command. */
 const FIELDS: Record<string, Field[]> = {
     EventTrigger: [{ path: ["event_info"], label: "Event", min: 0, max: 0xFFFFFF, hex: true }],
     TriggerSound: [{ path: ["sound"], label: "Sound effect", min: 0, max: 255 }],
-    TrackOverridePatch: [
-        { path: ["bank_set"], label: "Bank set", options: BANK_SETS },
-        { path: ["bank"], label: "Bank", min: 0, max: 15 },
-        { path: ["instrument"], label: "Instrument", min: 0, max: 15 },
-        { path: ["envelope"], label: "Envelope", min: 0, max: 3 },
-    ],
+    TrackOverridePatch: [],
     SeekCustomEnvelope: [{ path: ["index"], label: "Custom envelope to write", min: 1, max: 8 }],
     WriteCustomEnvelope: [
         { path: ["time"], label: "Time, or envelope command from 40", min: 0, max: 255 },
@@ -96,19 +88,14 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
     } else {
         const shown = FIELDS[variant] ?? numberFields(value)
         body = <Flex direction="column" gap="size-100">
-            {variant === "TrackOverridePatch" && <SoundSelect patch={value as never} onChange={patch => update([], patch as never)} />}
+            {variant === "TrackOverridePatch" && <>
+                <SoundSelect patch={value as never} onChange={patch => update([], patch as never)} />
+                <EnvelopeSelect patch={value as never} onChange={patch => update([], patch as never)} />
+            </>}
             {shown.map(field => {
                 const current = get(value, field.path)
                 const key = field.path.join(".") || "value"
-                if (field.options) {
-                    // A native list, as a Spectrum picker's own popup would count as outside this one and close it
-                    return <label key={key} className={styles.select}>
-                        {field.label}
-                        <select value={String(current)} onChange={event => update(field.path, event.target.value)}>
-                            {field.options.map(option => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                    </label>
-                } else if (typeof current === "string") {
+                if (typeof current === "string") {
                     return <TextField key={key} label={field.label} value={current} onChange={text => update(field.path, text)} />
                 }
                 return <NumberField

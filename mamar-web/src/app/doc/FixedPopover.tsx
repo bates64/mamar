@@ -7,7 +7,7 @@ const EXPECTED_HEIGHT = 320
 
 /**
  * A popup beside `anchor`, the element that opened it. It's fixed in place, so lanes that clip their contents don't
- * clip it, and it closes on a press outside it or on Escape.
+ * clip it, and it closes on a press elsewhere in the app or on Escape.
  */
 export default function FixedPopover({ anchor, onClose, children }: { anchor: DOMRect, onClose(): void, children: ReactNode }) {
     const ref = useRef<HTMLDivElement>(null)
@@ -16,12 +16,18 @@ export default function FixedPopover({ anchor, onClose, children }: { anchor: DO
 
     useEffect(() => {
         const onPointerDown = (event: PointerEvent) => {
-            if (!ref.current?.contains(event.target as Node)) {
+            // Spectrum's popups, such as a combo box's list, open outside the app's root, so pressing in one isn't outside
+            const target = event.target as Element
+            if (!ref.current?.contains(target) && target.closest?.("#root")) {
                 onCloseRef.current()
             }
         }
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
+            // Escape in an open Spectrum popup, or in a combo box whose list is open, closes only that
+            const target = event.target
+            const isInPopup = target instanceof Element && target !== document.body && !target.closest("#root")
+            const isListOpen = target instanceof Element && target.getAttribute("aria-expanded") === "true"
+            if (event.key === "Escape" && !isInPopup && !isListOpen) {
                 onCloseRef.current()
             }
         }

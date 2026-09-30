@@ -1,4 +1,4 @@
-import { NumberField } from "@adobe/react-spectrum"
+import { ComboBox, Item, NumberField, Picker, Section } from "@adobe/react-spectrum"
 import { Bgm, Event, Instrument, PatchAddress } from "pm64-typegen"
 
 import styles from "./InstrumentEditor.module.scss"
@@ -9,7 +9,7 @@ import * as instruments from "../instruments"
 import { useBgm } from "../store"
 import { auxBankFor } from "../store/bgm"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
-import { auxBankFiles } from "../util/soundBank"
+import { auxBankFiles, envelopesOf } from "../util/soundBank"
 
 /** A byte the engine reads as signed. */
 function signed(byte: number): number {
@@ -31,10 +31,15 @@ function soundKey(sound: { bank: number, instrument: number } | { file: string, 
     return "file" in sound ? `aux:${sound.file}:${sound.instrument}` : `music:${sound.bank}:${sound.instrument}`
 }
 
+interface SoundGroup {
+    name: string
+    sounds: { key: string, name: string }[]
+}
+
 /**
  * Chooses the sound `patch` plays, from the sounds in the game's music banks, and those the ROM's songs load into their
- * aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. A native list,
- * as a Spectrum picker's own popup would count as outside the popup it's in and close it.
+ * aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. Typing searches
+ * the sounds by name.
  */
 export function SoundSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
     const [bgm, dispatch] = useBgm()
@@ -50,40 +55,101 @@ export function SoundSelect({ patch, onChange }: { patch: PatchAddress, onChange
     }
     const auxFiles = (sbn ? auxBankFiles(sbn) : []).filter(file =>
         file.instruments.length > 0 && bgm && auxBankFor(bgm, file.name, auxBankCount) !== undefined)
-    const isListed = patch.bank_set === "Music"
-        ? instruments.musicBanks.some(bank => bank.families.some(family => soundKey(family.recordings[0]) === selected))
-        : auxFiles.some(file => file.name === auxBanks[patch.bank] && file.instruments.includes(patch.instrument))
+    const groups: SoundGroup[] = [
+        ...instruments.musicBanks.map(bank => ({
+            name: bank.name,
+            sounds: bank.families.map(family => ({ key: soundKey(family.recordings[0]), name: family.name })),
+        })),
+        ...auxFiles.map(file => ({
+            name: file.name,
+            sounds: file.instruments.map(instrument => ({
+                key: soundKey({ file: file.name, instrument }),
+                name: instruments.soundName(file.name, instrument),
+            })),
+        })),
+    ]
+    // A sound that isn't listed, such as one of the sound effect banks, is shown as it is until another is chosen
+    if (!groups.some(group => group.sounds.some(sound => sound.key === selected))) {
+        selected = "current"
+        groups.unshift({ name: "Current", sounds: [{ key: selected, name: instruments.getName(patch, auxBanks) }] })
+    }
 
-    return <label className={styles.field}>
-        Sound
-        <select
-            value={isListed ? selected : ""}
-            onChange={event => {
-                const [kind, bank, instrument] = event.target.value.split(":")
-                if (kind === "music") {
-                    onChange({ ...patch, bank_set: "Music", bank: Number(bank), instrument: Number(instrument) })
-                } else if (kind === "aux" && bgm) {
-                    const slot = auxBankFor(bgm, bank, auxBankCount)
-                    if (slot !== undefined) {
-                        dispatch({ type: "use_aux_bank", file: bank, count: auxBankCount })
-                        onChange({ ...patch, bank_set: "Aux", bank: slot, instrument: Number(instrument) })
-                    }
+    return <ComboBox
+        label="Sound"
+        width="100%"
+        menuTrigger="focus"
+        defaultItems={groups}
+        selectedKey={selected}
+        onSelectionChange={key => {
+            const [kind, bank, instrument] = String(key ?? "").split(":")
+            if (kind === "music") {
+                onChange({ ...patch, bank_set: "Music", bank: Number(bank), instrument: Number(instrument) })
+            } else if (kind === "aux" && bgm) {
+                const slot = auxBankFor(bgm, bank, auxBankCount)
+                if (slot !== undefined) {
+                    dispatch({ type: "use_aux_bank", file: bank, count: auxBankCount })
+                    onChange({ ...patch, bank_set: "Aux", bank: slot, instrument: Number(instrument) })
                 }
-            }}
-        >
-            {!isListed && <option value="">{instruments.getName(patch, auxBanks)}</option>}
-            {instruments.musicBanks.map(bank => <optgroup key={bank.name} label={bank.name}>
-                {bank.families.map(family => <option key={family.name} value={soundKey(family.recordings[0])}>
-                    {family.name}
-                </option>)}
-            </optgroup>)}
-            {auxFiles.map(file => <optgroup key={file.name} label={file.name}>
-                {file.instruments.map(instrument => <option key={instrument} value={soundKey({ file: file.name, instrument })}>
-                    {instruments.soundName(file.name, instrument)}
-                </option>)}
-            </optgroup>)}
-        </select>
-    </label>
+            }
+        }}
+    >
+        {group => <Section key={group.name} title={group.name} items={group.sounds}>
+            {sound => <Item key={sound.key}>{sound.name}</Item>}
+        </Section>}
+    </ComboBox>
+}
+
+/** A time an envelope takes, such as "280 ms" or "3.3 s". */
+function formatTime(seconds: number): string {
+    return seconds < 1 ? `${Math.round(seconds * 100) * 10} ms` : `${Math.round(seconds * 10) / 10} s`
+}
+
+/** Words for how detached notes sound, by the least time they take to fade out once they end, in seconds. */
+const ARTICULATIONS = [
+    { from: 0.2, name: "Smooth" },
+    { from: 0.08, name: "Normal" },
+    { from: 0.03, name: "Short" },
+    { from: 0, name: "Staccato" },
+]
+
+/** How detached a note sounds when it takes `release` seconds to fade out once it ends, such as "Short (50 ms)". */
+function articulation(release: number): string {
+    const { name } = ARTICULATIONS.find(({ from }) => release >= from)!
+    return `${name} (${formatTime(release)})`
+}
+
+/** How many envelopes an instrument can have, as a patch chooses one in 2 bits. */
+const ENVELOPE_COUNT = 4
+
+/**
+ * Chooses which of the envelopes of the instrument `patch` plays it plays with, by how long its notes take to fade out
+ * once they end, which is how the game's instruments' envelopes differ. The engine plays an envelope the instrument
+ * doesn't have with its default one.
+ */
+export function EnvelopeSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
+    const [bgm] = useBgm()
+    const sbn = useOptionalSoundBank()
+    const envelopes = sbn ? envelopesOf(sbn, patch, bgm?.aux_banks) : null
+
+    const names = envelopes?.map(envelope => articulation(envelope.release))
+    const choices = Array.from({ length: ENVELOPE_COUNT }, (_, i) => {
+        let name = names ? names[i] ?? "Default" : `Envelope ${i + 1}`
+        // Envelopes that sound alike are told apart by number
+        if (names && names.filter(other => other === name).length > 1) {
+            name = `${i + 1}: ${name}`
+        }
+        return { key: String(i), name }
+    }).filter((choice, i) => !envelopes || i < envelopes.length || i === patch.envelope)
+
+    return <Picker
+        label="Articulation"
+        width="100%"
+        items={choices}
+        selectedKey={String(patch.envelope)}
+        onSelectionChange={key => onChange({ ...patch, envelope: Number(key) })}
+    >
+        {choice => <Item key={choice.key}>{choice.name}</Item>}
+    </Picker>
 }
 
 /** The other tracks that play instrument `index` somewhere in the song, by their rows. */
@@ -168,13 +234,13 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
         </label>
         {instrument && <>
             <SoundSelect patch={instrument.patch} onChange={patch => update({ patch })} />
+            <EnvelopeSelect patch={instrument.patch} onChange={patch => update({ patch })} />
             <div className={styles.row}>
                 {number("Volume", instrument.volume, 0, 255, volume => update({ volume }))}
                 {number("Pan", instrument.pan, 0, 127, pan => update({ pan }))}
             </div>
             <div className={styles.row}>
                 {number("Reverb", instrument.reverb, 0, 255, reverb => update({ reverb }))}
-                {number("Envelope", instrument.patch.envelope, 0, 3, envelope => update({ patch: { ...instrument.patch, envelope } }))}
             </div>
             <div className={styles.row}>
                 {number("Tune (semitones)", signed(instrument.coarse_tune), -128, 127, coarse => update({ coarse_tune: coarse & 0xFF }))}
