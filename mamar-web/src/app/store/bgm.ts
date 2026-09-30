@@ -101,9 +101,6 @@ export type BgmAction = {
     trackList: number
     length: number
 } | {
-    type: "set_alternate_parts_name"
-    name: string
-} | {
     type: "set_mix_name"
     mix: number
     name: string
@@ -120,15 +117,88 @@ export function playingTrack(trackList: TrackList, index: number, alternateParts
     return (alternateParts ? alternatePartOf(trackList, index) : undefined) ?? index
 }
 
+/**
+ * Whether a track is unused, so it can become an alternate part. The game's own songs leave unused tracks empty
+ * without disabling them.
+ */
+function isFree(track: Track): boolean {
+    return track.commands.length === 0 && track.alternate_for == null
+}
+
 /** A slot after track `index` of `trackList` that's free for an alternate part. */
 function freeSlotAfter(trackList: TrackList, index: number): number | undefined {
-    const slot = trackList.tracks.findIndex((track, i) => i > index && track.is_disabled && track.commands.length === 0)
+    const slot = trackList.tracks.findIndex((track, i) => i > index && isFree(track))
     return slot >= 0 ? slot : undefined
 }
 
-/** Whether an alternate part can be added for track `index` of `trackList`. */
-export function canAddAlternatePart(trackList: TrackList, index: number): boolean {
-    return index > 0 && alternatePartOf(trackList, index) === undefined && freeSlotAfter(trackList, index) !== undefined
+/** `bgm` with rows `a` and `b` swapped in every track list, and alternate parts still pointing at their tracks. */
+function swapRows(bgm: Bgm, a: number, b: number): Bgm {
+    const moved = (index: number) => (index === a ? b : index === b ? a : index)
+    return {
+        ...bgm,
+        track_lists: Object.fromEntries(Object.entries(bgm.track_lists).map(([id, trackList]) => {
+            const tracks = [...trackList.tracks] as TrackList["tracks"]
+            ;[tracks[a], tracks[b]] = [tracks[b], tracks[a]]
+            return [id, {
+                ...trackList,
+                tracks: tracks.map(track => (track.alternate_for != null
+                    ? { ...track, alternate_for: moved(track.alternate_for) }
+                    : track)) as TrackList["tracks"],
+            }]
+        })),
+    }
+}
+
+/** Whether every alternate part comes after the track it's for, as the game only links it to an earlier track. */
+function alternatePartsFollowTracks(bgm: Bgm): boolean {
+    return Object.values(bgm.track_lists).every(trackList => trackList.tracks.every((track, index) =>
+        track.alternate_for == null || track.is_disabled || track.alternate_for < index))
+}
+
+/**
+ * The row track `index` moves to so that track list `trackListId` has a free track after it for an alternate part,
+ * swapped with a free row before it in every track list, or undefined if there's none to swap with. A row's number
+ * only decides the order voices are given out in, and which tracks an alternate part can follow, so it plays the same.
+ */
+function rowToMakeRoom(bgm: Bgm, trackListId: number, index: number): number | undefined {
+    const trackList = bgm.track_lists[trackListId]
+    for (let row = 1; row < index; row++) {
+        if (isFree(trackList.tracks[row]) && alternatePartsFollowTracks(swapRows(bgm, row, index))) {
+            return row
+        }
+    }
+    return undefined
+}
+
+/**
+ * Whether an alternate part can be added for track `index` of track list `trackListId`: it has none, and there's a
+ * free track after it, or one before it to swap rows with.
+ */
+export function canAddAlternatePart(bgm: Bgm, trackListId: number, index: number): boolean {
+    const trackList = bgm.track_lists[trackListId]
+    return index > 0 && alternatePartOf(trackList, index) === undefined &&
+        (freeSlotAfter(trackList, index) !== undefined || rowToMakeRoom(bgm, trackListId, index) !== undefined)
+}
+
+/**
+ * `bgm` with rows moved so that each of `trackListIds` has a free track after track `index` for an alternate part,
+ * where it can, and the row the track ends up in. The rows move in every track list, so each track keeps its row
+ * through the song.
+ */
+export function makeRoomForAlternateParts(bgm: Bgm, trackListIds: number[], index: number): { bgm: Bgm, index: number } {
+    for (const id of trackListIds) {
+        const trackList = bgm.track_lists[id]
+        if (!trackList || trackList.tracks[index].commands.length === 0 || alternatePartOf(trackList, index) !== undefined ||
+            freeSlotAfter(trackList, index) !== undefined) {
+            continue
+        }
+        const row = rowToMakeRoom(bgm, id, index)
+        if (row !== undefined) {
+            bgm = swapRows(bgm, row, index)
+            index = row
+        }
+    }
+    return { bgm, index }
 }
 
 /**
@@ -256,7 +326,8 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
         return produce(bgm, draft => {
             for (const id of action.trackLists) {
                 const trackList = draft.track_lists[id]
-                if (!trackList || !canAddAlternatePart(current(trackList), action.track)) {
+                if (!trackList || alternatePartOf(current(trackList), action.track) !== undefined ||
+                    freeSlotAfter(current(trackList), action.track) === undefined) {
                     continue
                 }
                 const main = trackList.tracks[action.track]
@@ -294,8 +365,6 @@ export function bgmReducer(bgm: Bgm, action: BgmAction): Bgm {
                 [action.trackList]: Bridge.track_list_set_length(bgm.track_lists[action.trackList], action.length),
             },
         }
-    case "set_alternate_parts_name":
-        return { ...bgm, alternate_parts_name: action.name || undefined }
     case "set_mix_name": {
         const mix_names = { ...bgm.mix_names }
         if (action.name) {

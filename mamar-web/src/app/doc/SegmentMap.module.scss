@@ -1,4 +1,5 @@
 $trackHeight: 70px;
+$alternatePartHeight: 40px;
 
 .table {
     width: 100%;
@@ -83,14 +84,6 @@ $trackHeight: 70px;
         }
     }
 
-    .versionTag {
-        margin-left: 6px;
-        padding: 0 6px;
-        border-radius: 4px;
-        font-size: 0.85em;
-        background: #00000033;
-    }
-
     // Some of its notes are cut off, as its segment needs more voices than the game has
     &.shortOfVoices {
         outline: 2px solid var(--spectrum-orange-600);
@@ -162,4 +155,38 @@ $trackHeight: 70px;
 
 .songLanes {
     grid-column: 1 / -1;
+}
+
+// A track's alternate part, in a thinner row under the track
+.alternatePartRow {
+    height: $alternatePartHeight;
+
+    .pianoRollThumbnail {
+        height: 100%;
+    }
+}
+
+.alternatePartName {
+    padding-left: 12px;
+    color: var(--spectrum-gray-700);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// Adds an alternate part in a segment without one
+.addAlternatePart {
+    flex: 1;
+    margin: 4px;
+    border: 1px dashed var(--spectrum-gray-300);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-600);
+    cursor: pointer;
+    opacity: 0;
+
+    &:hover, &:focus-visible {
+        opacity: 1;
+    }
 }

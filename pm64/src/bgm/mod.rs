@@ -54,11 +54,6 @@ pub struct Bgm {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beats_per_bar: Option<u8>,
 
-    /// What the song calls its [alternate parts](Track::alternate_for), such as "Oasis parts". The game doesn't use
-    /// it. None means the editor's default.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alternate_parts_name: Option<String>,
-
     /// What the song calls each proximity mix its [branches](Command::Branch) choose between, such as "Near the
     /// station". The game doesn't use them.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]

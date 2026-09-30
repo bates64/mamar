@@ -15,8 +15,6 @@ pub struct Metadata {
 
     beats_per_bar: Option<u8>,
 
-    alternate_parts_name: Option<String>,
-
     mix_names: BTreeMap<u8, String>,
 }
 
@@ -24,7 +22,6 @@ impl Metadata {
     pub fn has_data(&self) -> bool {
         // Look for any non-empty track name
         self.beats_per_bar.is_some()
-            || self.alternate_parts_name.is_some()
             || !self.mix_names.is_empty()
             || self
                 .track_names
@@ -34,7 +31,6 @@ impl Metadata {
 
     pub fn apply_to_bgm(&self, bgm: &mut super::Bgm) {
         bgm.beats_per_bar = self.beats_per_bar;
-        bgm.alternate_parts_name = self.alternate_parts_name.clone();
         bgm.mix_names = self.mix_names.clone();
 
         for (id, track_list) in &mut bgm.track_lists {
@@ -53,8 +49,7 @@ impl Metadata {
         self.beats_per_bar = beats_per_bar;
     }
 
-    pub fn set_names(&mut self, alternate_parts_name: Option<String>, mix_names: BTreeMap<u8, String>) {
-        self.alternate_parts_name = alternate_parts_name;
+    pub fn set_mix_names(&mut self, mix_names: BTreeMap<u8, String>) {
         self.mix_names = mix_names;
     }
 
@@ -118,13 +113,11 @@ mod test {
     }
 
     #[test]
-    fn encode_decode_metadata_preserves_names() {
+    fn encode_decode_metadata_preserves_mix_names() {
         let mut bgm = Bgm::new();
-        bgm.alternate_parts_name = Some("Oasis parts".to_string());
         bgm.mix_names.insert(2, "Near the station".to_string());
 
         let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
-        assert_eq!(bgm2.alternate_parts_name, bgm.alternate_parts_name);
         assert_eq!(bgm2.mix_names, bgm.mix_names);
     }
 

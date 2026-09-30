@@ -10,7 +10,6 @@ import { useSnap } from "./snap"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
-import { alternatePartOf } from "../store/bgm"
 import { useSelectedIds } from "../store/doc"
 import { useSize } from "../util/hooks/useSize"
 
@@ -36,17 +35,12 @@ export default function PianoRoll({ trackListId, trackIndex, segmentStart, pitch
 
     if (!bgm || !trackList || !track) return null
 
-    // The track's other version: the track an alternate part is for, or a track's alternate part
-    const otherIndex = track.alternate_for ?? alternatePartOf(trackList, trackIndex)
-    const behind = otherIndex !== undefined ? trackList.tracks[otherIndex] : null
-
     return <Canvas
         trackListId={trackListId}
         trackIndex={trackIndex}
         track={track}
         branches={bgm.branches}
         mix={location.mix}
-        behind={behind}
         segmentStart={segmentStart}
         pitchLimits={pitchLimits}
     />
@@ -86,13 +80,12 @@ let clipboard: { offset: number, pitch: number, velocity: number, length: number
  * or their ends to resize them. Delete removes the selected notes, Q snaps them to the grid, and the usual shortcuts
  * copy, paste, duplicate, and select all. Notes snap to the grid unless Shift is held.
  */
-function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segmentStart, pitchLimits }: {
+function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, pitchLimits }: {
     trackListId: number
     trackIndex: number
     track: Track
     branches: Bgm["branches"]
     mix: number
-    behind: Track | null
     /** Where the segment starts on the timeline, for pasting at the playback start point. */
     segmentStart: number
     pitchLimits: PitchLimit[]
@@ -192,8 +185,8 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, behind, segment
     useLayoutEffect(() => {
         // The renderer's methods aren't unwrapped by the bridge, so pass the objects under react-tracked's proxies
         const untracked = <T extends object>(value: T | null) => (value && getUntrackedObject(value)) ?? value
-        rendererRef.current?.set_track(untracked(track), untracked(branches), mix, untracked(behind))
-    }, [track, branches, mix, behind])
+        rendererRef.current?.set_track(untracked(track), untracked(branches), mix)
+    }, [track, branches, mix])
 
     useEffect(() => {
         // 0 is no limit, as it isn't a pitch the engine plays

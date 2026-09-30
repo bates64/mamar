@@ -1,6 +1,6 @@
 import { Bgm } from "pm64-typegen"
 
-import { BgmAction, bgmReducer } from "./bgm"
+import { BgmAction, bgmReducer, makeRoomForAlternateParts } from "./bgm"
 import { useRoot } from "./dispatch"
 
 export type PanelContent = {
@@ -120,12 +120,31 @@ export type DocAction = {
 
 export function docReducer(state: Doc, action: DocAction): Doc {
     switch (action.type) {
-    case "bgm":
+    case "bgm": {
+        if (action.action.type === "add_alternate_part") {
+            // Adding an alternate part can move its track to another row, which what refers to it follows
+            const from = action.action.track
+            const { bgm, index } = makeRoomForAlternateParts(state.bgm, action.action.trackLists, from)
+            const moved = (row: number) => (row === from ? index : row === index ? from : row)
+            const panelContent = state.panelContent.type === "tracker"
+                ? { ...state.panelContent, track: moved(state.panelContent.track) }
+                : state.panelContent
+            const trackLanes = state.trackLanes && Object.fromEntries(Object.entries(state.trackLanes)
+                .map(([row, lane]) => [moved(Number(row)), lane]))
+            return {
+                ...state,
+                bgm: bgmReducer(bgm, { ...action.action, track: index }),
+                panelContent,
+                trackLanes,
+                isSaved: false,
+            }
+        }
         return {
             ...state,
             bgm: bgmReducer(state.bgm, action.action),
             isSaved: false,
         }
+    }
     case "mark_saved":
         return {
             ...state,

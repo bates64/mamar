@@ -1,6 +1,7 @@
-import { ActionButton, Grid, View, Form, Switch, ContextualHelp, Heading, Content, Text, Flex, TextField } from "@adobe/react-spectrum"
+import { ActionButton, Grid, View, Form, Switch, Flex, TextField, Item, Menu, MenuTrigger, Text } from "@adobe/react-spectrum"
 import { Bgm } from "pm64-typegen"
 import { useEffect, useId, useRef, useState } from "react"
+import { Plus, X } from "react-feather"
 import { useDebounce } from "use-debounce"
 
 import Inspector from "./Inspector"
@@ -16,8 +17,7 @@ import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 import TrackLanes from "./TrackLanes"
 
-import { DEFAULT_ALTERNATE_PARTS_NAME } from "../emu/LocationControls"
-import { useBgm, useDoc, useLocation, useVariation } from "../store"
+import { useBgm, useDoc, useLocation, useRoot, useVariation } from "../store"
 import { alternatePartOf, BgmAction, canAddAlternatePart, playingTrack } from "../store/bgm"
 
 export interface Props {
@@ -66,6 +66,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             borderEndWidth="thin"
             UNSAFE_className={styles.panel}
         >
+            <VersionSwitch trackListId={trackListId} trackIndex={mainIndex} />
             <h3 id={hid} className={styles.regionName}>Region Settings</h3>
             {/* Spectrum gives forms a minimum width wider than the panel */}
             <Form width="100%" UNSAFE_style={{ minWidth: 0 }} aria-labelledby={hid} onSubmit={e => e.preventDefault()}>
@@ -80,9 +81,6 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                     {trackIndex !== 0 && <Switch isSelected={track.is_drum_track} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}
                 </Flex>
                 <StartingValues trackListId={trackListId} trackIndex={trackIndex} mainIndex={mainIndex} segmentIndex={segmentIndex} />
-                {trackIndex !== 0 ? <>
-                    <AlternatePartForm trackListId={trackListId} trackIndex={mainIndex} segmentIndex={segmentIndex} />
-                </> : <></>}
                 <View paddingTop="size-300">
                     <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
                 </View>
@@ -185,60 +183,66 @@ function GreyedSegment({ segment, mainIndex, segmentIndex, segmentStart, length 
 }
 
 /** Adds or removes the alternate part for track `trackIndex` of track list `trackListId`. */
-function AlternatePartForm({ trackListId, trackIndex, segmentIndex }: Props) {
-    const [bgm, dispatch] = useBgm()
+/**
+ * A switch between a track and its alternate part, which plays instead of it when the game turns alternate parts on.
+ * Choosing one edits it, and plays it, so the version being edited is the one heard. A track without one can add one,
+ * a copy of it, and the alternate part can be removed.
+ */
+function VersionSwitch({ trackListId, trackIndex }: { trackListId: number, trackIndex: number }) {
+    const [bgm] = useBgm()
+    const [root, rootDispatch] = useRoot()
     const [variation] = useVariation()
+    const [location] = useLocation()
     const trackList = bgm?.track_lists[trackListId]
-
-    if (!bgm || !trackList) {
+    const docId = root.activeDocId
+    if (!bgm || !trackList || !docId || trackIndex === 0) {
         return null
     }
 
-    const name = bgm.alternate_parts_name ?? DEFAULT_ALTERNATE_PARTS_NAME
+    const name = "Alternate"
+    const hasAlternatePart = alternatePartOf(trackList, trackIndex) !== undefined
     const variationTrackLists = (variation?.segments ?? [])
         .flatMap(segment => ("Subseg" in segment ? [segment.Subseg.track_list] : []))
+    const isAlternate = hasAlternatePart && location.alternateParts
 
-    const label = <Flex width="100%" alignItems="center">
-        <Text flexGrow={1}>{name}</Text>
-        <ContextualHelp variant="help" placement="right">
-            <Heading>Alternate parts</Heading>
-            <Content>
-                <Text>
-                    An alternate part plays <b>instead of this track</b> when the game turns alternate parts on, such as
-                    near the oasis in Dry Dry Desert. It plays in step with this track and uses its voices.
-                </Text>
-            </Content>
-        </ContextualHelp>
-    </Flex>
+    // One dispatch, so that the song's change and the switch to what plays change the same state
+    const change = (alternateParts: boolean, bgmAction?: BgmAction) => rootDispatch(
+        ...(bgmAction ? [{ type: "doc" as const, id: docId, action: { type: "bgm" as const, action: bgmAction } }] : []),
+        { type: "doc", id: docId, action: { type: "set_location", location: { alternateParts } } },
+    )
 
-    if (alternatePartOf(trackList, trackIndex) !== undefined) {
-        return <View>
-            <Text>{label}</Text>
-            <ActionButton onPress={() => dispatch({ type: "remove_alternate_part", trackList: trackListId, track: trackIndex })}>
-                Remove alternate part
-            </ActionButton>
-        </View>
-    }
-
-    const canAdd = canAddAlternatePart(trackList, trackIndex)
-    return <View>
-        <Text>{label}</Text>
-        <Flex direction="column" gap="size-50" marginTop="size-50">
-            <ActionButton
-                width="100%"
-                isDisabled={!canAdd}
-                onPress={() => dispatch({ type: "add_alternate_part", trackLists: [trackListId], track: trackIndex })}
-            >
-                Add in this segment
-            </ActionButton>
-            <ActionButton
-                width="100%"
-                isDisabled={!canAdd}
-                onPress={() => dispatch({ type: "add_alternate_part", trackLists: variationTrackLists, track: trackIndex })}
-            >
-                Add in every segment
-            </ActionButton>
-            {!canAdd && <Text UNSAFE_style={{ fontSize: "0.85em" }}>No free track after this one in segment {segmentIndex + 1}.</Text>}
-        </Flex>
-    </View>
+    return <div className={styles.versions} role="tablist" aria-label="Version">
+        <button role="tab" aria-selected={!isAlternate} className={styles.version} onClick={() => change(false)}>
+            Main
+        </button>
+        {hasAlternatePart
+            ? <div className={styles.version} role="tab" aria-selected={isAlternate}>
+                <button className={styles.versionName} title={name} onClick={() => change(true)}>{name}</button>
+                <button
+                    className={styles.versionRemove}
+                    aria-label={`Remove ${name} in this segment`}
+                    onClick={() => change(false, { type: "remove_alternate_part", trackList: trackListId, track: trackIndex })}
+                >
+                    <X size={12} />
+                </button>
+            </div>
+            : <MenuTrigger>
+                <ActionButton
+                    isQuiet
+                    UNSAFE_className={styles.versionAdd}
+                    isDisabled={!canAddAlternatePart(bgm, trackListId, trackIndex)}
+                >
+                    <Plus size={12} />
+                    <Text>{name}</Text>
+                </ActionButton>
+                <Menu onAction={key => change(true, {
+                    type: "add_alternate_part",
+                    trackLists: key === "every" ? variationTrackLists : [trackListId],
+                    track: trackIndex,
+                })}>
+                    <Item key="this">{"Add in this segment"}</Item>
+                    <Item key="every">{"Add in every segment"}</Item>
+                </Menu>
+            </MenuTrigger>}
+    </div>
 }
