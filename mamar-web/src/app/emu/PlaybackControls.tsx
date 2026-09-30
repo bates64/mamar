@@ -1,5 +1,4 @@
 import { ActionButton, ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
-import { Bgm } from "pm64-typegen"
 import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext, useState } from "react"
 import { Play, Repeat, SkipBack } from "react-feather"
 
@@ -8,23 +7,14 @@ import styles from "./PlaybackControls.module.scss"
 import SnapControl, { ZoomControls } from "./SnapControl"
 import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
 
-import Bridge from "../bridge"
 import { CYCLE_DESCRIPTION } from "../doc/CycleRegion"
 import { CONTEXT as PLAYHEAD_CONTEXT, Context as PlayheadContext, PlayheadPosition, useTimeline } from "../doc/Playhead"
 import { DEFAULT_BEATS_PER_BAR, TICKS_PER_BEAT, usePickup, useTicksPerBar } from "../doc/Ruler"
 import { useDoc, useLocation } from "../store"
 import { Cycle, proximityMixValue } from "../store/doc"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
+import { encodeForGame } from "../util/recordings"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
-
-function encodeBgm(bgm: Bgm): Uint8Array {
-    const bgmBin: Uint8Array | string = Bridge.bgm_encode(bgm)
-
-    if (typeof bgmBin === "string") {
-        throw new Error(bgmBin)
-    }
-
-    return bgmBin
-}
 
 /**
  * Loads the song when playback starts, and again when it changes while playing, from wherever it has got to. It reads
@@ -37,6 +27,7 @@ function SongLoader({ player, playing, timeline, songPosition }: {
     songPosition: MutableRefObject<SongPosition | null>
 }) {
     const [doc] = useDoc()
+    const sbn = useOptionalSoundBank()
     const bgm = doc?.bgm ?? null
     const activeVariation = doc?.activeVariation ?? -1
     const loaded = useRef<{ playing: typeof playing, variation: number } | null>(null)
@@ -56,7 +47,7 @@ function SongLoader({ player, playing, timeline, songPosition }: {
             }
         }
         loaded.current = { playing, variation: activeVariation }
-        player.load(encodeBgm(bgm), activeVariation, start)
+        player.load(encodeForGame(bgm, sbn), activeVariation, start)
     // timeline and songPosition change as the song does, which bgm tracks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player, bgm, activeVariation, playing])

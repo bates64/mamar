@@ -4,9 +4,11 @@ import { useEffect, useState } from "react"
 
 import { useRoot } from "../store"
 import { openFile, RootAction } from "../store/root"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 
 export default function OpenButton() {
     const [, dispatch] = useRoot()
+    const sbn = useOptionalSoundBank()
     const [loadError, setLoadError] = useState<Error | null>(null)
 
     useEffect(() => {
@@ -19,14 +21,14 @@ export default function OpenButton() {
 
                 for (const handle of launchParams.files) {
                     const file = await handle.getFile()
-                    const action = await openFile(file)
+                    const action = await openFile(file, sbn)
                     actions.push(action)
                 }
 
                 dispatch(...actions)
             })
         }
-    }, [dispatch])
+    }, [dispatch, sbn])
 
     return <>
         <ActionButton
@@ -38,7 +40,7 @@ export default function OpenButton() {
                 })
 
                 try {
-                    const action = await openFile(file)
+                    const action = await openFile(file, sbn)
                     dispatch(action)
                 } catch (error) {
                     console.error(error)

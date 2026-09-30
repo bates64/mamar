@@ -6,6 +6,8 @@ import OpenButton from "./OpenButton"
 
 import Bridge from "../bridge"
 import { useDoc, useRoot } from "../store"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
+import { encodeForGame } from "../util/recordings"
 
 function createBgmFileName(fileName: string) {
     // Remove supported extension
@@ -24,6 +26,7 @@ function createBgmFileName(fileName: string) {
 export default function BgmActionGroup() {
     const [, dispatch] = useRoot()
     const [doc, docDispatch] = useDoc()
+    const sbn = useOptionalSoundBank()
 
     JSON.stringify(doc?.bgm)
 
@@ -32,12 +35,8 @@ export default function BgmActionGroup() {
             return
         }
 
-        const bgmBin: Uint8Array<ArrayBuffer> | string = Bridge.bgm_encode(doc.bgm)
-
-        if (typeof bgmBin === "string") {
-            // TODO: surface error in a dialog
-            throw new Error(bgmBin)
-        }
+        // TODO: surface an error encoding it in a dialog
+        const bgmBin = encodeForGame(doc.bgm, sbn) as Uint8Array<ArrayBuffer>
 
         const fileHandle = await fileSave(new Blob([bgmBin]), {
             fileName: createBgmFileName(doc.name),
@@ -53,7 +52,7 @@ export default function BgmActionGroup() {
         }
 
         docDispatch({ type: "mark_saved", fileHandle })
-    }, [doc, docDispatch])
+    }, [doc, docDispatch, sbn])
 
     useEffect(() => {
         const handleKeyDown = (evt: KeyboardEvent) => {

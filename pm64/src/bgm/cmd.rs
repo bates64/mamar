@@ -610,7 +610,30 @@ impl CommandSeq {
             }
         }
 
-        // TODO: combine redundant stateful subsequences e.g. MasterTempo .. MasterTempo with no delay inbetween
+        // Remove settings that a later command replaces before any time passes or any note starts, such as a pan
+        // straight after another
+        let mut replaced = vec![false; self.vec.len()];
+        let mut latest: Vec<(Setting, usize)> = Vec::new();
+        for (i, event) in self.vec.iter().enumerate() {
+            match &event.command {
+                Command::Delay(_) | Command::Note { .. } => latest.clear(),
+                command => {
+                    if let Some(setting) = Setting::of(command) {
+                        if let Some(entry) = latest.iter_mut().find(|(other, _)| *other == setting) {
+                            replaced[entry.1] = true;
+                            entry.1 = i;
+                        } else {
+                            latest.push((setting, i));
+                        }
+                    }
+                }
+            }
+        }
+        let mut i = 0;
+        self.vec.retain(|_| {
+            i += 1;
+            !replaced[i - 1]
+        });
     }
 
     /// Appends the given [Command] to the end of the sequence.
@@ -884,6 +907,46 @@ impl CommandSeq {
         };
         after_time.insert_many_start(0, setup);
         after_time
+    }
+}
+
+/// A value that a command sets, which a later command setting the same value replaces entirely.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Setting {
+    MasterTempo,
+    MasterVolume,
+    MasterPitchShift,
+    MasterEffect(u8),
+    Volume,
+    TrackVolume,
+    Pan,
+    Reverb,
+    BusSend,
+    CoarseTune,
+    FineTune,
+    PitchBend,
+    /// Choosing one of the song's instruments and overriding the patch each replace the other
+    Instrument,
+}
+
+impl Setting {
+    fn of(command: &Command) -> Option<Self> {
+        Some(match command {
+            Command::MasterTempo(_) => Setting::MasterTempo,
+            Command::MasterVolume(_) => Setting::MasterVolume,
+            Command::MasterPitchShift { .. } => Setting::MasterPitchShift,
+            Command::MasterEffect { index, .. } => Setting::MasterEffect(*index),
+            Command::SubTrackVolume(_) => Setting::Volume,
+            Command::SegTrackVolume(_) => Setting::TrackVolume,
+            Command::SubTrackPan(_) => Setting::Pan,
+            Command::SubTrackReverb(_) => Setting::Reverb,
+            Command::SubTrackReverbType { .. } => Setting::BusSend,
+            Command::SubTrackCoarseTune(_) => Setting::CoarseTune,
+            Command::SubTrackFineTune(_) => Setting::FineTune,
+            Command::SegTrackTune { .. } => Setting::PitchBend,
+            Command::SetTrackVoice { .. } | Command::TrackOverridePatch(_) => Setting::Instrument,
+            _ => return None,
+        })
     }
 }
 
@@ -1351,6 +1414,44 @@ mod test {
                 Command::Delay(5),
                 note(3),
                 Command::Delay(5)
+            ]
+        );
+    }
+
+    #[test]
+    fn shrink_removes_replaced_settings() {
+        let note = || Command::Note {
+            pitch: 0x90,
+            velocity: 100,
+            length: 10,
+        };
+        let mut seq = CommandSeq::from(vec![
+            Command::SubTrackPan(64),
+            Command::SubTrackVolume(100),
+            Command::SetTrackVoice { index: 0 },
+            Command::SubTrackPan(20),
+            Command::SetTrackVoice { index: 1 },
+            note(),
+            // A note between two settings hears the first, so both stay
+            Command::SubTrackPan(30),
+            note(),
+            Command::SubTrackPan(40),
+            Command::Delay(10),
+            Command::SubTrackPan(40),
+        ]);
+        seq.shrink();
+        assert_eq!(
+            seq.to_command_vec(),
+            vec![
+                Command::SubTrackVolume(100),
+                Command::SubTrackPan(20),
+                Command::SetTrackVoice { index: 1 },
+                note(),
+                Command::SubTrackPan(30),
+                note(),
+                Command::SubTrackPan(40),
+                Command::Delay(10),
+                Command::SubTrackPan(40),
             ]
         );
     }

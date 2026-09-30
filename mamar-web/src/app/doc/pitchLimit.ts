@@ -5,6 +5,7 @@ import { timeline } from "./lanes"
 import { LOWEST_PITCH } from "./pitches"
 import { useCarriedValues } from "./segmentTracks"
 
+import * as instruments from "../instruments"
 import { useBgm } from "../store"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 
@@ -63,6 +64,36 @@ export function sampleOf(sbn: ArrayBuffer, patch: PatchAddress): Sample | null {
     return null
 }
 
+/** An instrument's name without the pitch its sample was recorded at, which its recordings at other pitches share. */
+function family(name: string): string {
+    return name.replace(/ [A-G]#?\d$/, "")
+}
+
+/**
+ * The recordings of the same instrument as `patch`, including `patch`, with their samples, from the lowest to the
+ * highest. Each plays a note at the same pitch, as its base key is the pitch it was recorded at.
+ */
+export function recordingsOf(sbn: ArrayBuffer, patch: PatchAddress): { patch: PatchAddress, sample: Sample }[] {
+    const name = instruments.getName(patch)
+    if (patch.bank_set !== "Music" || family(name) === name) {
+        const sample = sampleOf(sbn, patch)
+        return sample ? [{ patch, sample }] : []
+    }
+    const recordings = []
+    for (const category of instruments.categories) {
+        for (const other of category.instruments) {
+            if (family(other.name) === family(name) && other.name !== family(other.name)) {
+                const otherPatch = { ...patch, bank: other.bank, instrument: other.instrument }
+                const sample = sampleOf(sbn, otherPatch)
+                if (sample) {
+                    recordings.push({ patch: otherPatch, sample })
+                }
+            }
+        }
+    }
+    return recordings.sort((a, b) => a.sample.keyBase - b.sample.keyBase)
+}
+
 /**
  * The highest pitch `sample` plays at its own pitch when tuned by `tune` cents, or undefined if it plays every pitch.
  * Above it, the engine plays notes lower than they should be: the resampler can speed a sample up by just under an
@@ -93,7 +124,8 @@ export interface PitchLimit {
 /**
  * The highest pitch track `trackIndex` of track list `trackListId` plays at its own pitch through segment
  * `segmentIndex`, from the instrument and tuning it starts the segment with and each time they change. It's empty if
- * that's unknown. Percussion plays its drums at their own pitches, so it has no limit.
+ * that's unknown. Percussion plays its drums at their own pitches, so it has no limit. A track switches to higher
+ * recordings of its instrument as it needs, so its limit is the highest recording's. See util/recordings.
  */
 export function usePitchLimits(trackListId: number, trackIndex: number, mainIndex: number, segmentIndex: number): PitchLimit[] {
     const [bgm] = useBgm()
@@ -115,8 +147,9 @@ export function usePitchLimits(trackListId: number, trackIndex: number, mainInde
 
         const limits: PitchLimit[] = []
         const update = (time: number) => {
-            const sample = patch && sampleOf(sbn, patch)
-            const limit = sample ? highestPitch(sample, coarse * 100 + fine) : undefined
+            const recordings = patch ? recordingsOf(sbn, patch) : []
+            const highest = recordings[recordings.length - 1]?.sample
+            const limit = highest ? highestPitch(highest, coarse * 100 + fine) : undefined
             const last = limits[limits.length - 1]
             if (last?.time === time) {
                 last.limit = limit

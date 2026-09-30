@@ -4,6 +4,7 @@ import { Bgm } from "pm64-typegen"
 import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./doc"
 
 import Bridge from "../bridge"
+import { removeRecordings } from "../util/recordings"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
 
 function generateId() {
@@ -88,8 +89,12 @@ export function rootReducer(root: Root, action: RootAction): Root {
     }
 }
 
-export async function openFile(file: FileWithHandle): Promise<RootAction> {
-    const data = new Uint8Array(await file.arrayBuffer())
+/**
+ * Decodes a BGM or MIDI file. With the sound bank (SBN) of the user's ROM, a BGM file's switches between recordings of
+ * its tracks' instruments are taken out, to be put back as the song is built. See util/recordings. A MIDI file's tracks
+ * are new, so they're built with the switches they need.
+ */
+function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined): { bgm: Bgm } {
     const bgm: Bgm | string = Bridge.bgm_decode(data)
 
     if (typeof bgm === "string") {
@@ -97,25 +102,24 @@ export async function openFile(file: FileWithHandle): Promise<RootAction> {
     }
     bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
 
+    // "MThd"
+    const isMidi = data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64
+    return { bgm: sbn && !isMidi ? removeRecordings(bgm, sbn) : bgm }
+}
+
+export async function openFile(file: FileWithHandle, sbn?: ArrayBuffer | null): Promise<RootAction> {
     return {
         type: "open_doc",
         file,
-        bgm,
+        ...decode(new Uint8Array(await file.arrayBuffer()), sbn),
     }
 }
 
-export function openData(data: Uint8Array, name?: string, isSaved?: boolean): RootAction {
-    const bgm: Bgm | string = Bridge.bgm_decode(data)
-
-    if (typeof bgm === "string") {
-        throw new Error(bgm)
-    }
-    bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
-
+export function openData(data: Uint8Array, name?: string, isSaved?: boolean, sbn?: ArrayBuffer | null): RootAction {
     return {
         type: "open_doc",
         name,
-        bgm,
         isSaved,
+        ...decode(data, sbn),
     }
 }

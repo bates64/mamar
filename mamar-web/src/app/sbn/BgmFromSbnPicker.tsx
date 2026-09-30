@@ -57,7 +57,7 @@ export default function BgmFromSbnPicker() {
                 if (item) {
                     try {
                         // A song from the ROM has no changes to lose until it's edited
-                        const action = openData(new Uint8Array(item.file.data), item.name, true)
+                        const action = openData(new Uint8Array(item.file.data), item.name, true, sbnData)
                         dispatch(action)
                     } catch (error) {
                         console.error(error)
