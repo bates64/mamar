@@ -28,7 +28,7 @@ function valueOf(kind: LaneKind, event: Event): number {
 /** A name for a command that sets values for several lanes, such as tremolo, which sets its depth, speed, and delay. */
 function nameOf({ event, kinds }: StartingValue): string {
     if ("TrackOverridePatch" in event) {
-        return "Patch"
+        return "Sample"
     }
     return kinds.length > 1 ? kinds[0].name.split(" ")[0] : kinds[0].name
 }
@@ -149,7 +149,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
             title="From an earlier region"
             onClick={() => setHere([{ TrackOverridePatch: carriedPatch }])}
         >
-            <span className={styles.name}>Patch</span>
+            <span className={styles.name}>Sample</span>
             <span className={styles.summary}>{instruments.getName(carriedPatch, bgm?.aux_banks)}</span>
         </button>}
         {carriedGroups.map(group => <button

@@ -211,6 +211,8 @@ export function commandName(event: Event): string {
     const variant = Object.keys(event).find(key => key !== "id") ?? "Command"
     if (variant === "ProxMixOverride") {
         return "Volumes in a mix"
+    } else if (variant === "TrackOverridePatch") {
+        return "Sample"
     }
     return variant.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/ ([A-Z])/g, (_, letter) => ` ${letter.toLowerCase()}`)
 }

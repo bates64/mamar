@@ -1,7 +1,7 @@
 import { ActionButton, Content, Dialog, DialogTrigger, Flex, Form, Heading, NumberField } from "@adobe/react-spectrum"
 import { PatchAddress } from "pm64-typegen"
 
-import { EnvelopeSelect, SoundSelect } from "./doc/InstrumentEditor"
+import { EnvelopeSelect, SampleSelect } from "./doc/InstrumentEditor"
 import styles from "./InstrumentInput.module.scss"
 import * as instruments from "./instruments"
 import { useBgm } from "./store"
@@ -24,10 +24,10 @@ export default function InstrumentInput({ index, onChange }: Props) {
         <Dialog minWidth="500px">
             <Heading>
                 <Flex justifyContent="space-between">
-                    <span>Part {index}</span>
+                    <span>Instrument {index}</span>
 
                     {bgm && <NumberField
-                        aria-label="Part index"
+                        aria-label="Instrument index"
                         value={index}
                         onChange={onChange}
                         minValue={0}
@@ -39,7 +39,7 @@ export default function InstrumentInput({ index, onChange }: Props) {
             <Content>
                 {instrument && <Form isQuiet onSubmit={e => e.preventDefault()}>
                     <Flex gap="size-150">
-                        <SoundSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
+                        <SampleSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
                         <EnvelopeSelect patch={instrument.patch} onChange={patch => dispatch({ type: "update_instrument", index, partial: { patch } })} />
                     </Flex>
                     <Flex gap="size-150">
@@ -69,7 +69,7 @@ export function PatchInput({ patch, onChange }: { patch: PatchAddress, onChange:
             <Content>
                 <Form isQuiet onSubmit={e => e.preventDefault()}>
                     <Flex gap="size-150">
-                        <SoundSelect patch={patch} onChange={patch => onChange(patch)} />
+                        <SampleSelect patch={patch} onChange={patch => onChange(patch)} />
                         <EnvelopeSelect patch={patch} onChange={onChange} />
                     </Flex>
                 </Form>

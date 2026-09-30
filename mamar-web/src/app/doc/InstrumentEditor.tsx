@@ -37,11 +37,11 @@ interface SoundGroup {
 }
 
 /**
- * Chooses the sound `patch` plays, from the sounds in the game's music banks, and those the ROM's songs load into their
- * aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. Typing searches
- * the sounds by name.
+ * Chooses the sample `patch` plays, from the samples in the game's music banks, and those the ROM's songs load into
+ * their aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. Typing
+ * searches the samples by name.
  */
-export function SoundSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
+export function SampleSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
     const [bgm, dispatch] = useBgm()
     const sbn = useOptionalSoundBank()
     const auxBankCount = useAuxBankCount()
@@ -75,7 +75,7 @@ export function SoundSelect({ patch, onChange }: { patch: PatchAddress, onChange
     }
 
     return <ComboBox
-        label="Sound"
+        label="Sample"
         width="100%"
         menuTrigger="focus"
         defaultItems={groups}
@@ -233,7 +233,7 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
             </select>
         </label>
         {instrument && <>
-            <SoundSelect patch={instrument.patch} onChange={patch => update({ patch })} />
+            <SampleSelect patch={instrument.patch} onChange={patch => update({ patch })} />
             <EnvelopeSelect patch={instrument.patch} onChange={patch => update({ patch })} />
             <div className={styles.row}>
                 {number("Volume", instrument.volume, 0, 255, volume => update({ volume }))}

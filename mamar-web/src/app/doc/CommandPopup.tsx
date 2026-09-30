@@ -2,7 +2,7 @@ import { Flex, NumberField, Text, TextField } from "@adobe/react-spectrum"
 import { Event } from "pm64-typegen"
 
 import styles from "./CommandPopup.module.scss"
-import { EnvelopeSelect, SoundSelect } from "./InstrumentEditor"
+import { EnvelopeSelect, SampleSelect } from "./InstrumentEditor"
 import { commandName } from "./lanes"
 import { toEvent } from "./useLaneEditing"
 
@@ -89,7 +89,7 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
         const shown = FIELDS[variant] ?? numberFields(value)
         body = <Flex direction="column" gap="size-100">
             {variant === "TrackOverridePatch" && <>
-                <SoundSelect patch={value as never} onChange={patch => update([], patch as never)} />
+                <SampleSelect patch={value as never} onChange={patch => update([], patch as never)} />
                 <EnvelopeSelect patch={value as never} onChange={patch => update([], patch as never)} />
             </>}
             {shown.map(field => {

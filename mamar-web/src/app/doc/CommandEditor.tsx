@@ -356,7 +356,7 @@ export function Command({ command: rawCommand }:{ command: pm64.Event }) {
         </div>
     } else if ("SetTrackVoice" in command) {
         return <div className={classNames(styles.command, styles.track)}>
-            use part
+            use instrument
             <InputBox>
                 <InstrumentInput
                     index={command.SetTrackVoice.index}
