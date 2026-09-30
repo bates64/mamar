@@ -1,6 +1,7 @@
 import { Grid, View, Form, Switch, Flex } from "@adobe/react-spectrum"
-import { Bgm } from "pm64-typegen"
-import { useEffect, useId, useRef } from "react"
+import { Bgm, Event } from "pm64-typegen"
+import { useEffect, useId, useRef, useState } from "react"
+import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd"
 
 import EditableName from "./EditableName"
 import Inspector from "./Inspector"
@@ -17,6 +18,7 @@ import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 import TrackLanes from "./TrackLanes"
 
+import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
 import { BgmAction, playingTrack, playsDrums } from "../store/bgm"
 
@@ -35,11 +37,12 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     const trackIndex = trackList ? playingTrack(trackList, mainIndex, location.alternateParts) : mainIndex
     const track = trackList?.tracks[trackIndex]
 
-    const [showTracker, setShowTracker] = useState(true)
     const segmentLengths = useSegmentLengths()
     const segmentStart = segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)
     const segments = useSegmentTracks(mainIndex)
     const pitchLimits = usePitchLimits(trackListId, trackIndex, mainIndex, segmentIndex)
+    // The blocks view lists the track's commands to edit one by one, for what the piano roll and its lanes don't show
+    const [showBlocks, setShowBlocks] = useState(false)
     const instrumentName = useInstrumentName(track?.commands, track && bgm ? playsDrums(bgm, track, location.mix) : false, mainIndex, segmentIndex)
 
     if (!track || !bgm) {
@@ -47,7 +50,27 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
     }
     const isDrumTrack = playsDrums(bgm, track, location.mix)
 
-    return <Grid
+    // A block dragged within the list moves, and one dragged out of it is deleted
+    const onDragEnd = (result: DropResult) => {
+        if (!result.destination) {
+            return
+        } else if (result.destination.droppableId === TRASH) {
+            const id = (Bridge.commands_without_detours(track.commands) as Event[])[result.source.index]?.id
+            if (id !== undefined) {
+                dispatch({ type: "delete_track_commands", trackList: trackListId, track: trackIndex, ids: [id] })
+            }
+        } else {
+            dispatch({
+                type: "move_track_command",
+                trackList: trackListId,
+                track: trackIndex,
+                oldIndex: result.source.index,
+                newIndex: result.destination.index,
+            })
+        }
+    }
+
+    const region = <Grid
         // The settings and keyboard together are as wide as the track names above, so the timeline lines up with theirs
         columns="189px 36px 1fr"
         UNSAFE_className={styles.region}
@@ -74,54 +97,71 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                 <Flex wrap columnGap="size-200">
                     <Switch isSelected={!track.is_disabled} onChange={v => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDisabled: !v })}>Enabled</Switch>
                     {trackIndex !== 0 && <Switch isSelected={isDrumTrack} onChange={isDrumTrack => dispatch({ type: "modify_track_settings", trackList: trackListId, track: trackIndex, isDrumTrack })}>Percussion</Switch>}
+                    <Switch isSelected={showBlocks} onChange={setShowBlocks}>Blocks</Switch>
                 </Flex>
                 <StartingValues trackListId={trackListId} trackIndex={trackIndex} mainIndex={mainIndex} segmentIndex={segmentIndex} />
-                <View paddingTop="size-300">
-                    <Switch isSelected={showTracker} onChange={v => setShowTracker(v)}>Blocks view</Switch>
-                </View>
             </Form>
-            <Inspector trackListId={trackListId} trackIndex={trackIndex} />
+            {showBlocks && <Inspector trackListId={trackListId} trackIndex={trackIndex} />}
         </View>
-        {/* Follows the selected segment's piano roll, so it starts again when another opens */}
-        <PianoKeys key={segmentIndex} region={styles.region} isDrumTrack={isDrumTrack} pitchLimit={pitchLimits[0]?.limit} />
-        {showTracker ? <Tracker trackListId={trackListId} trackIndex={trackIndex} /> : <TimeGrid style={{
-            "backgroundColor": "var(--spectrum-gray-75)",
-            // The piano roll is dark whatever the theme.
-            "--playhead-line-color": "rgb(255 255 255 / 50%)",
-        } as React.CSSProperties}>
-            {segments.map((segment, index) => segment && index !== segmentIndex && <GreyedSegment
-                key={index}
-                segment={segment}
-                mainIndex={mainIndex}
-                segmentIndex={index}
-                segmentStart={segmentLengths.slice(0, index).reduce((sum, length) => sum + length, 0)}
-                length={segmentLengths[index] ?? 0}
-            />)}
-            {/* Every segment is in the one row, whatever order they're in here */}
-            <div style={{ gridColumn: segmentIndex + 1, gridRow: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                <SegmentStart.Provider value={segmentStart}>
-                    <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} data-selected-roll onScroll={event => syncGreyedRolls(event.currentTarget)}>
-                        <PianoRoll
+        {showBlocks ? <div style={{ gridColumn: "2 / -1", minHeight: 0 }}>
+            <Tracker trackListId={trackListId} trackIndex={trackIndex} />
+        </div> : <>
+            {/* Follows the selected segment's piano roll, so it starts again when another opens */}
+            <PianoKeys key={segmentIndex} region={styles.region} isDrumTrack={isDrumTrack} pitchLimit={pitchLimits[0]?.limit} />
+            <TimeGrid style={{
+                "backgroundColor": "var(--spectrum-gray-75)",
+                // The piano roll is dark whatever the theme.
+                "--playhead-line-color": "rgb(255 255 255 / 50%)",
+            } as React.CSSProperties}>
+                {segments.map((segment, index) => segment && index !== segmentIndex && <GreyedSegment
+                    key={index}
+                    segment={segment}
+                    mainIndex={mainIndex}
+                    segmentIndex={index}
+                    segmentStart={segmentLengths.slice(0, index).reduce((sum, length) => sum + length, 0)}
+                    length={segmentLengths[index] ?? 0}
+                />)}
+                {/* Every segment is in the one row, whatever order they're in here */}
+                <div style={{ gridColumn: segmentIndex + 1, gridRow: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                    <SegmentStart.Provider value={segmentStart}>
+                        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} data-selected-roll onScroll={event => syncGreyedRolls(event.currentTarget)}>
+                            <PianoRoll
+                                trackListId={trackListId}
+                                trackIndex={trackIndex}
+                                pitchLimits={pitchLimits}
+                                segmentStart={segmentStart}
+                            />
+                        </div>
+                        <TrackLanes
                             trackListId={trackListId}
                             trackIndex={trackIndex}
-                            pitchLimits={pitchLimits}
-                            segmentStart={segmentStart}
+                            mainIndex={mainIndex}
+                            segmentIndex={segmentIndex}
+                            length={segmentLengths[segmentIndex] ?? 0}
                         />
-                    </div>
-                    <TrackLanes
-                        trackListId={trackListId}
-                        trackIndex={trackIndex}
-                        mainIndex={mainIndex}
-                        segmentIndex={segmentIndex}
-                        length={segmentLengths[segmentIndex] ?? 0}
-                    />
-                </SegmentStart.Provider>
-            </div>
-            {isDrumTrack && <DrumLabels key={segmentIndex} region={styles.region} />}
-            <PlayheadLine />
-        </TimeGrid>}
+                    </SegmentStart.Provider>
+                </div>
+                {isDrumTrack && <DrumLabels key={segmentIndex} region={styles.region} />}
+                <PlayheadLine />
+            </TimeGrid>
+        </>}
     </Grid>
+
+    if (!showBlocks) {
+        return region
+    }
+    return <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId={TRASH}>
+            {provided => <div ref={provided.innerRef} {...provided.droppableProps} style={{ height: "100%" }}>
+                {region}
+                {provided.placeholder}
+            </div>}
+        </Droppable>
+    </DragDropContext>
 }
+
+/** Where a block dragged out of the blocks view goes: anywhere else in the region's view, which deletes it. */
+const TRASH = "trash"
 
 /** Scrolls the greyed segments' piano rolls to the pitches the selected one shows, so their notes line up. */
 function syncGreyedRolls(selected: HTMLElement) {

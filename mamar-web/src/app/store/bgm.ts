@@ -17,6 +17,7 @@ export type BgmAction = {
 } | {
     type: "add_voice"
 } | {
+    /** Moves a command of a track, as the blocks view lists them, with detours written out. */
     type: "move_track_command"
     trackList: number
     track: number
@@ -190,14 +191,23 @@ function withTrack(bgm: Bgm, trackListId: number, index: number, change: (track:
 }
 
 /**
+ * Whether the events with IDs `ids` are all the track's own commands, rather than ones in the passages of its mixes, as
+ * the blocks view edits them, branches and all.
+ */
+function isOwnCommand(bgm: Bgm, { trackList, track }: { trackList: number, track: number }, ids: number[]): boolean {
+    const commands = Bridge.commands_without_detours(bgm.track_lists[trackList].tracks[track].commands) as Event[]
+    return ids.every(id => commands.some(event => event.id === id))
+}
+
+/**
  * `bgm` with the commands of track `index` of track list `trackListId` edited by `edit`, which is given them as they
  * play in proximity mix `mix`, with detours written out, as the editor shows them. A track that varies by mix has
- * the edit written back into that mix's passages. The track forgets where it was decoded from, so the encoder
- * compresses it into detours again.
+ * the edit written back into that mix's passages, unless `mix` is undefined, which edits the track's own commands and
+ * its branches. The track forgets where it was decoded from, so the encoder compresses it into detours again.
  */
-function editTrack(bgm: Bgm, trackListId: number, index: number, mix: number, edit: (commands: Event[]) => Event[]): Bgm {
+function editTrack(bgm: Bgm, trackListId: number, index: number, mix: number | undefined, edit: (commands: Event[]) => Event[]): Bgm {
     const track = bgm.track_lists[trackListId].tracks[index]
-    if (!variesByMix(track.commands)) {
+    if (mix === undefined || !variesByMix(track.commands)) {
         return withTrack(bgm, trackListId, index, ({ pos: _, ...track }) => ({
             ...track,
             commands: edit(Bridge.commands_without_detours(track.commands)),
@@ -234,15 +244,12 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
         }
     } case "add_voice":
         return Bridge.bgm_add_voice(bgm)
-    case "move_track_command":
-        return produce(bgm, draft => {
-            const track = draft.track_lists[action.trackList].tracks[action.track]
-            editCommands(track)
-            track.commands = arrayMove(track.commands, action.oldIndex, action.newIndex)
-        })
     case "update_track_command":
-        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+        return editTrack(bgm, action.trackList, action.track, isOwnCommand(bgm, action, [action.command.id]) ? undefined : mix, commands =>
             commands.map(event => (event.id === action.command.id ? action.command : event)))
+    case "move_track_command":
+        return editTrack(bgm, action.trackList, action.track, undefined, commands =>
+            arrayMove(commands, action.oldIndex, action.newIndex))
     case "modify_track_settings": {
         const track = bgm.track_lists[action.trackList].tracks[action.track]
         // A track that varies by mix plays drums or not in each mix's passages
@@ -302,7 +309,7 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
             action.inserts.reduce((commands, { time, command }) => Bridge.commands_insert(commands, time, command), commands))
     case "delete_track_commands":
         // Deleting a delay would move everything after it
-        return editTrack(bgm, action.trackList, action.track, mix, commands =>
+        return editTrack(bgm, action.trackList, action.track, isOwnCommand(bgm, action, action.ids) ? undefined : mix, commands =>
             commands.filter(event => "Delay" in event || !action.ids.includes(event.id)))
     case "vary_by_mix": {
         const mixes = Math.max(2, mixCount(bgm))
