@@ -209,9 +209,10 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
     />
 
     return <div className={styles.editor}>
-        <label className={styles.field}>
-            Instrument
+        {/* Which instrument the track plays heads the popup, and the fields below edit that instrument */}
+        <label className={styles.heading}>
             <select
+                aria-label="Instrument"
                 value={index}
                 onChange={change => {
                     if (change.target.value === "new") {
