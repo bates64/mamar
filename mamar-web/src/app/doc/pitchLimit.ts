@@ -69,21 +69,11 @@ export function sampleOf(sbn: ArrayBuffer, patch: PatchAddress): Sample | null {
  * highest. Each plays a note at the same pitch, as its base key is the pitch it was recorded at.
  */
 export function recordingsOf(sbn: ArrayBuffer, patch: PatchAddress): { patch: PatchAddress, sample: Sample }[] {
-    const name = instruments.getName(patch)
-    if (patch.bank_set !== "Music" || instruments.familyName(name) === name) {
-        const sample = sampleOf(sbn, patch)
-        return sample ? [{ patch, sample }] : []
-    }
     const recordings = []
-    for (const category of instruments.categories) {
-        for (const other of category.instruments) {
-            if (instruments.familyName(other.name) === instruments.familyName(name) && other.name !== instruments.familyName(other.name)) {
-                const otherPatch = { ...patch, bank: other.bank, instrument: other.instrument }
-                const sample = sampleOf(sbn, otherPatch)
-                if (sample) {
-                    recordings.push({ patch: otherPatch, sample })
-                }
-            }
+    for (const recording of instruments.recordingsOf(patch)) {
+        const sample = sampleOf(sbn, recording)
+        if (sample) {
+            recordings.push({ patch: recording, sample })
         }
     }
     return recordings.sort((a, b) => a.sample.keyBase - b.sample.keyBase)

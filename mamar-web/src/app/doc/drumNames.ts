@@ -10,12 +10,9 @@ import { kitDrums } from "../util/soundBank"
 /** How many drums the shared kit has, after which pitches play the song's own drums. */
 const KIT_SIZE = 72
 
-/**
- * A drum's name, without the kit it's from, which the names start with, such as "STANDARD 1", or which some repeat, such
- * as "TR-808 TR-808 Kick 1".
- */
+/** A drum's name, without the standard kit it's from, which most start with, such as "Standard 1". */
 function shortName(name: string): string {
-    return name.replace(/^[A-Z0-9 ]+ (?=[A-Z][a-z])/, "").replace(/^(\S+) (?=\1 )/, "")
+    return name.replace(/^Standard \d /, "")
 }
 
 /**
@@ -33,6 +30,6 @@ export function useDrumNames(): (pitch: number) => string | undefined {
         }
         const index = pitch - LOWEST_PITCH
         const patch = index < KIT_SIZE ? kit[index] : bgm?.drums[index - KIT_SIZE]?.patch
-        return patch && shortName(instruments.getName(patch))
+        return patch && shortName(instruments.getName(patch, bgm?.aux_banks))
     }
 }

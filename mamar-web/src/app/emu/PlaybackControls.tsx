@@ -13,6 +13,7 @@ import { useDoc, useLocation } from "../store"
 import { Cycle, proximityMixValue } from "../store/doc"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 import { encodeForGame } from "../util/recordings"
+import { auxBankIndexes } from "../util/soundBank"
 import VerticalDragNumberInput from "../VerticalDragNumberInput"
 
 /**
@@ -46,7 +47,7 @@ function SongLoader({ player, playing, timeline, songPosition }: {
             }
         }
         loaded.current = { playing, variation: activeVariation }
-        player.load(encodeForGame(bgm, sbn), activeVariation, start)
+        player.load(encodeForGame(bgm, sbn), activeVariation, start, auxBankIndexes(sbn, bgm.aux_banks))
     // timeline and songPosition change as the song does, which bgm tracks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player, bgm, activeVariation, playing])

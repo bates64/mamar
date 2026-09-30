@@ -84,7 +84,7 @@ export default function BgmFromSbnPicker() {
                             {row.name}
                         </Cell>
                         <Cell>
-                            {row.song.bk_a_file} {row.song.bk_b_file} {row.song.unk_file}
+                            {[row.song.bk_a_file, row.song.bk_b_file, row.song.unk_file].filter(file => file !== null).map(file => sbn?.files[file]?.name).join(", ")}
                         </Cell>
                         <Cell>
                             {(row.file.data.length / 1024).toFixed(1)} KB

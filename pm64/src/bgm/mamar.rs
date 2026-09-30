@@ -16,6 +16,8 @@ pub struct Metadata {
     beats_per_bar: Option<u8>,
 
     mix_names: BTreeMap<u8, String>,
+
+    aux_banks: Vec<String>,
 }
 
 impl Metadata {
@@ -23,6 +25,7 @@ impl Metadata {
         // Look for any non-empty track name
         self.beats_per_bar.is_some()
             || !self.mix_names.is_empty()
+            || !self.aux_banks.is_empty()
             || self
                 .track_names
                 .values()
@@ -32,6 +35,7 @@ impl Metadata {
     pub fn apply_to_bgm(&self, bgm: &mut super::Bgm) {
         bgm.beats_per_bar = self.beats_per_bar;
         bgm.mix_names = self.mix_names.clone();
+        bgm.aux_banks = self.aux_banks.clone();
 
         for (id, track_list) in &mut bgm.track_lists {
             let Some(names) = self.track_names.get(&(*id as u16)) else {
@@ -51,6 +55,10 @@ impl Metadata {
 
     pub fn set_mix_names(&mut self, mix_names: BTreeMap<u8, String>) {
         self.mix_names = mix_names;
+    }
+
+    pub fn set_aux_banks(&mut self, aux_banks: Vec<String>) {
+        self.aux_banks = aux_banks;
     }
 
     pub fn add_track_name(&mut self, tracks_pos: u16, name: String) {
@@ -119,6 +127,15 @@ mod test {
 
         let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
         assert_eq!(bgm2.mix_names, bgm.mix_names);
+    }
+
+    #[test]
+    fn encode_decode_metadata_preserves_aux_banks() {
+        let mut bgm = Bgm::new();
+        bgm.aux_banks = vec![String::new(), "SPC2".to_string()];
+
+        let bgm2 = Bgm::from_bytes(&bgm.as_bytes().unwrap()).unwrap();
+        assert_eq!(bgm2.aux_banks, bgm.aux_banks);
     }
 
     #[test]

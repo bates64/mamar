@@ -5,6 +5,7 @@ import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./do
 
 import Bridge from "../bridge"
 import { removeRecordings } from "../util/recordings"
+import { romAuxBanks } from "../util/soundBank"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
 import vanillaMixNames from "../util/vanillaMixNames"
 
@@ -104,6 +105,10 @@ function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined): { bgm: B
     bgm.beats_per_bar ??= vanillaBeatsPerBar(data)
     if (Object.keys(bgm.mix_names ?? {}).length === 0) {
         bgm.mix_names = vanillaMixNames(data) ?? bgm.mix_names
+    }
+    // A song from the ROM loads its aux banks from the ROM's song list, which the BGM file doesn't say
+    if (sbn && (bgm.aux_banks ?? []).length === 0) {
+        bgm.aux_banks = romAuxBanks(sbn, data)
     }
 
     // "MThd"

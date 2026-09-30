@@ -7,7 +7,8 @@
 
 static u8 MamarBGM[MAMAR_BGM_MAX_SIZE];
 static s32 MamarBGMSize;
-static s32 MamarBankSong = -1;
+/// The SBN file index of the BK file loaded into each aux bank slot, or 0 for none.
+static u16 MamarAuxBanks[ARRAY_COUNT(((AuGlobals*)0)->auxBanks)];
 static s32 MamarStartSegment;
 static s32 MamarStartTick;
 static s32 MamarVariation;
@@ -32,19 +33,15 @@ b32 dx_mamar_load_song(BGMHeader* bgmFile, BGMPlayer* player, AuResult* result) 
     memcpy(bgmFile, MamarBGM, MamarBGMSize);
     mamar_swap_bgm(MamarBGM, MamarBGMSize, (u8*)bgmFile);
 
-    if (MamarBankSong >= 0 && MamarBankSong < globals->songListLength) {
-        InitSongEntry* bankSong = &globals->songList[MamarBankSong];
+    for (s32 i = 0; i < ARRAY_COUNT(MamarAuxBanks); i++) {
+        u16 bkFileIndex = MamarAuxBanks[i];
 
-        for (s32 i = 0; i < ARRAY_COUNT(bankSong->bkFileIndex); i++) {
-            u16 bkFileIndex = bankSong->bkFileIndex[i];
-
-            if (bkFileIndex != 0) {
-                SBNFileEntry* bkFileEntry = &globals->sbnFileList[bkFileIndex];
-
-                if ((bkFileEntry->data >> 0x18) == AU_FMT_BK) {
-                    au_load_aux_bank((bkFileEntry->offset & 0xFFFFFF) + globals->baseRomOffset, i);
-                }
-            }
+        // A slot without a bank plays the default instrument, not one left by the last song
+        if (bkFileIndex != 0 && bkFileIndex < globals->fileListLength
+            && (globals->sbnFileList[bkFileIndex].data >> 0x18) == AU_FMT_BK) {
+            au_load_aux_bank((globals->sbnFileList[bkFileIndex].offset & 0xFFFFFF) + globals->baseRomOffset, i);
+        } else {
+            au_clear_instrument_group(i, BANK_SET_AUX);
         }
     }
 
@@ -63,15 +60,28 @@ u8* mamar_audio_bgm_buffer(void) {
     return MamarBGM;
 }
 
-/// Plays the `size`-byte BGM file in `MamarBGM` from segment `startSegment`, `startTick` ticks in. Its instruments are
-/// loaded from the banks of `bankSong`, the ID of a song in the ROM, or none if it's -1. The song starts once the one
-/// playing has stopped, which takes the engine a frame.
+/// How many aux banks a song can load its own instruments from.
+__attribute__((export_name("mamar_audio_aux_bank_count")))
+s32 mamar_audio_aux_bank_count(void) {
+    return ARRAY_COUNT(MamarAuxBanks);
+}
+
+/// Loads aux bank `slot` from the BK file at index `fileIndex` of the SBN's file list, or leaves it empty if it's 0,
+/// when the next song plays.
+__attribute__((export_name("mamar_audio_set_aux_bank")))
+void mamar_audio_set_aux_bank(s32 slot, s32 fileIndex) {
+    if (slot >= 0 && slot < ARRAY_COUNT(MamarAuxBanks)) {
+        MamarAuxBanks[slot] = fileIndex;
+    }
+}
+
+/// Plays the `size`-byte BGM file in `MamarBGM` from segment `startSegment`, `startTick` ticks in, with the aux banks
+/// set by `mamar_audio_set_aux_bank`. The song starts once the one playing has stopped, which takes the engine a frame.
 __attribute__((export_name("mamar_audio_play")))
-void mamar_audio_play(s32 size, s32 variation, s32 bankSong, s32 startSegment, s32 startTick) {
+void mamar_audio_play(s32 size, s32 variation, s32 startSegment, s32 startTick) {
     mamar_audio_stop();
     MamarBGMSize = CLAMP(size, 0, MAMAR_BGM_MAX_SIZE);
     MamarVariation = variation;
-    MamarBankSong = bankSong;
     MamarStartSegment = startSegment;
     MamarStartTick = startTick;
     IsPlayRequested = true;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 
 /** Whether a track plays: `solo` silences every track that isn't soloed. */
 export type TrackMute = "none" | "mute" | "solo"
@@ -35,8 +35,11 @@ export interface PlayerStatus {
  * Plays songs. Each method takes effect as soon as it can, which might be after it returns.
  */
 export interface SongPlayer {
-    /** Plays an encoded BGM from `start`, or from its start if not given, replacing whatever is playing. */
-    load(bgm: Uint8Array, variation: number, start?: SongPosition): void | Promise<void>
+    /**
+     * Plays an encoded BGM from `start`, replacing whatever is playing, with `auxBanks` loaded into its aux banks: the
+     * sound bank's file index of each BK file, or 0 for none.
+     */
+    load(bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[]): void | Promise<void>
     setPaused(paused: boolean): void | Promise<void>
     setTrackMute(track: number, mute: TrackMute): void
     /** Sets the proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */
@@ -47,6 +50,8 @@ export interface SongPlayer {
     setVolume(volume: number): void
     /** Calls `listener` with the player's status every frame until disposed. */
     onStatus(listener: (status: PlayerStatus) => void): () => void
+    /** How many aux banks a song can load its own instruments from, once the player has started. */
+    readonly auxBankCount: Promise<number>
 }
 
 export const SongPlayerContext = createContext<SongPlayer | null>(null)
@@ -65,4 +70,20 @@ export default function useSongPlayer(onStatus?: (status: PlayerStatus) => void)
     }, [player, onStatus])
 
     return player
+}
+
+/** How many aux banks a song can load its own instruments from, which is 0 until the player has started. */
+export function useAuxBankCount(): number {
+    const player = useContext(SongPlayerContext)
+    const [count, setCount] = useState(0)
+
+    useEffect(() => {
+        let isCurrent = true
+        player?.auxBankCount.then(count => isCurrent && setCount(count))
+        return () => {
+            isCurrent = false
+        }
+    }, [player])
+
+    return count
 }

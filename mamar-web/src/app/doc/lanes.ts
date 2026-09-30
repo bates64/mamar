@@ -107,7 +107,7 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
             key: "instrument", name: "Instrument", min: 0, max: Math.max(0, bgm.instruments.length - 1), display: "spans", discrete: true,
             format: index => {
                 const instrument = bgm.instruments[index]
-                return instrument ? `${index}: ${instruments.getName(instrument.patch)}` : `${index}`
+                return instrument ? `${index}: ${instruments.getName(instrument.patch, bgm.aux_banks)}` : `${index}`
             },
             read: command => ("SetTrackVoice" in command ? { value: (command.SetTrackVoice as Fields).index } : undefined),
             set: index => ({ SetTrackVoice: { index } }),

@@ -14,7 +14,7 @@ Paper Mario music editor.
 Architecture
 ============
 
-Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, and [the game's audio engine](/mamar-audio) from [papermario-dx](https://github.com/bates64/papermario-dx), also compiled to WebAssembly. The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
+Mamar is a web app comprised of [a React frontend](/mamar-web), [Rust](/pm64) [supporting](/mamar-wasm-bridge) [libraries](/pm64-typegen) compiled to WebAssembly, and [the game's audio engine](/mamar-audio) from [papermario-dx](https://github.com/bates64/papermario-dx), also compiled to WebAssembly. The names of the game's sounds come from [Star Rod Classic](https://github.com/z64a/star-rod-classic)'s list of them. The whole thing is client-side only i.e. you can serve it with a simple static file server (the live site uses [Vercel](https://vercel.com/) for deployments).
 
 Why are some parts Rust? Mamar used to be a desktop application written entirely in Rust! It's also a more suitable language for the kind of encoding/decoding of binary data that Mamar needs to do.
 

@@ -1,4 +1,4 @@
-import type { AudioEngineMessage, AudioEngineOptions, AudioEngineStatus } from "./audioEngine.worklet"
+import type { AudioEngineMessage, AudioEngineOptions, AudioEngineReady, AudioEngineStatus } from "./audioEngine.worklet"
 import workletUrl from "./audioEngine.worklet?worker&url"
 import { PlayerStatus, SongCycle, SongPlayer, SongPosition, TrackMute } from "./SongPlayer"
 
@@ -13,12 +13,15 @@ export default class WasmSongPlayer implements SongPlayer {
     private readonly node: Promise<AudioWorkletNode>
     private readonly trackMutes: TrackMute[] = new Array(16).fill("none")
     private readonly listeners = new Set<(status: PlayerStatus) => void>()
+    readonly auxBankCount: Promise<number>
+    private onReady!: (ready: AudioEngineReady) => void
 
     /**
      * `sbn` is the sound bank (SBN) of the ROM whose instruments songs play with. `engine` is mamar-audio's build of the
      * engine to play them with, if not Mamar's own, such as one built from a mod's copy of papermario-dx.
      */
     constructor(sbn: ArrayBuffer, engine?: ArrayBuffer) {
+        this.auxBankCount = new Promise<AudioEngineReady>(resolve => this.onReady = resolve).then(ready => ready.auxBankCount)
         this.node = this.start(sbn, engine)
         this.node.catch(error => console.error("Couldn't start the audio engine", error))
     }
@@ -34,7 +37,13 @@ export default class WasmSongPlayer implements SongPlayer {
             outputChannelCount: [2],
             processorOptions,
         })
-        node.port.onmessage = ({ data }: MessageEvent<AudioEngineStatus>) => this.onEngineStatus(data)
+        node.port.onmessage = ({ data }: MessageEvent<AudioEngineReady | AudioEngineStatus>) => {
+            if ("auxBankCount" in data) {
+                this.onReady(data)
+            } else {
+                this.onEngineStatus(data)
+            }
+        }
         node.connect(this.context.destination)
         return node
     }
@@ -43,8 +52,8 @@ export default class WasmSongPlayer implements SongPlayer {
         this.node.then(node => node.port.postMessage(message))
     }
 
-    load(bgm: Uint8Array, variation: number, start: SongPosition = { segment: 0, tick: 0 }) {
-        this.post({ type: "play", bgm, variation, start })
+    load(bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[]) {
+        this.post({ type: "play", bgm, variation, start, auxBanks })
     }
 
     setPaused(paused: boolean) {

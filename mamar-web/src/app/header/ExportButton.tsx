@@ -8,6 +8,7 @@ import { useDoc, useLocation, useVariation } from "../store"
 import { proximityMixValue } from "../store/doc"
 import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 import { encodeForGame } from "../util/recordings"
+import { auxBankIndexes } from "../util/soundBank"
 
 /** Where the export settings are remembered between visits. */
 const SETTINGS_KEY = "mamar.export"
@@ -83,6 +84,7 @@ export default function ExportButton() {
                 bgm: encodeForGame(doc.bgm, sbn),
                 variation: doc.activeVariation,
                 sbn,
+                auxBanks: auxBankIndexes(sbn, doc.bgm.aux_banks),
                 proximityMix: proximityMixValue(location),
                 alternateParts: location.alternateParts,
                 loops: settings.loops,

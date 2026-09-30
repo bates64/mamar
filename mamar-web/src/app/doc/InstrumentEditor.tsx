@@ -4,8 +4,12 @@ import { Bgm, Event, Instrument, PatchAddress } from "pm64-typegen"
 import styles from "./InstrumentEditor.module.scss"
 import { toEvent } from "./useLaneEditing"
 
+import { useAuxBankCount } from "../emu/SongPlayer"
 import * as instruments from "../instruments"
 import { useBgm } from "../store"
+import { auxBankFor } from "../store/bgm"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
+import { auxBankFiles } from "../util/soundBank"
 
 /** A byte the engine reads as signed. */
 function signed(byte: number): number {
@@ -22,31 +26,60 @@ const NEW_INSTRUMENT: Instrument = {
     fine_tune: 0,
 }
 
+/** A choice of sound: a sound in a music bank, as its lowest recording, or one of a BK file a song can load. */
+function soundKey(sound: { bank: number, instrument: number } | { file: string, instrument: number }): string {
+    return "file" in sound ? `aux:${sound.file}:${sound.instrument}` : `music:${sound.bank}:${sound.instrument}`
+}
+
 /**
- * Chooses the sound `patch` plays, from the sounds in the game's music banks. A native list, as a Spectrum picker's own
- * popup would count as outside the popup it's in and close it.
+ * Chooses the sound `patch` plays, from the sounds in the game's music banks, and those the ROM's songs load into their
+ * aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. A native list,
+ * as a Spectrum picker's own popup would count as outside the popup it's in and close it.
  */
 export function SoundSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
-    const key = (bank: number, instrument: number) => `${bank},${instrument}`
-    const isListed = patch.bank_set === "Music" && instruments.categories.some(category =>
-        category.instruments.some(entry => entry.bank === patch.bank && entry.instrument === patch.instrument))
+    const [bgm, dispatch] = useBgm()
+    const sbn = useOptionalSoundBank()
+    const auxBankCount = useAuxBankCount()
+    const auxBanks = bgm?.aux_banks ?? []
+
+    let selected = ""
+    if (patch.bank_set === "Music") {
+        selected = soundKey(instruments.recordingsOf(patch)[0])
+    } else if (patch.bank_set === "Aux" && auxBanks[patch.bank]) {
+        selected = soundKey({ file: auxBanks[patch.bank], instrument: patch.instrument })
+    }
+    const auxFiles = (sbn ? auxBankFiles(sbn) : []).filter(file =>
+        file.instruments.length > 0 && bgm && auxBankFor(bgm, file.name, auxBankCount) !== undefined)
+    const isListed = patch.bank_set === "Music"
+        ? instruments.musicBanks.some(bank => bank.families.some(family => soundKey(family.recordings[0]) === selected))
+        : auxFiles.some(file => file.name === auxBanks[patch.bank] && file.instruments.includes(patch.instrument))
 
     return <label className={styles.field}>
         Sound
         <select
-            value={isListed ? key(patch.bank, patch.instrument) : ""}
+            value={isListed ? selected : ""}
             onChange={event => {
-                const [bank, instrument] = event.target.value.split(",").map(Number)
-                onChange({ ...patch, bank_set: "Music", bank, instrument })
+                const [kind, bank, instrument] = event.target.value.split(":")
+                if (kind === "music") {
+                    onChange({ ...patch, bank_set: "Music", bank: Number(bank), instrument: Number(instrument) })
+                } else if (kind === "aux" && bgm) {
+                    const slot = auxBankFor(bgm, bank, auxBankCount)
+                    if (slot !== undefined) {
+                        dispatch({ type: "use_aux_bank", file: bank, count: auxBankCount })
+                        onChange({ ...patch, bank_set: "Aux", bank: slot, instrument: Number(instrument) })
+                    }
+                }
             }}
         >
-            {!isListed && <option value="">{instruments.getName(patch)}</option>}
-            {instruments.categories.map(category => <optgroup key={category.name} label={category.name}>
-                {category.instruments.filter(entry => entry.visible !== false).map(entry => <option
-                    key={key(entry.bank, entry.instrument)}
-                    value={key(entry.bank, entry.instrument)}
-                >
-                    {entry.name}
+            {!isListed && <option value="">{instruments.getName(patch, auxBanks)}</option>}
+            {instruments.musicBanks.map(bank => <optgroup key={bank.name} label={bank.name}>
+                {bank.families.map(family => <option key={family.name} value={soundKey(family.recordings[0])}>
+                    {family.name}
+                </option>)}
+            </optgroup>)}
+            {auxFiles.map(file => <optgroup key={file.name} label={file.name}>
+                {file.instruments.map(instrument => <option key={instrument} value={soundKey({ file: file.name, instrument })}>
+                    {instruments.soundName(file.name, instrument)}
                 </option>)}
             </optgroup>)}
         </select>
@@ -128,7 +161,7 @@ export default function InstrumentEditor({ event, trackListId, trackIndex }: {
                 }}
             >
                 {bgm.instruments.map((instrument, i) => <option key={i} value={i}>
-                    {i}: {instruments.getName(instrument.patch)}
+                    {i}: {instruments.getName(instrument.patch, bgm.aux_banks)}
                 </option>)}
                 <option value="new">New instrument</option>
             </select>

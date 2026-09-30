@@ -33,9 +33,9 @@ function nameOf({ event, kinds }: StartingValue): string {
     return kinds.length > 1 ? kinds[0].name.split(" ")[0] : kinds[0].name
 }
 
-function summaryOf({ event, kinds }: StartingValue): string {
+function summaryOf({ event, kinds }: StartingValue, auxBanks?: string[]): string {
     if ("TrackOverridePatch" in event) {
-        return instruments.getName(event.TrackOverridePatch)
+        return instruments.getName(event.TrackOverridePatch, auxBanks)
     }
     return kinds.map(kind => (kind.format ?? String)(valueOf(kind, event))).join(", ")
 }
@@ -142,7 +142,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
             onClick={event => setOpen({ id: value.event.id, anchor: event.currentTarget.getBoundingClientRect() })}
         >
             <span className={styles.name}>{nameOf(value)}</span>
-            <span className={styles.summary}>{summaryOf(value)}</span>
+            <span className={styles.summary}>{summaryOf(value, bgm?.aux_banks)}</span>
         </button>)}
         {carriedPatch && <button
             className={classNames(styles.value, styles.carried)}
@@ -150,7 +150,7 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
             onClick={() => setHere([{ TrackOverridePatch: carriedPatch }])}
         >
             <span className={styles.name}>Patch</span>
-            <span className={styles.summary}>{instruments.getName(carriedPatch)}</span>
+            <span className={styles.summary}>{instruments.getName(carriedPatch, bgm?.aux_banks)}</span>
         </button>}
         {carriedGroups.map(group => <button
             key={group.name}

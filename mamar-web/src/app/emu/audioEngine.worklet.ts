@@ -18,7 +18,7 @@ export interface AudioEngineOptions {
 }
 
 export type AudioEngineMessage =
-    | { type: "play", bgm: Uint8Array, variation: number, start: SongPosition }
+    | { type: "play", bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[] }
     | { type: "pause", paused: boolean }
     | { type: "mutes", muteMask: number, soloMask: number }
     | { type: "location", proximityMix: number, alternateParts: boolean }
@@ -38,13 +38,21 @@ export interface AudioEngineStatus {
     levels: Float32Array
 }
 
+/** What the engine posts once it starts, before any status. */
+export interface AudioEngineReady {
+    /** How many aux banks a song can load its own instruments from. */
+    auxBankCount: number
+}
+
 interface Exports {
     memory: WebAssembly.Memory
     mamar_audio_init(): void
     mamar_audio_output(): number
     mamar_audio_render_frame(): number
     mamar_audio_bgm_buffer(): number
-    mamar_audio_play(size: number, variation: number, bankSong: number, startSegment: number, startTick: number): void
+    mamar_audio_play(size: number, variation: number, startSegment: number, startTick: number): void
+    mamar_audio_aux_bank_count(): number
+    mamar_audio_set_aux_bank(slot: number, fileIndex: number): void
     mamar_audio_set_proximity_mix(mix: number): void
     mamar_audio_set_alternate_parts(enabled: number): void
     mamar_audio_set_track_mutes(muteMask: number, soloMask: number): void
@@ -94,6 +102,7 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
         })
         this.engine = instance.exports as unknown as Exports
         this.engine.mamar_audio_init()
+        this.port.postMessage({ auxBankCount: this.engine.mamar_audio_aux_bank_count() } satisfies AudioEngineReady)
 
         this.port.onmessage = ({ data }: MessageEvent<AudioEngineMessage>) => this.onMessage(data)
     }
@@ -104,7 +113,10 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
         case "play":
             new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), message.bgm.length).set(message.bgm)
             this.song = { size: message.bgm.length, variation: message.variation }
-            engine.mamar_audio_play(message.bgm.length, message.variation, -1, message.start.segment, message.start.tick)
+            for (let slot = 0; slot < engine.mamar_audio_aux_bank_count(); slot++) {
+                engine.mamar_audio_set_aux_bank(slot, message.auxBanks[slot] ?? 0)
+            }
+            engine.mamar_audio_play(message.bgm.length, message.variation, message.start.segment, message.start.tick)
             break
         case "pause":
             this.paused = message.paused
@@ -177,7 +189,7 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
 
         const tick = engine.mamar_audio_tick()
         if (segment > cycle.end.segment || (segment === cycle.end.segment && tick >= cycle.end.tick)) {
-            engine.mamar_audio_play(song.size, song.variation, -1, cycle.start.segment, cycle.start.tick)
+            engine.mamar_audio_play(song.size, song.variation, cycle.start.segment, cycle.start.tick)
         }
     }
 

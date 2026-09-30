@@ -154,6 +154,6 @@ export function useInstrumentName(commands: Event[] | undefined, isDrumTrack: bo
         } else {
             patch = carried.patch ?? (carriedInstrument !== undefined ? bgm.instruments[carriedInstrument]?.patch : undefined)
         }
-        return patch && instruments.familyName(instruments.getName(patch))
+        return patch && instruments.getName(patch, bgm.aux_banks)
     }, [bgm, isDrumTrack, played, carried])
 }

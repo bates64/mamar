@@ -20,7 +20,9 @@ interface Engine {
     mamar_audio_output(): number
     mamar_audio_render_frame(): number
     mamar_audio_bgm_buffer(): number
-    mamar_audio_play(size: number, variation: number, bankSong: number, startSegment: number, startTick: number): void
+    mamar_audio_play(size: number, variation: number, startSegment: number, startTick: number): void
+    mamar_audio_aux_bank_count(): number
+    mamar_audio_set_aux_bank(slot: number, fileIndex: number): void
     mamar_audio_set_proximity_mix(mix: number): void
     mamar_audio_set_alternate_parts(enabled: number): void
     mamar_audio_segment(): number
@@ -38,6 +40,8 @@ export interface ExportOptions {
     variation: number
     /** The ROM's sound bank (SBN), whose instruments the song plays with. */
     sbn: ArrayBuffer
+    /** The sound bank's file index of the BK file each of the song's aux banks loads, or 0 for none. */
+    auxBanks: number[]
     /** The proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */
     proximityMix: number
     alternateParts: boolean
@@ -54,7 +58,7 @@ export interface ExportOptions {
  * ends.
  */
 export async function renderSong(options: ExportOptions, segments: Segment[]): Promise<Int16Array> {
-    const { bgm, variation, sbn, proximityMix, alternateParts, loops, fadeSeconds, onProgress } = options
+    const { bgm, variation, sbn, auxBanks, proximityMix, alternateParts, loops, fadeSeconds, onProgress } = options
     const sbnBytes = new Uint8Array(sbn)
     const wasm = await fetch(wasmUrl).then(response => response.arrayBuffer())
     // The engine reads the sound bank from the host, which needs the engine's memory to write it to
@@ -73,7 +77,10 @@ export async function renderSong(options: ExportOptions, segments: Segment[]): P
     new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), bgm.length).set(bgm)
     engine.mamar_audio_set_proximity_mix(proximityMix)
     engine.mamar_audio_set_alternate_parts(alternateParts ? 1 : 0)
-    engine.mamar_audio_play(bgm.length, variation, -1, 0, 0)
+    for (let slot = 0; slot < engine.mamar_audio_aux_bank_count(); slot++) {
+        engine.mamar_audio_set_aux_bank(slot, auxBanks[slot] ?? 0)
+    }
+    engine.mamar_audio_play(bgm.length, variation, 0, 0)
 
     const isLooping = loopsForever(segments)
     const chunks: Int16Array[] = []

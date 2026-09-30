@@ -1,5 +1,5 @@
 import produce, { current, setAutoFreeze } from "immer"
-import { Bgm, Command, Event, Instrument, Track, TrackList } from "pm64-typegen"
+import { Bgm, Command, Event, Instrument, PatchAddress, Track, TrackList } from "pm64-typegen"
 import { arrayMove } from "react-movable"
 
 import { useDoc } from "./doc"
@@ -107,6 +107,11 @@ export type BgmAction = {
     type: "set_mix_name"
     mix: number
     name: string
+} | {
+    /** Loads BK file `file` into an aux bank, if no aux bank has it, in the first of `count` banks that's free. */
+    type: "use_aux_bank"
+    file: string
+    count: number
 }
 
 /**
@@ -148,6 +153,45 @@ export function playsDrums(bgm: Bgm, track: Track, mix: number): boolean {
 }
 
 /** Whether `commands` play a passage of their own in each proximity mix. */
+/** The aux banks the song plays sounds from, by their patches. */
+function usedAuxBanks(bgm: Bgm): Set<number> {
+    const used = new Set<number>()
+    const add = (patch: PatchAddress) => {
+        if (patch.bank_set === "Aux") used.add(patch.bank)
+    }
+    bgm.instruments.forEach(instrument => add(instrument.patch))
+    bgm.drums.forEach(drum => add(drum.patch))
+    const commandLists = [
+        ...Object.values(bgm.track_lists).flatMap(trackList => trackList.tracks.map(track => track.commands)),
+        ...Object.values(bgm.branches).flatMap(branch => branch.options.map(option => option.commands)),
+    ]
+    for (const commands of commandLists) {
+        for (const event of commands) {
+            if ("TrackOverridePatch" in event) add(event.TrackOverridePatch)
+        }
+    }
+    return used
+}
+
+/**
+ * The aux bank the song would load BK file `file` into, of `count` banks: the one that has it, else the first that's
+ * empty or that the song doesn't play, or undefined if every bank is in use.
+ */
+export function auxBankFor(bgm: Bgm, file: string, count: number): number | undefined {
+    const auxBanks = bgm.aux_banks ?? []
+    const loaded = auxBanks.indexOf(file)
+    if (loaded >= 0) {
+        return loaded
+    }
+    const used = usedAuxBanks(bgm)
+    for (let bank = 0; bank < count; bank++) {
+        if (!auxBanks[bank] || !used.has(bank)) {
+            return bank
+        }
+    }
+    return undefined
+}
+
 export function variesByMix(commands: Event[]): boolean {
     // A detour only plays commands the sequence has, so a branch it plays is one of them
     return commands.some(event => "Branch" in event)
@@ -293,6 +337,16 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
         }, mix)
     case "split_variation":
         return Bridge.bgm_split_variation_at(bgm, action.variation, action.time)
+    case "use_aux_bank": {
+        const bank = auxBankFor(bgm, action.file, action.count)
+        if (bank === undefined || bgm.aux_banks?.[bank] === action.file) {
+            return bgm
+        }
+        const auxBanks = [...bgm.aux_banks ?? []]
+        while (auxBanks.length < bank) auxBanks.push("")
+        auxBanks[bank] = action.file
+        return { ...bgm, aux_banks: auxBanks }
+    }
     case "set_beats_per_bar":
         return { ...bgm, beats_per_bar: action.beatsPerBar }
     case "insert_track_command":

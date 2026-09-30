@@ -31,7 +31,11 @@ const audio = instance.exports
 
 audio.mamar_audio_init()
 new Uint8Array(memory.buffer, audio.mamar_audio_bgm_buffer(), bgm.length).set(bgm)
-audio.mamar_audio_play(bgm.length, 0, songId, 0, 0)
+// The song loads its aux banks from the BK files the song list gives it
+for (let slot = 0; slot < audio.mamar_audio_aux_bank_count(); slot++) {
+    audio.mamar_audio_set_aux_bank(slot, slot < 3 ? rom.readUInt16BE(songList + songId * 8 + 2 + slot * 2) : 0)
+}
+audio.mamar_audio_play(bgm.length, 0, 0, 0)
 
 const out = audio.mamar_audio_output()
 const chunks = []
