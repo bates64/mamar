@@ -21,7 +21,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: bates64/papermario-dx
-          ref: mamar-wasm
           path: papermario-dx
       - uses: cachix/install-nix-action@v31
 
