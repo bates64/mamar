@@ -58,7 +58,7 @@
               rust-analyzer
               nixpkgs-fmt
               wasm-pack
-              llvmPackages.clang-unwrapped
+              llvmPackages.clang
               lld
             ];
             env = {
