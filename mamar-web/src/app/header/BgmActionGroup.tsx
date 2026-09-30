@@ -76,7 +76,8 @@ export default function BgmActionGroup() {
         "WebkitAppRegion": "no-drag",
     } as CSSProperties}>
         <ActionButton
-            onPress={() => dispatch({ type: "open_doc" })}
+            // A new song has no changes to lose until it's edited
+            onPress={() => dispatch({ type: "open_doc", isSaved: true })}
             {...props}
         >New</ActionButton>
         <OpenButton />
