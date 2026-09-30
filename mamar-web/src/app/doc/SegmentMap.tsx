@@ -8,6 +8,7 @@ import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
 import SegmentEnd from "./SegmentEnd"
 import styles from "./SegmentMap.module.scss"
+import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 import { MAX_VOICES, total, useVoices } from "./voices"
@@ -260,7 +261,9 @@ function Container() {
                                 : <div key={i} className={styles.track} aria-label={`Track ${i}`}>
                                     <PianoRollThumbnail trackIndex={i} trackListIndex={segment.Subseg.track_list} segmentIndex={segmentIndex} />
                                 </div>))}
-                            <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
+                            <SegmentStart.Provider value={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}>
+                                <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
+                            </SegmentStart.Provider>
                         </View>
                     } else {
                         const id = getSegmentId(segment)

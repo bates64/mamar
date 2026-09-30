@@ -37,6 +37,10 @@ pub struct PianoRoll {
     pitch_limits: Vec<(usize, Option<u8>)>,
     /// Ticks per CSS pixel.
     zoom: f64,
+    /// Ticks in each bar.
+    ticks_per_bar: f64,
+    /// The first time a bar starts at, as the song's bars start after its pickup rather than at each segment.
+    first_bar: f64,
     /// Whether anything drawn has changed since the last render. The canvas keeps what was drawn until then.
     dirty: bool,
 }
@@ -60,6 +64,8 @@ impl PianoRoll {
             selection: Vec::new(),
             pitch_limits: Vec::new(),
             zoom: 2.0,
+            ticks_per_bar: TICKS_PER_BEAT * 4.0,
+            first_bar: 0.0,
             dirty: true,
         }
     }
@@ -103,6 +109,13 @@ impl PianoRoll {
         self.dirty = true;
     }
 
+    /// Sets how many ticks each bar is, and the first time a bar starts at.
+    pub fn set_bars(&mut self, ticks_per_bar: u32, first_bar: u32) {
+        self.ticks_per_bar = (ticks_per_bar as f64).max(1.0);
+        self.first_bar = first_bar as f64;
+        self.dirty = true;
+    }
+
     /// Sets how many ticks each CSS pixel is.
     pub fn set_zoom(&mut self, ticks_per_px: f64) {
         self.zoom = ticks_per_px.max(0.01);
@@ -114,14 +127,17 @@ impl PianoRoll {
         self.dirty = true;
     }
 
-    fn draw_lines(&self, ctx: &web_sys::CanvasRenderingContext2d, start: f64, end: f64, step: f64) {
+    /// Draws a line every `step` ticks, one of them at `first`, across what's in view.
+    fn draw_lines(&self, ctx: &web_sys::CanvasRenderingContext2d, first: f64, step: f64) {
+        let start = self.scroll_ticks;
+        let end = start + self.vw * self.zoom;
         ctx.begin_path();
-        let mut x = start;
-        while x <= end {
-            let sx = x - self.scroll_ticks;
-            ctx.move_to(sx, 0.0);
-            ctx.line_to(sx, self.vh);
-            x += step;
+        let mut time = first + ((start - first) / step).ceil() * step;
+        while time <= end {
+            let x = self.time_to_x(time);
+            ctx.move_to(x, 0.0);
+            ctx.line_to(x, self.vh);
+            time += step;
         }
         ctx.stroke();
     }
@@ -168,22 +184,12 @@ impl PianoRoll {
 
         // beat lines
         ctx.set_stroke_style_str("#1e1e2e"); // gray-100, Catppuccin Mocha base
-        self.draw_lines(
-            ctx,
-            self.time_to_x(self.scroll_ticks),
-            self.time_to_x(self.scroll_ticks) + self.vw,
-            self.beat_width(),
-        );
+        self.draw_lines(ctx, self.first_bar % TICKS_PER_BEAT, TICKS_PER_BEAT);
 
         // bar lines
         ctx.set_stroke_style_str("#313244"); // gray-200, Catppuccin Mocha surface0
         ctx.set_line_width(2.0);
-        self.draw_lines(
-            ctx,
-            self.time_to_x(self.scroll_ticks),
-            self.time_to_x(self.scroll_ticks) + self.vw,
-            self.beat_width() * 4.0,
-        );
+        self.draw_lines(ctx, self.first_bar, self.ticks_per_bar);
 
         // Dashed lines where each branch can switch to another mix's option
         ctx.set_stroke_style_str("rgb(249 226 175 / 35%)"); // Catppuccin Mocha yellow
@@ -243,10 +249,6 @@ impl PianoRoll {
 
     fn time_to_x(&self, time: f64) -> f64 {
         (time - self.scroll_ticks) / self.zoom
-    }
-
-    fn beat_width(&self) -> f64 {
-        self.time_to_x(TICKS_PER_BEAT) - self.time_to_x(0.0)
     }
 
     fn note_height(&self) -> f64 {

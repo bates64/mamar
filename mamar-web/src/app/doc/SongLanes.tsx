@@ -8,6 +8,7 @@ import LaneMenu, { useLaneShown } from "./LaneMenu"
 import { commandName, inLane, LaneKind, lanePoints, lastValue, MASTER_LANES, MASTER_VOLUME_LANE, TEMPO_LANE, timeline, TRANSPOSE_LANE } from "./lanes"
 import { PlayheadLine } from "./Playhead"
 import { usePickup, useSegmentLengths, useTicksPerBar } from "./Ruler"
+import { SegmentStart } from "./snap"
 import styles from "./SongLanes.module.scss"
 import TimeGrid from "./TimeGrid"
 import useLaneEditing from "./useLaneEditing"
@@ -29,6 +30,7 @@ export default function SongLanes() {
     const [bgm] = useBgm()
     const [variation] = useVariation()
     const segmentLengths = useSegmentLengths()
+    const segmentStarts = segmentLengths.map((_, i) => segmentLengths.slice(0, i).reduce((sum, length) => sum + length, 0))
     const ticksPerBar = useTicksPerBar()
     const pickup = usePickup()
     const isShown = useLaneShown()
@@ -76,14 +78,15 @@ export default function SongLanes() {
                     return <div key={segment.key} />
                 }
                 const initial = lastValue(masterTimelines.slice(0, i).flatMap(commands => lanePoints(kind, commands)))
-                return <SegmentLane
-                    key={segment.key}
-                    kind={kind}
-                    segment={segment as SegmentTrack}
-                    commands={masterTimelines[i]}
-                    length={segmentLengths[i]}
-                    initial={initial}
-                />
+                return <SegmentStart.Provider key={segment.key} value={segmentStarts[i]}>
+                    <SegmentLane
+                        kind={kind}
+                        segment={segment as SegmentTrack}
+                        commands={masterTimelines[i]}
+                        length={segmentLengths[i]}
+                        initial={initial}
+                    />
+                </SegmentStart.Provider>
             })}
             <PlayheadLine />
         </TimeGrid>
@@ -105,15 +108,16 @@ export default function SongLanes() {
             <TimeGrid className={styles.bars} style={barLines}>
                 {segments.map((segment, i) => (segment.trackListId === undefined
                     ? <div key={segment.key} />
-                    : <CommandMarkers
-                        key={segment.key}
-                        name=""
-                        trackListId={segment.trackListId}
-                        trackIndex={0}
-                        length={segmentLengths[i]}
-                        events={masterTimelines[i].filter(({ event }) => !inLane(event, SONG_LANES))}
-                        label={commandName}
-                    />))}
+                    : <SegmentStart.Provider key={segment.key} value={segmentStarts[i]}>
+                        <CommandMarkers
+                            name=""
+                            trackListId={segment.trackListId}
+                            trackIndex={0}
+                            length={segmentLengths[i]}
+                            events={masterTimelines[i].filter(({ event }) => !inLane(event, SONG_LANES))}
+                            label={commandName}
+                        />
+                    </SegmentStart.Provider>))}
                 <PlayheadLine />
             </TimeGrid>
         </div>}

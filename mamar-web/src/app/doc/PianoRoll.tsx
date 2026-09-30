@@ -6,6 +6,7 @@ import { timeline } from "./lanes"
 import { HIGHEST_PITCH, LOWEST_PITCH, NOTE_HEIGHT } from "./pitches"
 import { PitchLimit } from "./pitchLimit"
 import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
+import { usePickup, useTicksPerBar } from "./Ruler"
 import { useSnap } from "./snap"
 
 import Bridge from "../bridge"
@@ -98,6 +99,8 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
     const [, docDispatch] = useDoc()
     const [, dispatch] = useBgm()
     const [, snap, grid] = useSnap()
+    const ticksPerBar = useTicksPerBar()
+    const pickup = usePickup()
     const playhead = useContext(PLAYHEAD_CONTEXT)
     const [drag, setDrag] = useState<Drag | null>(null)
     const target = { trackList: trackListId, track: trackIndex }
@@ -195,6 +198,11 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
             new Uint8Array(pitchLimits.map(({ limit }) => limit ?? 0)),
         )
     }, [pitchLimits])
+
+    useEffect(() => {
+        // Bar 1 starts after the pickup, so a segment's bars start where the song's do
+        rendererRef.current?.set_bars(ticksPerBar, (((pickup - segmentStart) % ticksPerBar) + ticksPerBar) % ticksPerBar)
+    }, [ticksPerBar, pickup, segmentStart])
 
     const selectedKey = selectedIds.join()
     useEffect(() => {

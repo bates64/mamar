@@ -11,6 +11,7 @@ import { usePitchLimits } from "./pitchLimit"
 import { PlayheadLine } from "./Playhead"
 import { useSegmentLengths } from "./Ruler"
 import { SegmentTrack, useSegmentTracks } from "./segmentTracks"
+import { SegmentStart } from "./snap"
 import StartingValues from "./StartingValues"
 import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
@@ -45,6 +46,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
 
     const [showTracker, setShowTracker] = useState(true)
     const segmentLengths = useSegmentLengths()
+    const segmentStart = segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)
     const segments = useSegmentTracks(mainIndex)
     const pitchLimits = usePitchLimits(trackListId, trackIndex, mainIndex, segmentIndex)
 
@@ -104,21 +106,23 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
             />)}
             {/* Every segment is in the one row, whatever order they're in here */}
             <div style={{ gridColumn: segmentIndex + 1, gridRow: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} data-selected-roll onScroll={event => syncGreyedRolls(event.currentTarget)}>
-                    <PianoRoll
+                <SegmentStart.Provider value={segmentStart}>
+                    <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} data-selected-roll onScroll={event => syncGreyedRolls(event.currentTarget)}>
+                        <PianoRoll
+                            trackListId={trackListId}
+                            trackIndex={trackIndex}
+                            pitchLimits={pitchLimits}
+                            segmentStart={segmentStart}
+                        />
+                    </div>
+                    <TrackLanes
                         trackListId={trackListId}
                         trackIndex={trackIndex}
-                        pitchLimits={pitchLimits}
-                        segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
+                        mainIndex={mainIndex}
+                        segmentIndex={segmentIndex}
+                        length={segmentLengths[segmentIndex] ?? 0}
                     />
-                </div>
-                <TrackLanes
-                    trackListId={trackListId}
-                    trackIndex={trackIndex}
-                    mainIndex={mainIndex}
-                    segmentIndex={segmentIndex}
-                    length={segmentLengths[segmentIndex] ?? 0}
-                />
+                </SegmentStart.Provider>
             </div>
             {track.is_drum_track && <DrumLabels key={segmentIndex} region={styles.region} />}
             <PlayheadLine />
