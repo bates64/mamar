@@ -1,7 +1,7 @@
 import { Command, Event } from "pm64-typegen"
 
 import { Props as LaneProps } from "./AutomationLane"
-import { LaneKind, lanePoints, LanePoint, timeline } from "./lanes"
+import { LaneKind, lanePoints, LanePoint, lastValue, timeline, trackLanes } from "./lanes"
 import { useMixCommands } from "./segmentTracks"
 
 import { useBgm, useDoc } from "../store"
@@ -12,13 +12,18 @@ export function toEvent(command: Command, id: number): Event {
     return (typeof command === "string" ? { [command]: null, id } : { ...command, id }) as unknown as Event
 }
 
-/** Edits the commands of `kind` in track `trackIndex` of track list `trackListId` through a lane. */
+/**
+ * Edits the commands of `kind` in track `trackIndex` of track list `trackListId` through a lane. `carried` is what the
+ * track has in each lane from earlier segments, by the lane's key.
+ */
 export default function useLaneEditing(
     trackListId: number,
     trackIndex: number,
     kind: LaneKind,
+    carried?: (key: string) => number | undefined,
 ): Pick<LaneProps, "onAdd" | "onChange" | "onMove" | "onDelete" | "onToggleFade" | "onSelect" | "selectedIds"> {
     const [bgm, dispatch] = useBgm()
+    const kinds = bgm ? trackLanes(bgm) : []
     const [, docDispatch] = useDoc()
     const selectedIds = useSelectedIds(trackListId, trackIndex)
     const commands = useMixCommands(bgm?.track_lists[trackListId]?.tracks[trackIndex]?.commands) ?? []
@@ -39,6 +44,12 @@ export default function useLaneEditing(
 
     const change = (point: LanePoint, value: number) =>
         dispatch({ type: "update_track_command", ...target, command: toEvent(commandOf(point, value), point.event.id) })
+    /** What the track has at `time` in the lane with key `key`, from this segment or an earlier one. */
+    const valueAt = (time: number) => (key: string) => {
+        const other = kinds.find(other => other.key === key)
+        const points = other ? lanePoints(other, timeline(commands)).filter(point => point.time <= time) : []
+        return lastValue(points) ?? carried?.(key)
+    }
     // A lane has one value at a time, so a point already at `time` is replaced
     const pointAt = (time: number, except?: LanePoint) =>
         lanePoints(kind, timeline(commands)).find(point => point.time === time && point.event.id !== except?.event.id)
@@ -49,7 +60,7 @@ export default function useLaneEditing(
             if (existing) {
                 change(existing, value)
             } else {
-                insert(time, kind.set(value))
+                insert(time, kind.set(value, valueAt(time)))
             }
         },
         onChange: change,

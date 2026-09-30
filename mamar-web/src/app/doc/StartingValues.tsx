@@ -128,11 +128,11 @@ export default function StartingValues({ trackListId, trackIndex, mainIndex, seg
                     onAction={key => {
                         const kind = unset.find(kind => kind.key === key)
                         if (kind) {
-                            dispatch({ type: "insert_track_command", ...target, time: 0, command: kind.set(defaultValue(kind)) })
+                            dispatch({ type: "insert_track_command", ...target, time: 0, command: kind.set(defaultValue(kind), key => carried.values.find(value => value.kind.key === key)?.value) })
                         }
                     }}
                 >
-                    {kind => <Item key={kind.key}>{kind.name}</Item>}
+                    {kind => <Item key={kind.key}>{kind.addName ?? kind.name}</Item>}
                 </Menu>
             </MenuTrigger>}
         </div>

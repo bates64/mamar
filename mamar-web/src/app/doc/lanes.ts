@@ -26,13 +26,19 @@ export interface LaneKind {
     /** Whether each value is a named choice, picked from a list rather than dragged to. */
     discrete?: boolean
     read(command: Record<string, unknown>): { value: number, fade?: number } | undefined
-    set(value: number): Command
+    /**
+     * A command that sets the lane to `value`, where `valueOf` gives the value the track has in another lane there, for
+     * commands that set that lane too.
+     */
+    set(value: number, valueOf?: (key: string) => number | undefined): Command
     /** Changes the value of `command`, for commands with other fields to keep. Defaults to `set`. */
     update?(command: Record<string, unknown>, value: number): Command
     fade?(value: number, time: number): Command
     format?(value: number): string
     /** The value a new starting value has. Defaults to 0, or the nearest value in range. */
     defaultValue?: number
+    /** What adding a starting value for the lane adds, if not the lane's value alone. */
+    addName?: string
 }
 
 type Fields = Record<string, number>
@@ -169,12 +175,12 @@ export function trackLanes(bgm: Bgm): LaneKind[] {
                 : { TrackTremoloSpeed: speed }) as Command,
         },
         {
-            // Only a full tremolo command has a delay, so a new point starts one with the speed and depth vanilla songs
-            // use most
-            key: "tremoloDelay", name: "Tremolo delay", min: 0, max: TICKS_PER_BEAT * 4, display: "line",
+            // Only a full tremolo command has a delay, so a new point starts one with the speed and depth the track has
+            // there, or those vanilla songs use most. Adding it at the region start adds a whole tremolo.
+            key: "tremoloDelay", name: "Tremolo delay", addName: "Tremolo", min: 0, max: TICKS_PER_BEAT * 4, display: "line",
             format: formatBeats,
             read: command => ("TrackTremolo" in command ? { value: (command.TrackTremolo as Fields).delay } : undefined),
-            set: delay => ({ TrackTremolo: { delay, speed: 15, depth: 10 } }),
+            set: (delay, valueOf) => ({ TrackTremolo: { delay, speed: valueOf?.("tremoloSpeed") ?? 15, depth: valueOf?.("tremolo") ?? 10 } }),
             update: (command, delay) => ({ TrackTremolo: { ...(command.TrackTremolo as Fields), delay } }) as Command,
         },
         {

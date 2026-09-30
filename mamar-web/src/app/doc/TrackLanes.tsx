@@ -142,6 +142,7 @@ export default function TrackLanes({ trackListId, trackIndex, mainIndex, segment
                 length={length}
                 played={played}
                 initial={lanePoints(kind, starting)[0]?.value ?? carried.values.find(value => value.kind.key === kind.key)?.value}
+                carried={key => carried.values.find(value => value.kind.key === key)?.value}
             />}
             {chosen.key === EVENTS_LANE && <CommandMarkers
                 name="Events"
@@ -176,7 +177,7 @@ export default function TrackLanes({ trackListId, trackIndex, mainIndex, segment
     </div>
 }
 
-function TrackLane({ kind, trackListId, trackIndex, length, played, initial }: {
+function TrackLane({ kind, trackListId, trackIndex, length, played, initial, carried }: {
     kind: LaneKind
     trackListId: number
     trackIndex: number
@@ -184,7 +185,9 @@ function TrackLane({ kind, trackListId, trackIndex, length, played, initial }: {
     played: { time: number, event: Event }[]
     /** The track's starting value for the lane. */
     initial?: number
+    /** What the track has in each lane from earlier segments, by the lane's key. */
+    carried(key: string): number | undefined
 }) {
-    const editing = useLaneEditing(trackListId, trackIndex, kind)
+    const editing = useLaneEditing(trackListId, trackIndex, kind, carried)
     return <AutomationLane kind={kind} length={length} points={lanePoints(kind, played)} initial={initial} showName={false} {...editing} />
 }
