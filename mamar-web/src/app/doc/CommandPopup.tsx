@@ -30,6 +30,9 @@ const fadeTime: Field = { path: ["time"], label: "Fade time (ticks)", min: 0, ma
 const FIELDS: Record<string, Field[]> = {
     EventTrigger: [{ path: ["event_info"], label: "Event", min: 0, max: 0xFFFFFF, hex: true }],
     TriggerSound: [{ path: ["sound"], label: "Sound effect", min: 0, max: 255 }],
+    MasterTempo: [{ path: [], label: "Tempo (BPM)", min: 1, max: 0xFFFF }],
+    MasterTempoFade: [{ path: ["value"], label: "Tempo (BPM)", min: 1, max: 0xFFFF }, fadeTime],
+    MasterPitchShift: [{ path: ["semitones"], label: "Transpose (semitones)", min: -128, max: 127 }],
     MasterVolume: [volume([])],
     MasterVolumeFade: [volume(["volume"]), fadeTime],
     SubTrackVolume: [volume([])],
@@ -37,6 +40,9 @@ const FIELDS: Record<string, Field[]> = {
     TrackVolumeFade: [volume(["value"]), fadeTime],
     SubTrackPan: [{ path: [], label: "Pan", min: 0, max: 127, format: formatPan }],
     SubTrackReverb: [{ path: [], label: "Reverb", min: 0, max: 127, format: String }],
+    SubTrackCoarseTune: [{ path: [], label: "Tune (semitones)", min: -128, max: 127 }],
+    SubTrackFineTune: [{ path: [], label: "Fine tune (cents)", min: -128, max: 127 }],
+    SegTrackTune: [{ path: ["bend"], label: "Pitch bend (cents)", min: -0x8000, max: 0x7FFF }],
     TrackOverridePatch: [],
     SeekCustomEnvelope: [{ path: ["index"], label: "Custom envelope to write", min: 1, max: 8 }],
     WriteCustomEnvelope: [
@@ -142,7 +148,8 @@ export default function CommandPopup({ event, trackListId, trackIndex }: { event
     }
 
     return <div className={styles.popup}>
-        <h3 className={styles.heading}>{commandName(event)}</h3>
+        {/* Commands with their own fields are labeled by them, and the rest by what the command is */}
+        {!(variant in FIELDS) && variant !== "Branch" && <h3 className={styles.heading}>{commandName(event)}</h3>}
         {body}
     </div>
 }
