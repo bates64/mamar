@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { createContainer } from "react-tracked"
 import useUndoable from "use-undoable"
 
@@ -45,18 +46,25 @@ const {
         behavior: "destroyFuture", // "mergePastReversed",
         historyLimit: 100,
     })
+    // use-undoable gives a functional update the state from the last render, so several dispatches before the next
+    // render each start from the one before instead. A state that renders anew, such as after undoing, replaces it.
+    const latest = useRef(state)
+    const rendered = useRef(state)
+    if (rendered.current !== state) {
+        rendered.current = state
+        latest.current = state
+    }
 
     const dispatch: Dispatch = (...actions) => {
         console.info("dispatch", actions.map(action => joinActionTypes(action)), actions)
+        let newState = latest.current
+        for (const action of actions) {
+            newState = rootReducer(newState, action)
+        }
+        console.log("new state", newState)
+        latest.current = newState
         setState(
-            prevState => {
-                let newState = prevState
-                for (const action of actions) {
-                    newState = rootReducer(newState, action)
-                }
-                console.log("new state", newState)
-                return newState
-            },
+            newState,
             undefined,
             actions.every(action => !shouldActionCommitToHistory(action)),
         )
