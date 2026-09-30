@@ -2,6 +2,7 @@ import { View, ActionButton, Tooltip, TooltipTrigger } from "@adobe/react-spectr
 import { fileSave } from "browser-fs-access"
 import { CSSProperties, useCallback, useEffect } from "react"
 
+import ExportButton from "./ExportButton"
 import OpenButton from "./OpenButton"
 
 import Bridge from "../bridge"
@@ -90,6 +91,7 @@ export default function BgmActionGroup() {
             </ActionButton>
             <Tooltip>Hold Shift to <i>Save As</i></Tooltip>
         </TooltipTrigger>
+        <ExportButton />
         <ActionButton
             onPress={() => dispatch.undo()}
             isDisabled={!dispatch.canUndo}
