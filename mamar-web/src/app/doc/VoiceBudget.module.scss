@@ -1,0 +1,118 @@
+.short {
+    --voice-color: var(--spectrum-red-700);
+}
+
+.shared {
+    --voice-color: var(--spectrum-orange-700);
+}
+
+// Across the top of the region, over its notes, for the badge to slide along
+.badgeRow {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+// Stuck to the timeline's right edge while the region runs past it
+.badge {
+    position: sticky;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 5px;
+    border-radius: 8px;
+    pointer-events: auto;
+
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: bold;
+    color: white;
+    background: var(--voice-color);
+}
+
+
+// Inside the badge, to win over Spectrum's own icon sizes
+.badge .badgeIcon {
+    flex: none;
+    width: 11px;
+    height: 11px;
+    fill: currentColor;
+}
+
+// What's wrong with the open region's voices, under its settings
+.voices {
+    margin-top: 16px;
+    font-size: 13px;
+}
+
+// As the settings' own headings, with the help where their buttons go
+.heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.message {
+    margin: 4px 0 0;
+    padding-left: 8px;
+    border-left: 2px solid var(--voice-color);
+    color: var(--spectrum-gray-900);
+}
+
+.candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+// A region that could free voices
+.candidate {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background: var(--spectrum-gray-200);
+}
+
+.candidateName {
+    font-weight: bold;
+    color: var(--spectrum-gray-900);
+}
+
+.suggestion {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 4px;
+    color: var(--spectrum-gray-800);
+}
+
+.suggestion + .suggestion {
+    margin-top: 4px;
+}
+
+// As the settings' own small buttons
+.action {
+    padding: 2px 8px;
+    border: 1px solid var(--spectrum-gray-400);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-gray-900);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--spectrum-gray-300);
+        outline: none;
+    }
+}
