@@ -100,7 +100,8 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
     return <div ref={trigger} data-no-drag-scroll onClick={event => event.stopPropagation()}>
         <DialogTrigger type="popover" placement="bottom start" isOpen={isOpen} onOpenChange={setOpen}>
             <ActionButton margin="size-75">
-                <Alert color="notice" />
+                {/* Spaced by hand, as the button's own spacing doesn't reach icons, as in LaneMenu */}
+                <Alert color="notice" size="S" marginStart="size-125" marginEnd="size-75" />
                 <Text>{needed} / {MAX_VOICES} voices</Text>
             </ActionButton>
             {close => <VoiceBudgetDialog
