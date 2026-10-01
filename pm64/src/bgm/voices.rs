@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 use serde_derive::{Deserialize, Serialize};
 use typescript_type_def::TypeDef;
 
-use super::{Branch, BranchId, TrackList};
+use super::{Branch, BranchId, Command, CommandSeq, TrackList};
+use crate::id::Id;
 
 /// Voices the game has for a phrase's tracks. Beyond this, the game reads past the end of its voices.
 pub const MAX_VOICES: usize = 24;
@@ -94,7 +95,114 @@ fn notes_cut(spans: &[(usize, usize)], voices: u8) -> usize {
     cut
 }
 
+/// Longest overlap, in ticks, of one note into the next that's taken to be a mistake, such as a DAW leaves between
+/// notes meant to follow each other. A note held into the next for longer is taken to be meant.
+pub const SHORT_OVERLAP: usize = 6;
+
+/// Where a track of a phrase plays the most notes at once, and the short overlaps that may add to them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
+pub struct VoiceUse {
+    /// When the track first plays the most notes it plays at once, in ticks from the start of the phrase.
+    pub busiest_at: Option<usize>,
+    /// The notes playing whenever the track plays the most notes it plays at once.
+    pub busiest_notes: Vec<Id>,
+    /// Notes held at most [SHORT_OVERLAP] ticks into a note that starts after them, which
+    /// [CommandSeq::trim_short_overlaps] shortens.
+    pub short_overlaps: Vec<Id>,
+}
+
+/// The voices each track of a phrase needs and gets, and where each needs them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
+pub struct VoiceReport {
+    pub voices: Voices,
+    pub tracks: [VoiceUse; 16],
+}
+
+/// The notes of `notes`, as (start, end, ID), playing whenever the most of them play at once, and when that first is.
+fn busiest(notes: &[(usize, usize, Id)]) -> (Option<usize>, Vec<Id>) {
+    let most = most_at_once(&notes.iter().map(|&(start, end, _)| (start, end)).collect::<Vec<_>>());
+    if most == 0 {
+        return (None, Vec::new());
+    }
+    let mut starts: Vec<usize> = notes.iter().map(|&(start, ..)| start).collect();
+    starts.sort_unstable();
+    starts.dedup();
+
+    let mut first = None;
+    let mut ids = Vec::new();
+    for time in starts {
+        let playing: Vec<Id> = notes
+            .iter()
+            .filter(|&&(start, end, _)| start <= time && time < end)
+            .map(|&(.., id)| id)
+            .collect();
+        if playing.len() == most {
+            first.get_or_insert(time);
+            for id in playing {
+                if !ids.contains(&id) {
+                    ids.push(id);
+                }
+            }
+        }
+    }
+    (first, ids)
+}
+
+/// For each note of `notes`, as (start, end, ID), held at most [SHORT_OVERLAP] ticks into a note that starts after it,
+/// the note's ID and the length that ends it where the soonest such note starts.
+pub fn short_overlaps(notes: &[(usize, usize, Id)]) -> Vec<(Id, usize)> {
+    notes
+        .iter()
+        .filter_map(|&(start, end, id)| {
+            notes
+                .iter()
+                .filter(|&&(next, ..)| next > start && next < end && end - next <= SHORT_OVERLAP)
+                .map(|&(next, ..)| next)
+                .min()
+                .map(|next| (id, next - start))
+        })
+        .collect()
+}
+
+/// The notes `commands` plays itself, not those of its branches, as (start, end, ID).
+pub(super) fn own_notes(commands: &CommandSeq, branches: &BTreeMap<BranchId, Branch>) -> Vec<(usize, usize, Id)> {
+    commands
+        .playback(branches)
+        .into_iter()
+        .filter_map(|(time, event)| match event.command {
+            Command::Note { length, .. } => Some((time, time + length as usize, event.id)),
+            _ => None,
+        })
+        .collect()
+}
+
 impl TrackList {
+    /// The voices each track needs and gets, and where each track, as proximity mix `mix` plays it, needs them. Short
+    /// overlaps are found among a track's own notes, not its branches'.
+    pub fn voice_report(&self, branches: &BTreeMap<BranchId, Branch>, mix: usize) -> VoiceReport {
+        let tracks = std::array::from_fn(|index| {
+            let track = &self.tracks[index];
+            if track.is_disabled {
+                return VoiceUse::default();
+            }
+            // As the editor shows the mix, with the IDs it gives the notes of branches
+            let played = own_notes(&track.commands.for_mix(branches, mix), branches);
+            let (busiest_at, busiest_notes) = busiest(&played);
+            VoiceUse {
+                busiest_at,
+                busiest_notes,
+                short_overlaps: short_overlaps(&own_notes(&track.commands, branches))
+                    .into_iter()
+                    .map(|(id, _)| id)
+                    .collect(),
+            }
+        });
+        VoiceReport {
+            voices: self.voices(branches),
+            tracks,
+        }
+    }
+
     /// When each track holds voices, for each proximity mix its branches choose between.
     fn spans_by_mix(&self, branches: &BTreeMap<BranchId, Branch>) -> Vec<[Vec<(usize, usize)>; 16]> {
         let mixes = branches
@@ -228,6 +336,61 @@ mod test {
         let voices = track_list.voices(&BTreeMap::new());
         assert_eq!(voices.total_needed(), 28);
         assert_eq!(voices.total_given(), MAX_VOICES);
+    }
+
+    #[test]
+    fn busiest_notes_are_those_playing_at_the_peak() {
+        // Two notes in a row overlap slightly, and the third plays alone
+        let notes = [(0, 50, 1), (48, 96, 2), (100, 140, 3)];
+        assert_eq!(busiest(&notes), (Some(48), vec![1, 2]));
+        assert_eq!(busiest(&[]), (None, vec![]));
+    }
+
+    #[test]
+    fn short_overlaps_leave_chords_and_long_overlaps() {
+        let notes = [
+            (0, 50, 1),   // 2 ticks into the next
+            (48, 96, 2),  // 6 ticks into the next, the most that's short
+            (90, 150, 3), // 30 ticks into the next, so meant
+            (120, 200, 4),
+            (120, 200, 5), // A chord with the one before
+        ];
+        assert_eq!(short_overlaps(&notes), vec![(1, 48), (2, 42)]);
+    }
+
+    #[test]
+    fn trimming_short_overlaps_frees_a_voice() {
+        use crate::bgm::{Command, CommandSeq, Track};
+
+        let note = |length| Command::Note {
+            pitch: 60,
+            velocity: 100,
+            length,
+        };
+        // Each note is held 2 ticks into the next
+        let mut commands = CommandSeq::from(vec![note(50)]);
+        commands.push(Command::Delay(48));
+        commands.push(note(50));
+        commands.push(Command::Delay(48));
+        commands.push(note(48));
+        commands.push(Command::Delay(48));
+        commands.push(Command::End);
+
+        let mut track_list = TrackList::default();
+        track_list.tracks[1] = Track {
+            is_disabled: false,
+            commands,
+            ..Track::default()
+        };
+        let report = track_list.voice_report(&BTreeMap::new(), 0);
+        assert_eq!(report.voices.needed[1], 2);
+        assert_eq!(report.tracks[1].short_overlaps.len(), 2);
+        assert_eq!(report.tracks[1].busiest_at, Some(48));
+
+        assert_eq!(track_list.tracks[1].commands.trim_short_overlaps(&BTreeMap::new()), 2);
+        let report = track_list.voice_report(&BTreeMap::new(), 0);
+        assert_eq!(report.voices.needed[1], 1);
+        assert!(report.tracks[1].short_overlaps.is_empty());
     }
 
     #[test]

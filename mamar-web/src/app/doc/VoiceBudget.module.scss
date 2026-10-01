@@ -1,0 +1,99 @@
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 4px;
+    padding: 2px 8px;
+
+    border: 1px solid var(--spectrum-orange-600);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--spectrum-orange-500) 18%, transparent);
+    color: var(--spectrum-orange-900);
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background: color-mix(in srgb, var(--spectrum-orange-500) 30%, transparent);
+        outline: none;
+    }
+}
+
+.budget {
+    max-width: 520px;
+    font-size: 13px;
+}
+
+.heading {
+    padding: 2px 4px 6px;
+    font-weight: bold;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th {
+        padding: 2px 8px;
+        color: var(--spectrum-gray-700);
+        font-weight: normal;
+        text-align: left;
+    }
+
+    td {
+        padding: 4px 8px;
+        white-space: nowrap;
+    }
+}
+
+.row {
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--spectrum-gray-200);
+        outline: none;
+    }
+}
+
+// Fewer voices than the track needs, so it cuts notes off
+.short {
+    color: var(--spectrum-orange-700);
+    font-weight: bold;
+}
+
+.overlaps {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--spectrum-gray-800);
+}
+
+.trim,
+.trimAll {
+    padding: 1px 8px;
+
+    border: 1px solid var(--spectrum-gray-400);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--spectrum-blue-900);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+        background: var(--spectrum-gray-200);
+    }
+}
+
+.trimAll {
+    margin: 8px 8px 0;
+}
+
+.explanation {
+    margin: 8px 8px 2px;
+    color: var(--spectrum-gray-700);
+    font-size: 12px;
+}

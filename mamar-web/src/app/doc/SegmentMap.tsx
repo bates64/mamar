@@ -14,6 +14,7 @@ import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 import TrackMeter from "./TrackMeter"
+import VoiceBudget from "./VoiceBudget"
 import { MAX_VOICES, total, useVoices } from "./voices"
 
 import Bridge from "../bridge"
@@ -81,8 +82,14 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
             evt.preventDefault()
         }
 
+        const isShortOfVoices = voices !== undefined && total(voices.needed) > MAX_VOICES &&
+            voices.given[shownIndex] < voices.needed[shownIndex]
+
         return <div
             tabIndex={0}
+            title={isShortOfVoices
+                ? `Gets ${voices!.given[shownIndex]} voices but needs ${voices!.needed[shownIndex]}, so some notes are cut off. See the voice budget under these regions for why.`
+                : undefined}
             aria-labelledby={isVersion ? undefined : nameId}
             aria-label={isVersion ? track.name || instrumentName : undefined}
             className={classNames({
@@ -92,8 +99,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                 [styles.showsVersion]: isVersion,
                 // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one
                 // before, so this only warns when the segment needs more voices than the game has
-                [styles.shortOfVoices]: voices !== undefined && total(voices.needed) > MAX_VOICES &&
-                    voices.given[shownIndex] < voices.needed[shownIndex],
+                [styles.shortOfVoices]: isShortOfVoices,
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
@@ -369,6 +375,11 @@ function Container() {
                             >
                                 {cell(row, segment.Subseg.track_list, segmentIndex)}
                             </div>)}
+                            <VoiceBudget
+                                trackListId={segment.Subseg.track_list}
+                                segmentIndex={segmentIndex}
+                                segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
+                            />
                             <SegmentStart.Provider value={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}>
                                 <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
                             </SegmentStart.Provider>

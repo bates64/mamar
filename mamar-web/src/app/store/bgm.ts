@@ -107,6 +107,14 @@ export type BgmAction = {
     mix: number
     name: string
 } | {
+    /**
+     * Shortens the notes of tracks `tracks` of track list `trackList` that are held a little into a note that starts
+     * after them, as each overlap makes the track need another voice. See CommandSeq::trim_short_overlaps in pm64.
+     */
+    type: "trim_short_overlaps"
+    trackList: number
+    tracks: number[]
+} | {
     /** Loads BK file `file` into an aux bank, if no aux bank has it, in the first of `count` banks that's free. */
     type: "use_aux_bank"
     file: string
@@ -345,6 +353,12 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
     }
     case "set_beats_per_bar":
         return { ...bgm, beats_per_bar: action.beatsPerBar }
+    case "trim_short_overlaps":
+        // The tracks forget where they were decoded from, so the encoder chooses their voices again
+        return action.tracks.reduce((song, index) => withTrack(song, action.trackList, index, ({ pos: _, ...track }) => ({
+            ...track,
+            commands: Bridge.commands_trim_short_overlaps(track.commands, song.branches),
+        })), bgm)
     case "insert_track_command":
         return editTrack(bgm, action.trackList, action.track, mix, commands =>
             Bridge.commands_insert(commands, action.time, action.command))
