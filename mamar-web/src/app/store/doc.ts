@@ -62,6 +62,11 @@ export interface Doc {
     zoom?: number
     /** The part of the active variation that playback repeats, if one has been marked. */
     cycle?: Cycle | null
+    /**
+     * The MIDI file the song was last imported from, as the WASM bridge encodes it, if the song came from one. A
+     * reimport merges it with the song and the new file, and saving stores what was changed since. See pm64's reimport.
+     */
+    importBase?: Uint8Array
 }
 
 /** A part of the timeline that playback can repeat, as in a DAW. */
@@ -112,6 +117,10 @@ export type DocAction = {
 } | {
     type: "set_cycle"
     cycle: Cycle | null
+} | {
+    type: "reimport"
+    bgm: Bgm
+    importBase: Uint8Array
 }
 
 export function docReducer(state: Doc, action: DocAction): Doc {
@@ -176,6 +185,15 @@ export function docReducer(state: Doc, action: DocAction): Doc {
         return {
             ...state,
             location: { ...(state.location ?? DEFAULT_LOCATION), ...action.location },
+        }
+    case "reimport":
+        return {
+            ...state,
+            bgm: action.bgm,
+            importBase: action.importBase,
+            isSaved: false,
+            // Events may have moved or gone
+            selection: null,
         }
     }
 }

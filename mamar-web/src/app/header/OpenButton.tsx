@@ -21,6 +21,8 @@ export default function OpenButton() {
 
                 for (const handle of launchParams.files) {
                     const file = await handle.getFile()
+                    // Kept so a song made from a MIDI file can be reimported from it
+                    file.handle = handle
                     const action = await openFile(file, sbn)
                     actions.push(action)
                 }

@@ -4,6 +4,7 @@ import { Bgm } from "pm64-typegen"
 import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./doc"
 
 import Bridge from "../bridge"
+import { rememberMidi } from "../util/midiHandles"
 import { removeRecordings } from "../util/recordings"
 import { romAuxBanks } from "../util/soundBank"
 import vanillaBeatsPerBar from "../util/vanillaBeatsPerBar"
@@ -30,6 +31,7 @@ export type RootAction = {
     file?: FileWithHandle
     name?: string
     bgm?: Bgm
+    importBase?: Uint8Array
     isSaved?: boolean
 } | {
     type: "close_doc"
@@ -66,6 +68,7 @@ export function rootReducer(root: Root, action: RootAction): Root {
             },
             location: DEFAULT_LOCATION,
             snap: DEFAULT_SNAP,
+            importBase: action.importBase,
         }
         return {
             ...root,
@@ -95,9 +98,33 @@ export function rootReducer(root: Root, action: RootAction): Root {
  * Decodes a BGM or MIDI file. With the sound bank (SBN) of the user's ROM, a BGM file's switches between recordings of
  * its tracks' instruments are taken out, to be put back as the song is built. See util/recordings. A MIDI file's tracks
  * are new, so they're built with the switches they need.
+ *
+ * A MIDI file is linked to the song made from it, so it can be reimported; `importBase` is its import. A song saved
+ * since has that import rebuilt, once its recording switches are out.
  */
-function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined): { bgm: Bgm } {
-    const bgm: Bgm | string = Bridge.bgm_decode(data)
+function isMidi(data: Uint8Array): boolean {
+    // "MThd"
+    return data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64
+}
+
+function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined, name?: string): { bgm: Bgm, importBase?: Uint8Array } {
+    const midi = isMidi(data)
+
+    let bgm: Bgm | string
+    let importBase: Uint8Array | undefined
+    if (midi) {
+        const imported: { bgm: Bgm, base: Uint8Array, warnings: string[] } | string = Bridge.midi_import(data, name ?? "")
+        if (typeof imported === "string") {
+            throw new Error(imported)
+        }
+        for (const warning of imported.warnings) {
+            console.warn(warning)
+        }
+        bgm = imported.bgm
+        importBase = imported.base
+    } else {
+        bgm = Bridge.bgm_decode(data)
+    }
 
     if (typeof bgm === "string") {
         throw new Error(bgm)
@@ -111,16 +138,27 @@ function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined): { bgm: B
         bgm.aux_banks = romAuxBanks(sbn, data)
     }
 
-    // "MThd"
-    const isMidi = data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64
-    return { bgm: sbn && !isMidi ? removeRecordings(bgm, sbn) : bgm }
+    if (sbn && !midi) {
+        bgm = removeRecordings(bgm, sbn)
+    }
+    if (!midi && bgm.import) {
+        importBase = Bridge.import_base_rebuild(bgm) ?? undefined
+    }
+    return { bgm, importBase }
 }
 
 export async function openFile(file: FileWithHandle, sbn?: ArrayBuffer | null): Promise<RootAction> {
+    const data = new Uint8Array(await file.arrayBuffer())
+    const decoded = decode(data, sbn, file.name)
+    // A song made from a MIDI file remembers it, so it can be reimported in one click
+    const link = decoded.bgm.import
+    if (link && file.handle && isMidi(data)) {
+        await rememberMidi(link.id, file.handle)
+    }
     return {
         type: "open_doc",
         file,
-        ...decode(new Uint8Array(await file.arrayBuffer()), sbn),
+        ...decoded,
     }
 }
 
@@ -129,6 +167,6 @@ export function openData(data: Uint8Array, name?: string, isSaved?: boolean, sbn
         type: "open_doc",
         name,
         isSaved,
-        ...decode(data, sbn),
+        ...decode(data, sbn, name),
     }
 }
