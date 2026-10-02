@@ -175,7 +175,11 @@ pub fn align(value: u32, n: u32) -> u32 {
         return value;
     }
 
-    if value % n == 0 { n } else { value + (n - value % n) }
+    if value % n == 0 {
+        value.max(n)
+    } else {
+        value + (n - value % n)
+    }
 }
 
 #[cfg(test)]
@@ -187,6 +191,8 @@ mod test {
         assert_eq!(align(0, 5), 5);
         assert_eq!(align(5, 5), 5);
         assert_eq!(align(6, 5), 10);
+        assert_eq!(align(10, 5), 10);
+        assert_eq!(align(0xA0, 8), 0xA0);
 
         // 0 and 1 values for `n` should be a no-op
         assert_eq!(align(36, 0), 36);

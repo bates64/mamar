@@ -222,3 +222,67 @@ pub fn bgm_split_variation_at(bgm: &JsValue, variation: usize, time: usize) -> J
     bgm.split_variation_at(variation, time);
     to_js(&bgm)
 }
+
+/// An object with the given properties.
+fn object(properties: &[(&str, JsValue)]) -> JsValue {
+    let object = js_sys::Object::new();
+    for (key, value) in properties {
+        js_sys::Reflect::set(&object, &JsValue::from_str(key), value).unwrap();
+    }
+    object.into()
+}
+
+fn bytes(data: &[u8]) -> JsValue {
+    js_sys::Uint8Array::from(data).into()
+}
+
+/// Makes a song from the MIDI file `data`, named `name`, linked to it so it can be reimported. Returns `{ bgm, base,
+/// warnings }`, where `base` is the import to keep while the song is open, or an error message.
+#[wasm_bindgen]
+pub fn midi_import(data: &[u8], name: &str) -> JsValue {
+    match reimport::import(data, name) {
+        Ok(imported) => object(&[
+            ("bgm", to_js(&imported.bgm)),
+            ("base", bytes(&reimport::encode_timeline(&imported.base))),
+            ("warnings", to_js(&imported.warnings)),
+        ]),
+        Err(e) => e.to_string().into(),
+    }
+}
+
+/// Returns `bgm` with its import link's patch set to what was changed since the last import, `base`. Call it before
+/// saving. Returns `bgm` unchanged if it isn't linked or `base` can't be read.
+#[wasm_bindgen]
+pub fn import_patch(bgm: &JsValue, base: &[u8]) -> JsValue {
+    let mut bgm: Bgm = from_js(bgm);
+    if let Some(link) = reimport::decode_timeline(base).and_then(|base| reimport::with_patch(&bgm, &base)) {
+        bgm.import = Some(link);
+    }
+    to_js(&bgm)
+}
+
+/// Rebuilds the last import of an opened song from its patch, or returns undefined if it can't be.
+#[wasm_bindgen]
+pub fn import_base_rebuild(bgm: &JsValue) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    match reimport::rebuild_base(&bgm) {
+        Some(base) => bytes(&reimport::encode_timeline(&base)),
+        None => JsValue::UNDEFINED,
+    }
+}
+
+/// Reimports the MIDI file `data`, named `name`, into `bgm`, given its last import `base` if it has one. Returns
+/// `{ bgm, base, report }`, or an error message.
+#[wasm_bindgen]
+pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &str) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    let base = base.as_deref().and_then(reimport::decode_timeline);
+    match reimport::reimport(&bgm, base.as_ref(), data, name) {
+        Ok((bgm, base, report)) => object(&[
+            ("bgm", to_js(&bgm)),
+            ("base", bytes(&reimport::encode_timeline(&base))),
+            ("report", to_js(&report)),
+        ]),
+        Err(e) => e.to_string().into(),
+    }
+}

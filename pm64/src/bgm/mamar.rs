@@ -18,6 +18,8 @@ pub struct Metadata {
     mix_names: BTreeMap<u8, String>,
 
     aux_banks: Vec<String>,
+
+    import: Option<super::reimport::ImportLink>,
 }
 
 impl Metadata {
@@ -26,6 +28,7 @@ impl Metadata {
         self.beats_per_bar.is_some()
             || !self.mix_names.is_empty()
             || !self.aux_banks.is_empty()
+            || self.import.is_some()
             || self
                 .track_names
                 .values()
@@ -36,6 +39,7 @@ impl Metadata {
         bgm.beats_per_bar = self.beats_per_bar;
         bgm.mix_names = self.mix_names.clone();
         bgm.aux_banks = self.aux_banks.clone();
+        bgm.import = self.import.clone();
 
         for (id, track_list) in &mut bgm.track_lists {
             let Some(names) = self.track_names.get(&(*id as u16)) else {
@@ -59,6 +63,10 @@ impl Metadata {
 
     pub fn set_aux_banks(&mut self, aux_banks: Vec<String>) {
         self.aux_banks = aux_banks;
+    }
+
+    pub fn set_import(&mut self, import: Option<super::reimport::ImportLink>) {
+        self.import = import;
     }
 
     pub fn add_track_name(&mut self, tracks_pos: u16, name: String) {

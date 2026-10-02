@@ -1,0 +1,11 @@
+{
+  "name": "mamar-wasm-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "pkg/mamar_wasm_bridge.js",
+  "types": "pkg/mamar_wasm_bridge.d.ts",
+  "sideEffects": [
+    "./pkg/snippets/*"
+  ]
+}

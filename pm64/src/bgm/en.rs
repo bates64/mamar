@@ -62,6 +62,7 @@ impl Bgm {
         metadata.set_beats_per_bar(self.beats_per_bar);
         metadata.set_mix_names(self.mix_names.clone());
         metadata.set_aux_banks(self.aux_banks.clone());
+        metadata.set_import(self.import.clone());
 
         f.seek(SeekFrom::Start(0))?;
 

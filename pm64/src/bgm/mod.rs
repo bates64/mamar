@@ -10,6 +10,9 @@ pub mod mamar;
 #[cfg(feature = "midly")]
 pub mod midi;
 
+/// Reimporting MIDI files into songs made from them
+pub mod reimport;
+
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::LazyLock;
@@ -63,6 +66,10 @@ pub struct Bgm {
     /// empty name leaves that bank empty. The game loads these from the SBN's song list instead.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aux_banks: Vec<String>,
+
+    /// The MIDI file the song was imported from, so it can be reimported. The game doesn't use it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub import: Option<reimport::ImportLink>,
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]

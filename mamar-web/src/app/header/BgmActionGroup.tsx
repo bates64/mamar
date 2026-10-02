@@ -4,6 +4,7 @@ import { CSSProperties, useCallback, useEffect } from "react"
 
 import ExportButton from "./ExportButton"
 import OpenButton from "./OpenButton"
+import ReimportButton from "./ReimportButton"
 
 import Bridge from "../bridge"
 import { useDoc, useRoot } from "../store"
@@ -36,8 +37,11 @@ export default function BgmActionGroup() {
             return
         }
 
+        // A song made from a MIDI file saves what was changed since it was imported, so a reimport can keep it
+        const bgm = doc.bgm.import && doc.importBase ? Bridge.import_patch(doc.bgm, doc.importBase) : doc.bgm
+
         // TODO: surface an error encoding it in a dialog
-        const bgmBin = encodeForGame(doc.bgm, sbn) as Uint8Array<ArrayBuffer>
+        const bgmBin = encodeForGame(bgm, sbn) as Uint8Array<ArrayBuffer>
 
         const fileHandle = await fileSave(new Blob([bgmBin]), {
             fileName: createBgmFileName(doc.name),
@@ -48,7 +52,7 @@ export default function BgmActionGroup() {
         // If it was saved as .ron, overwrite the file contents (currently BGM) with the RON
         if (fileHandle?.name.endsWith(".ron")) {
             const writable = await fileHandle.createWritable({ keepExistingData: false })
-            await writable.write(Bridge.ron_encode(doc.bgm))
+            await writable.write(Bridge.ron_encode(bgm))
             await writable.close()
         }
 
@@ -60,11 +64,26 @@ export default function BgmActionGroup() {
             if (evt.ctrlKey && evt.key === "s") {
                 evt.preventDefault()
                 save(evt.shiftKey)
+                return
+            }
+
+            // Text fields keep their own undo
+            const target = evt.target as HTMLElement
+            if (!(evt.ctrlKey || evt.metaKey) || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+                return
+            }
+            const key = evt.key.toLowerCase()
+            if (key === "z" && !evt.shiftKey) {
+                evt.preventDefault()
+                dispatch.undo()
+            } else if ((key === "z" && evt.shiftKey) || key === "y") {
+                evt.preventDefault()
+                dispatch.redo()
             }
         }
         window.addEventListener("keydown", handleKeyDown)
         return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [save])
+    }, [save, dispatch])
 
     const props = {
         isQuiet: true,
@@ -91,16 +110,7 @@ export default function BgmActionGroup() {
             </ActionButton>
             <Tooltip>Hold Shift to <i>Save As</i></Tooltip>
         </TooltipTrigger>
+        <ReimportButton />
         <ExportButton />
-        <ActionButton
-            onPress={() => dispatch.undo()}
-            isDisabled={!dispatch.canUndo}
-            {...props}
-        >Undo</ActionButton>
-        <ActionButton
-            onPress={() => dispatch.redo()}
-            isDisabled={!dispatch.canRedo}
-            {...props}
-        >Redo</ActionButton>
     </View>
 }

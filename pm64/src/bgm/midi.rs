@@ -20,6 +20,42 @@ pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
 }
 
 pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
+    Ok(import(raw)?.bgm)
+}
+
+/// A song made from a MIDI file, with what [reimporting](super::reimport) needs to know about where it came from.
+pub struct MidiImport {
+    pub bgm: Bgm,
+    /// The source track each track came from, by [TrackKey](super::reimport::TrackKey). None for empty tracks.
+    pub track_keys: Vec<Option<String>>,
+    /// Whether the file's markers set the sections.
+    pub has_section_markers: bool,
+    /// Markers that couldn't be used, such as a `loop end` without a `loop start`.
+    pub warnings: Vec<String>,
+}
+
+/// What a marker in the MIDI file asks for. See [import].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum SectionMarker {
+    Section,
+    LoopStart,
+    LoopEnd,
+}
+
+impl SectionMarker {
+    fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_lowercase().as_str() {
+            "section" => Some(SectionMarker::Section),
+            "loop start" => Some(SectionMarker::LoopStart),
+            "loop end" => Some(SectionMarker::LoopEnd),
+            _ => None,
+        }
+    }
+}
+
+/// Makes a song from a MIDI file. Markers named `section`, `loop start` and `loop end` start sections there, and a
+/// loop between `loop start` and `loop end` repeats forever. A single-track file is split into a track per channel.
+pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
     let smf = Smf::parse(raw)?;
     let mut bgm = Bgm::new();
 
@@ -34,146 +70,50 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
 
     bgm.name = "New Song".to_string();
 
+    // A single-track file has everything on its first track, which is read as the master track, so split it by channel
+    let by_channel = smf.header.format == midly::Format::SingleTrack && smf.tracks.len() == 1;
+    let (tracks, channels) = if by_channel {
+        split_by_channel(&smf.tracks[0])
+    } else {
+        (smf.tracks.clone(), Vec::new())
+    };
+
     let total_song_length = convert_time(
-        {
-            let mut max = 0;
-
-            for track in &smf.tracks {
-                let mut length = 0;
-
-                for event in track {
-                    length += event.delta.as_int() as usize;
-                }
-
-                if length > max {
-                    max = length;
-                }
-            }
-
-            max
-        },
+        tracks
+            .iter()
+            .map(|track| track.iter().map(|event| event.delta.as_int() as usize).sum())
+            .max()
+            .unwrap_or(0),
         time_divisor,
     );
 
     log::debug!("song length: {} ticks (48 ticks/beat)", total_song_length);
 
-    let track_list = TrackList {
+    let mut markers = Vec::new();
+    let mut track_list = TrackList {
         pos: None,
-        tracks: [
+        tracks: core::array::from_fn(|track_number| {
             midi_track_to_bgm_track(
-                smf.tracks.first(),
+                tracks.get(track_number),
                 total_song_length,
-                0,
+                track_number,
                 time_divisor,
                 &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(1),
-                total_song_length,
-                1,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(2),
-                total_song_length,
-                2,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(3),
-                total_song_length,
-                3,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(4),
-                total_song_length,
-                4,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(5),
-                total_song_length,
-                5,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(6),
-                total_song_length,
-                6,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(7),
-                total_song_length,
-                7,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(8),
-                total_song_length,
-                8,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(9),
-                total_song_length,
-                9,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(10),
-                total_song_length,
-                10,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(11),
-                total_song_length,
-                11,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(12),
-                total_song_length,
-                12,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(13),
-                total_song_length,
-                13,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(14),
-                total_song_length,
-                14,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-            midi_track_to_bgm_track(
-                smf.tracks.get(15),
-                total_song_length,
-                15,
-                time_divisor,
-                &mut bgm.instruments,
-            ),
-        ],
+                &mut markers,
+            )
+        }),
     };
+
+    if by_channel {
+        // Channel 10 is General MIDI's percussion channel
+        for (track, channel) in track_list.tracks.iter_mut().skip(1).zip(&channels) {
+            if *channel == 9 && !track.commands.is_empty() {
+                track.is_drum_track = true;
+            }
+        }
+    }
+
+    let track_keys = track_keys(&track_list, by_channel.then_some(&channels[..]));
     let track_list_id = bgm.add_track_list(track_list);
 
     let (_, variation) = bgm.add_variation().unwrap();
@@ -182,7 +122,194 @@ pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
         track_list: track_list_id,
     }];
 
-    Ok(bgm)
+    let mut warnings = Vec::new();
+    let has_section_markers = apply_section_markers(&mut bgm, &markers, total_song_length, &mut warnings);
+
+    Ok(MidiImport {
+        bgm,
+        track_keys,
+        has_section_markers,
+        warnings,
+    })
+}
+
+/// Splits a single-track file's events into a master track, holding everything but channel messages, followed by a
+/// track for each channel used, in channel order. Returns the tracks and the channel of each track after the master.
+fn split_by_channel<'a>(events: &[midly::TrackEvent<'a>]) -> (Vec<Vec<midly::TrackEvent<'a>>>, Vec<u8>) {
+    use midly::TrackEventKind;
+
+    let mut timed: Vec<(usize, Option<u8>, TrackEventKind<'a>)> = Vec::new();
+    let mut time = 0;
+    for event in events {
+        time += event.delta.as_int() as usize;
+        let channel = match event.kind {
+            TrackEventKind::Midi { channel, .. } => Some(channel.as_int()),
+            _ => None,
+        };
+        timed.push((time, channel, event.kind));
+    }
+
+    let mut channels: Vec<u8> = timed.iter().filter_map(|(_, channel, _)| *channel).collect();
+    channels.sort_unstable();
+    channels.dedup();
+    if channels.len() > 15 {
+        log::warn!("only 15 channels fit, ignoring channel {}", channels[15] + 1);
+        channels.truncate(15);
+    }
+
+    let track_of = |wanted: Option<u8>| -> Vec<midly::TrackEvent<'a>> {
+        let mut last = 0;
+        timed
+            .iter()
+            .filter(|(_, channel, _)| *channel == wanted)
+            .map(|(time, _, kind)| {
+                let delta = (*time - last) as u32;
+                last = *time;
+                midly::TrackEvent {
+                    delta: delta.into(),
+                    kind: *kind,
+                }
+            })
+            .collect()
+    };
+
+    let mut tracks = vec![track_of(None)];
+    tracks.extend(channels.iter().map(|channel| track_of(Some(*channel))));
+    (tracks, channels)
+}
+
+/// Each track's [TrackKey](super::reimport::TrackKey): "master" for the master track, `ch1` to `ch16` for a
+/// single-track file split by channel, otherwise the track's name if no other track has it, or its position.
+fn track_keys(track_list: &TrackList, channels: Option<&[u8]>) -> Vec<Option<String>> {
+    track_list
+        .tracks
+        .iter()
+        .enumerate()
+        .map(|(index, track)| {
+            if index == 0 {
+                return Some("master".to_string());
+            }
+            if track.commands.is_empty() {
+                return None;
+            }
+            if let Some(channels) = channels {
+                return channels.get(index - 1).map(|channel| format!("ch{}", channel + 1));
+            }
+            let named = !track.name.is_empty()
+                && track_list
+                    .tracks
+                    .iter()
+                    .filter(|other| other.name == track.name)
+                    .count()
+                    == 1;
+            Some(if named { track.name.clone() } else { format!("#{index}") })
+        })
+        .collect()
+}
+
+/// Splits variation 0 at each section marker and adds the loops they mark. Returns whether there were any.
+fn apply_section_markers(
+    bgm: &mut Bgm,
+    markers: &[(usize, SectionMarker)],
+    total_song_length: usize,
+    warnings: &mut Vec<String>,
+) -> bool {
+    if markers.is_empty() {
+        return false;
+    }
+
+    let mut markers = markers.to_vec();
+    markers.sort_by_key(|(time, _)| *time);
+
+    let mut boundaries: Vec<usize> = markers
+        .iter()
+        .map(|(time, _)| *time)
+        .filter(|time| *time > 0 && *time < total_song_length)
+        .collect();
+    boundaries.dedup();
+    for time in &boundaries {
+        bgm.split_variation_at(0, *time);
+    }
+
+    // Pair each loop start with the loop end after it
+    let mut loops = Vec::new();
+    let mut open: Option<usize> = None;
+    for (time, marker) in &markers {
+        match marker {
+            SectionMarker::LoopStart => {
+                if open.is_some() {
+                    warnings.push(format!(
+                        "A loop start at tick {time} comes before the last one ended, so it was ignored."
+                    ));
+                } else {
+                    open = Some(*time);
+                }
+            }
+            SectionMarker::LoopEnd => match open.take() {
+                Some(start) if start < *time => loops.push((start, *time)),
+                _ => warnings.push(format!(
+                    "A loop end at tick {time} has no loop start before it, so it was ignored."
+                )),
+            },
+            SectionMarker::Section => {}
+        }
+    }
+    if let Some(start) = open {
+        warnings.push(format!(
+            "A loop start at tick {start} has no loop end after it, so it was ignored."
+        ));
+    }
+
+    let branches = bgm.branches.clone();
+    let track_lists = bgm.track_lists.clone();
+    let variation = bgm.variations[0].as_mut().unwrap();
+    for (label, (start, end)) in loops.into_iter().enumerate() {
+        let label = label + 1;
+
+        // Where each section starts and ends
+        let mut spans = Vec::new();
+        let mut time = 0;
+        for (index, segment) in variation.segments.iter().enumerate() {
+            if let Segment::Subseg { track_list, .. } = segment {
+                let len = track_lists.get(track_list).map_or(0, |tl| tl.len_time(&branches));
+                spans.push((index, time, time + len));
+                time += len;
+            }
+        }
+
+        let first = spans
+            .iter()
+            .find(|(_, from, _)| *from == start)
+            .map(|(index, ..)| *index);
+        let last = spans
+            .iter()
+            .find(|(_, _, to)| *to == end.min(total_song_length))
+            .map(|(index, ..)| *index);
+        let (Some(first), Some(last)) = (first, last) else {
+            warnings.push(format!(
+                "The loop from tick {start} to {end} doesn't line up with sections, so it was ignored."
+            ));
+            continue;
+        };
+
+        variation.segments.insert(
+            last + 1,
+            Segment::EndLoop {
+                id: Some(gen_id()),
+                label_index: label as u8,
+                iter_count: 0,
+            },
+        );
+        variation.segments.insert(
+            first,
+            Segment::StartLoop {
+                id: Some(gen_id()),
+                label_index: label as u16,
+            },
+        );
+    }
+
+    true
 }
 
 fn midi_track_to_bgm_track(
@@ -191,6 +318,7 @@ fn midi_track_to_bgm_track(
     track_number: usize,
     time_divisor: f32,
     instruments: &mut Vec<Instrument>,
+    markers: &mut Vec<(usize, SectionMarker)>,
 ) -> Track {
     use midly::{MidiMessage, TrackEventKind};
 
@@ -459,7 +587,10 @@ fn midi_track_to_bgm_track(
                     }
                     TrackEventKind::Meta(MetaMessage::CuePoint(s)) | TrackEventKind::Meta(MetaMessage::Marker(s)) => {
                         if let Ok(s) = String::from_utf8(s.to_owned()) {
-                            track.commands.insert_end(time_cvt, Command::Marker { label: s });
+                            match SectionMarker::parse(&s) {
+                                Some(marker) => markers.push((time_cvt, marker)),
+                                None => track.commands.insert_end(time_cvt, Command::Marker { label: s }),
+                            }
                         }
                     }
                     _ => {}
