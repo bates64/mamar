@@ -3,9 +3,10 @@ import {
     TableBody, TableHeader, TableView, Text,
 } from "@adobe/react-spectrum"
 import Alert from "@spectrum-icons/workflow/Alert"
-import { startTransition, useRef, useState } from "react"
+import { startTransition, useState } from "react"
 
 import { TICKS_PER_BEAT, usePickup, useTicksPerBar } from "./Ruler"
+import { useTime } from "./TimeProvider"
 import { MAX_VOICES, total, useVoiceReport } from "./voices"
 
 import { useBgm, useRoot } from "../store"
@@ -45,7 +46,7 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
     const report = useVoiceReport(trackListId)
     const pickup = usePickup()
     const ticksPerBar = useTicksPerBar()
-    const trigger = useRef<HTMLDivElement>(null)
+    const time = useTime()
     const [isOpen, setOpen] = useState(false)
 
     const trackList = bgm?.track_lists[trackListId]
@@ -87,17 +88,11 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
         })
         const busiestAt = use.busiest_at
         if (busiestAt == null) return
-        // Once the region is open, scroll every timeline to it, as the playhead does when it follows the song
-        const provider = trigger.current?.closest("[data-time-provider]")
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            for (const grid of provider?.querySelectorAll<HTMLElement>("[data-time-grid]") ?? []) {
-                const zoom = parseFloat(getComputedStyle(grid).getPropertyValue("--ruler-zoom")) || 2
-                grid.scrollLeft = Math.max(0, (segmentStart + busiestAt) / zoom - grid.clientWidth / 3)
-            }
-        }))
+        // The transition renders the region a frame later, and it's laid out the frame after
+        requestAnimationFrame(() => requestAnimationFrame(() => time.scrollToTicks(segmentStart + busiestAt)))
     }
 
-    return <div ref={trigger} data-no-drag-scroll onClick={event => event.stopPropagation()}>
+    return <div data-no-drag-scroll onClick={event => event.stopPropagation()}>
         <DialogTrigger type="popover" placement="bottom start" isOpen={isOpen} onOpenChange={setOpen}>
             <ActionButton margin="size-75">
                 {/* Spaced by hand, as the button's own spacing doesn't reach icons, as in LaneMenu */}
