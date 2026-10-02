@@ -8,8 +8,6 @@ interface Dispatch {
     (...actions: RootAction[]): void
     undo: () => void
     redo: () => void
-    canUndo: boolean
-    canRedo: boolean
 }
 
 function shouldActionCommitToHistory(action: RootAction): boolean {
@@ -40,7 +38,7 @@ const {
     Provider,
     useTracked,
 } = createContainer(() => {
-    const [state, setState, { undo, redo, canUndo, canRedo }] = useUndoable<Root>({
+    const [state, setState, { undo, redo }] = useUndoable<Root>({
         docs: {},
     }, {
         behavior: "destroyFuture", // "mergePastReversed",
@@ -71,8 +69,6 @@ const {
     }
     dispatch.undo = undo
     dispatch.redo = redo
-    dispatch.canUndo = canUndo
-    dispatch.canRedo = canRedo
 
     return [state, dispatch]
 })

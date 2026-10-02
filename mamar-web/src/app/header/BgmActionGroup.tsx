@@ -64,11 +64,26 @@ export default function BgmActionGroup() {
             if (evt.ctrlKey && evt.key === "s") {
                 evt.preventDefault()
                 save(evt.shiftKey)
+                return
+            }
+
+            // Text fields keep their own undo
+            const target = evt.target as HTMLElement
+            if (!(evt.ctrlKey || evt.metaKey) || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+                return
+            }
+            const key = evt.key.toLowerCase()
+            if (key === "z" && !evt.shiftKey) {
+                evt.preventDefault()
+                dispatch.undo()
+            } else if ((key === "z" && evt.shiftKey) || key === "y") {
+                evt.preventDefault()
+                dispatch.redo()
             }
         }
         window.addEventListener("keydown", handleKeyDown)
         return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [save])
+    }, [save, dispatch])
 
     const props = {
         isQuiet: true,
@@ -97,15 +112,5 @@ export default function BgmActionGroup() {
         </TooltipTrigger>
         <ReimportButton />
         <ExportButton />
-        <ActionButton
-            onPress={() => dispatch.undo()}
-            isDisabled={!dispatch.canUndo}
-            {...props}
-        >Undo</ActionButton>
-        <ActionButton
-            onPress={() => dispatch.redo()}
-            isDisabled={!dispatch.canRedo}
-            {...props}
-        >Redo</ActionButton>
     </View>
 }
