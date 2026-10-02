@@ -10,7 +10,7 @@ import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
 import { usePickup, useTicksPerBar } from "./Ruler"
 import { useMixCommands } from "./segmentTracks"
 import { SNAP_NAMES, useSnap } from "./snap"
-import { isOverBudget, useVoiceReport } from "./voices"
+import { budget, useVoiceReport } from "./voices"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
@@ -288,10 +288,10 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
         rendererRef.current?.set_bars(ticksPerBar, (((pickup - segmentStart) % ticksPerBar) + ticksPerBar) % ticksPerBar)
     }, [ticksPerBar, pickup, segmentStart])
 
-    // While the regions need more voices than the game has, mark the notes where this track needs the most
+    // While the regions need more voices than the music has to itself, mark the notes where this track needs the most
     const report = useVoiceReport(trackListId)
     // A track that needs only one voice has nothing to mark: each note is its busiest
-    const busiestKey = report && isOverBudget(report.voices) && report.voices.needed[trackIndex] > 1
+    const busiestKey = report && budget(report.voices) !== "fits" && report.voices.needed[trackIndex] > 1
         ? report.tracks[trackIndex].busiest_notes.join()
         : ""
     useEffect(() => {

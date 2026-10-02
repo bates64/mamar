@@ -1,7 +1,8 @@
 //! Choosing how many voices each track of a phrase gets.
 //!
 //! The game plays music on 24 voices, and gives each track of a phrase 0 to 4 of them, one track after another. A
-//! track that starts a note with none free takes one from its own notes, cutting it off.
+//! track that starts a note with none free takes one from its own notes, cutting it off. Sound effects take the voices
+//! from the 17th on whenever they play, cutting off the music's notes on them.
 
 use std::collections::BTreeMap;
 

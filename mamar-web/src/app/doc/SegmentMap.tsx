@@ -15,7 +15,7 @@ import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 import TrackMeter from "./TrackMeter"
 import VoiceBudget from "./VoiceBudget"
-import { MAX_VOICES, total, useVoices } from "./voices"
+import { budget, sharesVoices, useVoiceReport } from "./voices"
 
 import Bridge from "../bridge"
 import TrackControls from "../emu/TrackControls"
@@ -43,7 +43,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
     const [location] = useLocation()
     const trackList = bgm?.track_lists[trackListIndex]
     const shownIndex = isAlternatePart ? (trackList && alternatePartOf(trackList, trackIndex)) : trackIndex
-    const voices = useVoices(trackListIndex)
+    const voices = useVoiceReport(trackListIndex)?.voices
     const track = shownIndex !== undefined ? trackList?.tracks[shownIndex] : undefined
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex &&
         doc?.panelContent.track === trackIndex && location.alternateParts === isAlternatePart &&
@@ -82,14 +82,19 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
             evt.preventDefault()
         }
 
-        const isShortOfVoices = voices !== undefined && total(voices.needed) > MAX_VOICES &&
-            voices.given[shownIndex] < voices.needed[shownIndex]
+        // Alternate parts play on the voices of the tracks they're for
+        const voiceIndex = track.alternate_for ?? shownIndex
+        const level = voices ? budget(voices) : "fits"
+        const isShortOfVoices = level === "over" && voices!.given[voiceIndex] < voices!.needed[voiceIndex]
+        const isSharingVoices = !isShortOfVoices && level !== "fits" && sharesVoices(voices!, voiceIndex)
 
         return <div
             tabIndex={0}
             title={isShortOfVoices
-                ? `Gets ${voices!.given[shownIndex]} voices but needs ${voices!.needed[shownIndex]}, so some notes are cut off. See the voice budget under these regions for why.`
-                : undefined}
+                ? `Gets ${voices!.given[voiceIndex]} voices but needs ${voices!.needed[voiceIndex]}, so some notes are cut off. See the voice budget under these regions for why.`
+                : isSharingVoices
+                    ? "Plays on voices that sound effects share, so sound effects can cut its notes off. See the voice budget under these regions for why."
+                    : undefined}
             aria-labelledby={isVersion ? undefined : nameId}
             aria-label={isVersion ? track.name || instrumentName : undefined}
             className={classNames({

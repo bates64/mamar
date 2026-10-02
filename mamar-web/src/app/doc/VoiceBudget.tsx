@@ -7,7 +7,7 @@ import { startTransition, useState } from "react"
 
 import { TICKS_PER_BEAT, usePickup, useTicksPerBar } from "./Ruler"
 import { useTime } from "./TimeProvider"
-import { MAX_VOICES, total, useVoiceReport } from "./voices"
+import { Budget, MAX_VOICES, MUSIC_VOICES, budget, total, useVoiceReport, voiceRange } from "./voices"
 
 import { useBgm, useRoot } from "../store"
 
@@ -25,15 +25,19 @@ export interface BudgetRow {
     name: string
     needs: number
     gets: number
+    /** The voices the track plays on, counting from 0, from `first` up to but not including `end`. */
+    first: number
+    end: number
     /** Where the track plays the most notes at once, as bar and beat, if it plays any. */
     busiestAt?: string
     shortOverlaps: number
 }
 
 /**
- * The voices the regions of a part of the song need, shown under them only when that's more than the game has, which
- * cuts notes off. Pressing it lists each track's voices and where it needs them most, with a button to trim the short
- * overlaps that make a track need a voice more.
+ * The voices the regions of a part of the song need, shown under them only when that's more than the music's own, as
+ * sound effects can then cut notes off, or more than the game has, which cuts notes off. Pressing it lists each
+ * track's voices and where it needs them most, with a button to trim the short overlaps that make a track need a voice
+ * more.
  */
 export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }: {
     trackListId: number
@@ -54,8 +58,9 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
         return null
     }
     const needed = total(report.voices.needed)
-    // Trimming can bring the regions within budget while the list is open, which then says so
-    if (needed <= MAX_VOICES && !isOpen) {
+    const level = budget(report.voices)
+    // Trimming can bring the regions within the music's voices while the list is open, which then says so
+    if (level === "fits" && !isOpen) {
         return null
     }
 
@@ -67,6 +72,7 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
                 name: track.name || `Track ${index}`,
                 needs: report.voices.needed[index],
                 gets: report.voices.given[index],
+                ...voiceRange(report.voices, index),
                 busiestAt: use.busiest_at != null ? barAndBeat(segmentStart + use.busiest_at, pickup, ticksPerBar) : undefined,
                 shortOverlaps: use.short_overlaps.length,
             }
@@ -96,10 +102,11 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
         <DialogTrigger type="popover" placement="bottom start" isOpen={isOpen} onOpenChange={setOpen}>
             <ActionButton margin="size-75">
                 {/* Spaced by hand, as the button's own spacing doesn't reach icons, as in LaneMenu */}
-                <Alert color="notice" size="S" marginStart="size-125" marginEnd="size-75" />
-                <Text>{needed} / {MAX_VOICES} voices</Text>
+                <Alert color={level === "over" ? "negative" : "notice"} size="S" marginStart="size-125" marginEnd="size-75" />
+                <Text>{needed} voices</Text>
             </ActionButton>
             {close => <VoiceBudgetDialog
+                level={level}
                 needed={needed}
                 rows={rows}
                 onTrim={tracks => dispatch({ type: "trim_short_overlaps", trackList: trackListId, tracks })}
@@ -112,8 +119,21 @@ export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }:
     </div>
 }
 
+/** What the voice budget's heading says after the voices needed, at each level. */
+function headingOf(level: Budget, needed: number): string {
+    switch (level) {
+    case "over":
+        return `${needed - MAX_VOICES} more than the game has`
+    case "shared":
+        return `${needed - MUSIC_VOICES} shared with sound effects`
+    case "fits":
+        return "all for music only"
+    }
+}
+
 /** The voice budget's list of tracks, apart from the song, so it can be shown without one. */
-export function VoiceBudgetDialog({ needed, rows, onTrim, onOpenTrack }: {
+export function VoiceBudgetDialog({ level, needed, rows, onTrim, onOpenTrack }: {
+    level: Budget
     needed: number
     rows: BudgetRow[]
     onTrim(tracks: number[]): void
@@ -125,9 +145,7 @@ export function VoiceBudgetDialog({ needed, rows, onTrim, onOpenTrack }: {
     const trimmable = sorted.filter(row => row.shortOverlaps > 0)
 
     return <Dialog size="L">
-        <Heading>
-            {needed} / {MAX_VOICES} voices{needed <= MAX_VOICES ? ": now within the budget" : ""}
-        </Heading>
+        <Heading>{needed} voices: {headingOf(level, needed)}</Heading>
         <Divider />
         <Content>
             <TableView
@@ -143,6 +161,7 @@ export function VoiceBudgetDialog({ needed, rows, onTrim, onOpenTrack }: {
                     <Column width="2fr">Track</Column>
                     <Column width="1fr" align="end">Needs</Column>
                     <Column width="1fr" align="end">Gets</Column>
+                    <Column width="1.8fr">Voices</Column>
                     <Column width="1.8fr">Busiest at</Column>
                     <Column width="2.2fr">Short overlaps</Column>
                 </TableHeader>
@@ -154,10 +173,17 @@ export function VoiceBudgetDialog({ needed, rows, onTrim, onOpenTrack }: {
                             {/* Fewer than the track needs, so it cuts notes off */}
                             {row.gets < row.needs
                                 ? <Flex alignItems="center" gap="size-50" justifyContent="end">
-                                    <Alert color="notice" size="S" aria-label="Fewer than it needs" />
+                                    <Alert color="negative" size="S" aria-label="Fewer than it needs" />
                                     <Text>{row.gets}</Text>
                                 </Flex>
                                 : row.gets}
+                        </Cell>
+                        <Cell>
+                            {/* Counted from 1, as the footer counts them */}
+                            {row.end > row.first && <Flex alignItems="center" gap="size-50">
+                                {row.end > MUSIC_VOICES && <Alert color="notice" size="S" aria-label="Shared with sound effects" />}
+                                <Text>{row.end - row.first > 1 ? `${row.first + 1}–${row.end}` : row.end}</Text>
+                            </Flex>}
                         </Cell>
                         <Cell>{row.busiestAt ? `bar ${row.busiestAt}` : ""}</Cell>
                         <Cell>
@@ -173,8 +199,10 @@ export function VoiceBudgetDialog({ needed, rows, onTrim, onOpenTrack }: {
         <Footer>
             <Text>
                 Each track reserves a voice for every note it plays at once at its busiest point, up to 4, for as long as
-                these regions play. The game has {MAX_VOICES}, so tracks that get fewer than they need cut notes off.
-                Choose a track to see where.
+                these regions play, and takes the voices after the track before it. Voices 1 to {MUSIC_VOICES} are for
+                music only. Sound effects take voices {MUSIC_VOICES + 1} to {MAX_VOICES} whenever they play, cutting off
+                notes on them. Past {MAX_VOICES}, tracks get fewer voices than they need and cut notes off. Choose a track
+                to see where it needs the most.
             </Text>
         </Footer>
         {trimmable.length > 1 && <ButtonGroup>
