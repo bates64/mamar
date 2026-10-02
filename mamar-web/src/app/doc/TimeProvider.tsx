@@ -41,6 +41,8 @@ export function zoomTimeline(dispatch: (action: { type: "set_zoom", zoom: number
 
 export interface Time {
     xToTicks(clientX: number): number
+    /** Scrolls every timeline so `ticks` is a third of the way across. */
+    scrollToTicks(ticks: number): void
 }
 
 const TIME_CTX = createContext<Time | null>(null)
@@ -51,6 +53,9 @@ export function useTime(): Time {
     if (!time) {
         return {
             xToTicks(_: number): number {
+                throw new Error("TimeProvider missing in tree")
+            },
+            scrollToTicks(_: number) {
                 throw new Error("TimeProvider missing in tree")
             },
         }
@@ -125,6 +130,15 @@ export default function TimeProvider({ children }: { children: React.ReactNode }
             if (ticks < 0) return 0
             if (ticks > totalLength) return totalLength
             return ticks
+        },
+        scrollToTicks(ticks: number) {
+            const grids = [...container.current?.querySelectorAll<HTMLElement>("[data-time-grid]") ?? []]
+            // The grids scroll together, so all take the place that suits the widest, which the tracks are in
+            const width = Math.max(0, ...grids.map(grid => grid.clientWidth))
+            const scrollLeft = Math.max(0, ticks / zoomRef.current - width / 3)
+            for (const grid of grids) {
+                grid.scrollLeft = scrollLeft
+            }
         },
     }}>
         <div ref={container} style={{ "--ruler-zoom": zoom, "height": "100%" } as any} data-time-provider>
