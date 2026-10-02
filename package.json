@@ -3,7 +3,7 @@
   "workspaces": [
     "mamar-web",
     "mamar-editor",
-    "mamar-wasm-bridge/pkg",
+    "mamar-wasm-bridge",
     "pm64-typegen"
   ],
   "scripts": {
