@@ -17,6 +17,7 @@ import styles from "./SubsegDetails.module.scss"
 import TimeGrid from "./TimeGrid"
 import Tracker from "./Tracker"
 import TrackLanes from "./TrackLanes"
+import { VoiceNote } from "./VoiceBudget"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
@@ -100,6 +101,7 @@ export default function SubsegDetails({ trackListId, trackIndex: mainIndex, segm
                 </Flex>
                 <StartingValues trackListId={trackListId} trackIndex={trackIndex} mainIndex={mainIndex} segmentIndex={segmentIndex} />
             </Form>
+            <VoiceNote trackListId={trackListId} trackIndex={trackIndex} segmentStart={segmentStart} />
             {showBlocks && <Inspector trackListId={trackListId} trackIndex={trackIndex} />}
         </View>
         {showBlocks ? <div style={{ gridColumn: "2 / -1", minHeight: 0 }}>

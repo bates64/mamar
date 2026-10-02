@@ -14,8 +14,8 @@ import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 import TrackMeter from "./TrackMeter"
-import VoiceBudget from "./VoiceBudget"
-import { budget, sharesVoices, useVoiceReport } from "./voices"
+import { VoiceBadge } from "./VoiceBudget"
+import { useVoiceReport } from "./voices"
 
 import Bridge from "../bridge"
 import TrackControls from "../emu/TrackControls"
@@ -82,19 +82,8 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
             evt.preventDefault()
         }
 
-        // Alternate parts play on the voices of the tracks they're for
-        const voiceIndex = track.alternate_for ?? shownIndex
-        const level = voices ? budget(voices) : "fits"
-        const isShortOfVoices = level === "over" && voices!.given[voiceIndex] < voices!.needed[voiceIndex]
-        const isSharingVoices = !isShortOfVoices && level !== "fits" && sharesVoices(voices!, voiceIndex)
-
         return <div
             tabIndex={0}
-            title={isShortOfVoices
-                ? `Gets ${voices!.given[voiceIndex]} voices but needs ${voices!.needed[voiceIndex]}, so some notes are cut off. See the voice budget under these regions for why.`
-                : isSharingVoices
-                    ? "Plays on voices that sound effects share, so sound effects can cut its notes off. See the voice budget under these regions for why."
-                    : undefined}
             aria-labelledby={isVersion ? undefined : nameId}
             aria-label={isVersion ? track.name || instrumentName : undefined}
             className={classNames({
@@ -102,9 +91,6 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
                 [styles.showsVersion]: isVersion,
-                // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one
-                // before, so this only warns when the segment needs more voices than the game has
-                [styles.shortOfVoices]: isShortOfVoices,
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
@@ -120,6 +106,8 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                 {/* A region without a name of its own is called after its instrument */}
                 {track.name || instrumentName}
             </div>}
+            {/* Alternate parts play on the voices of the tracks they're for */}
+            {voices && <VoiceBadge voices={voices} index={track.alternate_for ?? shownIndex} />}
         </div>
     }
 }
@@ -380,11 +368,6 @@ function Container() {
                             >
                                 {cell(row, segment.Subseg.track_list, segmentIndex)}
                             </div>)}
-                            <VoiceBudget
-                                trackListId={segment.Subseg.track_list}
-                                segmentIndex={segmentIndex}
-                                segmentStart={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}
-                            />
                             <SegmentStart.Provider value={segmentLengths.slice(0, segmentIndex).reduce((sum, length) => sum + length, 0)}>
                                 <SegmentEnd trackListId={segment.Subseg.track_list} length={segmentLengths[segmentIndex]} />
                             </SegmentStart.Provider>

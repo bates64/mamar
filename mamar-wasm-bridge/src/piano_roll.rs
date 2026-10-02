@@ -228,7 +228,7 @@ impl PianoRoll {
             self.draw_note(ctx, time, pitch, length);
             ctx.set_global_alpha(1.0);
             if self.busiest.contains(&id) {
-                // Outlined in the orange of the regions short of voices
+                // Outlined in the orange of the regions on voices sound effects share
                 ctx.save();
                 ctx.set_stroke_style_str("#e46f00");
                 ctx.set_line_width(2.0);

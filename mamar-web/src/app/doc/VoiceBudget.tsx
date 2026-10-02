@@ -1,214 +1,101 @@
-import {
-    ActionButton, Button, ButtonGroup, Cell, Column, Content, Dialog, DialogTrigger, Divider, Flex, Footer, Heading, Row,
-    TableBody, TableHeader, TableView, Text,
-} from "@adobe/react-spectrum"
-import Alert from "@spectrum-icons/workflow/Alert"
-import { startTransition, useState } from "react"
+import { ActionButton, Flex, Text } from "@adobe/react-spectrum"
+import classNames from "classnames"
+import { Voices } from "pm64-typegen"
 
-import { TICKS_PER_BEAT, usePickup, useTicksPerBar } from "./Ruler"
 import { useTime } from "./TimeProvider"
-import { Budget, MAX_VOICES, MUSIC_VOICES, budget, total, useVoiceReport, voiceRange } from "./voices"
+import styles from "./VoiceBudget.module.scss"
+import { MUSIC_VOICES, budget, sharesVoices, useVoiceReport, voiceRange } from "./voices"
 
-import { useBgm, useRoot } from "../store"
+import { useBgm, useDoc } from "../store"
 
-/** Where `ticks` along the variation falls, as bar and beat, counting the pickup as bar 0, as the playhead shows it. */
-function barAndBeat(ticks: number, pickup: number, ticksPerBar: number): string {
-    const sinceBar1 = ticks - pickup
-    const bar = Math.floor(sinceBar1 / ticksPerBar)
-    const beat = Math.floor((sinceBar1 - bar * ticksPerBar) / TICKS_PER_BEAT)
-    return `${bar + 1}.${beat + 1}`
-}
-
-/** A track's line in the voice budget. */
-export interface BudgetRow {
-    index: number
-    name: string
-    needs: number
-    gets: number
-    /** The voices the track plays on, counting from 0, from `first` up to but not including `end`. */
-    first: number
-    end: number
-    /** Where the track plays the most notes at once, as bar and beat, if it plays any. */
-    busiestAt?: string
-    shortOverlaps: number
+/** Names the voices track `index` plays on that sound effects share, counting voices from 1. */
+function describeShared(voices: Voices, index: number): string {
+    const range = voiceRange(voices, index)
+    const first = Math.max(range.first, MUSIC_VOICES)
+    return range.end - first > 1 ? `voices ${first + 1}–${range.end}` : `voice ${range.end}`
 }
 
 /**
- * The voices the regions of a part of the song need, shown under them only when that's more than the music's own, as
- * sound effects can then cut notes off, or more than the game has, which cuts notes off. Pressing it lists each
- * track's voices and where it needs them most, with a button to trim the short overlaps that make a track need a voice
- * more.
+ * A label at a region's top right, or at the timeline's right edge while the region runs past it, when the regions it
+ * plays with need more than the music has to itself: in red with the voices it's short of, if it gets fewer than it
+ * needs, or in orange if it plays on voices sound effects share.
  */
-export default function VoiceBudget({ trackListId, segmentIndex, segmentStart }: {
+export function VoiceBadge({ voices, index }: {
+    voices: Voices
+    /** The track whose voices the region plays on. */
+    index: number
+}) {
+    const level = budget(voices)
+    const needs = voices.needed[index]
+    const gets = voices.given[index]
+    // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one before, so
+    // this only warns of that when the regions need more voices than the game has
+    if (level === "over" && gets < needs) {
+        return <div className={styles.badgeRow}>
+            <span className={classNames(styles.badge, styles.short)} title={`Gets ${gets} of the ${needs} voices it needs, so some notes are cut off`}>
+                −{needs - gets} {needs - gets === 1 ? "voice" : "voices"}
+            </span>
+        </div>
+    }
+    if (level !== "fits" && sharesVoices(voices, index)) {
+        return <div className={styles.badgeRow}>
+            <span className={classNames(styles.badge, styles.shared)} title={`Plays on ${describeShared(voices, index)}, which sound effects share, so they can cut its notes off`}>
+                shared
+            </span>
+        </div>
+    }
+    return null
+}
+
+/**
+ * What's wrong with an open region's voices, if anything, with ways to fix it: showing where it plays the most notes
+ * at once, and trimming the short overlaps that make it need a voice more.
+ */
+export function VoiceNote({ trackListId, trackIndex, segmentStart }: {
     trackListId: number
-    segmentIndex: number
-    /** Where the regions start along the variation, in ticks. */
+    trackIndex: number
+    /** Where the region starts along the variation, in ticks. */
     segmentStart: number
 }) {
     const [bgm, dispatch] = useBgm()
-    const [root, rootDispatch] = useRoot()
+    const [, docDispatch] = useDoc()
     const report = useVoiceReport(trackListId)
-    const pickup = usePickup()
-    const ticksPerBar = useTicksPerBar()
     const time = useTime()
-    const [isOpen, setOpen] = useState(false)
-
-    const trackList = bgm?.track_lists[trackListId]
-    if (!report || !trackList) {
+    const track = bgm?.track_lists[trackListId]?.tracks[trackIndex]
+    if (!report || !track) {
         return null
     }
-    const needed = total(report.voices.needed)
-    const level = budget(report.voices)
-    // Trimming can bring the regions within the music's voices while the list is open, which then says so
-    if (level === "fits" && !isOpen) {
+    const { voices } = report
+    const level = budget(voices)
+    // Alternate parts play on the voices of the tracks they're for
+    const index = track.alternate_for ?? trackIndex
+    const needs = voices.needed[index]
+    const gets = voices.given[index]
+    const isShort = level === "over" && gets < needs
+    if (!isShort && !(level !== "fits" && sharesVoices(voices, index))) {
         return null
     }
+    const use = report.tracks[trackIndex]
+    const busiestAt = use.busiest_at
 
-    const rows: BudgetRow[] = trackList.tracks
-        .map((track, index) => {
-            const use = report.tracks[index]
-            return {
-                index,
-                name: track.name || `Track ${index}`,
-                needs: report.voices.needed[index],
-                gets: report.voices.given[index],
-                ...voiceRange(report.voices, index),
-                busiestAt: use.busiest_at != null ? barAndBeat(segmentStart + use.busiest_at, pickup, ticksPerBar) : undefined,
-                shortOverlaps: use.short_overlaps.length,
-            }
-        })
-        // Alternate parts use the voices of the tracks they're for, which count them
-        .filter(row => row.index !== 0 && row.needs > 0 && trackList.tracks[row.index].alternate_for == null)
-
-    // Opens the track's region where it plays the most notes at once, with those notes selected
-    const open = (index: number) => {
-        const id = root.activeDocId
-        if (!id) return
-        const use = report.tracks[index]
-        startTransition(() => {
-            rootDispatch(
-                { type: "doc", id, action: { type: "set_panel_content", panelContent: { type: "tracker", trackList: trackListId, track: index, segment: segmentIndex } } },
-                { type: "doc", id, action: { type: "set_location", location: { alternateParts: false } } },
-                { type: "doc", id, action: { type: "set_selection", selection: { trackList: trackListId, track: index, events: use.busiest_notes } } },
-            )
-        })
-        const busiestAt = use.busiest_at
-        if (busiestAt == null) return
-        // The transition renders the region a frame later, and it's laid out the frame after
-        requestAnimationFrame(() => requestAnimationFrame(() => time.scrollToTicks(segmentStart + busiestAt)))
-    }
-
-    return <div data-no-drag-scroll onClick={event => event.stopPropagation()}>
-        <DialogTrigger type="popover" placement="bottom start" isOpen={isOpen} onOpenChange={setOpen}>
-            <ActionButton margin="size-75">
-                {/* Spaced by hand, as the button's own spacing doesn't reach icons, as in LaneMenu */}
-                <Alert color={level === "over" ? "negative" : "notice"} size="S" marginStart="size-125" marginEnd="size-75" />
-                <Text>{needed} voices</Text>
-            </ActionButton>
-            {close => <VoiceBudgetDialog
-                level={level}
-                needed={needed}
-                rows={rows}
-                onTrim={tracks => dispatch({ type: "trim_short_overlaps", trackList: trackListId, tracks })}
-                onOpenTrack={index => {
-                    close()
-                    open(index)
-                }}
-            />}
-        </DialogTrigger>
-    </div>
-}
-
-/** What the voice budget's heading says after the voices needed, at each level. */
-function headingOf(level: Budget, needed: number): string {
-    switch (level) {
-    case "over":
-        return `${needed - MAX_VOICES} more than the game has`
-    case "shared":
-        return `${needed - MUSIC_VOICES} shared with sound effects`
-    case "fits":
-        return "all for music only"
-    }
-}
-
-/** The voice budget's list of tracks, apart from the song, so it can be shown without one. */
-export function VoiceBudgetDialog({ level, needed, rows, onTrim, onOpenTrack }: {
-    level: Budget
-    needed: number
-    rows: BudgetRow[]
-    onTrim(tracks: number[]): void
-    onOpenTrack(index: number): void
-}) {
-    // The tracks most likely to give up a voice cheaply first
-    const sorted = [...rows].sort((a, b) =>
-        Number(b.shortOverlaps > 0) - Number(a.shortOverlaps > 0) || b.needs - a.needs)
-    const trimmable = sorted.filter(row => row.shortOverlaps > 0)
-
-    return <Dialog size="L">
-        <Heading>{needed} voices: {headingOf(level, needed)}</Heading>
-        <Divider />
-        <Content>
-            <TableView
-                aria-label="Voices each track needs"
-                density="compact"
-                isQuiet
-                // As tall as its rows, as compact rows are, with the header
-                height={`calc(${sorted.length} * 33px + 36px)`}
-                maxHeight="size-6000"
-                onAction={key => onOpenTrack(Number(key))}
+    return <div className={classNames(styles.note, isShort ? styles.short : styles.shared)}>
+        <Text>
+            {isShort
+                ? `Gets ${gets} of the ${needs} voices it needs, so some notes are cut off.`
+                : `Plays on ${describeShared(voices, index)}, which sound effects share, so they can cut its notes off.`}
+        </Text>
+        <Flex direction="column" alignItems="start">
+            {needs > 1 && busiestAt != null && <ActionButton isQuiet onPress={() => {
+                docDispatch({ type: "set_selection", selection: { trackList: trackListId, track: trackIndex, events: use.busiest_notes } })
+                time.scrollToTicks(segmentStart + busiestAt)
+            }}>
+                Show busiest point
+            </ActionButton>}
+            {use.short_overlaps.length > 0 && <ActionButton isQuiet onPress={() =>
+                dispatch({ type: "trim_short_overlaps", trackList: trackListId, tracks: [trackIndex] })}
             >
-                <TableHeader>
-                    <Column width="2fr">Track</Column>
-                    <Column width="1fr" align="end">Needs</Column>
-                    <Column width="1fr" align="end">Gets</Column>
-                    <Column width="1.8fr">Voices</Column>
-                    <Column width="1.8fr">Busiest at</Column>
-                    <Column width="2.2fr">Short overlaps</Column>
-                </TableHeader>
-                <TableBody items={sorted}>
-                    {row => <Row key={row.index}>
-                        <Cell>{row.name}</Cell>
-                        <Cell>{row.needs}</Cell>
-                        <Cell>
-                            {/* Fewer than the track needs, so it cuts notes off */}
-                            {row.gets < row.needs
-                                ? <Flex alignItems="center" gap="size-50" justifyContent="end">
-                                    <Alert color="negative" size="S" aria-label="Fewer than it needs" />
-                                    <Text>{row.gets}</Text>
-                                </Flex>
-                                : row.gets}
-                        </Cell>
-                        <Cell>
-                            {/* Counted from 1, as the footer counts them */}
-                            {row.end > row.first && <Flex alignItems="center" gap="size-50">
-                                {row.end > MUSIC_VOICES && <Alert color="notice" size="S" aria-label="Shared with sound effects" />}
-                                <Text>{row.end - row.first > 1 ? `${row.first + 1}–${row.end}` : row.end}</Text>
-                            </Flex>}
-                        </Cell>
-                        <Cell>{row.busiestAt ? `bar ${row.busiestAt}` : ""}</Cell>
-                        <Cell>
-                            {row.shortOverlaps > 0 && <Flex alignItems="center" gap="size-100">
-                                <Text>{row.shortOverlaps}</Text>
-                                <ActionButton isQuiet onPress={() => onTrim([row.index])}>Trim</ActionButton>
-                            </Flex>}
-                        </Cell>
-                    </Row>}
-                </TableBody>
-            </TableView>
-        </Content>
-        <Footer>
-            <Text>
-                Each track reserves a voice for every note it plays at once at its busiest point, up to 4, for as long as
-                these regions play, and takes the voices after the track before it. Voices 1 to {MUSIC_VOICES} are for
-                music only. Sound effects take voices {MUSIC_VOICES + 1} to {MAX_VOICES} whenever they play, cutting off
-                notes on them. Past {MAX_VOICES}, tracks get fewer voices than they need and cut notes off. Choose a track
-                to see where it needs the most.
-            </Text>
-        </Footer>
-        {trimmable.length > 1 && <ButtonGroup>
-            <Button variant="secondary" onPress={() => onTrim(trimmable.map(row => row.index))}>
-                Trim all short overlaps
-            </Button>
-        </ButtonGroup>}
-    </Dialog>
+                Trim {use.short_overlaps.length} short overlaps
+            </ActionButton>}
+        </Flex>
+    </div>
 }

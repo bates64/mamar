@@ -1,0 +1,40 @@
+.short {
+    --voice-color: var(--spectrum-red-700);
+}
+
+.shared {
+    --voice-color: var(--spectrum-orange-700);
+}
+
+// Across the top of the region, over its notes, for the badge to slide along
+.badgeRow {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+// Stuck to the timeline's right edge while the region runs past it
+.badge {
+    position: sticky;
+    right: 4px;
+    padding: 0 5px;
+    border-radius: 8px;
+    pointer-events: auto;
+
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: bold;
+    color: white;
+    background: var(--voice-color);
+}
+
+.note {
+    margin-top: 12px;
+    padding-left: 8px;
+    border-left: 2px solid var(--voice-color);
+    font-size: 12px;
+}
