@@ -109,7 +109,8 @@ export type BgmAction = {
 } | {
     /**
      * Shortens the notes of tracks `tracks` of track list `trackList` that are held a little into a note that starts
-     * after them, as each overlap makes the track need another voice. See CommandSeq::trim_short_overlaps in pm64.
+     * after them, as each overlap makes the track need another voice, in every mix. See CommandSeq::trim_short_overlaps
+     * in pm64.
      */
     type: "trim_short_overlaps"
     trackList: number
@@ -353,12 +354,21 @@ export function bgmReducer(bgm: Bgm, action: BgmAction, mix = 0): Bgm {
     }
     case "set_beats_per_bar":
         return { ...bgm, beats_per_bar: action.beatsPerBar }
-    case "trim_short_overlaps":
-        // The tracks forget where they were decoded from, so the encoder chooses their voices again
-        return action.tracks.reduce((song, index) => withTrack(song, action.trackList, index, ({ pos: _, ...track }) => ({
-            ...track,
-            commands: Bridge.commands_trim_short_overlaps(track.commands, song.branches),
-        })), bgm)
+    case "trim_short_overlaps": {
+        // The commands editTrack gives have their passages written in, so play no branches
+        const trim = (commands: Event[]) => Bridge.commands_trim_short_overlaps(commands, {})
+        // A track that varies by mix is trimmed as each mix plays it
+        return action.tracks.reduce((song, index) => {
+            if (!variesByMix(song.track_lists[action.trackList].tracks[index].commands)) {
+                return editTrack(song, action.trackList, index, undefined, trim)
+            }
+            let edited = song
+            for (let mix = 0; mix < mixCount(song); mix++) {
+                edited = editTrack(edited, action.trackList, index, mix, trim)
+            }
+            return edited
+        }, bgm)
+    }
     case "insert_track_command":
         return editTrack(bgm, action.trackList, action.track, mix, commands =>
             Bridge.commands_insert(commands, action.time, action.command))

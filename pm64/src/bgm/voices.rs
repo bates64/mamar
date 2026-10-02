@@ -177,8 +177,7 @@ pub(super) fn own_notes(commands: &CommandSeq, branches: &BTreeMap<BranchId, Bra
 }
 
 impl TrackList {
-    /// The voices each track needs and gets, and where each track, as proximity mix `mix` plays it, needs them. Short
-    /// overlaps are found among a track's own notes, not its branches'.
+    /// The voices each track needs and gets, and where each track, as proximity mix `mix` plays it, needs them.
     pub fn voice_report(&self, branches: &BTreeMap<BranchId, Branch>, mix: usize) -> VoiceReport {
         let tracks = std::array::from_fn(|index| {
             let track = &self.tracks[index];
@@ -191,10 +190,7 @@ impl TrackList {
             VoiceUse {
                 busiest_at,
                 busiest_notes,
-                short_overlaps: short_overlaps(&own_notes(&track.commands, branches))
-                    .into_iter()
-                    .map(|(id, _)| id)
-                    .collect(),
+                short_overlaps: short_overlaps(&played).into_iter().map(|(id, _)| id).collect(),
             }
         });
         VoiceReport {
