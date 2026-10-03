@@ -667,6 +667,39 @@ mod test {
     }
 
     #[test]
+    fn import_puts_drums_last_and_reimport_finds_them() {
+        let v1 = midi(
+            &[
+                ("Drums", notes(&[(0, 36)])),
+                ("Lead", notes(&[(0, 60)])),
+                ("Bass", notes(&[(0, 36)])),
+            ],
+            &[],
+        );
+        let imported = import(&v1, "song.mid").unwrap();
+        let link = imported.bgm.import.as_ref().unwrap();
+        assert_eq!(link.track_keys[1].as_deref(), Some("Lead"));
+        assert_eq!(link.track_keys[2].as_deref(), Some("Bass"));
+        assert_eq!(link.track_keys[3].as_deref(), Some("Drums"));
+        let Segment::Subseg { track_list, .. } = imported.bgm.variations[0].as_ref().unwrap().segments[0] else {
+            panic!()
+        };
+        assert!(imported.bgm.track_lists[&track_list].tracks[3].is_drum_track);
+
+        let v2 = midi(
+            &[
+                ("Drums", notes(&[(0, 38)])),
+                ("Lead", notes(&[(0, 62)])),
+                ("Bass", notes(&[(0, 36)])),
+            ],
+            &[],
+        );
+        let (bgm, _, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        assert_eq!(played(&bgm, "Lead"), vec![(0, 62)]);
+        assert_eq!(played(&bgm, "Drums"), vec![(0, 38)]);
+    }
+
+    #[test]
     fn unedited_song_has_an_empty_patch_and_rebuilds_its_base() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
         let imported = import(&raw, "song.mid").unwrap();

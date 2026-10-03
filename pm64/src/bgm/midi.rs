@@ -113,7 +113,8 @@ pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
         }
     }
 
-    let track_keys = track_keys(&track_list, by_channel.then_some(&channels[..]));
+    let mut track_keys = track_keys(&track_list, by_channel.then_some(&channels[..]));
+    put_drums_last(&mut track_list, &mut track_keys);
     let track_list_id = bgm.add_track_list(track_list);
 
     let (_, variation) = bgm.add_variation().unwrap();
@@ -131,6 +132,27 @@ pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
         has_section_markers,
         warnings,
     })
+}
+
+/// Moves the drum tracks after the other tracks, before the unused ones, keeping each group in order, with their keys.
+/// The game gives tracks their voices in order, and sound effects take the last voices from the music, so drums go
+/// last, as in vanilla songs, where a drum hit cut short is hardly heard.
+fn put_drums_last(track_list: &mut TrackList, track_keys: &mut [Option<String>]) {
+    let mut order: Vec<usize> = (1..track_list.tracks.len()).collect();
+    // Unused tracks stay at the end
+    order.sort_by_key(|&index| {
+        (
+            track_list.tracks[index].commands.is_empty(),
+            track_list.tracks[index].is_drum_track,
+        )
+    });
+    order.insert(0, 0);
+    let tracks = track_list.tracks.clone();
+    let keys = track_keys.to_vec();
+    for (to, &from) in order.iter().enumerate() {
+        track_list.tracks[to] = tracks[from].clone();
+        track_keys[to] = keys[from].clone();
+    }
 }
 
 /// Splits a single-track file's events into a master track, holding everything but channel messages, followed by a
