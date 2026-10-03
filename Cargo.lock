@@ -215,6 +215,7 @@ dependencies = [
  "lazy_static",
  "log",
  "midly",
+ "pm64",
  "regex",
  "rmp-serde",
  "ron",

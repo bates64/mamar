@@ -17,3 +17,7 @@ typescript-type-def = "0.5"
 
 [build-dependencies]
 typescript-type-def = "0.5"
+
+# Tests cover MIDI import, which is optional for crates that use pm64
+[dev-dependencies]
+pm64 = { path = ".", features = ["midly"] }
