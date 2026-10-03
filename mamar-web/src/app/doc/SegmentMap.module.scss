@@ -74,6 +74,13 @@ $versionHeight: 40px;
         padding: 6px 10px;
     }
 
+    // Stuck to the timeline's left edge while the region runs past it, as far as the region's end
+    .stickyName {
+        display: inline-block;
+        position: sticky;
+        left: 10px;
+    }
+
     // A name from the region's instrument, as it has none of its own
     .instrumentName {
         opacity: 0.75;

@@ -104,7 +104,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
             {/* A version's row is under the track's, which names the region */}
             {!isVersion && <div id={nameId} className={classNames(styles.segmentName, { [styles.instrumentName]: !track.name })}>
                 {/* A region without a name of its own is called after its instrument */}
-                {track.name || instrumentName}
+                <span className={styles.stickyName}>{track.name || instrumentName}</span>
             </div>}
             {/* Alternate parts play on the voices of the tracks they're for */}
             {voices && trackList && <VoiceBadge trackList={trackList} voices={voices} index={track.alternate_for ?? shownIndex} />}
