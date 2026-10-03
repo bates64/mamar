@@ -6,6 +6,7 @@ use typescript_type_def::TypeDef;
 use crate::bgm::{self, Bgm};
 use crate::rw::*;
 
+pub mod bank;
 pub mod de;
 pub mod en;
 

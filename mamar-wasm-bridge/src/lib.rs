@@ -296,3 +296,37 @@ pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &st
         Err(e) => e.to_string().into(),
     }
 }
+
+/// A ROM's sound bank, kept in wasm memory so looking up its instruments doesn't copy it each time. See
+/// [pm64::sbn::bank::SoundBank].
+#[wasm_bindgen(js_name = SoundBank)]
+pub struct WasmSoundBank(pm64::sbn::bank::SoundBank);
+
+#[wasm_bindgen(js_class = SoundBank)]
+impl WasmSoundBank {
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: &[u8]) -> Self {
+        Self(pm64::sbn::bank::SoundBank::new(data.to_vec()))
+    }
+
+    pub fn file_name(&self, index: usize) -> Option<String> {
+        self.0.file_name(index)
+    }
+
+    pub fn file_index_of(&self, name: &str) -> Option<usize> {
+        self.0.file_index_of(name)
+    }
+
+    pub fn kit_drums(&self) -> JsValue {
+        to_js(&self.0.kit_drums())
+    }
+
+    pub fn instrument_offset(&self, patch: &JsValue, aux_banks: &JsValue) -> Option<usize> {
+        self.0
+            .instrument_offset(&from_js(patch), &from_js::<Vec<String>>(aux_banks))
+    }
+
+    pub fn envelopes(&self, patch: &JsValue, aux_banks: &JsValue) -> JsValue {
+        to_js(&self.0.envelopes(&from_js(patch), &from_js::<Vec<String>>(aux_banks)))
+    }
+}
