@@ -24,7 +24,20 @@ pub use merge::{Imported, import, reimport};
 /// and the others have the key and the channel, such as `#3/ch2`.
 pub type TrackKey = String;
 
-/// The MIDI file a song was imported from, and what Mamar has changed since.
+/// How a MIDI file's programs and drum notes are read. See [super::midi::import].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
+pub enum MidiMapping {
+    /// As General MIDI: programs are its instruments, played with the closest samples, drum notes are its drums, and
+    /// channel 10 plays drums.
+    GeneralMidi,
+    /// Programs are Paper Mario sample numbers, 16 to a bank, drum notes play the drum kit in its own order, and only a
+    /// track's name says it plays drums, as Mamar read MIDI files before it read General MIDI.
+    #[default]
+    PaperMario,
+}
+
+/// The MIDI file a song was imported from, and what Mamar has changed since. A song saves its fields in order, so a new
+/// field goes last, where a song saved before it has nothing, and reads as its default.
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, TypeDef)]
 #[serde(default)]
 pub struct ImportLink {
@@ -40,6 +53,9 @@ pub struct ImportLink {
     pub base_hash: u32,
     /// What Mamar changed since the last import. Only up to date as saved.
     pub patch: Patch,
+    /// How the file's programs and drum notes are read, chosen on the first import and kept across reimports. Songs
+    /// imported before Mamar read General MIDI read them as Paper Mario numbers.
+    pub mapping: MidiMapping,
 }
 
 /// The commands Mamar added to and removed from each source track since the last import.

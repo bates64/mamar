@@ -72,6 +72,34 @@ export function highestPitch({ keyBase, sampleRate }: Sample, tune: number): num
     return highest >= 0xD3 ? undefined : Math.max(LOWEST_PITCH - 1, highest)
 }
 
+/** The pitch pm64's MIDI import gives a note of MIDI key 0. */
+const MIDI_KEY_0_PITCH = 104
+
+const sampleReachCache = new WeakMap<ArrayBuffer, Uint8Array>()
+
+/**
+ * The highest MIDI key each sample in the music banks plays at its own pitch, untuned, by its number, 16 to a bank:
+ * its highest recording's limit, as Mamar switches between them to play each note. 127 for one that plays every key,
+ * and 0 for one the sound bank doesn't have. Importing a MIDI file avoids samples its parts play past.
+ */
+export function sampleReach(sbn: ArrayBuffer): Uint8Array {
+    const cached = sampleReachCache.get(sbn)
+    if (cached) {
+        return cached
+    }
+    const reach = new Uint8Array(256)
+    for (let number = 0; number < reach.length; number++) {
+        const patch: PatchAddress = { bank_set: "Music", bank: number >> 4, instrument: number & 0xF, envelope: 0 }
+        const keys = recordingsOf(sbn, patch).map(({ sample }) => {
+            const highest = highestPitch(sample, 0)
+            return highest === undefined ? 127 : highest - MIDI_KEY_0_PITCH
+        })
+        reach[number] = keys.length === 0 ? 0 : Math.min(127, Math.max(1, ...keys))
+    }
+    sampleReachCache.set(sbn, reach)
+    return reach
+}
+
 /** A byte the engine reads as signed. */
 function signed(byte: number): number {
     return byte > 127 ? byte - 256 : byte

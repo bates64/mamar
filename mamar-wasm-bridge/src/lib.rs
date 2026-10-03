@@ -250,11 +250,13 @@ fn bytes(data: &[u8]) -> JsValue {
     js_sys::Uint8Array::from(data).into()
 }
 
-/// Makes a song from the MIDI file `data`, named `name`, linked to it so it can be reimported. Returns `{ bgm, base,
-/// warnings }`, where `base` is the import to keep while the song is open, or an error message.
+/// Makes a song from the MIDI file `data`, named `name`, reading its programs and drum notes as `mapping`, a
+/// [reimport::MidiMapping], says, and choosing samples that reach its notes by `sample_reach`, the highest MIDI key
+/// each sample plays, linked to it so it can be reimported. Returns `{ bgm, base, warnings }`, where `base` is the
+/// import to keep while the song is open, or an error message.
 #[wasm_bindgen]
-pub fn midi_import(data: &[u8], name: &str) -> JsValue {
-    match reimport::import(data, name) {
+pub fn midi_import(data: &[u8], name: &str, mapping: &JsValue, sample_reach: &[u8]) -> JsValue {
+    match reimport::import(data, name, from_js(mapping), sample_reach) {
         Ok(imported) => object(&[
             ("bgm", to_js(&imported.bgm)),
             ("base", bytes(&reimport::encode_timeline(&imported.base))),
@@ -285,13 +287,13 @@ pub fn import_base_rebuild(bgm: &JsValue) -> JsValue {
     }
 }
 
-/// Reimports the MIDI file `data`, named `name`, into `bgm`, given its last import `base` if it has one. Returns
-/// `{ bgm, base, report }`, or an error message.
+/// Reimports the MIDI file `data`, named `name`, into `bgm`, given its last import `base` if it has one, and
+/// `sample_reach` as [midi_import] has it. Returns `{ bgm, base, report }`, or an error message.
 #[wasm_bindgen]
-pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &str) -> JsValue {
+pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &str, sample_reach: &[u8]) -> JsValue {
     let bgm: Bgm = from_js(bgm);
     let base = base.as_deref().and_then(reimport::decode_timeline);
-    match reimport::reimport(&bgm, base.as_ref(), data, name) {
+    match reimport::reimport(&bgm, base.as_ref(), data, name, sample_reach) {
         Ok((bgm, base, report)) => object(&[
             ("bgm", to_js(&bgm)),
             ("base", bytes(&reimport::encode_timeline(&base))),

@@ -5,6 +5,7 @@ use std::io::prelude::*;
 
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
 
+use super::reimport::MidiMapping;
 use crate::bgm::*;
 use crate::id::gen_id;
 use crate::rw::*;
@@ -21,7 +22,7 @@ pub fn is_midi<R: Read + Seek>(file: &mut R) -> Result<bool, std::io::Error> {
 }
 
 pub fn to_bgm(raw: &[u8]) -> Result<Bgm, Box<dyn Error>> {
-    Ok(import(raw)?.bgm)
+    Ok(import(raw, MidiMapping::default(), &[])?.bgm)
 }
 
 /// A song made from a MIDI file, with what [reimporting](super::reimport) needs to know about where it came from.
@@ -55,6 +56,16 @@ impl SectionMarker {
 }
 
 /// Makes a song from a MIDI file. Markers named `section`, `loop start` and `loop end` start sections there, and a
+/// The keys of the drums General MIDI drum parts play most: kicks, snares, hi-hats, crash and ride cymbals.
+const CORE_DRUM_KEYS: [u8; 13] = [35, 36, 37, 38, 39, 40, 42, 44, 46, 49, 51, 54, 57];
+
+/// The keys General MIDI has drums on.
+const GENERAL_MIDI_DRUM_KEYS: std::ops::RangeInclusive<u8> = 35..=81;
+
+/// The lowest key a channel 10 part can play a melody from, above the kicks, snares and toms, which drum fills step
+/// between.
+const LOWEST_MELODY_KEY: u8 = 52;
+
 /// The tracks the game has for a section's notes, after its master track.
 const NOTE_TRACKS: usize = 15;
 
@@ -86,9 +97,8 @@ impl Part<'_> {
             .count()
     }
 
-    /// Whether it plays drums: its track's or instrument's name says so, or it's channel 10 of a single-track file, if
-    /// `is_single_track`.
-    fn is_drums(&self, is_single_track: bool) -> bool {
+    /// Whether it plays drums, read as `mapping` says, from a single-track file if `is_single_track`.
+    fn is_drums(&self, is_single_track: bool, mapping: MidiMapping) -> bool {
         let instrument_name = self
             .events
             .iter()
@@ -98,8 +108,25 @@ impl Part<'_> {
                 _ => None,
             })
             .flatten();
-        let is_named = is_named_drums(&self.name) || instrument_name.as_deref().is_some_and(is_named_drums);
-        is_named || (is_single_track && self.channel == 9)
+        let is_named = is_named_drums(&self.name, mapping)
+            || instrument_name
+                .as_deref()
+                .is_some_and(|name| is_named_drums(name, mapping));
+        match mapping {
+            MidiMapping::GeneralMidi => {
+                // XG plays drums on any channel that selects bank 127
+                let selects_drum_bank = self.events.iter().any(|(_, kind)| {
+                    matches!(kind, TrackEventKind::Midi { message: MidiMessage::Controller { controller, value }, .. }
+                        if controller.as_int() == 0 && value.as_int() == 127)
+                });
+                (self.channel == 9 && !self.plays_like_melody())
+                    || selects_drum_bank
+                    || is_named
+                    || self.plays_like_drums()
+            }
+            // Before General MIDI, only a single-track file's channel 10 played drums
+            MidiMapping::PaperMario => is_named || (is_single_track && self.channel == 9),
+        }
     }
 
     /// The program it plays its first note with, if it chooses one before then.
@@ -124,12 +151,67 @@ impl Part<'_> {
             })
             .last()
     }
+
+    /// The keys of its notes, in order.
+    fn keys(&self) -> Vec<u8> {
+        self.events
+            .iter()
+            .filter_map(|(_, kind)| match kind {
+                TrackEventKind::Midi {
+                    message: MidiMessage::NoteOn { key, vel },
+                    ..
+                } if vel.as_int() > 0 => Some(key.as_int()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether it plays as drum parts do, though not on channel 10: as a game rip's drum kit, which some put on their
+    /// last program, where General MIDI has a sound effect, or as one drum given a track of its own, choosing no
+    /// program.
+    fn plays_like_drums(&self) -> bool {
+        let keys = self.keys();
+        if keys.is_empty() {
+            return false;
+        }
+        let share =
+            |within: &dyn Fn(u8) -> bool| keys.iter().filter(|&&key| within(key)).count() as f32 / keys.len() as f32;
+        let core = share(&|key| CORE_DRUM_KEYS.contains(&key));
+        match self.first_program() {
+            Some(127) => share(&|key| GENERAL_MIDI_DRUM_KEYS.contains(&key)) >= 0.95 && core >= 0.7,
+            None => {
+                let mut distinct = keys.clone();
+                distinct.sort_unstable();
+                distinct.dedup();
+                distinct.len() <= 2 && core == 1.0
+            }
+            Some(_) => false,
+        }
+    }
+
+    /// Whether it plays a melody, stepping between neighboring keys above the drums General MIDI puts at the bottom
+    /// of its kit, as a channel 10 part of a game rip can. A drum part rarely steps, but for toms, which are low.
+    fn plays_like_melody(&self) -> bool {
+        let keys = self.keys();
+        let mut distinct = keys.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        if distinct.len() < 6 || distinct[0] < LOWEST_MELODY_KEY {
+            return false;
+        }
+        let steps = keys
+            .windows(2)
+            .filter(|pair| matches!(pair[0].abs_diff(pair[1]), 1 | 2))
+            .count();
+        steps as f32 >= 0.5 * (keys.len() - 1) as f32
+    }
 }
 
-/// Makes a song from a MIDI file. Markers named `section`, `loop start` and `loop end` start sections there, and a
-/// loop between `loop start` and `loop end` repeats forever. Each channel of each track becomes a track of its own, and
-/// tempo changes on any track change the song's tempo.
-pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
+/// Makes a song from a MIDI file, reading its programs and drum notes as `mapping` says. Markers named `section`,
+/// `loop start` and `loop end` start sections there, and a loop between `loop start` and `loop end` repeats forever.
+/// Each channel of each track becomes a track of its own, and tempo changes on any track change the song's tempo.
+/// Reading General MIDI, samples are chosen that reach each part's notes by `sample_reach`. See [general_midi_sample].
+pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
     let smf = Smf::parse(raw)?;
     let mut bgm = Bgm::new();
 
@@ -171,7 +253,7 @@ pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
     let is_single_track = smf.header.format == midly::Format::SingleTrack && tracks.len() == 1;
     let (parts, reserved) = parts(&tracks, is_single_track);
     bgm.instruments = (0..reserved).map(|_| new_instrument()).collect();
-    let (parts, mut warnings) = fit_parts(parts);
+    let (parts, mut warnings) = fit_parts(parts, is_single_track, mapping);
 
     // Section markers can be on any track, and the master track has the other markers of tracks without notes
     let mut markers = Vec::new();
@@ -202,11 +284,15 @@ pub fn import(raw: &[u8]) -> Result<MidiImport, Box<dyn Error>> {
         track_list.tracks[index + 1] = part_to_track(
             &fitted.part,
             is_single_track,
-            total_song_length,
+            mapping,
+            sample_reach,
             time_divisor,
             &mut bgm.instruments,
             fitted.instrument,
         );
+        track_list.tracks[index + 1]
+            .commands
+            .insert_end(total_song_length, Command::End);
         track_keys[index + 1] = Some(fitted.part.key.clone());
     }
     put_drums_last(&mut track_list, &mut track_keys);
@@ -390,17 +476,20 @@ fn parts<'a>(tracks: &[Vec<(usize, TrackEventKind<'a>)>], is_single_track: bool)
     (parts, reserved)
 }
 
-/// `parts`, fitted into the [NOTE_TRACKS] the game has. If there are more, a part Mamar didn't make a track of before
-/// it split tracks by channel plays with an earlier part on the same channel that starts with the same program, then
-/// the parts with the fewest notes are left out, leaving those Mamar made tracks of until last, so reimporting a song
-/// made then keeps its tracks. Returns warnings of those left out.
-fn fit_parts(mut parts: Vec<Fitted>) -> (Vec<Fitted>, Vec<String>) {
+/// `parts`, fitted into the [NOTE_TRACKS] the game has. If there are more, a part plays with an earlier part on the
+/// same channel that starts with the same program, then the parts with the fewest notes are left out, drums last.
+///
+/// Reading Paper Mario numbers, as songs imported before Mamar read General MIDI did, the parts Mamar made tracks of
+/// before it split tracks by channel aren't joined to others, and are left out last instead of drums, so reimporting a
+/// song made then keeps its tracks. Returns warnings of those left out.
+fn fit_parts(mut parts: Vec<Fitted>, is_single_track: bool, mapping: MidiMapping) -> (Vec<Fitted>, Vec<String>) {
+    let keeps_tracks = mapping == MidiMapping::PaperMario;
     let mut warnings = Vec::new();
     if parts.len() > NOTE_TRACKS {
         let mut merged: Vec<Fitted> = Vec::new();
         for fitted in parts {
             let same = merged.iter_mut().find(|other| {
-                !fitted.was_track()
+                !(keeps_tracks && fitted.was_track())
                     && other.part.channel == fitted.part.channel
                     && other.part.first_program() == fitted.part.first_program()
             });
@@ -438,7 +527,12 @@ fn fit_parts(mut parts: Vec<Fitted>) -> (Vec<Fitted>, Vec<String>) {
         let mut ranked: Vec<usize> = (0..parts.len()).collect();
         ranked.sort_by_key(|&index| {
             let fitted = &parts[index];
-            (!fitted.was_track(), std::cmp::Reverse(fitted.part.note_count()))
+            let is_kept_first = if keeps_tracks {
+                fitted.was_track()
+            } else {
+                fitted.part.is_drums(is_single_track, mapping)
+            };
+            (!is_kept_first, std::cmp::Reverse(fitted.part.note_count()))
         });
         let kept: BTreeSet<usize> = ranked.into_iter().take(NOTE_TRACKS).collect();
         let mut index = 0;
@@ -646,33 +740,170 @@ fn apply_section_markers(
     true
 }
 
-/// A MIDI note's pitch in the game, where it plays the same pitch.
+/// The Paper Mario sample, as its number in the music banks, 16 to a bank, that plays each General MIDI program.
+#[rustfmt::skip]
+const GENERAL_MIDI_SAMPLES: [u8; 128] = [
+    // Pianos: acoustic grand, bright, electric grand, honky-tonk, electric 1 and 2, harpsichord, clavinet
+    35, 35, 35, 96, 32, 117, 146, 146,
+    // Chromatic percussion: celesta, glockenspiel, music box, vibraphone, marimba, xylophone, tubular bells, dulcimer
+    9, 128, 37, 6, 0, 3, 114, 130,
+    // Organs: drawbar, percussive, rock, church, reed, accordion, harmonica, tango accordion
+    78, 77, 99, 163, 78, 137, 137, 137,
+    // Guitars: nylon, steel, jazz, clean, muted, overdriven, distortion, harmonics
+    39, 41, 32, 32, 32, 68, 68, 82,
+    // Basses: acoustic, finger, pick, fretless, slap 1 and 2, synth 1 and 2
+    64, 92, 124, 64, 113, 113, 47, 101,
+    // Strings: violin, viola, cello, contrabass, tremolo, pizzicato, harp, timpani
+    18, 17, 16, 64, 24, 20, 144, 28,
+    // Ensembles: strings 1 and 2, synth strings 1 and 2, choir aahs, voice oohs, synth voice, orchestra hit
+    24, 24, 25, 26, 89, 89, 165, 136,
+    // Brass: trumpet, trombone, tuba, muted trumpet, french horn, brass section, synth brass 1 and 2
+    80, 51, 49, 80, 48, 66, 66, 67,
+    // Reeds: soprano, alto, tenor and baritone sax, oboe, english horn, bassoon, clarinet
+    57, 57, 148, 86, 58, 45, 53, 56,
+    // Pipes: piccolo, flute, recorder, pan flute, blown bottle, shakuhachi, whistle, ocarina
+    71, 71, 71, 110, 110, 71, 108, 108,
+    // Leads: square, sawtooth, calliope, chiff, charang, voice, fifths, bass and lead
+    115, 62, 61, 11, 141, 89, 106, 153,
+    // Pads: new age, warm, polysynth, choir, bowed, metallic, halo, sweep
+    25, 25, 107, 165, 25, 25, 165, 112,
+    // Effects: rain, soundtrack, crystal, atmosphere, brightness, goblins, echoes, sci-fi
+    121, 25, 122, 25, 117, 25, 165, 112,
+    // Ethnic: sitar, banjo, shamisen, koto, kalimba, bagpipe, fiddle, shanai
+    102, 85, 102, 144, 135, 45, 18, 58,
+    // Percussive: tinkle bell, agogo, steel drums, woodblock, taiko, melodic tom, synth drum, reverse cymbal
+    121, 140, 74, 0, 28, 28, 28, 164,
+    // Sound effects: fret noise, breath, seashore, bird, telephone, helicopter, applause, gunshot
+    82, 71, 164, 125, 132, 164, 164, 136,
+];
+
+/// The sample, by its number in the music banks, that plays General MIDI program `program` for a part whose highest
+/// key is `highest`. That's the closest sample to the program whose recordings reach the part's notes, by
+/// `sample_reach`: the program's own, or another of its family of 8 programs, or else the sample of another program
+/// that reaches least further, so notes aren't played lower than they should be. If none reach, it's the one that
+/// reaches furthest.
+///
+/// `sample_reach` is the highest MIDI key each sample's recordings play, by the sample's number, 0 for one it doesn't
+/// know. Without it, as without a sound bank to find it in, each program plays its own sample.
+fn general_midi_sample(program: u8, highest: u8, sample_reach: &[u8]) -> u8 {
+    let reach = |sample: u8| sample_reach.get(sample as usize).copied().unwrap_or(0);
+    let reaches = |sample: u8| reach(sample) >= highest;
+    let own = GENERAL_MIDI_SAMPLES[program as usize];
+    if reach(own) == 0 || reaches(own) {
+        return own;
+    }
+    let family = (program / 8 * 8) as usize;
+    if let Some(&sample) = GENERAL_MIDI_SAMPLES[family..family + 8]
+        .iter()
+        .find(|&&sample| reaches(sample))
+    {
+        return sample;
+    }
+    GENERAL_MIDI_SAMPLES
+        .iter()
+        .copied()
+        .filter(|&sample| reaches(sample))
+        .min_by_key(|&sample| reach(sample))
+        .or_else(|| GENERAL_MIDI_SAMPLES.iter().copied().max_by_key(|&sample| reach(sample)))
+        .unwrap_or(own)
+}
+
+/// The drum of the drum kit that plays each General MIDI drum note from [FIRST_GENERAL_MIDI_DRUM], or None for one the
+/// kit has nothing like. The kit's drums are in an order of their own.
+const GENERAL_MIDI_DRUMS: [Option<u8>; 47] = [
+    Some(0),  // 35 acoustic bass drum: kick 1
+    Some(0),  // 36 bass drum 1: kick 1
+    Some(58), // 37 side stick
+    Some(1),  // 38 acoustic snare: snare 1
+    Some(56), // 39 hand clap
+    Some(2),  // 40 electric snare: snare 2
+    Some(11), // 41 low floor tom: low tom 2
+    Some(3),  // 42 closed hi-hat
+    Some(10), // 43 high floor tom: low tom 1
+    Some(4),  // 44 pedal hi-hat
+    Some(9),  // 45 low tom: mid tom 2
+    Some(5),  // 46 open hi-hat
+    Some(8),  // 47 low-mid tom: mid tom 1
+    Some(7),  // 48 high-mid tom: high tom 2
+    Some(12), // 49 crash cymbal 1
+    Some(6),  // 50 high tom: high tom 1
+    Some(36), // 51 ride cymbal 1
+    Some(13), // 52 chinese cymbal: crash cymbal 2
+    Some(37), // 53 ride bell
+    Some(18), // 54 tambourine
+    Some(13), // 55 splash cymbal: crash cymbal 2
+    Some(47), // 56 cowbell
+    Some(13), // 57 crash cymbal 2
+    Some(60), // 58 vibraslap
+    Some(36), // 59 ride cymbal 2: ride cymbal 1
+    Some(15), // 60 high bongo
+    Some(14), // 61 low bongo
+    Some(23), // 62 mute high conga
+    Some(21), // 63 open high conga
+    Some(22), // 64 low conga
+    Some(24), // 65 high timbale
+    Some(25), // 66 low timbale
+    Some(48), // 67 high agogo
+    Some(49), // 68 low agogo
+    Some(44), // 69 cabasa
+    Some(55), // 70 maracas
+    Some(52), // 71 short whistle: long low whistle
+    Some(53), // 72 long whistle: long low whistle
+    Some(27), // 73 short guiro
+    Some(26), // 74 long guiro
+    Some(46), // 75 claves
+    Some(50), // 76 high wood block
+    Some(51), // 77 low wood block
+    Some(17), // 78 mute cuica
+    Some(16), // 79 open cuica
+    Some(19), // 80 mute triangle: open triangle
+    Some(20), // 81 open triangle
+];
+
+/// The General MIDI drum note [GENERAL_MIDI_DRUMS] starts at.
+const FIRST_GENERAL_MIDI_DRUM: u8 = 35;
+
+/// The pitch of a drum track's note that plays the drum kit's first drum.
+const FIRST_DRUM_PITCH: u8 = 0x80;
+
+/// A MIDI note's pitch in the game, where it plays the same pitch, for a track that isn't drums.
 fn pitch_of(key: u8) -> u8 {
     key + 104
 }
 
-/// The sample that plays `program`: the one with that number in the music banks, 16 to a bank.
-fn sample_of(program: u8) -> PatchAddress {
+/// The sample that plays `program`, read as `mapping` says, for a part whose highest key is `highest`. See
+/// [general_midi_sample] for `sample_reach`.
+fn sample_of(program: u8, mapping: MidiMapping, highest: u8, sample_reach: &[u8]) -> PatchAddress {
+    let number = match mapping {
+        MidiMapping::GeneralMidi => general_midi_sample(program, highest, sample_reach),
+        MidiMapping::PaperMario => program,
+    };
     PatchAddress {
         bank_set: BankSetIndex::Music,
-        bank: program / 16,
-        instrument: program % 16,
+        bank: number / 16,
+        instrument: number % 16,
         envelope: 0,
     }
 }
 
 /// Whether `name`, a track's or its instrument's, says it plays drums, such as "Drums" or "Percussion", but not "Steel
-/// Drums".
-fn is_named_drums(name: &str) -> bool {
+/// Drums". As `mapping` reads General MIDI, "Perc" and "Kit" do too.
+fn is_named_drums(name: &str, mapping: MidiMapping) -> bool {
     let name = name.to_lowercase();
-    (name.contains("drum") && !name.contains("steel")) || name.contains("percussion")
+    let drums = (name.contains("drum") && !name.contains("steel")) || name.contains("percussion");
+    match mapping {
+        MidiMapping::GeneralMidi => drums || name.contains("perc") || name.contains("kit"),
+        MidiMapping::PaperMario => drums,
+    }
 }
 
-/// Makes a track from `part`. It plays instrument `instrument` of `instruments`, or one it adds if None.
+/// Makes a track from `part`, reading it as `mapping` says, with `sample_reach` as [general_midi_sample] has it. It
+/// plays instrument `instrument` of `instruments`, or one it adds if None.
 fn part_to_track(
     part: &Part,
     is_single_track: bool,
-    total_song_length: usize,
+    mapping: MidiMapping,
+    sample_reach: &[u8],
     time_divisor: f32,
     instruments: &mut Vec<Instrument>,
     instrument: Option<usize>,
@@ -692,7 +923,7 @@ fn part_to_track(
         ParameterLSBSet,
     }
 
-    let is_drum_track = part.is_drums(is_single_track);
+    let is_drum_track = part.is_drums(is_single_track, mapping);
 
     let mut track = Track {
         name: String::new(),
@@ -708,12 +939,27 @@ fn part_to_track(
         instruments.push(new_instrument());
         instruments.len() - 1
     });
-    instruments[voice_idx].patch = sample_of(0);
+    let highest = part.keys().into_iter().max().unwrap_or(0);
+    instruments[voice_idx].patch = sample_of(0, mapping, highest, sample_reach);
     let mut set_bank_patch = false;
 
+    // A note's pitch, which plays the drum General MIDI has at that key on a drum track
+    let pitch_of_key = |key: u8| -> u8 {
+        if is_drum_track && mapping == MidiMapping::GeneralMidi {
+            let drum = key
+                .checked_sub(FIRST_GENERAL_MIDI_DRUM)
+                .and_then(|index| GENERAL_MIDI_DRUMS.get(index as usize))
+                .copied()
+                .flatten();
+            if let Some(drum) = drum {
+                return FIRST_DRUM_PITCH + drum;
+            }
+        }
+        pitch_of(key)
+    };
     // A note at least a tick long, as shorter ones round to nothing
     let note = |start: Note, end: usize, key: u8| Command::Note {
-        pitch: pitch_of(key),
+        pitch: pitch_of_key(key),
         velocity: start.vel,
         length: convert_time(end - start.time, time_divisor).max(1) as u16,
     };
@@ -766,7 +1012,7 @@ fn part_to_track(
                     put(time_cvt, Command::SegTrackTune { bend });
                 }
                 MidiMessage::ProgramChange { program } => {
-                    let patch = sample_of(program.as_int());
+                    let patch = sample_of(program.as_int(), mapping, highest, sample_reach);
                     if !set_bank_patch {
                         instruments[voice_idx].patch = patch;
                         set_bank_patch = true;
@@ -913,7 +1159,6 @@ fn part_to_track(
         ],
     );
 
-    track.commands.insert_end(total_song_length, Command::End);
     track.commands.shrink();
 
     // A long name is usually a comment or credit, so the region is called after its instrument instead
@@ -932,7 +1177,7 @@ fn convert_time(t: usize, time_divisor: f32) -> usize {
 /// An instrument for a track to play, until it chooses a program.
 fn new_instrument() -> Instrument {
     Instrument {
-        patch: sample_of(0),
+        patch: sample_of(0, MidiMapping::PaperMario, 0, &[]),
         pan: 64,
         volume: 100,
         ..Default::default()
@@ -1040,6 +1285,47 @@ mod test {
     }
 
     #[test]
+    fn general_midi_programs_and_drums() {
+        let raw = midi(
+            48,
+            vec![
+                vec![],
+                vec![
+                    (0, on(0, MidiMessage::ProgramChange { program: u7::new(0) })),
+                    (0, note_on(0, 60)),
+                    (48, note_off(0, 60)),
+                ],
+                vec![
+                    (0, note_on(9, 36)),
+                    (24, note_off(9, 36)),
+                    (24, note_on(9, 38)),
+                    (48, note_off(9, 38)),
+                ],
+            ],
+        );
+
+        let general = import(&raw, MidiMapping::GeneralMidi, &[]).unwrap();
+        let (piano, instrument) = track(&general, "#1");
+        assert!(!piano.is_drum_track);
+        // Acoustic grand piano plays Acoustic Piano 1, sample 35
+        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (2, 3));
+        let (drums, _) = track(&general, "#2");
+        assert!(drums.is_drum_track);
+        // Bass drum 1 and acoustic snare play the kit's kick 1 and snare 1
+        assert_eq!(
+            notes(drums),
+            vec![(0, FIRST_DRUM_PITCH, 24), (24, FIRST_DRUM_PITCH + 1, 24)]
+        );
+
+        let paper_mario = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        let (_, instrument) = track(&paper_mario, "#1");
+        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 0));
+        let (drums, _) = track(&paper_mario, "#2");
+        assert!(!drums.is_drum_track);
+        assert_eq!(notes(drums), vec![(0, pitch_of(36), 24), (24, pitch_of(38), 24)]);
+    }
+
+    #[test]
     fn a_key_starting_again_ends_its_note() {
         let raw = midi(
             48,
@@ -1048,7 +1334,7 @@ mod test {
                 vec![(0, note_on(0, 60)), (24, note_on(0, 60)), (48, note_off(0, 60))],
             ],
         );
-        let imported = import(&raw).unwrap();
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         let (lead, _) = track(&imported, "#1");
         assert_eq!(notes(lead), vec![(0, pitch_of(60), 24), (24, pitch_of(60), 24)]);
     }
@@ -1066,7 +1352,7 @@ mod test {
                 ],
             ],
         );
-        let imported = import(&raw).unwrap();
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(notes(track(&imported, "#0").0), vec![(0, pitch_of(60), 48)]);
         assert_eq!(notes(track(&imported, "#1").0), vec![(0, pitch_of(64), 48)]);
         let master = &imported.bgm.track_lists.values().next().unwrap().tracks[0];
@@ -1094,7 +1380,7 @@ mod test {
                 ],
             ],
         );
-        let imported = import(&raw).unwrap();
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(notes(track(&imported, "#1").0).len(), 2);
         assert_eq!(notes(track(&imported, "#1/ch2").0), vec![(0, pitch_of(40), 48)]);
     }
@@ -1105,7 +1391,7 @@ mod test {
         for _ in 0..17 {
             tracks.push(vec![(0, note_on(0, 60)), (48, note_off(0, 60))]);
         }
-        let imported = import(&midi(48, tracks)).unwrap();
+        let imported = import(&midi(48, tracks), MidiMapping::PaperMario, &[]).unwrap();
         let track_list = imported.bgm.track_lists.values().next().unwrap();
         let with_notes = track_list
             .tracks
@@ -1141,7 +1427,7 @@ mod test {
                 ],
             ],
         );
-        let imported = import(&raw).unwrap();
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         let (lead, _) = track(&imported, "#1");
         assert!(
             lead.commands
@@ -1153,7 +1439,7 @@ mod test {
     #[test]
     fn notes_shorter_than_a_tick_last_one() {
         let raw = midi(480, vec![vec![], vec![(0, note_on(0, 60)), (1, note_off(0, 60))]]);
-        let imported = import(&raw).unwrap();
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(notes(track(&imported, "#1").0), vec![(0, pitch_of(60), 1)]);
     }
 }

@@ -3,7 +3,9 @@ import { Report } from "pm64-typegen"
 import { useEffect, useState } from "react"
 
 import Bridge from "../bridge"
+import { sampleReach } from "../doc/pitchLimit"
 import { useDoc } from "../store"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
 import { pickMidi, readRememberedMidi, rememberMidi } from "../util/midiHandles"
 
 /** What went wrong in a reimport, shown in a dialog. A reimport that went fine says so in the tooltip for a moment. */
@@ -18,6 +20,7 @@ interface Problems {
  */
 export default function ReimportButton() {
     const [doc, docDispatch] = useDoc()
+    const sbn = useOptionalSoundBank()
     const [done, setDone] = useState<"Reimported" | "No changes" | null>(null)
     const [isHovered, setHovered] = useState(false)
     const [problems, setProblems] = useState<Problems | null>(null)
@@ -50,7 +53,7 @@ export default function ReimportButton() {
 
         const data = new Uint8Array(await file.arrayBuffer())
         const reimported: { bgm: typeof doc.bgm, base: Uint8Array, report: Report } | string =
-            Bridge.bgm_reimport(doc.bgm, doc.importBase, data, file.name)
+            Bridge.bgm_reimport(doc.bgm, doc.importBase, data, file.name, sbn ? sampleReach(sbn) : new Uint8Array())
         if (typeof reimported === "string") {
             setProblems({ title: "Couldn't reimport", lines: [reimported] })
             return

@@ -12,9 +12,10 @@ pub struct Imported {
     pub warnings: Vec<String>,
 }
 
-/// Makes a song from a MIDI file named `name`, linked to the file so that it can be reimported.
-pub fn import(raw: &[u8], name: &str) -> Result<Imported, Box<dyn Error>> {
-    let midi = midi::import(raw)?;
+/// Makes a song from a MIDI file named `name`, reading its programs and drum notes as `mapping` says, with
+/// `sample_reach` as [midi::import] has it, linked to the file so that it can be reimported.
+pub fn import(raw: &[u8], name: &str, mapping: MidiMapping, sample_reach: &[u8]) -> Result<Imported, Box<dyn Error>> {
+    let midi = midi::import(raw, mapping, sample_reach)?;
     let mut bgm = midi.bgm;
     let track_keys = padded(midi.track_keys);
     let base = timeline(&bgm, &track_keys)?;
@@ -26,6 +27,7 @@ pub fn import(raw: &[u8], name: &str) -> Result<Imported, Box<dyn Error>> {
         track_keys,
         base_hash: hash(&canonical(&base)),
         patch: Patch::default(),
+        mapping,
     });
     Ok(Imported {
         bgm,
@@ -150,11 +152,13 @@ fn cut(mut seq: CommandSeq, spans: &[Span]) -> Vec<CommandSeq> {
 
 /// Reimports the MIDI file `raw`, named `name`, into `bgm`. `base` is the last import, if it could be kept or rebuilt;
 /// without it, every note comes from the file and only the song's settings, sections and Mamar-only tracks are kept.
+/// `sample_reach` is as [midi::import] has it.
 pub fn reimport(
     bgm: &Bgm,
     base: Option<&Timeline>,
     raw: &[u8],
     name: &str,
+    sample_reach: &[u8],
 ) -> Result<(Bgm, Timeline, Report), Box<dyn Error>> {
     let link = bgm
         .import
@@ -172,7 +176,7 @@ pub fn reimport(
         return Ok((bgm.clone(), base, report));
     }
 
-    let new = midi::import(raw)?;
+    let new = midi::import(raw, link.mapping, sample_reach)?;
     report.problems.extend(new.warnings.iter().cloned());
     let their_keys = padded(new.track_keys.clone());
     let theirs = timeline(&new.bgm, &their_keys)?;
@@ -424,6 +428,7 @@ pub fn reimport(
         base_hash: hash(&canonical(&new_base)),
         track_keys: keys,
         patch: Patch::default(),
+        mapping: link.mapping,
     });
 
     Ok((out, new_base, report))
@@ -657,7 +662,7 @@ mod test {
     #[test]
     fn import_links_tracks_by_name() {
         let raw = midi(&[("Lead", notes(&[(0, 60)])), ("Bass", notes(&[(0, 36)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let link = imported.bgm.import.as_ref().unwrap();
         assert_eq!(link.track_keys[0].as_deref(), Some("master"));
         assert_eq!(link.track_keys[1].as_deref(), Some("Lead"));
@@ -676,7 +681,7 @@ mod test {
             ],
             &[],
         );
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let link = imported.bgm.import.as_ref().unwrap();
         assert_eq!(link.track_keys[1].as_deref(), Some("Lead"));
         assert_eq!(link.track_keys[2].as_deref(), Some("Bass"));
@@ -694,7 +699,7 @@ mod test {
             ],
             &[],
         );
-        let (bgm, _, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         assert_eq!(played(&bgm, "Lead"), vec![(0, 62)]);
         assert_eq!(played(&bgm, "Drums"), vec![(0, 38)]);
     }
@@ -702,7 +707,7 @@ mod test {
     #[test]
     fn unedited_song_has_an_empty_patch_and_rebuilds_its_base() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert!(
             with_patch(&imported.bgm, &imported.base)
                 .unwrap()
@@ -718,7 +723,7 @@ mod test {
     #[test]
     fn edited_song_rebuilds_its_base_after_saving() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             remove_note(seq, 62);
@@ -737,7 +742,7 @@ mod test {
     #[test]
     fn small_patch() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let unedited = rmp_serde::to_vec(imported.bgm.import.as_ref().unwrap()).unwrap();
         assert!(unedited.len() < 100, "{} bytes", unedited.len());
 
@@ -754,9 +759,17 @@ mod test {
     }
 
     #[test]
+    fn links_saved_before_general_midi_read_as_paper_mario_numbers() {
+        let saved = rmp_serde::to_vec(&(1u32, "song.mid", 2u32, vec![Some("Lead")], 3u32, Patch::default())).unwrap();
+        let link: ImportLink = rmp_serde::from_slice(&saved).unwrap();
+        assert_eq!(link.base_hash, 3);
+        assert_eq!(link.mapping, MidiMapping::PaperMario);
+    }
+
+    #[test]
     fn mamar_edits_survive_a_reimport() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             seq.insert_after(
@@ -773,7 +786,7 @@ mod test {
 
         // The source changes a note and adds one
         let v2 = midi(&[("Lead", notes(&[(0, 60), (48, 65), (96, 64), (144, 67)]))], &[]);
-        let (bgm, _, report) = reimport(&bgm, base.as_ref(), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&bgm, base.as_ref(), &v2, "song.mid", &[]).unwrap();
 
         assert_eq!(
             played(&bgm, "Lead"),
@@ -786,7 +799,7 @@ mod test {
     #[test]
     fn source_wins_when_both_change_a_note() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             remove_note(seq, 62);
@@ -804,7 +817,7 @@ mod test {
             &[("Lead", vec![(0, Ev::Note(60, 100, 24)), (48, Ev::Note(62, 100, 40))])],
             &[],
         );
-        let (bgm, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
 
         assert_eq!(played(&bgm, "Lead"), vec![(0, 60), (48, 62)]);
         assert!(
@@ -817,7 +830,7 @@ mod test {
     #[test]
     fn mamar_setup_wins() {
         let v1 = midi(&[("Lead", notes(&[(0, 60)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             let index = seq
@@ -828,7 +841,7 @@ mod test {
             seq.insert_after(0, Command::SubTrackVolume(20));
         });
         let v2 = midi(&[("Lead", notes(&[(0, 62)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         let keys = bgm.import.as_ref().unwrap().track_keys.clone();
         let volumes: Vec<Command> = timeline(&bgm, &keys).unwrap()["Lead"]
             .iter()
@@ -841,9 +854,9 @@ mod test {
     #[test]
     fn tracks_added_and_removed() {
         let v1 = midi(&[("Lead", notes(&[(0, 60)])), ("Bass", notes(&[(0, 36)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let v2 = midi(&[("Lead", notes(&[(0, 60)])), ("Pad", notes(&[(0, 48)]))], &[]);
-        let (bgm, _, report) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
 
         let keys = &bgm.import.as_ref().unwrap().track_keys;
         assert!(!keys.contains(&Some("Bass".to_string())));
@@ -855,8 +868,8 @@ mod test {
     #[test]
     fn unchanged_file() {
         let raw = midi(&[("Lead", notes(&[(0, 60)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
-        let (_, _, report) = reimport(&imported.bgm, Some(&imported.base), &raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
+        let (_, _, report) = reimport(&imported.bgm, Some(&imported.base), &raw, "song.mid", &[]).unwrap();
         assert!(report.unchanged);
     }
 
@@ -866,7 +879,7 @@ mod test {
             &[("Lead", notes(&[(0, 60), (96, 62), (192, 64), (288, 65)]))],
             &[(96, "Loop start"), (192, "section"), (288, "loop end")],
         );
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(
             subsegs(&imported.bgm),
             vec!["section", "loop start", "section", "section", "loop end", "section"]
@@ -883,14 +896,14 @@ mod test {
     #[test]
     fn sections_made_in_mamar_are_kept() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (96, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         bgm.split_variation_at(0, 96);
         let (bgm, base) = save_and_open(&bgm, &imported.base);
         assert!(base.is_some());
 
         let v2 = midi(&[("Lead", notes(&[(0, 60), (96, 63), (192, 65)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, base.as_ref(), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, base.as_ref(), &v2, "song.mid", &[]).unwrap();
         assert_eq!(subsegs(&bgm), vec!["section", "section"]);
         assert_eq!(played(&bgm, "Lead"), vec![(0, 60), (96, 63), (192, 65)]);
     }
@@ -898,7 +911,7 @@ mod test {
     #[test]
     fn tracks_made_in_mamar_are_kept() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         let Segment::Subseg { track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[0] else {
             panic!()
@@ -913,7 +926,7 @@ mod test {
         .into();
 
         let v2 = midi(&[("Lead", notes(&[(0, 61), (48, 62)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         let track = &bgm.track_lists[&track_list].tracks[5];
         assert_eq!(track.alternate_for, Some(1));
         assert!(
@@ -928,7 +941,7 @@ mod test {
     #[test]
     fn tracks_varying_by_mix_are_left_alone() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         let Segment::Subseg { track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[0] else {
             panic!()
@@ -941,7 +954,7 @@ mod test {
         let before = bgm.track_lists[&track_list].tracks[1].commands.clone();
 
         let v2 = midi(&[("Lead", notes(&[(0, 61), (48, 62)]))], &[]);
-        let (after, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (after, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         assert_eq!(after.track_lists[&track_list].tracks[1].commands, before);
         assert!(
             report.problems.iter().any(|problem| problem.contains("proximity mix")),
@@ -953,12 +966,12 @@ mod test {
     #[test]
     fn markers_in_the_new_file_set_the_sections() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (96, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let v2 = midi(
             &[("Lead", notes(&[(0, 60), (96, 62), (192, 64)]))],
             &[(96, "loop start"), (192, "loop end")],
         );
-        let (bgm, base, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, base, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         assert_eq!(
             subsegs(&bgm),
             vec!["section", "loop start", "section", "loop end", "section"]
@@ -1025,7 +1038,7 @@ mod test {
             smf.write_std(&mut bytes).unwrap();
             bytes
         };
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(played(&imported.bgm, "ch1"), vec![(0, 60)]);
         assert_eq!(played(&imported.bgm, "ch10"), vec![(0, 36)]);
         let drums = track_index(&imported.bgm, "ch10");
@@ -1035,7 +1048,7 @@ mod test {
     #[test]
     fn rebuild_fails_cleanly_when_the_song_changed_outside_mamar() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut saved = imported.bgm.clone();
         saved.import = with_patch(&imported.bgm, &imported.base);
         // Changed without updating the patch, as a recording switch left in by opening without the ROM would

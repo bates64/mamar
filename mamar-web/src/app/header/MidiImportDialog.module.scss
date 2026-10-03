@@ -1,0 +1,16 @@
+// A choice's name, with what it means under it
+.option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+
+.description {
+    font-size: 12px;
+    color: var(--spectrum-gray-700);
+}
+
+.fileName {
+    font-family: var(--spectrum-code-font-family, monospace);
+}
