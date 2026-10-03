@@ -352,7 +352,7 @@ fn compress_edited_tracks() {
             }
         }
         for (id, track_list) in &edited.track_lists {
-            let voices = track_list.voices(&edited.branches);
+            let voices = track_list.voices(&edited.branches, None);
             assert!(
                 voices.total_given() <= MAX_VOICES,
                 "{name}: track list {id} is given {} voices",

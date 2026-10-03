@@ -1,8 +1,10 @@
-import { Bgm, TrackList, VoiceReport, Voices } from "pm64-typegen"
+import { Bgm, Releases, TrackList, VoiceReport, Voices } from "pm64-typegen"
 import { getUntrackedObject } from "react-tracked"
 
 import Bridge from "../bridge"
 import { useBgm, useLocation } from "../store"
+import { useOptionalSoundBank } from "../util/hooks/useSoundBank"
+import { releasesOf } from "../util/soundBank"
 
 /** Voices the game has for a phrase's tracks, as in pm64. */
 export const MAX_VOICES = 24
@@ -13,16 +15,17 @@ export const MAX_VOICES = 24
  */
 export const MUSIC_VOICES = 16
 
-/** Voice reports already worked out for each track list, by the branches and mix they were worked out for. */
-const reportCache = new WeakMap<TrackList, { branches: Bgm["branches"], mix: number, report: VoiceReport }>()
+/** Voice reports already worked out for each track list, by the branches, mix, and releases they were worked out for. */
+const reportCache = new WeakMap<TrackList, { branches: Bgm["branches"], mix: number, releases: Releases | null, report: VoiceReport }>()
 
 /**
- * The voices each track of track list `trackListId` needs and gets, and where each needs them, as the mix being
- * listened to plays it.
+ * The voices each track of track list `trackListId` needs and gets, with notes ringing on as the sound bank's
+ * instruments let them, and where each needs them, as the mix being listened to plays it.
  */
 export function useVoiceReport(trackListId: number): VoiceReport | undefined {
     const [bgm] = useBgm()
     const [{ mix }] = useLocation()
+    const sbn = useOptionalSoundBank()
     const tracked = bgm?.track_lists[trackListId]
     if (!tracked || !bgm) {
         return undefined
@@ -30,12 +33,14 @@ export function useVoiceReport(trackListId: number): VoiceReport | undefined {
     // The objects under react-tracked's proxies are the same while the track list and branches are
     const trackList = getUntrackedObject(tracked) ?? tracked
     const branches = getUntrackedObject(bgm.branches) ?? bgm.branches
+    // Read through the proxies, so a change to what the releases come from works the report out again
+    const releases = sbn && [bgm.instruments, bgm.drums, bgm.aux_banks] ? releasesOf(sbn, getUntrackedObject(bgm) ?? bgm) : null
     const cached = reportCache.get(trackList)
-    if (cached?.branches === branches && cached.mix === mix) {
+    if (cached?.branches === branches && cached.mix === mix && cached.releases === releases) {
         return cached.report
     }
-    const report: VoiceReport = Bridge.track_list_voice_report(trackList, branches, mix)
-    reportCache.set(trackList, { branches, mix, report })
+    const report: VoiceReport = Bridge.track_list_voice_report(trackList, branches, mix, releases)
+    reportCache.set(trackList, { branches, mix, releases, report })
     return report
 }
 

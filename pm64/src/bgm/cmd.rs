@@ -828,29 +828,39 @@ impl CommandSeq {
         self.vec.into_iter().map(|e| e.command).collect()
     }
 
-    /// When each note this sequence plays holds a voice, as (start, end) ticks. Detours are followed, and each branch
-    /// plays option `option`, or its first if it has no such option.
-    pub fn note_spans(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, usize)> {
-        let mut spans = Vec::new();
+    /// The commands this sequence plays, with when, in order. Detours are followed, and each branch plays option
+    /// `option`, or its first if it has no such option.
+    pub fn played(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, Command)> {
+        let mut played = Vec::new();
         for (time, event) in self.playback(branches) {
             match event.command {
-                Command::Note { length, .. } => spans.push((time, time + length as usize)),
                 Command::Branch { branch } => {
                     let options = branches.get(&branch).map(|branch| &branch.options);
                     if let Some(chosen) = options.and_then(|options| options.get(option).or(options.first())) {
-                        spans.extend(
+                        played.extend(
                             chosen
                                 .commands
-                                .note_spans(branches, option)
+                                .played(branches, option)
                                 .into_iter()
-                                .map(|(start, end)| (time + start, time + end)),
+                                .map(|(start, command)| (time + start, command)),
                         );
                     }
                 }
-                _ => {}
+                command => played.push((time, command)),
             }
         }
-        spans
+        played
+    }
+
+    /// When each note this sequence plays holds a voice, as (start, end) ticks. See [CommandSeq::played].
+    pub fn note_spans(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, usize)> {
+        self.played(branches, option)
+            .into_iter()
+            .filter_map(|(time, command)| match command {
+                Command::Note { length, .. } => Some((time, time + length as usize)),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Shortens each note held a little into a note that starts after it, so it ends as that note starts, as the

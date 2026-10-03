@@ -1,6 +1,8 @@
 import { Bgm, Command, Event, PatchAddress, Track, TrackList } from "pm64-typegen"
 import { getUntrackedObject } from "react-tracked"
 
+import { releasesOf } from "./soundBank"
+
 import Bridge from "../bridge"
 import { timeline } from "../doc/lanes"
 import { highestPitch, recordingsOf, Sample, sampleOf } from "../doc/pitchLimit"
@@ -325,11 +327,13 @@ function withMixFadePoints(bgm: Bgm): Bgm {
 }
 
 /**
- * Encodes the song as the game plays it, switching between recordings of each track's instrument as it needs when the
- * user's sound bank is known, and with the points where tracks fade to their volumes in a proximity mix.
+ * Encodes the song as the game plays it, switching between recordings of each track's instrument as it needs and
+ * giving tracks voices for their notes to ring on with when the user's sound bank is known, and with the points where
+ * tracks fade to their volumes in a proximity mix.
  */
 export function encodeForGame(bgm: Bgm, sbn: ArrayBuffer | null): Uint8Array {
-    const encoded: Uint8Array | string = Bridge.bgm_encode(withMixFadePoints(sbn ? addRecordings(bgm, sbn) : bgm))
+    const song = withMixFadePoints(sbn ? addRecordings(bgm, sbn) : bgm)
+    const encoded: Uint8Array | string = Bridge.bgm_encode(song, sbn ? releasesOf(sbn, song) : null)
     if (typeof encoded === "string") {
         throw new Error(encoded)
     }

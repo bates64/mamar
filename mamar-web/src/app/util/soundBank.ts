@@ -1,4 +1,4 @@
-import { Envelope, PatchAddress } from "pm64-typegen"
+import { Bgm, Envelope, PatchAddress, Releases } from "pm64-typegen"
 
 import Bridge from "../bridge"
 
@@ -154,4 +154,23 @@ export function instrumentOffset(sbn: ArrayBuffer, patch: PatchAddress, auxBanks
 /** The envelopes the instrument `patch` plays can play with, or null if it isn't in one of the banks it can be in. */
 export function envelopesOf(sbn: ArrayBuffer, patch: PatchAddress, auxBanks: string[] = []): Envelope[] | null {
     return bankOf(sbn).envelopes(patch, auxBanks)
+}
+
+/** The releases worked out last, which are kept while they come out the same, so what depends on them is kept too. */
+let lastReleases: Releases | null = null
+const releasesCache = new WeakMap<Bgm, Releases>()
+
+/** How long the notes of `bgm` ring on after they end, with its instruments as the sound bank has them. */
+export function releasesOf(sbn: ArrayBuffer, bgm: Bgm): Releases {
+    const cached = releasesCache.get(bgm)
+    if (cached) {
+        return cached
+    }
+    let releases: Releases = Bridge.bgm_releases(bgm, bankOf(sbn))
+    if (lastReleases && JSON.stringify(lastReleases) === JSON.stringify(releases)) {
+        releases = lastReleases
+    }
+    lastReleases = releases
+    releasesCache.set(bgm, releases)
+    return releases
 }

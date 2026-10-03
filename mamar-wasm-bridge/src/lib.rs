@@ -56,12 +56,15 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
     }
 }
 
+/// Encodes `bgm`, giving tracks voices for their notes to ring on with as `releases` says, if it isn't null. See
+/// [Bgm::encode_with_releases].
 #[wasm_bindgen]
-pub fn bgm_encode(bgm: &JsValue) -> JsValue {
+pub fn bgm_encode(bgm: &JsValue, releases: &JsValue) -> JsValue {
     let bgm: Bgm = from_js(bgm);
+    let releases: Option<Releases> = from_js(releases);
 
     let mut f = Cursor::new(Vec::new());
-    match bgm.encode(&mut f) {
+    match bgm.encode_with_releases(&mut f, releases.as_ref()) {
         Ok(_) => {
             let data: Vec<u8> = f.into_inner();
             let arr = js_sys::Uint8Array::new_with_length(data.len() as u32);
@@ -132,13 +135,14 @@ pub fn commands_place(commands: &JsValue, id: u32, time: usize, command: &JsValu
     to_js(&commands)
 }
 
-/// Returns the voices each track of `track_list` needs and gets, and where each needs them as proximity mix `mix`
-/// plays it. See [TrackList::voice_report].
+/// Returns the voices each track of `track_list` needs and gets, given `releases` if it isn't null, and where each
+/// needs them as proximity mix `mix` plays it. See [TrackList::voice_report].
 #[wasm_bindgen]
-pub fn track_list_voice_report(track_list: &JsValue, branches: &JsValue, mix: usize) -> JsValue {
+pub fn track_list_voice_report(track_list: &JsValue, branches: &JsValue, mix: usize, releases: &JsValue) -> JsValue {
     let track_list: TrackList = from_js(track_list);
     let branches: BTreeMap<BranchId, Branch> = from_js(branches);
-    to_js(&track_list.voice_report(&branches, mix))
+    let releases: Option<Releases> = from_js(releases);
+    to_js(&track_list.voice_report(&branches, mix, releases.as_ref()))
 }
 
 /// Returns `commands` with notes held a little into the next shortened. See [CommandSeq::trim_short_overlaps].
@@ -329,4 +333,12 @@ impl WasmSoundBank {
     pub fn envelopes(&self, patch: &JsValue, aux_banks: &JsValue) -> JsValue {
         to_js(&self.0.envelopes(&from_js(patch), &from_js::<Vec<String>>(aux_banks)))
     }
+}
+
+/// Returns how long the notes of `bgm` ring on after they end, with its instruments as `bank` has them. See
+/// [Bgm::releases].
+#[wasm_bindgen]
+pub fn bgm_releases(bgm: &JsValue, bank: &WasmSoundBank) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    to_js(&bgm.releases(&bank.0))
 }

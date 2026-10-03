@@ -73,7 +73,7 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
             if (!doc) {
                 throw new Error("No song is open")
             }
-            const bgmBin: Uint8Array | string = Bridge.bgm_encode(doc.bgm)
+            const bgmBin: Uint8Array | string = Bridge.bgm_encode(doc.bgm, null)
             if (typeof bgmBin === "string") {
                 throw new Error(bgmBin)
             }
