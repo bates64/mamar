@@ -240,7 +240,7 @@ impl TrackList {
 
     /// Voices each track needs, and gets. Tracks as decoded keep the voices they were stored with, to encode as they
     /// were. If the phrase needs more than [MAX_VOICES], voices are taken, one at a time, from the track that cuts off
-    /// the fewest more notes without it.
+    /// the fewest more notes without it, counting drums' notes half, and taking tracks' last voices last.
     pub fn voices(&self, branches: &BTreeMap<BranchId, Branch>) -> Voices {
         let spans = self.spans_by_mix(branches);
         let need_of = |index: usize| {
@@ -292,10 +292,24 @@ impl TrackList {
                 .max()
                 .unwrap_or(0)
         };
+        // A drum hit cut short is hardly heard, so drums' cuts count half, as vanilla songs give their drums fewer
+        // voices than they need more often than other tracks. A track's last voice goes last, as without it the track
+        // plays nothing.
+        let cost = |index: usize, voices: u8| {
+            let more = cuts(index, voices - 1) - cuts(index, voices);
+            (
+                voices == 1,
+                if self.tracks[index].is_drum_track {
+                    more
+                } else {
+                    more * 2
+                },
+            )
+        };
         while given.iter().map(|&voices| voices as usize).sum::<usize>() > MAX_VOICES {
             let cheapest = (0..16)
                 .filter(|&index| !is_fixed(index) && given[index] > 0)
-                .min_by_key(|&index| cuts(index, given[index] - 1) - cuts(index, given[index]));
+                .min_by_key(|&index| cost(index, given[index]));
             match cheapest {
                 Some(index) => given[index] -= 1,
                 None => break,
@@ -348,6 +362,12 @@ mod test {
 
         let voices = track_list.voices(&BTreeMap::new());
         assert_eq!(voices.total_needed(), 28);
+        assert_eq!(voices.total_given(), MAX_VOICES);
+
+        // As drums, the last track gives up its voices first, all but its last
+        track_list.tracks[7].is_drum_track = true;
+        let voices = track_list.voices(&BTreeMap::new());
+        assert_eq!(voices.given[7], 1);
         assert_eq!(voices.total_given(), MAX_VOICES);
     }
 
