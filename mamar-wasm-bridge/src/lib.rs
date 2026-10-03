@@ -132,12 +132,22 @@ pub fn commands_place(commands: &JsValue, id: u32, time: usize, command: &JsValu
     to_js(&commands)
 }
 
-/// Returns the voices each track of `track_list` needs and gets. See [TrackList::voices].
+/// Returns the voices each track of `track_list` needs and gets, and where each needs them as proximity mix `mix`
+/// plays it. See [TrackList::voice_report].
 #[wasm_bindgen]
-pub fn track_list_voices(track_list: &JsValue, branches: &JsValue) -> JsValue {
+pub fn track_list_voice_report(track_list: &JsValue, branches: &JsValue, mix: usize) -> JsValue {
     let track_list: TrackList = from_js(track_list);
-    let branches: std::collections::BTreeMap<BranchId, Branch> = from_js(branches);
-    to_js(&track_list.voices(&branches))
+    let branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    to_js(&track_list.voice_report(&branches, mix))
+}
+
+/// Returns `commands` with notes held a little into the next shortened. See [CommandSeq::trim_short_overlaps].
+#[wasm_bindgen]
+pub fn commands_trim_short_overlaps(commands: &JsValue, branches: &JsValue) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    let branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    commands.trim_short_overlaps(&branches);
+    to_js(&commands)
 }
 
 /// Returns what `commands` play in proximity mix `mix`. See [CommandSeq::for_mix].

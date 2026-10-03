@@ -14,7 +14,8 @@ import { SegmentStart } from "./snap"
 import SongLanes from "./SongLanes"
 import TimeGrid from "./TimeGrid"
 import TrackMeter from "./TrackMeter"
-import { MAX_VOICES, total, useVoices } from "./voices"
+import { VoiceBadge } from "./VoiceBudget"
+import { useVoiceReport } from "./voices"
 
 import Bridge from "../bridge"
 import TrackControls from "../emu/TrackControls"
@@ -42,7 +43,7 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
     const [location] = useLocation()
     const trackList = bgm?.track_lists[trackListIndex]
     const shownIndex = isAlternatePart ? (trackList && alternatePartOf(trackList, trackIndex)) : trackIndex
-    const voices = useVoices(trackListIndex)
+    const voices = useVoiceReport(trackListIndex)?.voices
     const track = shownIndex !== undefined ? trackList?.tracks[shownIndex] : undefined
     const isSelected = doc?.panelContent.type === "tracker" && doc?.panelContent.trackList === trackListIndex &&
         doc?.panelContent.track === trackIndex && location.alternateParts === isAlternatePart &&
@@ -90,10 +91,6 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                 [styles.drumRegion]: track.is_drum_track,
                 [styles.disabledRegion]: track.is_disabled,
                 [styles.showsVersion]: isVersion,
-                // Vanilla tracks often have fewer voices than notes at once, letting a note cut off the end of the one
-                // before, so this only warns when the segment needs more voices than the game has
-                [styles.shortOfVoices]: voices !== undefined && total(voices.needed) > MAX_VOICES &&
-                    voices.given[shownIndex] < voices.needed[shownIndex],
                 [styles.selected]: isSelected,
             })}
             onClick={handlePress}
@@ -109,6 +106,8 @@ function PianoRollThumbnail({ trackIndex, trackListIndex, segmentIndex, isAltern
                 {/* A region without a name of its own is called after its instrument */}
                 {track.name || instrumentName}
             </div>}
+            {/* Alternate parts play on the voices of the tracks they're for */}
+            {voices && <VoiceBadge voices={voices} index={track.alternate_for ?? shownIndex} />}
         </div>
     }
 }

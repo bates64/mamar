@@ -853,6 +853,24 @@ impl CommandSeq {
         spans
     }
 
+    /// Shortens each note held a little into a note that starts after it, so it ends as that note starts, as the
+    /// overlap makes the track need another voice. See [short_overlaps](super::short_overlaps). Detours are written
+    /// out first. Returns how many notes were shortened.
+    pub fn trim_short_overlaps(&mut self, branches: &BTreeMap<BranchId, Branch>) -> usize {
+        *self = self.without_detours();
+        let lengths: HashMap<Id, usize> = super::short_overlaps(&super::voices::own_notes(self, branches))
+            .into_iter()
+            .collect();
+        for event in &mut self.vec {
+            if let Command::Note { length, .. } = &mut event.command
+                && let Some(&trimmed) = lengths.get(&event.id)
+            {
+                *length = trimmed as u16;
+            }
+        }
+        lengths.len()
+    }
+
     /// Splits this sequence at the given time such that self is the 'before `time`' sequence and the returned
     /// sequence is the 'after `time`' sequence. Adjusts Wait commands on the boundaries to keep the sum len_time
     /// the same as before this was called.
