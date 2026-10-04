@@ -92,7 +92,8 @@ impl PianoRoll {
     pub fn set_viewport(&mut self, width_css_px: f64, height_css_px: f64, dpr: f64) {
         self.vw = width_css_px.max(0.0);
         self.vh = height_css_px.max(0.0);
-        self.dpr = dpr.max(1.0);
+        // Below 1 when the browser is zoomed out, which the canvas is sized for
+        self.dpr = dpr;
         // Resizing a canvas clears it
         self.dirty = true;
     }
