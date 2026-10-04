@@ -953,6 +953,8 @@ enum Setting {
     CoarseTune,
     FineTune,
     PitchBend,
+    /// Starting or stopping tremolo.
+    Tremolo,
     /// The sample, which overriding the patch sets.
     Patch,
     /// Choosing one of the song's instruments, which sets its sample, volume, pan, reverb and tuning too.
@@ -974,6 +976,7 @@ impl Setting {
             Command::SubTrackCoarseTune(_) => Setting::CoarseTune,
             Command::SubTrackFineTune(_) => Setting::FineTune,
             Command::SegTrackTune { .. } => Setting::PitchBend,
+            Command::TrackTremolo { .. } | Command::TrackTremoloStop => Setting::Tremolo,
             Command::SetTrackVoice { .. } => Setting::Instrument,
             Command::TrackOverridePatch(_) => Setting::Patch,
             _ => return None,

@@ -644,6 +644,7 @@ mod test {
     /// A MIDI event at a tick, at 48 ticks per beat like the game.
     enum Ev {
         Note(u32, u8, u32),
+        Controller(u8, u8),
     }
 
     /// Writes a MIDI file: a master track holding `markers`, then each track named and holding its events.
@@ -703,6 +704,13 @@ mod test {
                         ));
                         track.push((*tick + *len, midi(MidiMessage::NoteOff { key, vel: u7::new(0) })));
                     }
+                    Ev::Controller(controller, value) => track.push((
+                        *tick,
+                        midi(MidiMessage::Controller {
+                            controller: u7::new(*controller),
+                            value: u7::new(*value),
+                        }),
+                    )),
                 }
             }
             all.push(finish(track));
@@ -925,7 +933,7 @@ mod test {
     }
 
     #[test]
-    fn songs_imported_before_loudness_was_normalized_get_it_on_reimport() {
+    fn songs_imported_before_get_starting_values_in_their_instruments_on_reimport() {
         // The commands the Lead track starts with, but its instrument, and the volume, pan and reverb of its instrument
         let start = |bgm: &Bgm| {
             let track = &bgm.track_lists.values().next().unwrap().tracks[track_index(bgm, "Lead")];
@@ -945,20 +953,27 @@ mod test {
             });
             (setup, instrument)
         };
-        let lead = |second: u32| midi(&[("Lead", notes(&[(0, 60), (48, second)]))], &[]);
+        let lead = |second: u32| {
+            let mut events = vec![(0, Ev::Controller(10, 20))];
+            events.extend(notes(&[(0, 60), (48, second)]));
+            midi(&[("Lead", events)], &[])
+        };
 
-        // As Mamar imported songs before: instruments as they were made
+        // As Mamar imported songs before: instruments as they were made, and the file's pan after the instrument
         let mut bgm = import(&lead(62), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
         bgm.import.as_mut().unwrap().instruments.clear();
         for instrument in &mut bgm.instruments {
             instrument.volume = midi::INSTRUMENT_VOLUME;
+            instrument.pan = 64;
         }
+        edit(&mut bgm, "Lead", |seq| seq.insert_after(0, Command::SubTrackPan(20)));
 
         let (bgm, _, _) = reimport(&bgm, None, &lead(64), "song.mid", &[]).unwrap();
         let fresh = import(&lead(64), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
+        assert_eq!(start(&fresh).0, vec![]);
         assert_ne!(
             start(&fresh).1,
-            Some((midi::INSTRUMENT_VOLUME, 64, 0)),
+            Some((midi::INSTRUMENT_VOLUME, 20, 0)),
             "loudness is normalized"
         );
         assert_eq!(start(&bgm), start(&fresh));

@@ -1301,21 +1301,33 @@ fn part_to_track(
         log::warn!("{} unended notes", started_notes.len());
     }
 
+    // What the track starts with goes in its instrument, which sets it all at once
+    let instrument = &mut instruments[voice_idx];
+    timed.retain(|(time, command)| {
+        if *time != 0 {
+            return true;
+        }
+        match *command {
+            Command::SubTrackVolume(volume) => instrument.volume = volume,
+            Command::SubTrackPan(pan) => instrument.pan = pan,
+            Command::SubTrackReverb(reverb) => instrument.reverb = reverb,
+            Command::TrackOverridePatch(ref patch) => instrument.patch = patch.clone(),
+            // A track starts without bending or wavering
+            Command::SegTrackTune { bend: 0 } | Command::TrackTremolo { speed: 0, .. } => {}
+            _ => return true,
+        }
+        false
+    });
+
     timed.sort_by_key(|(time, _)| *time);
     for (time, command) in timed {
         track.commands.insert_end(time, command);
     }
 
     // Required else the game crashes D:
-    track.commands.insert_many_start(
-        0,
-        vec![
-            Command::SubTrackReverb(0),
-            Command::SubTrackVolume(100),
-            Command::SubTrackPan(64),
-            Command::SetTrackVoice { index: voice_idx as u8 },
-        ],
-    );
+    track
+        .commands
+        .insert_many_start(0, vec![Command::SetTrackVoice { index: voice_idx as u8 }]);
 
     track.commands.shrink();
 
@@ -1344,7 +1356,7 @@ fn new_instrument() -> Instrument {
 
 #[cfg(test)]
 mod test {
-    use midly::num::{u4, u7, u15, u24, u28};
+    use midly::num::{u4, u7, u14, u15, u24, u28};
     use midly::{Header, Timing, TrackEvent};
 
     use super::*;
@@ -1612,9 +1624,9 @@ mod test {
             ],
         );
         let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
-        let (lead, _) = track(&imported, "#1");
-        // The volumes as set, the last two being the channel volume and that with its expression, scaled alike to play
-        // as loud as vanilla songs do
+        let (lead, instrument) = track(&imported, "#1");
+        // The channel volume, which the track starts with, so its instrument has it, and that with its expression
+        // later, scaled alike to play as loud as vanilla songs do
         let volumes: Vec<u8> = lead
             .commands
             .iter()
@@ -1623,8 +1635,56 @@ mod test {
                 _ => None,
             })
             .collect();
-        let (channel, expressed) = (volumes[volumes.len() - 2] as f32, volumes[volumes.len() - 1] as f32);
+        assert_eq!(volumes.len(), 1, "{volumes:?}");
+        let (channel, expressed) = (instrument.volume as f32, volumes[0] as f32);
         assert!((expressed - channel * 64.0 / 127.0).abs() <= 1.0, "{volumes:?}");
+    }
+
+    #[test]
+    fn tracks_start_with_only_their_instrument() {
+        let control = |controller: u8, value: u8| {
+            on(
+                0,
+                MidiMessage::Controller {
+                    controller: u7::new(controller),
+                    value: u7::new(value),
+                },
+            )
+        };
+        let raw = midi(
+            48,
+            vec![
+                vec![],
+                vec![
+                    (0, on(0, MidiMessage::ProgramChange { program: u7::new(1) })),
+                    (0, control(10, 20)),
+                    (0, control(1, 0)),
+                    (
+                        0,
+                        on(
+                            0,
+                            MidiMessage::PitchBend {
+                                bend: midly::PitchBend(u14::new(0x2000)),
+                            },
+                        ),
+                    ),
+                    (0, on(0, MidiMessage::ProgramChange { program: u7::new(5) })),
+                    (0, note_on(0, 60)),
+                    (48, note_off(0, 60)),
+                ],
+            ],
+        );
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        let (lead, instrument) = track(&imported, "#1");
+        let start: Vec<Command> = lead
+            .commands
+            .iter()
+            .take_while(|event| !matches!(event.command, Command::Note { .. } | Command::Delay(_)))
+            .map(|event| event.command.clone())
+            .collect();
+        assert!(matches!(start[..], [Command::SetTrackVoice { .. }]), "{start:?}");
+        assert_eq!(instrument.pan, 20);
+        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 5));
     }
 
     #[test]
