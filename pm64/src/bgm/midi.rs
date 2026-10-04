@@ -240,7 +240,7 @@ pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<M
                 .collect()
         })
         .collect();
-    let total_song_length = convert_time(
+    let mut total_song_length = convert_time(
         tracks
             .iter()
             .filter_map(|track| track.last().map(|(time, _)| *time))
@@ -306,6 +306,16 @@ pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<M
         .any(|event| matches!(&event.command, Command::TrackOverridePatch(patch) if plays_aux(patch)));
     if overrides_aux || bgm.instruments.iter().any(|instrument| plays_aux(&instrument.patch)) {
         bgm.aux_banks = vec![GENERAL_MIDI_AUX_BANK.to_string()];
+    }
+    // A file that writes its loop out again at its end plays it with a loop instead, as the game's songs do
+    if markers.is_empty()
+        && let Some((start, end)) = written_out_repeat(&track_list, total_song_length)
+    {
+        for track in &mut track_list.tracks {
+            track.commands.split_at(end);
+        }
+        total_song_length = end;
+        markers = vec![(start, SectionMarker::LoopStart), (end, SectionMarker::LoopEnd)];
     }
     let track_list_id = bgm.add_track_list(track_list);
 
@@ -774,6 +784,51 @@ fn put_drums_last(track_list: &mut TrackList, track_keys: &mut [Option<String>])
         track_list.tracks[to] = tracks[from].clone();
         track_keys[to] = keys[from].clone();
     }
+}
+
+/// The shortest end of a song, in beats, that [written_out_repeat] takes for a loop written out again.
+const SHORTEST_REPEAT_BEATS: usize = 32;
+
+/// Where `track_list`, `length` ticks long, starts a passage that its end repeats, and where that repeat starts, both
+/// on beats, if its end repeats one. A file whose music loops often writes the loop out twice, as a MIDI file can't
+/// loop, often playing it a little differently the second time, so the repeat need only play the same notes, but for
+/// their velocities, at the same tempo. It's the repeat that starts earliest, from the passage that starts earliest.
+fn written_out_repeat(track_list: &TrackList, length: usize) -> Option<(usize, usize)> {
+    // The notes and tempos in each beat, as when in the beat and on which track, as the pitch and length of a note or
+    // the tempo
+    let beats = length.div_ceil(TICKS_PER_BEAT);
+    let mut contents: Vec<Vec<(usize, usize, u8, u16)>> = vec![Vec::new(); beats];
+    for (index, track) in track_list.tracks.iter().enumerate() {
+        for (time, event) in track.commands.iter_time() {
+            let played = match event.command {
+                Command::Note { pitch, length, .. } => (pitch, length),
+                Command::MasterTempo(bpm) => (0, bpm),
+                _ => continue,
+            };
+            if time < length {
+                contents[time / TICKS_PER_BEAT].push((time % TICKS_PER_BEAT, index, played.0, played.1));
+            }
+        }
+    }
+
+    // The beats from `end` play what the beats from `start` do, up to the song's end
+    let repeats = |start: usize, end: usize| {
+        (0..beats - end).all(|beat| {
+            let (source, repeat) = (&contents[start + beat], &contents[end + beat]);
+            let last = end + beat == beats - 1;
+            // The song might end partway through its last beat
+            let in_song =
+                |&&(time, ..): &&(usize, usize, u8, u16)| !last || (end + beat) * TICKS_PER_BEAT + time < length;
+            source.iter().filter(in_song).eq(repeat.iter())
+        })
+    };
+    (1..=beats.saturating_sub(SHORTEST_REPEAT_BEATS))
+        .find_map(|end| {
+            (0..end)
+                .find(|&start| !contents[start].is_empty() && repeats(start, end))
+                .map(|start| (start, end))
+        })
+        .map(|(start, end)| (start * TICKS_PER_BEAT, end * TICKS_PER_BEAT))
 }
 
 /// Splits variation 0 at each section marker and adds the loops they mark. Returns whether there were any.
@@ -1707,6 +1762,45 @@ mod test {
         assert_eq!(volumes.len(), 1, "{volumes:?}");
         let (channel, expressed) = (instrument.volume as f32, volumes[0] as f32);
         assert!((expressed - channel * 64.0 / 127.0).abs() <= 1.0, "{volumes:?}");
+    }
+
+    #[test]
+    fn a_loop_written_out_twice_is_a_loop() {
+        // A beat of intro, then 32 beats of a tune, then the tune again, louder
+        let tune = |from: u32, velocity: u8| {
+            (0..32u32).flat_map(move |beat| {
+                let key = 60 + (beat % 7) as u8;
+                let on = on(
+                    0,
+                    MidiMessage::NoteOn {
+                        key: u7::new(key),
+                        vel: u7::new(velocity),
+                    },
+                );
+                [(from + beat * 48, on), (from + beat * 48 + 24, note_off(0, key))]
+            })
+        };
+        let mut events = vec![(0, note_on(0, 48)), (24, note_off(0, 48))];
+        events.extend(tune(48, 80));
+        events.extend(tune(48 + 32 * 48, 110));
+        let imported = import(&midi(48, vec![vec![], events]), MidiMapping::PaperMario, &[]).unwrap();
+
+        let bgm = &imported.bgm;
+        let segments = &bgm.variations[0].as_ref().unwrap().segments;
+        let lengths: Vec<usize> = segments
+            .iter()
+            .filter_map(|segment| match segment {
+                Segment::Subseg { track_list, .. } => Some(bgm.track_lists[track_list].len_time(&bgm.branches)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(lengths, vec![48, 32 * 48]);
+        assert!(
+            segments
+                .iter()
+                .any(|segment| matches!(segment, Segment::EndLoop { iter_count: 0, .. }))
+        );
+        assert!(imported.has_section_markers);
     }
 
     #[test]

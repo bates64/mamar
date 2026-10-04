@@ -429,6 +429,26 @@ pub fn reimport(
     // The sections to cut the timeline into, in the order they play: the new file's, if it marks them, else the song's
     let their_spans = spans(&new.bgm)?;
     let new_len: usize = their_spans.iter().map(|span| span.len).sum();
+    let past_end: usize = ours
+        .iter()
+        .map(|(key, track)| {
+            difference(track, base.get(key).unwrap_or(&empty))
+                .iter()
+                .filter(|timed| timed.tick as usize >= new_len)
+                .count()
+        })
+        .sum();
+    if past_end > 0 {
+        let edits = if past_end == 1 {
+            "1 edit".to_string()
+        } else {
+            format!("{past_end} edits")
+        };
+        report.problems.push(format!(
+            "{edits} made in Mamar after where the MIDI file now ends were removed. If its end repeated an \
+             earlier part, the song now loops back to that part instead."
+        ));
+    }
     let use_markers = new.has_section_markers && !branching.contains(&true);
     if new.has_section_markers && !use_markers {
         report
@@ -977,6 +997,38 @@ mod test {
             "loudness is normalized"
         );
         assert_eq!(start(&bgm), start(&fresh));
+    }
+
+    #[test]
+    fn edits_past_a_new_loop_are_reported() {
+        // A beat of intro and a 32-beat tune, then the tune again in the new version of the file
+        let file = |second: &dyn Fn(u32) -> u32| {
+            let mut notes_at = vec![(0, 48)];
+            notes_at.extend((1..33).map(|beat| (beat * 48, 60 + beat % 7)));
+            notes_at.extend((33..65).map(|beat| (beat * 48, second(beat))));
+            midi(&[("Lead", notes(&notes_at))], &[])
+        };
+        let v1 = file(&|_| 72);
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
+        let mut bgm = imported.bgm.clone();
+        edit(&mut bgm, "Lead", |seq| {
+            seq.insert_after(
+                60 * 48 + 24,
+                Command::Note {
+                    pitch: 80 + 104,
+                    velocity: 100,
+                    length: 12,
+                },
+            )
+        });
+
+        let v2 = file(&|beat| 60 + (beat - 32) % 7);
+        let (_, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
+        assert!(
+            report.problems.iter().any(|problem| problem.starts_with("1 edit made")),
+            "{:?}",
+            report.problems
+        );
     }
 
     #[test]
