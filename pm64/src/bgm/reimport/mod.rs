@@ -19,7 +19,9 @@ mod merge;
 pub use merge::{Imported, import, reimport};
 
 /// Names a source track: "master" for the master track, the MIDI track's name if no other track in the file has it,
-/// `ch1` to `ch16` for the channels of a single-track file, or else `#` and its position, such as `#3`.
+/// `ch1` to `ch16` for the channels of a single-track file, or else `#` and its position, such as `#3`. A MIDI track
+/// that plays on several channels is split into a track for each: the channel it plays the most notes on has its key,
+/// and the others have the key and the channel, such as `#3/ch2`.
 pub type TrackKey = String;
 
 /// The MIDI file a song was imported from, and what Mamar has changed since.
