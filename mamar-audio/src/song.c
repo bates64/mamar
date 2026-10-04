@@ -60,6 +60,12 @@ u8* mamar_audio_bgm_buffer(void) {
     return MamarBGM;
 }
 
+/// The most bytes the host can write into the buffer `mamar_audio_bgm_buffer` gives.
+__attribute__((export_name("mamar_audio_bgm_max_size")))
+s32 mamar_audio_bgm_max_size(void) {
+    return MAMAR_BGM_MAX_SIZE;
+}
+
 /// How many aux banks a song can load its own instruments from.
 __attribute__((export_name("mamar_audio_aux_bank_count")))
 s32 mamar_audio_aux_bank_count(void) {

@@ -1,10 +1,13 @@
-import { ActionButton, ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
+import { ActionButton, Content, ContextualHelp, Heading, ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
+import Alert from "@spectrum-icons/workflow/Alert"
+import { Bgm } from "pm64-typegen"
 import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext, useState } from "react"
 import { Play, Repeat, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
 import SnapControl, { ZoomControls } from "./SnapControl"
-import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition } from "./SongPlayer"
+import useSongPlayer, { PlayerStatus, SongPlayer, SongPosition, useMaxSongSize } from "./SongPlayer"
+import { songTooBig } from "./songSize"
 
 import { CYCLE_DESCRIPTION } from "../doc/CycleRegion"
 import { CONTEXT as PLAYHEAD_CONTEXT, Context as PlayheadContext, PlayheadPosition, useTimeline } from "../doc/Playhead"
@@ -31,6 +34,7 @@ function SongLoader({ player, playing, timeline, songPosition }: {
     const bgm = doc?.bgm ?? null
     const activeVariation = doc?.activeVariation ?? -1
     const loaded = useRef<{ playing: typeof playing, variation: number } | null>(null)
+    const maxSongSize = useMaxSongSize()
 
     useEffect(() => {
         if (!bgm || activeVariation < 0 || !playing) {
@@ -47,12 +51,50 @@ function SongLoader({ player, playing, timeline, songPosition }: {
             }
         }
         loaded.current = { playing, variation: activeVariation }
-        player.load(encodeForGame(bgm, sbn), activeVariation, start, auxBankIndexes(sbn, bgm.aux_banks))
+        const encoded = encodeForGame(bgm, sbn)
+        // A song too big to play is left unplayed, which SongSizeWarning explains
+        if (maxSongSize !== null && encoded.length > maxSongSize) {
+            return
+        }
+        player.load(encoded, activeVariation, start, auxBankIndexes(sbn, bgm.aux_banks))
     // timeline and songPosition change as the song does, which bgm tracks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [player, bgm, activeVariation, playing])
+    }, [player, bgm, activeVariation, playing, maxSongSize])
 
     return null
+}
+
+/** How long after the song last changed to measure it, in milliseconds, as encoding a big song takes a moment. */
+const SIZE_CHECK_DELAY = 500
+
+/** Warns that the song is too big for the game to load, so it won't play. */
+function SongSizeWarning({ bgm }: { bgm: Bgm }) {
+    const sbn = useOptionalSoundBank()
+    const maxSongSize = useMaxSongSize()
+    const [size, setSize] = useState<number | null>(null)
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            try {
+                setSize(encodeForGame(bgm, sbn).length)
+            } catch {
+                setSize(null)
+            }
+        }, SIZE_CHECK_DELAY)
+        return () => clearTimeout(timeout)
+    }, [bgm, sbn])
+
+    if (size === null || maxSongSize === null || size <= maxSongSize) {
+        return null
+    }
+    return <div className={styles.sizeWarning} role="status">
+        <Alert size="S" UNSAFE_className={styles.sizeWarningIcon} />
+        Too big to play
+        <ContextualHelp variant="info">
+            <Heading>Song too big</Heading>
+            <Content>{songTooBig(size, maxSongSize)}</Content>
+        </ContextualHelp>
+    </div>
 }
 
 /**
@@ -307,5 +349,6 @@ export default function PlaybackControls() {
             <span className={styles.divider} aria-hidden="true" />
             <ZoomControls />
         </div>
+        <SongSizeWarning bgm={bgm} />
     </View>
 }

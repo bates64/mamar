@@ -14,6 +14,7 @@ export default class WasmSongPlayer implements SongPlayer {
     private readonly trackMutes: TrackMute[] = new Array(16).fill("none")
     private readonly listeners = new Set<(status: PlayerStatus) => void>()
     readonly auxBankCount: Promise<number>
+    readonly maxSongSize: Promise<number>
     private onReady!: (ready: AudioEngineReady) => void
 
     /**
@@ -21,7 +22,9 @@ export default class WasmSongPlayer implements SongPlayer {
      * engine to play them with, if not Mamar's own, such as one built from a mod's copy of papermario-dx.
      */
     constructor(sbn: ArrayBuffer, engine?: ArrayBuffer) {
-        this.auxBankCount = new Promise<AudioEngineReady>(resolve => this.onReady = resolve).then(ready => ready.auxBankCount)
+        const ready = new Promise<AudioEngineReady>(resolve => this.onReady = resolve)
+        this.auxBankCount = ready.then(ready => ready.auxBankCount)
+        this.maxSongSize = ready.then(ready => ready.maxSongSize)
         this.node = this.start(sbn, engine)
         this.node.catch(error => console.error("Couldn't start the audio engine", error))
     }

@@ -189,3 +189,15 @@
     display: flex;
     gap: 2px;
 }
+
+.sizeWarning {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--spectrum-orange-700);
+    white-space: nowrap;
+}
+
+.sizeWarningIcon {
+    color: inherit;
+}
