@@ -1000,14 +1000,7 @@ mod test {
         let v1 = midi(&[("Lead", notes(&[(0, 60)]))], &[]);
         let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
-        edit(&mut bgm, "Lead", |seq| {
-            let index = seq
-                .iter()
-                .position(|event| matches!(event.command, Command::SubTrackVolume(_)))
-                .unwrap();
-            seq.clear_command(index);
-            seq.insert_after(0, Command::SubTrackVolume(20));
-        });
+        edit(&mut bgm, "Lead", |seq| seq.insert_after(0, Command::SubTrackVolume(20)));
         let v2 = midi(&[("Lead", notes(&[(0, 62)]))], &[]);
         let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         let keys = bgm.import.as_ref().unwrap().track_keys.clone();

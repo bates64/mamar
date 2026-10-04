@@ -619,12 +619,12 @@ impl CommandSeq {
                 Command::Delay(_) | Command::Note { .. } => latest.clear(),
                 command => {
                     if let Some(setting) = Setting::of(command) {
-                        if let Some(entry) = latest.iter_mut().find(|(other, _)| *other == setting) {
-                            replaced[entry.1] = true;
-                            entry.1 = i;
-                        } else {
-                            latest.push((setting, i));
-                        }
+                        latest.retain(|&(other, index)| {
+                            let is_replaced = setting.replaces(other);
+                            replaced[index] |= is_replaced;
+                            !is_replaced
+                        });
+                        latest.push((setting, i));
                     }
                 }
             }
@@ -953,7 +953,9 @@ enum Setting {
     CoarseTune,
     FineTune,
     PitchBend,
-    /// Choosing one of the song's instruments and overriding the patch each replace the other
+    /// The sample, which overriding the patch sets.
+    Patch,
+    /// Choosing one of the song's instruments, which sets its sample, volume, pan, reverb and tuning too.
     Instrument,
 }
 
@@ -972,9 +974,25 @@ impl Setting {
             Command::SubTrackCoarseTune(_) => Setting::CoarseTune,
             Command::SubTrackFineTune(_) => Setting::FineTune,
             Command::SegTrackTune { .. } => Setting::PitchBend,
-            Command::SetTrackVoice { .. } | Command::TrackOverridePatch(_) => Setting::Instrument,
+            Command::SetTrackVoice { .. } => Setting::Instrument,
+            Command::TrackOverridePatch(_) => Setting::Patch,
             _ => return None,
         })
+    }
+
+    /// Whether setting `self` replaces an earlier `other`.
+    fn replaces(self, other: Setting) -> bool {
+        self == other
+            || self == Setting::Instrument
+                && matches!(
+                    other,
+                    Setting::Patch
+                        | Setting::Volume
+                        | Setting::Pan
+                        | Setting::Reverb
+                        | Setting::CoarseTune
+                        | Setting::FineTune
+                )
     }
 }
 
@@ -1448,6 +1466,12 @@ mod test {
 
     #[test]
     fn shrink_removes_replaced_settings() {
+        let patch = PatchAddress {
+            bank_set: crate::bgm::BankSetIndex::Music,
+            bank: 0,
+            instrument: 1,
+            envelope: 3,
+        };
         let note = || Command::Note {
             pitch: 0x90,
             velocity: 100,
@@ -1466,13 +1490,15 @@ mod test {
             Command::SubTrackPan(40),
             Command::Delay(10),
             Command::SubTrackPan(40),
+            Command::Delay(10),
+            // Overriding the patch leaves the instrument's volume, pan, reverb and tuning
+            Command::SetTrackVoice { index: 2 },
+            Command::TrackOverridePatch(patch.clone()),
         ]);
         seq.shrink();
         assert_eq!(
             seq.to_command_vec(),
             vec![
-                Command::SubTrackVolume(100),
-                Command::SubTrackPan(20),
                 Command::SetTrackVoice { index: 1 },
                 note(),
                 Command::SubTrackPan(30),
@@ -1480,6 +1506,9 @@ mod test {
                 Command::SubTrackPan(40),
                 Command::Delay(10),
                 Command::SubTrackPan(40),
+                Command::Delay(10),
+                Command::SetTrackVoice { index: 2 },
+                Command::TrackOverridePatch(patch),
             ]
         );
     }
