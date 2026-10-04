@@ -1,6 +1,7 @@
 // Runs papermario-dx's audio engine, compiled to WebAssembly by mamar-audio, on the audio thread.
 
 import type { SongCycle, SongPosition } from "./SongPlayer"
+import { maxSongSize } from "./songSize"
 
 declare const currentTime: number
 declare const sampleRate: number
@@ -42,6 +43,8 @@ export interface AudioEngineStatus {
 export interface AudioEngineReady {
     /** How many aux banks a song can load its own instruments from. */
     auxBankCount: number
+    /** The most bytes a song can be to play. */
+    maxSongSize: number
 }
 
 interface Exports {
@@ -50,6 +53,7 @@ interface Exports {
     mamar_audio_output(): number
     mamar_audio_render_frame(): number
     mamar_audio_bgm_buffer(): number
+    mamar_audio_bgm_max_size?(): number
     mamar_audio_play(size: number, variation: number, startSegment: number, startTick: number): void
     mamar_audio_aux_bank_count(): number
     mamar_audio_set_aux_bank(slot: number, fileIndex: number): void
@@ -102,7 +106,10 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
         })
         this.engine = instance.exports as unknown as Exports
         this.engine.mamar_audio_init()
-        this.port.postMessage({ auxBankCount: this.engine.mamar_audio_aux_bank_count() } satisfies AudioEngineReady)
+        this.port.postMessage({
+            auxBankCount: this.engine.mamar_audio_aux_bank_count(),
+            maxSongSize: maxSongSize(this.engine),
+        } satisfies AudioEngineReady)
 
         this.port.onmessage = ({ data }: MessageEvent<AudioEngineMessage>) => this.onMessage(data)
     }
@@ -111,6 +118,10 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
         const { engine } = this
         switch (message.type) {
         case "play":
+            // A song too big for the engine's buffer would write past its end
+            if (message.bgm.length > maxSongSize(engine)) {
+                break
+            }
             new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), message.bgm.length).set(message.bgm)
             this.song = { size: message.bgm.length, variation: message.variation }
             for (let slot = 0; slot < engine.mamar_audio_aux_bank_count(); slot++) {

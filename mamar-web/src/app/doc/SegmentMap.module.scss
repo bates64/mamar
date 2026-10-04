@@ -57,7 +57,8 @@ $versionHeight: 40px;
     background: linear-gradient(var(--color-500) 0%, var(--color-400) 100%);
     color: #ffffffee;
     border-radius: 6px;
-    overflow: hidden;
+    // Clipped, as hidden would make it a scroll container, which its voice badge would stick to instead of the timeline
+    overflow: clip;
 
     height: $trackHeight;
 
@@ -71,6 +72,13 @@ $versionHeight: 40px;
 
     .segmentName {
         padding: 6px 10px;
+    }
+
+    // Stuck to the timeline's left edge while the region runs past it, as far as the region's end
+    .stickyName {
+        display: inline-block;
+        position: sticky;
+        left: 10px;
     }
 
     // A name from the region's instrument, as it has none of its own
@@ -88,12 +96,6 @@ $versionHeight: 40px;
         }
     }
 
-    // Some of its notes are cut off, as its segment needs more voices than the game has
-    &.shortOfVoices {
-        outline: 2px solid var(--spectrum-orange-600);
-        outline-offset: -2px;
-    }
-
     &.drumRegion {
         --color-500: var(--spectrum-seafoam-700);
         --color-400: var(--spectrum-seafoam-600);
@@ -107,7 +109,8 @@ $versionHeight: 40px;
     }
 }
 
-.pianoRollThumbnail svg {
+// The notes, not the icons over them
+.pianoRollThumbnail > svg {
     width: calc(100% - 12px);
     height: calc(100% - 12px);
 

@@ -10,6 +10,7 @@ import { CONTEXT as PLAYHEAD_CONTEXT } from "./Playhead"
 import { usePickup, useTicksPerBar } from "./Ruler"
 import { useMixCommands } from "./segmentTracks"
 import { SNAP_NAMES, useSnap } from "./snap"
+import { useVoiceReport, voiceProblem } from "./voices"
 
 import Bridge from "../bridge"
 import { useBgm, useDoc, useLocation } from "../store"
@@ -125,7 +126,7 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
     const rendererRef = useRef<Renderer | null>(null)
     const rafRef = useRef<number>(0)
     const [, docDispatch] = useDoc()
-    const [, dispatch] = useBgm()
+    const [bgm, dispatch] = useBgm()
     const [snapSetting, snap, grid] = useSnap()
     const ticksPerBar = useTicksPerBar()
     const pickup = usePickup()
@@ -286,6 +287,19 @@ function Canvas({ trackListId, trackIndex, track, branches, mix, segmentStart, p
         // Bar 1 starts after the pickup, so a segment's bars start where the song's do
         rendererRef.current?.set_bars(ticksPerBar, (((pickup - segmentStart) % ticksPerBar) + ticksPerBar) % ticksPerBar)
     }, [ticksPerBar, pickup, segmentStart])
+
+    // While this track is short of voices or plays on voices sound effects share, mark the notes where it needs the most.
+    // Alternate parts play on the voices of the tracks they're for.
+    const report = useVoiceReport(trackListId)
+    const voiceIndex = track.alternate_for ?? trackIndex
+    const trackList = bgm?.track_lists[trackListId]
+    // A track that needs only one voice has nothing to mark: each note is its busiest
+    const busiestKey = report && trackList && voiceProblem(trackList, report.voices, voiceIndex) && report.voices.needed[voiceIndex] > 1
+        ? report.tracks[trackIndex].busiest_notes.join()
+        : ""
+    useEffect(() => {
+        rendererRef.current?.set_busiest_notes(new Uint32Array(busiestKey ? busiestKey.split(",").map(Number) : []))
+    }, [busiestKey])
 
     const selectedKey = selectedIds.join()
     useEffect(() => {

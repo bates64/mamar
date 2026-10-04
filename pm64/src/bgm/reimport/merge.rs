@@ -12,9 +12,10 @@ pub struct Imported {
     pub warnings: Vec<String>,
 }
 
-/// Makes a song from a MIDI file named `name`, linked to the file so that it can be reimported.
-pub fn import(raw: &[u8], name: &str) -> Result<Imported, Box<dyn Error>> {
-    let midi = midi::import(raw)?;
+/// Makes a song from a MIDI file named `name`, reading its programs and drum notes as `mapping` says, with
+/// `sample_reach` as [midi::import] has it, linked to the file so that it can be reimported.
+pub fn import(raw: &[u8], name: &str, mapping: MidiMapping, sample_reach: &[u8]) -> Result<Imported, Box<dyn Error>> {
+    let midi = midi::import(raw, mapping, sample_reach)?;
     let mut bgm = midi.bgm;
     let track_keys = padded(midi.track_keys);
     let base = timeline(&bgm, &track_keys)?;
@@ -26,6 +27,8 @@ pub fn import(raw: &[u8], name: &str) -> Result<Imported, Box<dyn Error>> {
         track_keys,
         base_hash: hash(&canonical(&base)),
         patch: Patch::default(),
+        mapping,
+        instruments: starting_instruments(&base, &bgm.instruments),
     });
     Ok(Imported {
         bgm,
@@ -45,10 +48,42 @@ fn is_setup(timed: &Timed) -> bool {
         && matches!(
             timed.command,
             Command::SetTrackVoice { .. }
+                | Command::TrackOverridePatch(_)
                 | Command::SubTrackVolume(_)
                 | Command::SubTrackPan(_)
                 | Command::SubTrackReverb(_)
         )
+}
+
+/// The index of the instrument `track` starts with, if it chooses one.
+fn starting_voice(track: &[Timed]) -> Option<usize> {
+    track
+        .iter()
+        .filter(|timed| is_setup(timed))
+        .find_map(|timed| match timed.command {
+            Command::SetTrackVoice { index } => Some(index as usize),
+            _ => None,
+        })
+}
+
+/// The sample `track` starts with in place of its instrument's, if it overrides it.
+fn starting_override(track: &[Timed]) -> Option<PatchAddress> {
+    track
+        .iter()
+        .filter(|timed| is_setup(timed))
+        .rev()
+        .find_map(|timed| match &timed.command {
+            Command::TrackOverridePatch(patch) => Some(patch.clone()),
+            _ => None,
+        })
+}
+
+/// The instrument each track of `timeline` starts with, of `instruments`.
+fn starting_instruments(timeline: &Timeline, instruments: &[Instrument]) -> BTreeMap<TrackKey, Instrument> {
+    timeline
+        .iter()
+        .filter_map(|(key, track)| Some((key.clone(), instruments.get(starting_voice(track)?)?.clone())))
+        .collect()
 }
 
 /// What makes two commands the same place in a track: a note's pitch, or anything else's kind.
@@ -89,8 +124,31 @@ fn remove_near(track: &mut Vec<Timed>, timed: &Timed) {
 /// Merges one track: the source's version, with Mamar's edits applied where the source didn't change the same slot.
 /// Returns the merged track and how many edits were dropped.
 fn merge_track(base: &[Timed], ours: &[Timed], theirs: &[Timed]) -> (Vec<Timed>, usize) {
-    // The song's setup goes first, as the import's did
-    let mut track: Vec<Timed> = ours.iter().filter(|timed| is_setup(timed)).cloned().collect();
+    // Setup goes first, as the import's did: the song's if Mamar changed it, else the file's. Either way the instrument
+    // is the song's, as it's an index into the song's instruments.
+    let is_voice = |timed: &&Timed| matches!(timed.command, Command::SetTrackVoice { .. });
+    let our_setup: Vec<Timed> = ours.iter().filter(|timed| is_setup(timed)).cloned().collect();
+    let base_setup = base.iter().filter(|timed| is_setup(timed));
+    let mut track: Vec<Timed> = if our_setup
+        .iter()
+        .filter(|timed| !is_voice(timed))
+        .eq(base_setup.filter(|timed| !is_voice(timed)))
+    {
+        let our_voice = our_setup.iter().find(is_voice);
+        theirs
+            .iter()
+            .filter(|timed| is_setup(timed))
+            .filter_map(|timed| {
+                if is_voice(&timed) {
+                    our_voice.cloned()
+                } else {
+                    Some(timed.clone())
+                }
+            })
+            .collect()
+    } else {
+        our_setup
+    };
     let mut merged: Vec<Timed> = theirs.iter().filter(|timed| !is_setup(timed)).cloned().collect();
     let mut dropped = 0;
 
@@ -150,11 +208,13 @@ fn cut(mut seq: CommandSeq, spans: &[Span]) -> Vec<CommandSeq> {
 
 /// Reimports the MIDI file `raw`, named `name`, into `bgm`. `base` is the last import, if it could be kept or rebuilt;
 /// without it, every note comes from the file and only the song's settings, sections and Mamar-only tracks are kept.
+/// `sample_reach` is as [midi::import] has it.
 pub fn reimport(
     bgm: &Bgm,
     base: Option<&Timeline>,
     raw: &[u8],
     name: &str,
+    sample_reach: &[u8],
 ) -> Result<(Bgm, Timeline, Report), Box<dyn Error>> {
     let link = bgm
         .import
@@ -172,7 +232,7 @@ pub fn reimport(
         return Ok((bgm.clone(), base, report));
     }
 
-    let new = midi::import(raw)?;
+    let new = midi::import(raw, link.mapping, sample_reach)?;
     report.problems.extend(new.warnings.iter().cloned());
     let their_keys = padded(new.track_keys.clone());
     let theirs = timeline(&new.bgm, &their_keys)?;
@@ -257,6 +317,55 @@ pub fn reimport(
         }
     }
 
+    // The instrument each merged track starts with takes the file's values where Mamar didn't change them
+    let their_instruments = starting_instruments(&theirs, &new.bgm.instruments);
+    for index in (0..16).filter(|&index| fresh[index].is_some()) {
+        let Some(key) = &keys[index] else { continue };
+        let our_track = ours.get(key).map_or(&[][..], Vec::as_slice);
+        let base_track = base.get(key).map_or(&[][..], Vec::as_slice);
+        let Some(theirs) = their_instruments.get(key) else {
+            continue;
+        };
+        let Some(voice) = starting_voice(our_track) else {
+            // A track that starts without choosing an instrument takes the file's, before anything Mamar set
+            out.instruments.push(theirs.clone());
+            let voice = Command::SetTrackVoice {
+                index: (out.instruments.len() - 1) as u8,
+            };
+            if let Some(track) = &mut merged[index] {
+                track.insert(
+                    0,
+                    Timed {
+                        tick: 0,
+                        command: voice,
+                    },
+                );
+            }
+            continue;
+        };
+        let Some(instrument) = out.instruments.get_mut(voice) else {
+            continue;
+        };
+        let (base_patch, base_volume, base_pan, base_reverb) = match link.instruments.get(key) {
+            Some(base) => (Some(base.patch.clone()), base.volume, base.pan, base.reverb),
+            None => (starting_override(base_track), midi::INSTRUMENT_VOLUME, 64, 0),
+        };
+        if base_patch
+            .is_some_and(|patch| starting_override(our_track).unwrap_or_else(|| instrument.patch.clone()) == patch)
+        {
+            instrument.patch = theirs.patch.clone();
+        }
+        if instrument.volume == base_volume {
+            instrument.volume = theirs.volume;
+        }
+        if instrument.pan == base_pan {
+            instrument.pan = theirs.pan;
+        }
+        if instrument.reverb == base_reverb {
+            instrument.reverb = theirs.reverb;
+        }
+    }
+
     // Tracks new in the file go in free tracks
     let mut added_tracks: Vec<(usize, usize)> = Vec::new(); // (song track, new import's track)
     for (their_index, key) in added {
@@ -289,6 +398,28 @@ pub fn reimport(
         added_tracks.push((index, their_index));
     }
 
+    // The file's samples in an aux bank need the song to load it into the same aux bank
+    for (index, bank) in new
+        .bgm
+        .aux_banks
+        .iter()
+        .enumerate()
+        .filter(|(_, bank)| !bank.is_empty())
+    {
+        if out.aux_banks.len() <= index {
+            out.aux_banks.resize(index + 1, String::new());
+        }
+        if out.aux_banks[index].is_empty() {
+            out.aux_banks[index] = bank.clone();
+        } else if out.aux_banks[index] != *bank {
+            report.problems.push(format!(
+                "The MIDI file plays samples from {bank}, which aux bank {} would need to load, but it loads {}.",
+                index + 1,
+                out.aux_banks[index]
+            ));
+        }
+    }
+
     if dropped > 0 {
         report.problems.push(format!(
             "{dropped} edits made in Mamar were overwritten by the MIDI file, which changed the same notes."
@@ -298,6 +429,26 @@ pub fn reimport(
     // The sections to cut the timeline into, in the order they play: the new file's, if it marks them, else the song's
     let their_spans = spans(&new.bgm)?;
     let new_len: usize = their_spans.iter().map(|span| span.len).sum();
+    let past_end: usize = ours
+        .iter()
+        .map(|(key, track)| {
+            difference(track, base.get(key).unwrap_or(&empty))
+                .iter()
+                .filter(|timed| timed.tick as usize >= new_len)
+                .count()
+        })
+        .sum();
+    if past_end > 0 {
+        let edits = if past_end == 1 {
+            "1 edit".to_string()
+        } else {
+            format!("{past_end} edits")
+        };
+        report.problems.push(format!(
+            "{edits} made in Mamar after where the MIDI file now ends were removed. If its end repeated an \
+             earlier part, the song now loops back to that part instead."
+        ));
+    }
     let use_markers = new.has_section_markers && !branching.contains(&true);
     if new.has_section_markers && !use_markers {
         report
@@ -424,6 +575,8 @@ pub fn reimport(
         base_hash: hash(&canonical(&new_base)),
         track_keys: keys,
         patch: Patch::default(),
+        mapping: link.mapping,
+        instruments: their_instruments,
     });
 
     Ok((out, new_base, report))
@@ -511,6 +664,7 @@ mod test {
     /// A MIDI event at a tick, at 48 ticks per beat like the game.
     enum Ev {
         Note(u32, u8, u32),
+        Controller(u8, u8),
     }
 
     /// Writes a MIDI file: a master track holding `markers`, then each track named and holding its events.
@@ -570,6 +724,13 @@ mod test {
                         ));
                         track.push((*tick + *len, midi(MidiMessage::NoteOff { key, vel: u7::new(0) })));
                     }
+                    Ev::Controller(controller, value) => track.push((
+                        *tick,
+                        midi(MidiMessage::Controller {
+                            controller: u7::new(*controller),
+                            value: u7::new(*value),
+                        }),
+                    )),
                 }
             }
             all.push(finish(track));
@@ -657,7 +818,7 @@ mod test {
     #[test]
     fn import_links_tracks_by_name() {
         let raw = midi(&[("Lead", notes(&[(0, 60)])), ("Bass", notes(&[(0, 36)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let link = imported.bgm.import.as_ref().unwrap();
         assert_eq!(link.track_keys[0].as_deref(), Some("master"));
         assert_eq!(link.track_keys[1].as_deref(), Some("Lead"));
@@ -667,9 +828,42 @@ mod test {
     }
 
     #[test]
+    fn import_puts_drums_last_and_reimport_finds_them() {
+        let v1 = midi(
+            &[
+                ("Drums", notes(&[(0, 36)])),
+                ("Lead", notes(&[(0, 60)])),
+                ("Bass", notes(&[(0, 36)])),
+            ],
+            &[],
+        );
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
+        let link = imported.bgm.import.as_ref().unwrap();
+        assert_eq!(link.track_keys[1].as_deref(), Some("Lead"));
+        assert_eq!(link.track_keys[2].as_deref(), Some("Bass"));
+        assert_eq!(link.track_keys[3].as_deref(), Some("Drums"));
+        let Segment::Subseg { track_list, .. } = imported.bgm.variations[0].as_ref().unwrap().segments[0] else {
+            panic!()
+        };
+        assert!(imported.bgm.track_lists[&track_list].tracks[3].is_drum_track);
+
+        let v2 = midi(
+            &[
+                ("Drums", notes(&[(0, 38)])),
+                ("Lead", notes(&[(0, 62)])),
+                ("Bass", notes(&[(0, 36)])),
+            ],
+            &[],
+        );
+        let (bgm, _, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
+        assert_eq!(played(&bgm, "Lead"), vec![(0, 62)]);
+        assert_eq!(played(&bgm, "Drums"), vec![(0, 38)]);
+    }
+
+    #[test]
     fn unedited_song_has_an_empty_patch_and_rebuilds_its_base() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert!(
             with_patch(&imported.bgm, &imported.base)
                 .unwrap()
@@ -685,7 +879,7 @@ mod test {
     #[test]
     fn edited_song_rebuilds_its_base_after_saving() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             remove_note(seq, 62);
@@ -704,7 +898,7 @@ mod test {
     #[test]
     fn small_patch() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let unedited = rmp_serde::to_vec(imported.bgm.import.as_ref().unwrap()).unwrap();
         assert!(unedited.len() < 100, "{} bytes", unedited.len());
 
@@ -721,9 +915,17 @@ mod test {
     }
 
     #[test]
+    fn links_saved_before_general_midi_read_as_paper_mario_numbers() {
+        let saved = rmp_serde::to_vec(&(1u32, "song.mid", 2u32, vec![Some("Lead")], 3u32, Patch::default())).unwrap();
+        let link: ImportLink = rmp_serde::from_slice(&saved).unwrap();
+        assert_eq!(link.base_hash, 3);
+        assert_eq!(link.mapping, MidiMapping::PaperMario);
+    }
+
+    #[test]
     fn mamar_edits_survive_a_reimport() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62), (96, 64)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             seq.insert_after(
@@ -740,7 +942,7 @@ mod test {
 
         // The source changes a note and adds one
         let v2 = midi(&[("Lead", notes(&[(0, 60), (48, 65), (96, 64), (144, 67)]))], &[]);
-        let (bgm, _, report) = reimport(&bgm, base.as_ref(), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&bgm, base.as_ref(), &v2, "song.mid", &[]).unwrap();
 
         assert_eq!(
             played(&bgm, "Lead"),
@@ -751,9 +953,88 @@ mod test {
     }
 
     #[test]
+    fn songs_imported_before_get_starting_values_in_their_instruments_on_reimport() {
+        // The commands the Lead track starts with, but its instrument, and the volume, pan and reverb of its instrument
+        let start = |bgm: &Bgm| {
+            let track = &bgm.track_lists.values().next().unwrap().tracks[track_index(bgm, "Lead")];
+            let setup: Vec<Command> = track
+                .commands
+                .iter()
+                .take_while(|event| !matches!(event.command, Command::Delay(_) | Command::Note { .. }))
+                .filter(|event| !matches!(event.command, Command::SetTrackVoice { .. }))
+                .map(|event| event.command.clone())
+                .collect();
+            let instrument = track.commands.iter().find_map(|event| match event.command {
+                Command::SetTrackVoice { index } => {
+                    let instrument = &bgm.instruments[index as usize];
+                    Some((instrument.volume, instrument.pan, instrument.reverb))
+                }
+                _ => None,
+            });
+            (setup, instrument)
+        };
+        let lead = |second: u32| {
+            let mut events = vec![(0, Ev::Controller(10, 20))];
+            events.extend(notes(&[(0, 60), (48, second)]));
+            midi(&[("Lead", events)], &[])
+        };
+
+        // As Mamar imported songs before: instruments as they were made, and the file's pan after the instrument
+        let mut bgm = import(&lead(62), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
+        bgm.import.as_mut().unwrap().instruments.clear();
+        for instrument in &mut bgm.instruments {
+            instrument.volume = midi::INSTRUMENT_VOLUME;
+            instrument.pan = 64;
+        }
+        edit(&mut bgm, "Lead", |seq| seq.insert_after(0, Command::SubTrackPan(20)));
+
+        let (bgm, _, _) = reimport(&bgm, None, &lead(64), "song.mid", &[]).unwrap();
+        let fresh = import(&lead(64), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
+        assert_eq!(start(&fresh).0, vec![]);
+        assert_ne!(
+            start(&fresh).1,
+            Some((midi::INSTRUMENT_VOLUME, 20, 0)),
+            "loudness is normalized"
+        );
+        assert_eq!(start(&bgm), start(&fresh));
+    }
+
+    #[test]
+    fn edits_past_a_new_loop_are_reported() {
+        // A beat of intro and a 32-beat tune, then the tune again in the new version of the file
+        let file = |second: &dyn Fn(u32) -> u32| {
+            let mut notes_at = vec![(0, 48)];
+            notes_at.extend((1..33).map(|beat| (beat * 48, 60 + beat % 7)));
+            notes_at.extend((33..65).map(|beat| (beat * 48, second(beat))));
+            midi(&[("Lead", notes(&notes_at))], &[])
+        };
+        let v1 = file(&|_| 72);
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
+        let mut bgm = imported.bgm.clone();
+        edit(&mut bgm, "Lead", |seq| {
+            seq.insert_after(
+                60 * 48 + 24,
+                Command::Note {
+                    pitch: 80 + 104,
+                    velocity: 100,
+                    length: 12,
+                },
+            )
+        });
+
+        let v2 = file(&|beat| 60 + (beat - 32) % 7);
+        let (_, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
+        assert!(
+            report.problems.iter().any(|problem| problem.starts_with("1 edit made")),
+            "{:?}",
+            report.problems
+        );
+    }
+
+    #[test]
     fn source_wins_when_both_change_a_note() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         edit(&mut bgm, "Lead", |seq| {
             remove_note(seq, 62);
@@ -771,7 +1052,7 @@ mod test {
             &[("Lead", vec![(0, Ev::Note(60, 100, 24)), (48, Ev::Note(62, 100, 40))])],
             &[],
         );
-        let (bgm, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
 
         assert_eq!(played(&bgm, "Lead"), vec![(0, 60), (48, 62)]);
         assert!(
@@ -784,18 +1065,11 @@ mod test {
     #[test]
     fn mamar_setup_wins() {
         let v1 = midi(&[("Lead", notes(&[(0, 60)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
-        edit(&mut bgm, "Lead", |seq| {
-            let index = seq
-                .iter()
-                .position(|event| matches!(event.command, Command::SubTrackVolume(_)))
-                .unwrap();
-            seq.clear_command(index);
-            seq.insert_after(0, Command::SubTrackVolume(20));
-        });
+        edit(&mut bgm, "Lead", |seq| seq.insert_after(0, Command::SubTrackVolume(20)));
         let v2 = midi(&[("Lead", notes(&[(0, 62)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         let keys = bgm.import.as_ref().unwrap().track_keys.clone();
         let volumes: Vec<Command> = timeline(&bgm, &keys).unwrap()["Lead"]
             .iter()
@@ -808,9 +1082,9 @@ mod test {
     #[test]
     fn tracks_added_and_removed() {
         let v1 = midi(&[("Lead", notes(&[(0, 60)])), ("Bass", notes(&[(0, 36)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let v2 = midi(&[("Lead", notes(&[(0, 60)])), ("Pad", notes(&[(0, 48)]))], &[]);
-        let (bgm, _, report) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, report) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
 
         let keys = &bgm.import.as_ref().unwrap().track_keys;
         assert!(!keys.contains(&Some("Bass".to_string())));
@@ -822,8 +1096,8 @@ mod test {
     #[test]
     fn unchanged_file() {
         let raw = midi(&[("Lead", notes(&[(0, 60)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
-        let (_, _, report) = reimport(&imported.bgm, Some(&imported.base), &raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
+        let (_, _, report) = reimport(&imported.bgm, Some(&imported.base), &raw, "song.mid", &[]).unwrap();
         assert!(report.unchanged);
     }
 
@@ -833,7 +1107,7 @@ mod test {
             &[("Lead", notes(&[(0, 60), (96, 62), (192, 64), (288, 65)]))],
             &[(96, "Loop start"), (192, "section"), (288, "loop end")],
         );
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(
             subsegs(&imported.bgm),
             vec!["section", "loop start", "section", "section", "loop end", "section"]
@@ -850,14 +1124,14 @@ mod test {
     #[test]
     fn sections_made_in_mamar_are_kept() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (96, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         bgm.split_variation_at(0, 96);
         let (bgm, base) = save_and_open(&bgm, &imported.base);
         assert!(base.is_some());
 
         let v2 = midi(&[("Lead", notes(&[(0, 60), (96, 63), (192, 65)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, base.as_ref(), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, base.as_ref(), &v2, "song.mid", &[]).unwrap();
         assert_eq!(subsegs(&bgm), vec!["section", "section"]);
         assert_eq!(played(&bgm, "Lead"), vec![(0, 60), (96, 63), (192, 65)]);
     }
@@ -865,7 +1139,7 @@ mod test {
     #[test]
     fn tracks_made_in_mamar_are_kept() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         let Segment::Subseg { track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[0] else {
             panic!()
@@ -880,7 +1154,7 @@ mod test {
         .into();
 
         let v2 = midi(&[("Lead", notes(&[(0, 61), (48, 62)]))], &[]);
-        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, _, _) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         let track = &bgm.track_lists[&track_list].tracks[5];
         assert_eq!(track.alternate_for, Some(1));
         assert!(
@@ -895,7 +1169,7 @@ mod test {
     #[test]
     fn tracks_varying_by_mix_are_left_alone() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut bgm = imported.bgm.clone();
         let Segment::Subseg { track_list, .. } = bgm.variations[0].as_ref().unwrap().segments[0] else {
             panic!()
@@ -908,7 +1182,7 @@ mod test {
         let before = bgm.track_lists[&track_list].tracks[1].commands.clone();
 
         let v2 = midi(&[("Lead", notes(&[(0, 61), (48, 62)]))], &[]);
-        let (after, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (after, _, report) = reimport(&bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         assert_eq!(after.track_lists[&track_list].tracks[1].commands, before);
         assert!(
             report.problems.iter().any(|problem| problem.contains("proximity mix")),
@@ -920,12 +1194,12 @@ mod test {
     #[test]
     fn markers_in_the_new_file_set_the_sections() {
         let v1 = midi(&[("Lead", notes(&[(0, 60), (96, 62)]))], &[]);
-        let imported = import(&v1, "song.mid").unwrap();
+        let imported = import(&v1, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let v2 = midi(
             &[("Lead", notes(&[(0, 60), (96, 62), (192, 64)]))],
             &[(96, "loop start"), (192, "loop end")],
         );
-        let (bgm, base, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid").unwrap();
+        let (bgm, base, _) = reimport(&imported.bgm, Some(&imported.base), &v2, "song.mid", &[]).unwrap();
         assert_eq!(
             subsegs(&bgm),
             vec!["section", "loop start", "section", "loop end", "section"]
@@ -992,7 +1266,7 @@ mod test {
             smf.write_std(&mut bytes).unwrap();
             bytes
         };
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(played(&imported.bgm, "ch1"), vec![(0, 60)]);
         assert_eq!(played(&imported.bgm, "ch10"), vec![(0, 36)]);
         let drums = track_index(&imported.bgm, "ch10");
@@ -1002,7 +1276,7 @@ mod test {
     #[test]
     fn rebuild_fails_cleanly_when_the_song_changed_outside_mamar() {
         let raw = midi(&[("Lead", notes(&[(0, 60), (48, 62)]))], &[]);
-        let imported = import(&raw, "song.mid").unwrap();
+        let imported = import(&raw, "song.mid", MidiMapping::PaperMario, &[]).unwrap();
         let mut saved = imported.bgm.clone();
         saved.import = with_patch(&imported.bgm, &imported.base);
         // Changed without updating the patch, as a recording switch left in by opening without the ROM would

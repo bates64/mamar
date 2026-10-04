@@ -1,5 +1,5 @@
 import { FileWithHandle } from "browser-fs-access"
-import { Bgm } from "pm64-typegen"
+import { Bgm, MidiMapping } from "pm64-typegen"
 
 import { DEFAULT_LOCATION, DEFAULT_SNAP, Doc, DocAction, docReducer } from "./doc"
 
@@ -94,26 +94,34 @@ export function rootReducer(root: Root, action: RootAction): Root {
     }
 }
 
+export function isMidi(data: Uint8Array): boolean {
+    // "MThd"
+    return data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64
+}
+
 /**
  * Decodes a BGM or MIDI file. With the sound bank (SBN) of the user's ROM, a BGM file's switches between recordings of
  * its tracks' instruments are taken out, to be put back as the song is built. See util/recordings. A MIDI file's tracks
  * are new, so they're built with the switches they need.
  *
  * A MIDI file is linked to the song made from it, so it can be reimported; `importBase` is its import. A song saved
- * since has that import rebuilt, once its recording switches are out.
+ * since has that import rebuilt, once its recording switches are out. Its programs and drum notes are read as `mapping`
+ * says, which is Paper Mario numbers unless given, as Mamar read them before it read General MIDI, choosing samples
+ * that reach its notes by `sampleReach`, from doc/pitchLimit.
  */
-function isMidi(data: Uint8Array): boolean {
-    // "MThd"
-    return data[0] === 0x4D && data[1] === 0x54 && data[2] === 0x68 && data[3] === 0x64
-}
-
-function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined, name?: string): { bgm: Bgm, importBase?: Uint8Array } {
+function decode(
+    data: Uint8Array,
+    sbn: ArrayBuffer | null | undefined,
+    name?: string,
+    mapping: MidiMapping = "PaperMario",
+    sampleReach?: Uint8Array,
+): { bgm: Bgm, importBase?: Uint8Array } {
     const midi = isMidi(data)
 
     let bgm: Bgm | string
     let importBase: Uint8Array | undefined
     if (midi) {
-        const imported: { bgm: Bgm, base: Uint8Array, warnings: string[] } | string = Bridge.midi_import(data, name ?? "")
+        const imported: { bgm: Bgm, base: Uint8Array, warnings: string[] } | string = Bridge.midi_import(data, name ?? "", mapping, sampleReach ?? new Uint8Array())
         if (typeof imported === "string") {
             throw new Error(imported)
         }
@@ -147,9 +155,15 @@ function decode(data: Uint8Array, sbn: ArrayBuffer | null | undefined, name?: st
     return { bgm, importBase }
 }
 
-export async function openFile(file: FileWithHandle, sbn?: ArrayBuffer | null): Promise<RootAction> {
+/** Opens `file`, reading a MIDI file as `mapping` and `sampleReach` say. See {@link decode}. */
+export async function openFile(
+    file: FileWithHandle,
+    sbn?: ArrayBuffer | null,
+    mapping?: MidiMapping,
+    sampleReach?: Uint8Array,
+): Promise<RootAction> {
     const data = new Uint8Array(await file.arrayBuffer())
-    const decoded = decode(data, sbn, file.name)
+    const decoded = decode(data, sbn, file.name, mapping, sampleReach)
     // A song made from a MIDI file remembers it, so it can be reimported in one click
     const link = decoded.bgm.import
     if (link && file.handle && isMidi(data)) {

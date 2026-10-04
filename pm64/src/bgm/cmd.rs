@@ -619,12 +619,12 @@ impl CommandSeq {
                 Command::Delay(_) | Command::Note { .. } => latest.clear(),
                 command => {
                     if let Some(setting) = Setting::of(command) {
-                        if let Some(entry) = latest.iter_mut().find(|(other, _)| *other == setting) {
-                            replaced[entry.1] = true;
-                            entry.1 = i;
-                        } else {
-                            latest.push((setting, i));
-                        }
+                        latest.retain(|&(other, index)| {
+                            let is_replaced = setting.replaces(other);
+                            replaced[index] |= is_replaced;
+                            !is_replaced
+                        });
+                        latest.push((setting, i));
                     }
                 }
             }
@@ -828,29 +828,57 @@ impl CommandSeq {
         self.vec.into_iter().map(|e| e.command).collect()
     }
 
-    /// When each note this sequence plays holds a voice, as (start, end) ticks. Detours are followed, and each branch
-    /// plays option `option`, or its first if it has no such option.
-    pub fn note_spans(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, usize)> {
-        let mut spans = Vec::new();
+    /// The commands this sequence plays, with when, in order. Detours are followed, and each branch plays option
+    /// `option`, or its first if it has no such option.
+    pub fn played(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, Command)> {
+        let mut played = Vec::new();
         for (time, event) in self.playback(branches) {
             match event.command {
-                Command::Note { length, .. } => spans.push((time, time + length as usize)),
                 Command::Branch { branch } => {
                     let options = branches.get(&branch).map(|branch| &branch.options);
                     if let Some(chosen) = options.and_then(|options| options.get(option).or(options.first())) {
-                        spans.extend(
+                        played.extend(
                             chosen
                                 .commands
-                                .note_spans(branches, option)
+                                .played(branches, option)
                                 .into_iter()
-                                .map(|(start, end)| (time + start, time + end)),
+                                .map(|(start, command)| (time + start, command)),
                         );
                     }
                 }
-                _ => {}
+                command => played.push((time, command)),
             }
         }
-        spans
+        played
+    }
+
+    /// When each note this sequence plays holds a voice, as (start, end) ticks. See [CommandSeq::played].
+    pub fn note_spans(&self, branches: &BTreeMap<BranchId, Branch>, option: usize) -> Vec<(usize, usize)> {
+        self.played(branches, option)
+            .into_iter()
+            .filter_map(|(time, command)| match command {
+                Command::Note { length, .. } => Some((time, time + length as usize)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Shortens each note held a little into a note that starts after it, so it ends as that note starts, as the
+    /// overlap makes the track need another voice. See [short_overlaps](super::short_overlaps). Detours are written
+    /// out first. Returns how many notes were shortened.
+    pub fn trim_short_overlaps(&mut self, branches: &BTreeMap<BranchId, Branch>) -> usize {
+        *self = self.without_detours();
+        let lengths: HashMap<Id, usize> = super::short_overlaps(&super::voices::own_notes(self, branches))
+            .into_iter()
+            .collect();
+        for event in &mut self.vec {
+            if let Command::Note { length, .. } = &mut event.command
+                && let Some(&trimmed) = lengths.get(&event.id)
+            {
+                *length = trimmed as u16;
+            }
+        }
+        lengths.len()
     }
 
     /// Splits this sequence at the given time such that self is the 'before `time`' sequence and the returned
@@ -925,7 +953,11 @@ enum Setting {
     CoarseTune,
     FineTune,
     PitchBend,
-    /// Choosing one of the song's instruments and overriding the patch each replace the other
+    /// Starting or stopping tremolo.
+    Tremolo,
+    /// The sample, which overriding the patch sets.
+    Patch,
+    /// Choosing one of the song's instruments, which sets its sample, volume, pan, reverb and tuning too.
     Instrument,
 }
 
@@ -944,9 +976,26 @@ impl Setting {
             Command::SubTrackCoarseTune(_) => Setting::CoarseTune,
             Command::SubTrackFineTune(_) => Setting::FineTune,
             Command::SegTrackTune { .. } => Setting::PitchBend,
-            Command::SetTrackVoice { .. } | Command::TrackOverridePatch(_) => Setting::Instrument,
+            Command::TrackTremolo { .. } | Command::TrackTremoloStop => Setting::Tremolo,
+            Command::SetTrackVoice { .. } => Setting::Instrument,
+            Command::TrackOverridePatch(_) => Setting::Patch,
             _ => return None,
         })
+    }
+
+    /// Whether setting `self` replaces an earlier `other`.
+    fn replaces(self, other: Setting) -> bool {
+        self == other
+            || self == Setting::Instrument
+                && matches!(
+                    other,
+                    Setting::Patch
+                        | Setting::Volume
+                        | Setting::Pan
+                        | Setting::Reverb
+                        | Setting::CoarseTune
+                        | Setting::FineTune
+                )
     }
 }
 
@@ -1420,6 +1469,12 @@ mod test {
 
     #[test]
     fn shrink_removes_replaced_settings() {
+        let patch = PatchAddress {
+            bank_set: crate::bgm::BankSetIndex::Music,
+            bank: 0,
+            instrument: 1,
+            envelope: 3,
+        };
         let note = || Command::Note {
             pitch: 0x90,
             velocity: 100,
@@ -1438,13 +1493,15 @@ mod test {
             Command::SubTrackPan(40),
             Command::Delay(10),
             Command::SubTrackPan(40),
+            Command::Delay(10),
+            // Overriding the patch leaves the instrument's volume, pan, reverb and tuning
+            Command::SetTrackVoice { index: 2 },
+            Command::TrackOverridePatch(patch.clone()),
         ]);
         seq.shrink();
         assert_eq!(
             seq.to_command_vec(),
             vec![
-                Command::SubTrackVolume(100),
-                Command::SubTrackPan(20),
                 Command::SetTrackVoice { index: 1 },
                 note(),
                 Command::SubTrackPan(30),
@@ -1452,6 +1509,9 @@ mod test {
                 Command::SubTrackPan(40),
                 Command::Delay(10),
                 Command::SubTrackPan(40),
+                Command::Delay(10),
+                Command::SetTrackVoice { index: 2 },
+                Command::TrackOverridePatch(patch),
             ]
         );
     }

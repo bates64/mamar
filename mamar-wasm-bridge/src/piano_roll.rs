@@ -31,6 +31,9 @@ pub struct PianoRoll {
     branch_times: Vec<usize>,
     /// IDs of the selected notes.
     selection: Vec<u32>,
+    /// IDs of the notes playing where the track plays the most notes at once, marked while its phrase needs more
+    /// voices than the game has.
+    busiest: Vec<u32>,
     /// The highest pitch the track's instrument plays at its own pitch, above which the engine plays notes lower than
     /// they should be, from each time the instrument or its tuning changes until the next, in time order. None is no
     /// limit.
@@ -61,6 +64,7 @@ impl PianoRoll {
             notes: Vec::new(),
             branch_times: Vec::new(),
             selection: Vec::new(),
+            busiest: Vec::new(),
             pitch_limits: Vec::new(),
             zoom: 2.0,
             ticks_per_bar: TICKS_PER_BEAT * 4.0,
@@ -88,13 +92,20 @@ impl PianoRoll {
     pub fn set_viewport(&mut self, width_css_px: f64, height_css_px: f64, dpr: f64) {
         self.vw = width_css_px.max(0.0);
         self.vh = height_css_px.max(0.0);
-        self.dpr = dpr.max(1.0);
+        // Below 1 when the browser is zoomed out, which the canvas is sized for
+        self.dpr = dpr;
         // Resizing a canvas clears it
         self.dirty = true;
     }
 
     pub fn set_selection(&mut self, ids: Vec<u32>) {
         self.selection = ids;
+        self.dirty = true;
+    }
+
+    /// Marks the notes with `ids`, where the track plays the most notes at once. Empty marks none.
+    pub fn set_busiest_notes(&mut self, ids: Vec<u32>) {
+        self.busiest = ids;
         self.dirty = true;
     }
 
@@ -217,6 +228,14 @@ impl PianoRoll {
             ctx.set_global_alpha(0.35 + 0.65 * (velocity.min(127) as f64 / 127.0));
             self.draw_note(ctx, time, pitch, length);
             ctx.set_global_alpha(1.0);
+            if self.busiest.contains(&id) {
+                // Outlined in the orange of the regions on voices sound effects share
+                ctx.save();
+                ctx.set_stroke_style_str("#e46f00");
+                ctx.set_line_width(2.0);
+                self.outline_note(ctx, time, pitch, length);
+                ctx.restore();
+            }
             if selected {
                 ctx.set_stroke_style_str("#1d80f5");
                 ctx.set_fill_style_str("#066ce7");
@@ -225,6 +244,20 @@ impl PianoRoll {
 
         ctx.restore();
         Ok(())
+    }
+
+    /// Strokes around a note, just outside it, so the note's own colour still shows.
+    fn outline_note(&self, ctx: &web_sys::CanvasRenderingContext2d, time: usize, pitch: u8, length: u16) {
+        let x = self.time_to_x(time as f64);
+        let Some(y) = self.pitch_to_y(pitch) else { return };
+        let w = self.time_to_x(length as f64) - self.time_to_x(0.0);
+        let h = self.note_height();
+        if x + w < 0.0 || x > self.vw {
+            return;
+        }
+        ctx.begin_path();
+        let _ = ctx.round_rect_with_f64(x - 1.0, y - 1.0, w + 2.0, h + 2.0, 2.0);
+        ctx.stroke();
     }
 
     fn draw_note(&self, ctx: &web_sys::CanvasRenderingContext2d, time: usize, pitch: u8, length: u16) {

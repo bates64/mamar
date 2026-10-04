@@ -56,12 +56,15 @@ pub fn bgm_decode(data: &[u8]) -> JsValue {
     }
 }
 
+/// Encodes `bgm`, giving tracks voices for their notes to ring on with as `releases` says, if it isn't null. See
+/// [Bgm::encode_with_releases].
 #[wasm_bindgen]
-pub fn bgm_encode(bgm: &JsValue) -> JsValue {
+pub fn bgm_encode(bgm: &JsValue, releases: &JsValue) -> JsValue {
     let bgm: Bgm = from_js(bgm);
+    let releases: Option<Releases> = from_js(releases);
 
     let mut f = Cursor::new(Vec::new());
-    match bgm.encode(&mut f) {
+    match bgm.encode_with_releases(&mut f, releases.as_ref()) {
         Ok(_) => {
             let data: Vec<u8> = f.into_inner();
             let arr = js_sys::Uint8Array::new_with_length(data.len() as u32);
@@ -132,12 +135,23 @@ pub fn commands_place(commands: &JsValue, id: u32, time: usize, command: &JsValu
     to_js(&commands)
 }
 
-/// Returns the voices each track of `track_list` needs and gets. See [TrackList::voices].
+/// Returns the voices each track of `track_list` needs and gets, given `releases` if it isn't null, and where each
+/// needs them as proximity mix `mix` plays it. See [TrackList::voice_report].
 #[wasm_bindgen]
-pub fn track_list_voices(track_list: &JsValue, branches: &JsValue) -> JsValue {
+pub fn track_list_voice_report(track_list: &JsValue, branches: &JsValue, mix: usize, releases: &JsValue) -> JsValue {
     let track_list: TrackList = from_js(track_list);
-    let branches: std::collections::BTreeMap<BranchId, Branch> = from_js(branches);
-    to_js(&track_list.voices(&branches))
+    let branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    let releases: Option<Releases> = from_js(releases);
+    to_js(&track_list.voice_report(&branches, mix, releases.as_ref()))
+}
+
+/// Returns `commands` with notes held a little into the next shortened. See [CommandSeq::trim_short_overlaps].
+#[wasm_bindgen]
+pub fn commands_trim_short_overlaps(commands: &JsValue, branches: &JsValue) -> JsValue {
+    let mut commands: CommandSeq = from_js(commands);
+    let branches: BTreeMap<BranchId, Branch> = from_js(branches);
+    commands.trim_short_overlaps(&branches);
+    to_js(&commands)
 }
 
 /// Returns what `commands` play in proximity mix `mix`. See [CommandSeq::for_mix].
@@ -236,11 +250,13 @@ fn bytes(data: &[u8]) -> JsValue {
     js_sys::Uint8Array::from(data).into()
 }
 
-/// Makes a song from the MIDI file `data`, named `name`, linked to it so it can be reimported. Returns `{ bgm, base,
-/// warnings }`, where `base` is the import to keep while the song is open, or an error message.
+/// Makes a song from the MIDI file `data`, named `name`, reading its programs and drum notes as `mapping`, a
+/// [reimport::MidiMapping], says, and choosing samples that reach its notes by `sample_reach`, the highest MIDI key
+/// each sample plays, linked to it so it can be reimported. Returns `{ bgm, base, warnings }`, where `base` is the
+/// import to keep while the song is open, or an error message.
 #[wasm_bindgen]
-pub fn midi_import(data: &[u8], name: &str) -> JsValue {
-    match reimport::import(data, name) {
+pub fn midi_import(data: &[u8], name: &str, mapping: &JsValue, sample_reach: &[u8]) -> JsValue {
+    match reimport::import(data, name, from_js(mapping), sample_reach) {
         Ok(imported) => object(&[
             ("bgm", to_js(&imported.bgm)),
             ("base", bytes(&reimport::encode_timeline(&imported.base))),
@@ -271,13 +287,13 @@ pub fn import_base_rebuild(bgm: &JsValue) -> JsValue {
     }
 }
 
-/// Reimports the MIDI file `data`, named `name`, into `bgm`, given its last import `base` if it has one. Returns
-/// `{ bgm, base, report }`, or an error message.
+/// Reimports the MIDI file `data`, named `name`, into `bgm`, given its last import `base` if it has one, and
+/// `sample_reach` as [midi_import] has it. Returns `{ bgm, base, report }`, or an error message.
 #[wasm_bindgen]
-pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &str) -> JsValue {
+pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &str, sample_reach: &[u8]) -> JsValue {
     let bgm: Bgm = from_js(bgm);
     let base = base.as_deref().and_then(reimport::decode_timeline);
-    match reimport::reimport(&bgm, base.as_ref(), data, name) {
+    match reimport::reimport(&bgm, base.as_ref(), data, name, sample_reach) {
         Ok((bgm, base, report)) => object(&[
             ("bgm", to_js(&bgm)),
             ("base", bytes(&reimport::encode_timeline(&base))),
@@ -285,4 +301,46 @@ pub fn bgm_reimport(bgm: &JsValue, base: Option<Vec<u8>>, data: &[u8], name: &st
         ]),
         Err(e) => e.to_string().into(),
     }
+}
+
+/// A ROM's sound bank, kept in wasm memory so looking up its instruments doesn't copy it each time. See
+/// [pm64::sbn::bank::SoundBank].
+#[wasm_bindgen(js_name = SoundBank)]
+pub struct WasmSoundBank(pm64::sbn::bank::SoundBank);
+
+#[wasm_bindgen(js_class = SoundBank)]
+impl WasmSoundBank {
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: &[u8]) -> Self {
+        Self(pm64::sbn::bank::SoundBank::new(data.to_vec()))
+    }
+
+    pub fn file_name(&self, index: usize) -> Option<String> {
+        self.0.file_name(index)
+    }
+
+    pub fn file_index_of(&self, name: &str) -> Option<usize> {
+        self.0.file_index_of(name)
+    }
+
+    pub fn kit_drums(&self) -> JsValue {
+        to_js(&self.0.kit_drums())
+    }
+
+    pub fn instrument_offset(&self, patch: &JsValue, aux_banks: &JsValue) -> Option<usize> {
+        self.0
+            .instrument_offset(&from_js(patch), &from_js::<Vec<String>>(aux_banks))
+    }
+
+    pub fn envelopes(&self, patch: &JsValue, aux_banks: &JsValue) -> JsValue {
+        to_js(&self.0.envelopes(&from_js(patch), &from_js::<Vec<String>>(aux_banks)))
+    }
+}
+
+/// Returns how long the notes of `bgm` ring on after they end, with its instruments as `bank` has them. See
+/// [Bgm::releases].
+#[wasm_bindgen]
+pub fn bgm_releases(bgm: &JsValue, bank: &WasmSoundBank) -> JsValue {
+    let bgm: Bgm = from_js(bgm);
+    to_js(&bgm.releases(&bank.0))
 }

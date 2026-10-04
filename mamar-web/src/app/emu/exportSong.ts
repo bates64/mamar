@@ -1,5 +1,7 @@
 import { Segment } from "pm64-typegen"
 
+import { maxSongSize, songTooBig } from "./songSize"
+
 import wasmUrl from "../../../../mamar-audio/build/mamar_audio.wasm?url"
 
 /** The rate papermario-dx's audio engine outputs at, in Hz. */
@@ -20,6 +22,7 @@ interface Engine {
     mamar_audio_output(): number
     mamar_audio_render_frame(): number
     mamar_audio_bgm_buffer(): number
+    mamar_audio_bgm_max_size?(): number
     mamar_audio_play(size: number, variation: number, startSegment: number, startTick: number): void
     mamar_audio_aux_bank_count(): number
     mamar_audio_set_aux_bank(slot: number, fileIndex: number): void
@@ -74,6 +77,9 @@ export async function renderSong(options: ExportOptions, segments: Segment[]): P
     memory.current = engine.memory
     engine.mamar_audio_init()
 
+    if (bgm.length > maxSongSize(engine)) {
+        throw new Error(songTooBig(bgm.length, maxSongSize(engine)))
+    }
     new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), bgm.length).set(bgm)
     engine.mamar_audio_set_proximity_mix(proximityMix)
     engine.mamar_audio_set_alternate_parts(alternateParts ? 1 : 0)

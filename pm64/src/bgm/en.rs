@@ -58,6 +58,12 @@ impl Bgm {
     }
 
     pub fn encode<W: Write + Seek>(&self, f: &mut W) -> Result<(), Error> {
+        self.encode_with_releases(f, None)
+    }
+
+    /// Encodes the song, giving tracks voices for their notes to ring on with as `releases` says. See
+    /// [TrackList::voices].
+    pub fn encode_with_releases<W: Write + Seek>(&self, f: &mut W, releases: Option<&Releases>) -> Result<(), Error> {
         let mut metadata = mamar::Metadata::default();
         metadata.set_beats_per_bar(self.beats_per_bar);
         metadata.set_mix_names(self.mix_names.clone());
@@ -198,7 +204,7 @@ impl Bgm {
             }
 
             // Write flags
-            let voices = track_list.voices(&self.branches);
+            let voices = track_list.voices(&self.branches, releases);
             let mut todo_commands = Vec::new();
             for (track_no, track) in track_list.tracks.iter().enumerate() {
                 let Track {

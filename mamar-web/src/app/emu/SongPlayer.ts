@@ -52,6 +52,8 @@ export interface SongPlayer {
     onStatus(listener: (status: PlayerStatus) => void): () => void
     /** How many aux banks a song can load its own instruments from, once the player has started. */
     readonly auxBankCount: Promise<number>
+    /** The most bytes an encoded song can be for the player to play it, once the player has started. */
+    readonly maxSongSize: Promise<number>
 }
 
 export const SongPlayerContext = createContext<SongPlayer | null>(null)
@@ -86,4 +88,20 @@ export function useAuxBankCount(): number {
     }, [player])
 
     return count
+}
+
+/** The most bytes an encoded song can be for the player to play it, or null until the player has started. */
+export function useMaxSongSize(): number | null {
+    const player = useContext(SongPlayerContext)
+    const [size, setSize] = useState<number | null>(null)
+
+    useEffect(() => {
+        let isCurrent = true
+        player?.maxSongSize.then(size => isCurrent && setSize(size))
+        return () => {
+            isCurrent = false
+        }
+    }, [player])
+
+    return size
 }
