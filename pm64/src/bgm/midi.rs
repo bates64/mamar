@@ -722,7 +722,7 @@ fn normalize_loudness(track_list: &mut TrackList, instruments: &mut [Instrument]
         .map(|instrument| instrument.volume)
         .chain(track_list.tracks.iter().flat_map(|track| {
             track.commands.iter().filter_map(|event| match event.command {
-                Command::SubTrackVolume(value) => Some(value),
+                Command::SubTrackVolume(value) | Command::TrackVolumeFade { value, .. } => Some(value),
                 _ => None,
             })
         }))
@@ -741,6 +741,13 @@ fn normalize_loudness(track_list: &mut TrackList, instruments: &mut [Instrument]
             .map(|event| match event.command {
                 Command::SubTrackVolume(value) => Event {
                     command: Command::SubTrackVolume(scale(value)),
+                    ..event.clone()
+                },
+                Command::TrackVolumeFade { time, value } => Event {
+                    command: Command::TrackVolumeFade {
+                        time,
+                        value: scale(value),
+                    },
                     ..event.clone()
                 },
                 _ => event.clone(),
@@ -1055,6 +1062,66 @@ fn is_named_drums(name: &str, mapping: MidiMapping) -> bool {
     }
 }
 
+/// The furthest apart two volume changes can be, in ticks, to be steps of one fade.
+const FADE_STEP_TICKS: usize = 48;
+
+/// How far a step's volume can be from the line of the fade it's part of.
+const FADE_TOLERANCE: f64 = 1.5;
+
+/// The fewest volume changes that make a fade.
+const FADE_STEPS: usize = 3;
+
+/// Replaces each run of volume changes in `timed` that steps along a line with a fade along it, as one command is
+/// much smaller than many, and fades as the game's own songs do.
+fn volume_fades(timed: &mut Vec<(usize, Command)>) {
+    timed.sort_by_key(|(time, _)| *time);
+    let steps: Vec<(usize, u8)> = timed
+        .iter()
+        .filter_map(|(time, command)| match command {
+            Command::SubTrackVolume(volume) => Some((*time, *volume)),
+            _ => None,
+        })
+        .collect();
+    // Whether the steps from `start` to `end` lie along the line between them
+    let on_line = |start: usize, end: usize| {
+        let ((t0, v0), (t1, v1)) = (steps[start], steps[end]);
+        t1 > t0
+            && steps[start..=end].iter().all(|&(time, volume)| {
+                let expected = v0 as f64 + (v1 as f64 - v0 as f64) * (time - t0) as f64 / (t1 - t0) as f64;
+                (volume as f64 - expected).abs() <= FADE_TOLERANCE
+            })
+    };
+
+    let mut volumes = Vec::new();
+    let mut start = 0;
+    while start < steps.len() {
+        let mut end = start;
+        while end + 1 < steps.len() && steps[end + 1].0 - steps[end].0 <= FADE_STEP_TICKS && on_line(start, end + 1) {
+            end += 1;
+        }
+        let (time, volume) = steps[start];
+        volumes.push((time, Command::SubTrackVolume(volume)));
+        if end + 1 - start >= FADE_STEPS {
+            let (end_time, end_volume) = steps[end];
+            volumes.push((
+                time,
+                Command::TrackVolumeFade {
+                    time: (end_time - time).min(u16::MAX as usize) as u16,
+                    value: end_volume,
+                },
+            ));
+            start = end + 1;
+        } else {
+            start += 1;
+        }
+    }
+
+    timed.retain(|(_, command)| !matches!(command, Command::SubTrackVolume(_)));
+    timed.extend(volumes);
+    // Notes start after what's set at the same time, so they play with it
+    timed.sort_by_key(|(time, command)| (*time, matches!(command, Command::Note { .. })));
+}
+
 /// Makes a track from `part`, reading it as `mapping` says, with `sample_reach` as [general_midi_sample] has it. It
 /// plays instrument `instrument` of `instruments`, or one it adds if None.
 fn part_to_track(
@@ -1300,6 +1367,8 @@ fn part_to_track(
     if !started_notes.is_empty() {
         log::warn!("{} unended notes", started_notes.len());
     }
+
+    volume_fades(&mut timed);
 
     // What the track starts with goes in its instrument, which sets it all at once
     let instrument = &mut instruments[voice_idx];
@@ -1638,6 +1707,45 @@ mod test {
         assert_eq!(volumes.len(), 1, "{volumes:?}");
         let (channel, expressed) = (instrument.volume as f32, volumes[0] as f32);
         assert!((expressed - channel * 64.0 / 127.0).abs() <= 1.0, "{volumes:?}");
+    }
+
+    #[test]
+    fn volume_ramps_are_fades() {
+        // Expression falling from 124 to 0 a step every 4 ticks, from a beat in
+        let mut events: Vec<(u32, TrackEventKind)> = (0..=31)
+            .map(|step| {
+                let message = MidiMessage::Controller {
+                    controller: u7::new(11),
+                    value: u7::new(124 - step * 4),
+                };
+                (48 + step as u32 * 4, on(0, message))
+            })
+            .collect();
+        events.extend([(0, note_on(0, 60)), (192, note_off(0, 60))]);
+        let raw = midi(48, vec![vec![], events]);
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        let (lead, _) = track(&imported, "#1");
+        let volumes: Vec<(usize, &Command)> = lead
+            .commands
+            .iter_time()
+            .filter(|(_, event)| {
+                matches!(
+                    event.command,
+                    Command::SubTrackVolume(_) | Command::TrackVolumeFade { .. }
+                )
+            })
+            .map(|(time, event)| (time, &event.command))
+            .collect();
+        assert!(
+            matches!(
+                volumes[..],
+                [
+                    (48, Command::SubTrackVolume(_)),
+                    (48, Command::TrackVolumeFade { time: 124, value: 0 })
+                ]
+            ),
+            "{volumes:?}"
+        );
     }
 
     #[test]
