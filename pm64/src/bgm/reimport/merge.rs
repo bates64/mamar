@@ -398,6 +398,28 @@ pub fn reimport(
         added_tracks.push((index, their_index));
     }
 
+    // The file's samples in an aux bank need the song to load it into the same aux bank
+    for (index, bank) in new
+        .bgm
+        .aux_banks
+        .iter()
+        .enumerate()
+        .filter(|(_, bank)| !bank.is_empty())
+    {
+        if out.aux_banks.len() <= index {
+            out.aux_banks.resize(index + 1, String::new());
+        }
+        if out.aux_banks[index].is_empty() {
+            out.aux_banks[index] = bank.clone();
+        } else if out.aux_banks[index] != *bank {
+            report.problems.push(format!(
+                "The MIDI file plays samples from {bank}, which aux bank {} would need to load, but it loads {}.",
+                index + 1,
+                out.aux_banks[index]
+            ));
+        }
+    }
+
     if dropped > 0 {
         report.problems.push(format!(
             "{dropped} edits made in Mamar were overwritten by the MIDI file, which changed the same notes."

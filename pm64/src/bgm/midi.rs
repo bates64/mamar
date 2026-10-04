@@ -297,6 +297,16 @@ pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<M
     }
     normalize_loudness(&mut track_list, &mut bgm.instruments);
     put_drums_last(&mut track_list, &mut track_keys);
+    // A song that plays a sample of an aux bank loads it
+    let plays_aux = |patch: &PatchAddress| patch.bank_set == BankSetIndex::Aux;
+    let overrides_aux = track_list
+        .tracks
+        .iter()
+        .flat_map(|track| track.commands.iter())
+        .any(|event| matches!(&event.command, Command::TrackOverridePatch(patch) if plays_aux(patch)));
+    if overrides_aux || bgm.instruments.iter().any(|instrument| plays_aux(&instrument.patch)) {
+        bgm.aux_banks = vec![GENERAL_MIDI_AUX_BANK.to_string()];
+    }
     let track_list_id = bgm.add_track_list(track_list);
 
     let (_, variation) = bgm.add_variation().unwrap();
@@ -864,7 +874,8 @@ fn apply_section_markers(
     true
 }
 
-/// The Paper Mario sample, as its number in the music banks, 16 to a bank, that plays each General MIDI program.
+/// The Paper Mario sample, as its number in the music banks, 16 to a bank, that plays each General MIDI program, except
+/// those that play [GENERAL_MIDI_AUX_SAMPLES].
 #[rustfmt::skip]
 const GENERAL_MIDI_SAMPLES: [u8; 128] = [
     // Pianos: acoustic grand, bright, electric grand, honky-tonk, electric 1 and 2, harpsichord, clavinet
@@ -995,9 +1006,32 @@ fn pitch_of(key: u8) -> u8 {
     key + 104
 }
 
+/// The BK file a song made from a General MIDI file loads into its first aux bank, for [GENERAL_MIDI_AUX_SAMPLES]: the
+/// drums that Jade Jungle loads.
+const GENERAL_MIDI_AUX_BANK: &str = "PS11";
+
+/// The General MIDI programs that play a sample of [GENERAL_MIDI_AUX_BANK] rather than one in the music banks, with the
+/// sample's number there. Jade Jungle plays tunes with these drums.
+const GENERAL_MIDI_AUX_SAMPLES: [(u8, u8); 2] = [
+    (116, 11), // taiko drum
+    (117, 1),  // melodic tom
+];
+
 /// The sample that plays `program`, read as `mapping` says, for a part whose highest key is `highest`. See
 /// [general_midi_sample] for `sample_reach`.
 fn sample_of(program: u8, mapping: MidiMapping, highest: u8, sample_reach: &[u8]) -> PatchAddress {
+    if mapping == MidiMapping::GeneralMidi
+        && let Some(&(_, instrument)) = GENERAL_MIDI_AUX_SAMPLES
+            .iter()
+            .find(|(aux_program, _)| *aux_program == program)
+    {
+        return PatchAddress {
+            bank_set: BankSetIndex::Aux,
+            bank: 0,
+            instrument,
+            envelope: 0,
+        };
+    }
     let number = match mapping {
         MidiMapping::GeneralMidi => general_midi_sample(program, highest, sample_reach),
         MidiMapping::PaperMario => program,
@@ -1447,6 +1481,32 @@ mod test {
         let (drums, _) = track(&paper_mario, "#2");
         assert!(!drums.is_drum_track);
         assert_eq!(notes(drums), vec![(0, pitch_of(36), 24), (24, pitch_of(38), 24)]);
+    }
+
+    #[test]
+    fn general_midi_taiko_plays_jade_jungles_drums() {
+        let raw = midi(
+            48,
+            vec![
+                vec![],
+                vec![
+                    (0, on(0, MidiMessage::ProgramChange { program: u7::new(116) })),
+                    (0, note_on(0, 48)),
+                    (48, note_off(0, 48)),
+                ],
+            ],
+        );
+
+        let general = import(&raw, MidiMapping::GeneralMidi, &[]).unwrap();
+        let (_, instrument) = track(&general, "#1");
+        assert_eq!(instrument.patch.bank_set, BankSetIndex::Aux);
+        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 11));
+        assert_eq!(general.bgm.aux_banks, vec!["PS11".to_string()]);
+
+        let paper_mario = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        let (_, instrument) = track(&paper_mario, "#1");
+        assert_eq!(instrument.patch.bank_set, BankSetIndex::Music);
+        assert!(paper_mario.bgm.aux_banks.is_empty());
     }
 
     #[test]
