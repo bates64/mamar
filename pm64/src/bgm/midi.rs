@@ -295,6 +295,7 @@ pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<M
             .insert_end(total_song_length, Command::End);
         track_keys[index + 1] = Some(fitted.part.key.clone());
     }
+    normalize_loudness(&mut track_list, &mut bgm.instruments);
     put_drums_last(&mut track_list, &mut track_keys);
     let track_list_id = bgm.add_track_list(track_list);
 
@@ -586,7 +587,7 @@ fn master_track(
         0,
         vec![
             Command::MasterTempo(120),
-            Command::MasterVolume(100),
+            Command::MasterVolume(MASTER_VOLUME),
             Command::MasterEffect { index: 0, value: 1 },
         ],
     );
@@ -614,6 +615,129 @@ fn name_of_track(track: &[(usize, TrackEventKind)]) -> String {
         .unwrap_or_default()
 }
 
+/// The master volume a song starts with, before [normalize_loudness] sets it.
+const MASTER_VOLUME: u8 = 100;
+
+/// The volume each instrument starts with, before [normalize_loudness] sets it.
+pub(crate) const INSTRUMENT_VOLUME: u8 = 100;
+
+/// How loud the game's own songs play, by [loudness]: the median of them.
+const VANILLA_LOUDNESS: f64 = 0.95;
+
+/// Longest a note counts for in [loudness], in ticks, as the samples fade before then.
+const LOUDEST_LENGTH: usize = 96;
+
+/// An estimate of how loud `track_list` plays, with `instruments`: the root mean square of its notes' volumes, as
+/// the game multiplies the master, instrument and track volumes and velocity, weighted by how long each sounds. It
+/// can't tell how loud each sample is, or each drum of the shared kit, so it only compares songs that play alike
+/// samples, as vanilla songs and imported ones do.
+fn loudness(track_list: &TrackList, instruments: &[Instrument]) -> f64 {
+    let length = track_list
+        .tracks
+        .iter()
+        .map(|track| track.commands.len_time())
+        .max()
+        .unwrap_or(0);
+    if length == 0 {
+        return 0.0;
+    }
+    let level = |value: u8| (value & 0x7F) as f64 / 127.0;
+    let master_changes: Vec<(usize, f64)> = track_list.tracks[0]
+        .commands
+        .iter_time()
+        .filter_map(|(time, event)| match event.command {
+            Command::MasterVolume(volume) | Command::MasterVolumeFade { volume, .. } => Some((time, level(volume))),
+            _ => None,
+        })
+        .collect();
+    let master_at = |at: usize| {
+        master_changes
+            .iter()
+            .rev()
+            .find(|(time, _)| *time <= at)
+            .map_or(1.0, |(_, volume)| *volume)
+    };
+    let mut energy = 0.0;
+    for track in track_list.tracks.iter().skip(1).filter(|track| !track.is_disabled) {
+        let (mut instrument, mut volume) = (1.0, 1.0);
+        for (time, event) in track.commands.iter_time() {
+            match event.command {
+                Command::SetTrackVoice { index } => {
+                    instrument = instruments
+                        .get(index as usize)
+                        .map_or(1.0, |instrument| level(instrument.volume));
+                }
+                Command::SubTrackVolume(value) | Command::TrackVolumeFade { value, .. } => instrument = level(value),
+                Command::SegTrackVolume(value) => volume = level(value),
+                Command::Note { velocity, length, .. } => {
+                    let source = if track.is_drum_track { 1.0 } else { instrument };
+                    let gain = master_at(time) * source * volume * level(velocity);
+                    energy += gain * gain * (length as usize).min(LOUDEST_LENGTH) as f64;
+                }
+                _ => {}
+            }
+        }
+    }
+    (energy / length as f64).sqrt()
+}
+
+/// Sets the master volume of `track_list`, which plays `instruments`, so it plays about as loud as the game's own
+/// songs, by [loudness]. If the master volume can't go high enough, its instruments' volumes go up the rest of the way.
+fn normalize_loudness(track_list: &mut TrackList, instruments: &mut [Instrument]) {
+    let loudness = loudness(track_list, instruments);
+    if loudness == 0.0 {
+        return;
+    }
+    let wanted = MASTER_VOLUME as f64 * VANILLA_LOUDNESS / loudness;
+    let master = wanted.round().clamp(1.0, 127.0) as u8;
+    let rest = wanted / master as f64;
+    let master_track = &mut track_list.tracks[0];
+    master_track.commands = master_track
+        .commands
+        .iter()
+        .map(|event| match event.command {
+            Command::MasterVolume(_) => Event {
+                command: Command::MasterVolume(master),
+                ..event.clone()
+            },
+            _ => event.clone(),
+        })
+        .collect();
+    if rest <= 1.0 {
+        return;
+    }
+    // Only as far as the loudest volume goes, so the rest keep their balance with it
+    let loudest = instruments
+        .iter()
+        .map(|instrument| instrument.volume)
+        .chain(track_list.tracks.iter().flat_map(|track| {
+            track.commands.iter().filter_map(|event| match event.command {
+                Command::SubTrackVolume(value) => Some(value),
+                _ => None,
+            })
+        }))
+        .max()
+        .unwrap_or(127)
+        .max(1);
+    let rest = rest.min(127.0 / loudest as f64);
+    let scale = |value: u8| (value as f64 * rest).round().min(127.0) as u8;
+    for instrument in instruments.iter_mut() {
+        instrument.volume = scale(instrument.volume);
+    }
+    for track in track_list.tracks.iter_mut().skip(1) {
+        track.commands = track
+            .commands
+            .iter()
+            .map(|event| match event.command {
+                Command::SubTrackVolume(value) => Event {
+                    command: Command::SubTrackVolume(scale(value)),
+                    ..event.clone()
+                },
+                _ => event.clone(),
+            })
+            .collect();
+    }
+}
 /// Moves the drum tracks after the other tracks, before the unused ones, keeping each group in order, with their keys.
 /// The game gives tracks their voices in order, and sound effects take the last voices from the music, so drums go
 /// last, as in vanilla songs, where a drum hit cut short is hardly heard.
@@ -1179,7 +1303,7 @@ fn new_instrument() -> Instrument {
     Instrument {
         patch: sample_of(0, MidiMapping::PaperMario, 0, &[]),
         pan: 64,
-        volume: 100,
+        volume: INSTRUMENT_VOLUME,
         ..Default::default()
     }
 }
@@ -1429,11 +1553,18 @@ mod test {
         );
         let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         let (lead, _) = track(&imported, "#1");
-        assert!(
-            lead.commands
-                .iter()
-                .any(|event| event.command == Command::SubTrackVolume(50))
-        );
+        // The volumes as set, the last two being the channel volume and that with its expression, scaled alike to play
+        // as loud as vanilla songs do
+        let volumes: Vec<u8> = lead
+            .commands
+            .iter()
+            .filter_map(|event| match event.command {
+                Command::SubTrackVolume(volume) => Some(volume),
+                _ => None,
+            })
+            .collect();
+        let (channel, expressed) = (volumes[volumes.len() - 2] as f32, volumes[volumes.len() - 1] as f32);
+        assert!((expressed - channel * 64.0 / 127.0).abs() <= 1.0, "{volumes:?}");
     }
 
     #[test]
@@ -1441,5 +1572,65 @@ mod test {
         let raw = midi(480, vec![vec![], vec![(0, note_on(0, 60)), (1, note_off(0, 60))]]);
         let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
         assert_eq!(notes(track(&imported, "#1").0), vec![(0, pitch_of(60), 1)]);
+    }
+
+    #[test]
+    fn songs_play_about_as_loud_as_vanilla_ones() {
+        let master_volume = |imported: &MidiImport| {
+            let master = &imported.bgm.track_lists.values().next().unwrap().tracks[0];
+            master
+                .commands
+                .iter()
+                .find_map(|event| match event.command {
+                    Command::MasterVolume(volume) => Some(volume),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let loud = midi(
+            48,
+            vec![
+                vec![],
+                (0..4)
+                    .flat_map(|voice| {
+                        (0..16).flat_map(move |beat| {
+                            let key = 60 + voice * 4;
+                            let on = on(
+                                0,
+                                MidiMessage::NoteOn {
+                                    key: u7::new(key),
+                                    vel: u7::new(127),
+                                },
+                            );
+                            [(beat * 48, on), (beat * 48 + 48, note_off(0, key))]
+                        })
+                    })
+                    .collect(),
+            ],
+        );
+        let quiet = midi(
+            48,
+            vec![
+                vec![],
+                vec![
+                    (
+                        0,
+                        on(
+                            0,
+                            MidiMessage::NoteOn {
+                                key: u7::new(60),
+                                vel: u7::new(20),
+                            },
+                        ),
+                    ),
+                    (48, note_off(0, 60)),
+                ],
+            ],
+        );
+        assert!(master_volume(&import(&loud, MidiMapping::PaperMario, &[]).unwrap()) < MASTER_VOLUME);
+        assert_eq!(
+            master_volume(&import(&quiet, MidiMapping::PaperMario, &[]).unwrap()),
+            127
+        );
     }
 }

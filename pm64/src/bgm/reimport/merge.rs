@@ -28,6 +28,7 @@ pub fn import(raw: &[u8], name: &str, mapping: MidiMapping, sample_reach: &[u8])
         base_hash: hash(&canonical(&base)),
         patch: Patch::default(),
         mapping,
+        instruments: starting_instruments(&base, &bgm.instruments),
     });
     Ok(Imported {
         bgm,
@@ -47,10 +48,42 @@ fn is_setup(timed: &Timed) -> bool {
         && matches!(
             timed.command,
             Command::SetTrackVoice { .. }
+                | Command::TrackOverridePatch(_)
                 | Command::SubTrackVolume(_)
                 | Command::SubTrackPan(_)
                 | Command::SubTrackReverb(_)
         )
+}
+
+/// The index of the instrument `track` starts with, if it chooses one.
+fn starting_voice(track: &[Timed]) -> Option<usize> {
+    track
+        .iter()
+        .filter(|timed| is_setup(timed))
+        .find_map(|timed| match timed.command {
+            Command::SetTrackVoice { index } => Some(index as usize),
+            _ => None,
+        })
+}
+
+/// The sample `track` starts with in place of its instrument's, if it overrides it.
+fn starting_override(track: &[Timed]) -> Option<PatchAddress> {
+    track
+        .iter()
+        .filter(|timed| is_setup(timed))
+        .rev()
+        .find_map(|timed| match &timed.command {
+            Command::TrackOverridePatch(patch) => Some(patch.clone()),
+            _ => None,
+        })
+}
+
+/// The instrument each track of `timeline` starts with, of `instruments`.
+fn starting_instruments(timeline: &Timeline, instruments: &[Instrument]) -> BTreeMap<TrackKey, Instrument> {
+    timeline
+        .iter()
+        .filter_map(|(key, track)| Some((key.clone(), instruments.get(starting_voice(track)?)?.clone())))
+        .collect()
 }
 
 /// What makes two commands the same place in a track: a note's pitch, or anything else's kind.
@@ -91,8 +124,31 @@ fn remove_near(track: &mut Vec<Timed>, timed: &Timed) {
 /// Merges one track: the source's version, with Mamar's edits applied where the source didn't change the same slot.
 /// Returns the merged track and how many edits were dropped.
 fn merge_track(base: &[Timed], ours: &[Timed], theirs: &[Timed]) -> (Vec<Timed>, usize) {
-    // The song's setup goes first, as the import's did
-    let mut track: Vec<Timed> = ours.iter().filter(|timed| is_setup(timed)).cloned().collect();
+    // Setup goes first, as the import's did: the song's if Mamar changed it, else the file's. Either way the instrument
+    // is the song's, as it's an index into the song's instruments.
+    let is_voice = |timed: &&Timed| matches!(timed.command, Command::SetTrackVoice { .. });
+    let our_setup: Vec<Timed> = ours.iter().filter(|timed| is_setup(timed)).cloned().collect();
+    let base_setup = base.iter().filter(|timed| is_setup(timed));
+    let mut track: Vec<Timed> = if our_setup
+        .iter()
+        .filter(|timed| !is_voice(timed))
+        .eq(base_setup.filter(|timed| !is_voice(timed)))
+    {
+        let our_voice = our_setup.iter().find(is_voice);
+        theirs
+            .iter()
+            .filter(|timed| is_setup(timed))
+            .filter_map(|timed| {
+                if is_voice(&timed) {
+                    our_voice.cloned()
+                } else {
+                    Some(timed.clone())
+                }
+            })
+            .collect()
+    } else {
+        our_setup
+    };
     let mut merged: Vec<Timed> = theirs.iter().filter(|timed| !is_setup(timed)).cloned().collect();
     let mut dropped = 0;
 
@@ -258,6 +314,55 @@ pub fn reimport(
             ));
             merged[index] = Some(track);
             keys[index] = None;
+        }
+    }
+
+    // The instrument each merged track starts with takes the file's values where Mamar didn't change them
+    let their_instruments = starting_instruments(&theirs, &new.bgm.instruments);
+    for index in (0..16).filter(|&index| fresh[index].is_some()) {
+        let Some(key) = &keys[index] else { continue };
+        let our_track = ours.get(key).map_or(&[][..], Vec::as_slice);
+        let base_track = base.get(key).map_or(&[][..], Vec::as_slice);
+        let Some(theirs) = their_instruments.get(key) else {
+            continue;
+        };
+        let Some(voice) = starting_voice(our_track) else {
+            // A track that starts without choosing an instrument takes the file's, before anything Mamar set
+            out.instruments.push(theirs.clone());
+            let voice = Command::SetTrackVoice {
+                index: (out.instruments.len() - 1) as u8,
+            };
+            if let Some(track) = &mut merged[index] {
+                track.insert(
+                    0,
+                    Timed {
+                        tick: 0,
+                        command: voice,
+                    },
+                );
+            }
+            continue;
+        };
+        let Some(instrument) = out.instruments.get_mut(voice) else {
+            continue;
+        };
+        let (base_patch, base_volume, base_pan, base_reverb) = match link.instruments.get(key) {
+            Some(base) => (Some(base.patch.clone()), base.volume, base.pan, base.reverb),
+            None => (starting_override(base_track), midi::INSTRUMENT_VOLUME, 64, 0),
+        };
+        if base_patch
+            .is_some_and(|patch| starting_override(our_track).unwrap_or_else(|| instrument.patch.clone()) == patch)
+        {
+            instrument.patch = theirs.patch.clone();
+        }
+        if instrument.volume == base_volume {
+            instrument.volume = theirs.volume;
+        }
+        if instrument.pan == base_pan {
+            instrument.pan = theirs.pan;
+        }
+        if instrument.reverb == base_reverb {
+            instrument.reverb = theirs.reverb;
         }
     }
 
@@ -429,6 +534,7 @@ pub fn reimport(
         track_keys: keys,
         patch: Patch::default(),
         mapping: link.mapping,
+        instruments: their_instruments,
     });
 
     Ok((out, new_base, report))
@@ -794,6 +900,46 @@ mod test {
         );
         assert_eq!(bgm.instruments[1].volume, 55);
         assert!(report.problems.is_empty(), "{:?}", report.problems);
+    }
+
+    #[test]
+    fn songs_imported_before_loudness_was_normalized_get_it_on_reimport() {
+        // The commands the Lead track starts with, but its instrument, and the volume, pan and reverb of its instrument
+        let start = |bgm: &Bgm| {
+            let track = &bgm.track_lists.values().next().unwrap().tracks[track_index(bgm, "Lead")];
+            let setup: Vec<Command> = track
+                .commands
+                .iter()
+                .take_while(|event| !matches!(event.command, Command::Delay(_) | Command::Note { .. }))
+                .filter(|event| !matches!(event.command, Command::SetTrackVoice { .. }))
+                .map(|event| event.command.clone())
+                .collect();
+            let instrument = track.commands.iter().find_map(|event| match event.command {
+                Command::SetTrackVoice { index } => {
+                    let instrument = &bgm.instruments[index as usize];
+                    Some((instrument.volume, instrument.pan, instrument.reverb))
+                }
+                _ => None,
+            });
+            (setup, instrument)
+        };
+        let lead = |second: u32| midi(&[("Lead", notes(&[(0, 60), (48, second)]))], &[]);
+
+        // As Mamar imported songs before: instruments as they were made
+        let mut bgm = import(&lead(62), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
+        bgm.import.as_mut().unwrap().instruments.clear();
+        for instrument in &mut bgm.instruments {
+            instrument.volume = midi::INSTRUMENT_VOLUME;
+        }
+
+        let (bgm, _, _) = reimport(&bgm, None, &lead(64), "song.mid", &[]).unwrap();
+        let fresh = import(&lead(64), "song.mid", MidiMapping::PaperMario, &[]).unwrap().bgm;
+        assert_ne!(
+            start(&fresh).1,
+            Some((midi::INSTRUMENT_VOLUME, 64, 0)),
+            "loudness is normalized"
+        );
+        assert_eq!(start(&bgm), start(&fresh));
     }
 
     #[test]

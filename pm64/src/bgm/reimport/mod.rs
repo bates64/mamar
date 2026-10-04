@@ -56,6 +56,11 @@ pub struct ImportLink {
     /// How the file's programs and drum notes are read, chosen on the first import and kept across reimports. Songs
     /// imported before Mamar read General MIDI read them as Paper Mario numbers.
     pub mapping: MidiMapping,
+    /// The instrument each source track started with in the last import, which holds the file's starting volume, pan
+    /// and reverb, so a reimport can tell which of its values Mamar changed. Empty for songs imported before Mamar
+    /// kept them, whose instruments all had a volume of [INSTRUMENT_VOLUME](super::midi::INSTRUMENT_VOLUME),
+    /// centre pan and no reverb, and set the file's starting values with commands after them instead.
+    pub instruments: BTreeMap<TrackKey, Instrument>,
 }
 
 /// The commands Mamar added to and removed from each source track since the last import.
