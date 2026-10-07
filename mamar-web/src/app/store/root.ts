@@ -109,7 +109,7 @@ export function isMidi(data: Uint8Array): boolean {
  * says, which is Paper Mario numbers unless given, as Mamar read them before it read General MIDI, choosing samples
  * that reach its notes by `sampleReach`, from doc/pitchLimit.
  */
-function decode(
+export function decode(
     data: Uint8Array,
     sbn: ArrayBuffer | null | undefined,
     name?: string,
