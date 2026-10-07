@@ -15,6 +15,11 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # npm trusts this workflow to publish mamar-editor, given the identity
+    # token GitHub issues it.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
@@ -34,10 +39,8 @@ jobs:
       - name: Install dependencies
         run: nix develop --command yarn install --frozen-lockfile
 
+      # Trusted publishing needs npm 11.5.1 or later.
       - name: Publish
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > "$HOME/.npmrc"
           cd mamar-editor
-          nix develop --command npm publish --access public
+          nix develop --command npx --yes npm@11 publish --access public
