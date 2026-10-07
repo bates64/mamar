@@ -2,7 +2,7 @@ import { DialogContainer, Provider as SpectrumProvider } from "@adobe/react-spec
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 
 import styles from "./BgmEditor.module.scss"
-import Bridge, { ensureBridge } from "./bridge"
+import { ensureBridge } from "./bridge"
 import ActiveDoc from "./doc/ActiveDoc"
 import { PlayheadContextProvider } from "./doc/Playhead"
 import PlaybackControls from "./emu/PlaybackControls"
@@ -15,6 +15,7 @@ import { RootProvider } from "./store/dispatch"
 import { openData } from "./store/root"
 import { mochaTheme } from "./theme"
 import { SoundBankContext } from "./util/hooks/useSoundBank"
+import { encodeToSave } from "./util/recordings"
 
 import "./colors.scss"
 
@@ -69,13 +70,13 @@ const BgmEditor = forwardRef<BgmEditorHandle, BgmEditorProps>(function BgmEditor
 
 export default BgmEditor
 
-const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ data, onDirtyChange }, ref) {
+const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ data, soundBank, onDirtyChange }, ref) {
     const [root, dispatch] = useRoot()
     const docId = root.activeDocId
     const doc = docId ? root.docs[docId] : undefined
 
     useEffect(() => {
-        dispatch(openData(data, undefined, true))
+        dispatch(openData(data, undefined, true, soundBank))
     // Opens the song once, when the editor mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -83,19 +84,16 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
     const [isExporting, setExporting] = useState(false)
     const { reimport, dialog: reimportDialog } = useReimport()
 
-    const latest = useRef({ doc, dispatch, reimport })
-    latest.current = { doc, dispatch, reimport }
+    const latest = useRef({ doc, dispatch, reimport, soundBank })
+    latest.current = { doc, dispatch, reimport, soundBank }
 
     useImperativeHandle(ref, () => ({
         save() {
-            const { doc, dispatch } = latest.current
+            const { doc, dispatch, soundBank } = latest.current
             if (!doc) {
                 throw new Error("No song is open")
             }
-            const bgmBin: Uint8Array | string = Bridge.bgm_encode(doc.bgm, null)
-            if (typeof bgmBin === "string") {
-                throw new Error(bgmBin)
-            }
+            const bgmBin = encodeToSave(doc.bgm, doc.importBase, soundBank)
             dispatch({ type: "doc", id: doc.id, action: { type: "mark_saved" } })
             return bgmBin
         },

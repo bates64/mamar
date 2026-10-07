@@ -339,3 +339,11 @@ export function encodeForGame(bgm: Bgm, sbn: ArrayBuffer | null): Uint8Array {
     }
     return encoded
 }
+
+/**
+ * Encodes the song to save, as encodeForGame does. A song made from a MIDI file keeps what was changed since
+ * `importBase`, its import, so a reimport can keep it.
+ */
+export function encodeToSave(bgm: Bgm, importBase: Uint8Array | undefined, sbn: ArrayBuffer | null): Uint8Array {
+    return encodeForGame(bgm.import && importBase ? Bridge.import_patch(bgm, importBase) : bgm, sbn)
+}
