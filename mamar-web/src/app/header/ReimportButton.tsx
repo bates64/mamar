@@ -14,30 +14,23 @@ interface Problems {
     lines: string[]
 }
 
+/** What a reimport did, or null if it did nothing, or showed a dialog of what went wrong. */
+export type ReimportResult = "Reimported" | "No changes" | null
+
 /**
- * Reimports the MIDI file the song was made from, keeping what was changed in Mamar. Only shown for songs made from a
- * MIDI file. Reads the remembered file in one click; Shift-click, or a file that can't be read, picks one instead.
+ * Reimports the MIDI file the song was made from, keeping what was changed in Mamar. `reimport` reads the remembered
+ * file, or picks one if `pick` is set or the file can't be read. Render `dialog`, which shows what went wrong.
  */
-export default function ReimportButton() {
+export function useReimport() {
     const [doc, docDispatch] = useDoc()
     const sbn = useOptionalSoundBank()
-    const [done, setDone] = useState<"Reimported" | "No changes" | null>(null)
-    const [isHovered, setHovered] = useState(false)
     const [problems, setProblems] = useState<Problems | null>(null)
-
-    useEffect(() => {
-        if (done) {
-            const timeout = setTimeout(() => setDone(null), 2000)
-            return () => clearTimeout(timeout)
-        }
-    }, [done])
-
     const link = doc?.bgm.import
-    if (!doc || !link) {
-        return null
-    }
 
-    const reimport = async (pick: boolean) => {
+    const reimport = async (pick: boolean): Promise<ReimportResult> => {
+        if (!doc || !link) {
+            return null
+        }
         let file: File | null = pick ? null : await readRememberedMidi(link.id)
         let handle: FileSystemFileHandle | undefined
         if (!file) {
@@ -47,7 +40,7 @@ export default function ReimportButton() {
                 handle = picked.handle
             } catch {
                 // Cancelled
-                return
+                return null
             }
         }
 
@@ -56,7 +49,7 @@ export default function ReimportButton() {
             Bridge.bgm_reimport(doc.bgm, doc.importBase, data, file.name, sbn ? sampleReach(sbn) : new Uint8Array())
         if (typeof reimported === "string") {
             setProblems({ title: "Couldn't reimport", lines: [reimported] })
-            return
+            return null
         }
 
         if (handle) {
@@ -64,20 +57,52 @@ export default function ReimportButton() {
         }
         const { report } = reimported
         if (report.unchanged) {
-            setDone("No changes")
-            return
+            return "No changes"
         }
         docDispatch({ type: "reimport", bgm: reimported.bgm, importBase: reimported.base })
         if (report.problems.length > 0) {
             setProblems({ title: `Reimported ${file.name}`, lines: report.problems })
-        } else {
-            setDone("Reimported")
+            return null
         }
+        return "Reimported"
+    }
+
+    const dialog = <DialogContainer onDismiss={() => setProblems(null)}>
+        {problems && <AlertDialog title={problems.title} variant="warning" primaryActionLabel="OK">
+            <Content>
+                {problems.lines.length === 1
+                    ? <Text>{problems.lines[0]}</Text>
+                    : <ul>{problems.lines.map((line, i) => <li key={i}>{line}</li>)}</ul>}
+            </Content>
+        </AlertDialog>}
+    </DialogContainer>
+
+    return { link, reimport, dialog }
+}
+
+/**
+ * Reimports the MIDI file the song was made from. Only shown for songs made from a MIDI file. Reads the remembered file
+ * in one click; Shift-click, or a file that can't be read, picks one instead.
+ */
+export default function ReimportButton() {
+    const { link, reimport, dialog } = useReimport()
+    const [done, setDone] = useState<ReimportResult>(null)
+    const [isHovered, setHovered] = useState(false)
+
+    useEffect(() => {
+        if (done) {
+            const timeout = setTimeout(() => setDone(null), 2000)
+            return () => clearTimeout(timeout)
+        }
+    }, [done])
+
+    if (!link) {
+        return null
     }
 
     return <>
         <TooltipTrigger isOpen={done !== null || isHovered} onOpenChange={setHovered}>
-            <ActionButton onPress={evt => reimport(evt.shiftKey)} isQuiet>
+            <ActionButton onPress={async evt => setDone(await reimport(evt.shiftKey))} isQuiet>
                 Reimport
             </ActionButton>
             {done
@@ -85,14 +110,6 @@ export default function ReimportButton() {
                 : <Tooltip>Update from {link.source_name || "the MIDI file"}. Shift-click to choose another file.</Tooltip>}
         </TooltipTrigger>
 
-        <DialogContainer onDismiss={() => setProblems(null)}>
-            {problems && <AlertDialog title={problems.title} variant="warning" primaryActionLabel="OK">
-                <Content>
-                    {problems.lines.length === 1
-                        ? <Text>{problems.lines[0]}</Text>
-                        : <ul>{problems.lines.map((line, i) => <li key={i}>{line}</li>)}</ul>}
-                </Content>
-            </AlertDialog>}
-        </DialogContainer>
+        {dialog}
     </>
 }

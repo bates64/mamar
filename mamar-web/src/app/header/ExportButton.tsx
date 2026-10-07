@@ -52,8 +52,19 @@ function fileName(name: string, extension: string): string {
     return name.replace(/\.(bgm|ron|mid|midi)$/i, "") + extension
 }
 
-/** Exports the song as an audio file, as the game plays it, with the variation and mix being listened to. */
+/** Opens the export dialog. */
 export default function ExportButton() {
+    const [doc] = useDoc()
+    const sbn = useOptionalSoundBank()
+
+    return <DialogTrigger>
+        <ActionButton isQuiet isDisabled={!doc || !sbn}>Export</ActionButton>
+        {close => <ExportDialog close={close} />}
+    </DialogTrigger>
+}
+
+/** Exports the song as an audio file, as the game plays it, with the variation and mix being listened to. */
+export function ExportDialog({ close }: { close: () => void }) {
     const [doc] = useDoc()
     const [variation] = useVariation()
     const [location] = useLocation()
@@ -75,7 +86,7 @@ export default function ExportButton() {
     const segments = variation?.segments ?? []
     const isLooping = loopsForever(segments)
 
-    const exportWav = async (close: () => void) => {
+    const exportWav = async () => {
         if (!doc || !sbn) return
         setError(null)
         setProgress(0)
@@ -104,49 +115,46 @@ export default function ExportButton() {
         }
     }
 
-    return <DialogTrigger>
-        <ActionButton isQuiet isDisabled={!doc || !sbn}>Export</ActionButton>
-        {close => <Dialog size="S">
-            <Heading>Export</Heading>
-            <Divider />
-            <Content>
-                <Flex direction="column" gap="size-150">
-                    {canOgg && <Picker
-                        label="Format"
-                        width="100%"
-                        selectedKey={format.key}
-                        onSelectionChange={key => change({ format: key as Format })}
-                        items={FORMATS}
-                    >
-                        {item => <Item key={item.key}>{item.name}</Item>}
-                    </Picker>}
-                    {isLooping
-                        ? <>
-                            <Text>This song loops forever, so it plays its loop a number of times and then fades out.</Text>
-                            <NumberField
-                                label="Times to play the loop"
-                                value={settings.loops}
-                                minValue={1}
-                                maxValue={20}
-                                onChange={loops => !Number.isNaN(loops) && change({ loops })}
-                            />
-                            <NumberField
-                                label="Fade out (seconds)"
-                                value={settings.fadeSeconds}
-                                minValue={0}
-                                maxValue={60}
-                                onChange={fadeSeconds => !Number.isNaN(fadeSeconds) && change({ fadeSeconds })}
-                            />
-                        </>
-                        : <Text>This song plays once, to its end.</Text>}
-                    {progress !== null && <ProgressBar label="Rendering" value={progress * 100} width="100%" />}
-                    {error && <Text UNSAFE_style={{ color: "var(--spectrum-red-900)" }}>Couldn't export this song: {error}</Text>}
-                </Flex>
-            </Content>
-            <ButtonGroup>
-                <Button variant="secondary" onPress={close} isDisabled={progress !== null}>Cancel</Button>
-                <Button variant="accent" onPress={() => exportWav(close)} isDisabled={progress !== null}>Export</Button>
-            </ButtonGroup>
-        </Dialog>}
-    </DialogTrigger>
+    return <Dialog size="S">
+        <Heading>Export</Heading>
+        <Divider />
+        <Content>
+            <Flex direction="column" gap="size-150">
+                {canOgg && <Picker
+                    label="Format"
+                    width="100%"
+                    selectedKey={format.key}
+                    onSelectionChange={key => change({ format: key as Format })}
+                    items={FORMATS}
+                >
+                    {item => <Item key={item.key}>{item.name}</Item>}
+                </Picker>}
+                {isLooping
+                    ? <>
+                        <Text>This song loops forever, so it plays its loop a number of times and then fades out.</Text>
+                        <NumberField
+                            label="Times to play the loop"
+                            value={settings.loops}
+                            minValue={1}
+                            maxValue={20}
+                            onChange={loops => !Number.isNaN(loops) && change({ loops })}
+                        />
+                        <NumberField
+                            label="Fade out (seconds)"
+                            value={settings.fadeSeconds}
+                            minValue={0}
+                            maxValue={60}
+                            onChange={fadeSeconds => !Number.isNaN(fadeSeconds) && change({ fadeSeconds })}
+                        />
+                    </>
+                    : <Text>This song plays once, to its end.</Text>}
+                {progress !== null && <ProgressBar label="Rendering" value={progress * 100} width="100%" />}
+                {error && <Text UNSAFE_style={{ color: "var(--spectrum-red-900)" }}>Couldn't export this song: {error}</Text>}
+            </Flex>
+        </Content>
+        <ButtonGroup>
+            <Button variant="secondary" onPress={close} isDisabled={progress !== null}>Cancel</Button>
+            <Button variant="accent" onPress={exportWav} isDisabled={progress !== null}>Export</Button>
+        </ButtonGroup>
+    </Dialog>
 }

@@ -1,5 +1,6 @@
 export { default as BgmEditor } from "./BgmEditor"
 export type { BgmEditorHandle, BgmEditorProps } from "./BgmEditor"
+export type { ReimportResult } from "./header/ReimportButton"
 export type { PlayerStatus, SongPlayer, SongPosition, TrackMute } from "./emu/SongPlayer"
 export { default as WasmSongPlayer } from "./emu/WasmSongPlayer"
 export { findSoundBank } from "./util/soundBank"

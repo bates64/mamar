@@ -1,4 +1,4 @@
-import { Provider as SpectrumProvider } from "@adobe/react-spectrum"
+import { DialogContainer, Provider as SpectrumProvider } from "@adobe/react-spectrum"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 
 import styles from "./BgmEditor.module.scss"
@@ -8,6 +8,8 @@ import { PlayheadContextProvider } from "./doc/Playhead"
 import PlaybackControls from "./emu/PlaybackControls"
 import { SongPlayer, SongPlayerContext } from "./emu/SongPlayer"
 import ErrorBoundaryView from "./ErrorBoundaryView"
+import { ExportDialog } from "./header/ExportButton"
+import { ReimportResult, useReimport } from "./header/ReimportButton"
 import { useRoot } from "./store"
 import { RootProvider } from "./store/dispatch"
 import { openData } from "./store/root"
@@ -21,6 +23,15 @@ export interface BgmEditorHandle {
     save(): Uint8Array
     undo(): void
     redo(): void
+    /** Opens the dialog that exports the song as an audio file. */
+    exportAudio(): void
+    /** Whether the song was made from a MIDI file, which it can be reimported from. */
+    canReimport(): boolean
+    /**
+     * Reimports the MIDI file the song was made from, keeping what was changed in Mamar. It reads the file it last
+     * read, or asks for one if `pick` is set or that file can't be read. A dialog in the editor shows what went wrong.
+     */
+    reimport(pick: boolean): Promise<ReimportResult>
 }
 
 export interface BgmEditorProps {
@@ -69,8 +80,11 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const latest = useRef({ doc, dispatch })
-    latest.current = { doc, dispatch }
+    const [isExporting, setExporting] = useState(false)
+    const { reimport, dialog: reimportDialog } = useReimport()
+
+    const latest = useRef({ doc, dispatch, reimport })
+    latest.current = { doc, dispatch, reimport }
 
     useImperativeHandle(ref, () => ({
         save() {
@@ -91,6 +105,15 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
         redo() {
             latest.current.dispatch.redo()
         },
+        exportAudio() {
+            setExporting(true)
+        },
+        canReimport() {
+            return !!latest.current.doc?.bgm.import
+        },
+        reimport(pick) {
+            return latest.current.reimport(pick)
+        },
     }), [])
 
     const isDirty = doc ? !doc.isSaved : false
@@ -103,5 +126,9 @@ const Editor = forwardRef<BgmEditorHandle, BgmEditorProps>(function Editor({ dat
         <ErrorBoundaryView UNSAFE_className={styles.doc}>
             {doc && <ActiveDoc />}
         </ErrorBoundaryView>
+        <DialogContainer onDismiss={() => setExporting(false)}>
+            {isExporting && <ExportDialog close={() => setExporting(false)} />}
+        </DialogContainer>
+        {reimportDialog}
     </div>
 })
