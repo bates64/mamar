@@ -1,23 +1,48 @@
 import path from "path"
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { build } from "esbuild"
+import { defineConfig, Plugin } from "vite"
+
+const WORKLET_URL = "\0audio-engine-worklet-url"
+
+/**
+ * Builds the audio engine's worklet into the library as a blob URL. A worklet
+ * otherwise loads from a file beside the library, which the host's bundler
+ * would have to know to copy and serve.
+ */
+function inlineWorklet(): Plugin {
+    return {
+        name: "inline-worklet",
+        enforce: "pre",
+        resolveId(source) {
+            if (source.endsWith("/audioEngine.worklet?worker&url")) {
+                return WORKLET_URL
+            }
+        },
+        async load(id) {
+            if (id !== WORKLET_URL) {
+                return
+            }
+            const result = await build({
+                entryPoints: [path.resolve(__dirname, "../mamar-web/src/app/emu/audioEngine.worklet.ts")],
+                bundle: true,
+                format: "esm",
+                minify: true,
+                write: false,
+            })
+            const code = JSON.stringify(result.outputFiles[0].text)
+            return `export default URL.createObjectURL(new Blob([${code}], { type: "text/javascript" }))`
+        },
+    }
+}
 
 // Builds the editor from mamar-web's source. Library mode inlines the
-// WebAssembly bridge as a data URL, so the host's bundler needs no loader for it.
+// WebAssembly as data URLs, so the host's bundler needs no loader for it.
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), inlineWorklet()],
     // Library mode leaves this for the host's bundler, which might not define it.
     define: {
         "process.env.NODE_ENV": JSON.stringify("production"),
-    },
-    // The audio engine's worklet is a separate file, found relative to the library so it loads wherever the host puts
-    // the package. Host bundlers also recognise this pattern and copy the file.
-    experimental: {
-        renderBuiltUrl(filename, { hostType }) {
-            if (hostType === "js") {
-                return { runtime: `new URL(${JSON.stringify(filename)}, import.meta.url).href` }
-            }
-        },
     },
     build: {
         outDir: path.resolve(__dirname, "dist"),

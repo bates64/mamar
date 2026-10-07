@@ -51,6 +51,11 @@ export default class WasmSongPlayer implements SongPlayer {
         return node
     }
 
+    /** Stops the audio engine and frees what it plays through. The player plays nothing after. */
+    close(): Promise<void> {
+        return this.context.close()
+    }
+
     private post(message: AudioEngineMessage) {
         this.node.then(node => node.port.postMessage(message))
     }

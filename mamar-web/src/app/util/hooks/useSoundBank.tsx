@@ -5,7 +5,8 @@ import { useEffect, ReactNode, useState, useContext, createContext } from "react
 import PaperMarioRomInputDialog from "../../emu/PaperMarioRomInputDialog"
 import { findSoundBank } from "../soundBank"
 
-const soundBank = createContext<ArrayBuffer | null>(null)
+/** The sound bank (SBN) of the ROM whose instruments songs play with. */
+export const SoundBankContext = createContext<ArrayBuffer | null>(null)
 
 /** Loads the sound bank of the ROM the user gave, asking for a ROM if they haven't given one. */
 async function loadSoundBank(): Promise<ArrayBuffer | null> {
@@ -43,18 +44,18 @@ export function SoundBankProvider({ children }: { children: ReactNode }) {
         setValue(sbn)
     }
 
-    return <soundBank.Provider value={value}>
+    return <SoundBankContext.Provider value={value}>
         <DialogContainer onDismiss={() => {}} isDismissable={false} isKeyboardDismissDisabled={true}>
             {!value && isLoaded && <PaperMarioRomInputDialog onChange={onChange} />}
         </DialogContainer>
 
         {value && children}
-    </soundBank.Provider>
+    </SoundBankContext.Provider>
 }
 
 /** The sound bank (SBN) of the user's Paper Mario ROM. */
 export default function useSoundBank(): ArrayBuffer {
-    const value = useContext(soundBank)
+    const value = useContext(SoundBankContext)
 
     if (!value) {
         throw new Error("useSoundBank must be used within a SoundBankProvider")
@@ -63,7 +64,7 @@ export default function useSoundBank(): ArrayBuffer {
     return value
 }
 
-/** The sound bank of the user's ROM, or null where there's none, such as in a host that plays songs itself. */
+/** The sound bank of the user's ROM, or null outside a SoundBankContext. */
 export function useOptionalSoundBank(): ArrayBuffer | null {
-    return useContext(soundBank)
+    return useContext(SoundBankContext)
 }

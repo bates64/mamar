@@ -12,6 +12,7 @@ import { useRoot } from "./store"
 import { RootProvider } from "./store/dispatch"
 import { openData } from "./store/root"
 import { mochaTheme } from "./theme"
+import { SoundBankContext } from "./util/hooks/useSoundBank"
 
 import "./colors.scss"
 
@@ -25,6 +26,8 @@ export interface BgmEditorHandle {
 export interface BgmEditorProps {
     /** The encoded BGM to edit. Changing it after the first render does nothing. */
     data: Uint8Array
+    /** The sound bank (SBN) of the ROM whose instruments the song plays with, as findSoundBank finds it. */
+    soundBank: ArrayBuffer
     player: SongPlayer
     /** Called when the song gains or loses unsaved changes. */
     onDirtyChange?: (dirty: boolean) => void
@@ -42,11 +45,13 @@ const BgmEditor = forwardRef<BgmEditorHandle, BgmEditorProps>(function BgmEditor
 
     return <SpectrumProvider theme={mochaTheme} colorScheme="dark" UNSAFE_className={styles.editor}>
         {isBridgeLoaded && <RootProvider>
-            <SongPlayerContext.Provider value={props.player}>
-                <PlayheadContextProvider>
-                    <Editor ref={ref} {...props} />
-                </PlayheadContextProvider>
-            </SongPlayerContext.Provider>
+            <SoundBankContext.Provider value={props.soundBank}>
+                <SongPlayerContext.Provider value={props.player}>
+                    <PlayheadContextProvider>
+                        <Editor ref={ref} {...props} />
+                    </PlayheadContextProvider>
+                </SongPlayerContext.Provider>
+            </SoundBankContext.Provider>
         </RootProvider>}
     </SpectrumProvider>
 })
