@@ -1,18 +1,26 @@
 name: Publish mamar-editor
 
 # Publishes mamar-editor to npm when a tag such as mamar-editor-v0.1.0 is pushed.
-# The tag must match the version in mamar-editor/package.json.
+# The tag must match the version in mamar-editor/package.json. The package
+# bundles mamar-audio, which is built from a papermario-dx checkout.
 
 on:
   push:
     tags:
       - "mamar-editor-v*"
 
+env:
+  DX_DIR: papermario-dx
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: bates64/papermario-dx
+          path: papermario-dx
       - uses: cachix/install-nix-action@v31
 
       - name: Check the tag matches the package version
