@@ -65,9 +65,12 @@ export interface AuxBankFile {
 
 const auxBankFilesCache = new WeakMap<ArrayBuffer, AuxBankFile[]>()
 
+/** The group of the INIT file's bank list that holds the music banks. */
+const MUSIC_BANK_GROUP = 3
+
 /**
- * The BK files that songs can load into their aux banks: those the INIT file doesn't load into a bank of its own, which
- * the ROM's songs load theirs from.
+ * The BK files that songs can load into their aux banks: every one but the music banks, which are always loaded for
+ * songs to play from.
  */
 export function auxBankFiles(sbn: ArrayBuffer): AuxBankFile[] {
     const cached = auxBankFilesCache.get(sbn)
@@ -82,18 +85,18 @@ export function auxBankFiles(sbn: ArrayBuffer): AuxBankFile[] {
         return files
     }
 
-    const loaded = new Set<number>()
+    const musicBanks = new Set<number>()
     const bankList = init + view.getUint16(init + 0x08)
     for (let entry = bankList; entry + 4 <= bankList + view.getUint16(init + 0x0A); entry += 4) {
         const fileIndex = view.getUint16(entry)
         if (fileIndex === 0xFFFF) break
-        loaded.add(fileIndex)
+        if (view.getUint8(entry + 3) === MUSIC_BANK_GROUP) musicBanks.add(fileIndex)
     }
 
     for (let i = 0; i < fileCount; i++) {
         const file = view.getUint32(0x40 + i * 8) & 0xFFFFFF
         // "BK  "
-        if (loaded.has(i) || view.getUint32(file) !== 0x424B2020) continue
+        if (musicBanks.has(i) || view.getUint32(file) !== 0x424B2020) continue
         const instruments = []
         for (let instrument = 0; instrument < 16; instrument++) {
             if (view.getUint16(file + 0x12 + instrument * 2) !== 0) {

@@ -63,7 +63,8 @@ pub struct Bgm {
     pub mix_names: BTreeMap<u8, String>,
 
     /// The name of the SBN's BK file each aux bank loads, such as "SPC2", for patches in the aux bank set to play. An
-    /// empty name leaves that bank empty. The game loads these from the SBN's song list instead.
+    /// empty name leaves that bank empty. The game loads these from the SBN's song list, which Paper Mario DX's build
+    /// fills in from this list.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aux_banks: Vec<String>,
 

@@ -41,8 +41,8 @@ interface SoundGroup {
 }
 
 /**
- * Chooses the sample `patch` plays, from the samples in the game's music banks, and those the ROM's songs load into
- * their aux banks, while the song has an aux bank free for them. Choosing one loads it into a free aux bank. Typing
+ * Chooses the sample `patch` plays, from the samples in the game's music banks, and those of the ROM's other banks
+ * while the song has an aux bank free for them. Choosing one loads it into a free aux bank. Typing
  * searches the samples by name.
  */
 export function SampleSelect({ patch, onChange }: { patch: PatchAddress, onChange(patch: PatchAddress): void }) {
