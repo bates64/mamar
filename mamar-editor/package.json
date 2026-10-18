@@ -1,6 +1,6 @@
 {
   "name": "mamar-editor",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Paper Mario music editor as a React component",
   "repository": "https://github.com/bates64/mamar",
   "author": "Alex Bates <alex@bates64.com>",
