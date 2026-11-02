@@ -23,7 +23,7 @@ export enum MusicBankSet {
 
 /**
  * The names of the samples in the sound bank's BK files, by file and then instrument, from Star Rod Classic's list of
- * them. A sample it doesn't know the name of is null.
+ * them and papermario-dx's sound banks. A sample neither names is null.
  */
 const SOUND_NAMES: Record<string, Record<string, string | null> | undefined> = soundNames
 
