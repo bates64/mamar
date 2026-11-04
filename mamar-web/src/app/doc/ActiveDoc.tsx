@@ -5,6 +5,7 @@ import Ruler from "./Ruler"
 import SegmentMap from "./SegmentMap"
 import { SongLaneMenu } from "./SongLanes"
 import SubsegDetails from "./SubsegDetails"
+import TimeGrid from "./TimeGrid"
 import TimeProvider from "./TimeProvider"
 
 import { useDoc } from "../store"
@@ -37,6 +38,9 @@ export default function ActiveDoc() {
                         <Ruler />
                     </div>
                     <SegmentMap />
+                    <div className={styles.scrollbarRow}>
+                        <TimeGrid className={styles.scrollbar} style={{ scrollbarWidth: "auto" }} />
+                    </div>
                 </Flex>
                 {doc.panelContent.type !== "not_open" && <View
                     elementType="aside"

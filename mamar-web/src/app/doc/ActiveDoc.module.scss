@@ -10,6 +10,19 @@
     grid-template-columns: 225px minmax(0, 1fr);
 }
 
+// The timeline's scrollbar, under the tracks however few there are, and as wide as the timeline above it
+.scrollbarRow {
+    display: grid;
+    grid-template-columns: 225px minmax(0, 1fr);
+    margin-top: auto;
+}
+
+// Scrollbars that overlay content need it to have height to show over
+.scrollbar {
+    grid-column: 2;
+    min-height: 12px;
+}
+
 .corner {
     display: flex;
     align-items: center;

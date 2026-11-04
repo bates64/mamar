@@ -44,7 +44,7 @@ export default function TimeGrid({
     onClick,
     onMouseDown,
 }: {
-    children: React.ReactNode
+    children?: React.ReactNode
     syncKey?: string
     className?: string
     style?: React.CSSProperties
