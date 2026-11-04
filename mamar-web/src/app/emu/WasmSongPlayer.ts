@@ -60,7 +60,7 @@ export default class WasmSongPlayer implements SongPlayer {
         this.node.then(node => node.port.postMessage(message))
     }
 
-    load(bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[]) {
+    load(bgm: Uint8Array, variation: number, start: SongPosition | null, auxBanks: number[]) {
         this.post({ type: "play", bgm, variation, start, auxBanks })
     }
 

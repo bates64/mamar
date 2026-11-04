@@ -19,7 +19,7 @@ export interface AudioEngineOptions {
 }
 
 export type AudioEngineMessage =
-    | { type: "play", bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[] }
+    | { type: "play", bgm: Uint8Array, variation: number, start: SongPosition | null, auxBanks: number[] }
     | { type: "pause", paused: boolean }
     | { type: "mutes", muteMask: number, soloMask: number }
     | { type: "location", proximityMix: number, alternateParts: boolean }
@@ -117,9 +117,15 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
     private onMessage(message: AudioEngineMessage) {
         const { engine } = this
         switch (message.type) {
-        case "play":
+        case "play": {
             // A song too big for the engine's buffer would write past its end
             if (message.bgm.length > maxSongSize(engine)) {
+                break
+            }
+            // Where the engine is, rather than where it last reported, as it has rendered on since
+            const segment = engine.mamar_audio_segment()
+            const start = message.start ?? (segment < 0 ? null : { segment, tick: engine.mamar_audio_tick() })
+            if (!start) {
                 break
             }
             new Uint8Array(engine.memory.buffer, engine.mamar_audio_bgm_buffer(), message.bgm.length).set(message.bgm)
@@ -127,8 +133,9 @@ class AudioEngineProcessor extends AudioWorkletProcessor {
             for (let slot = 0; slot < engine.mamar_audio_aux_bank_count(); slot++) {
                 engine.mamar_audio_set_aux_bank(slot, message.auxBanks[slot] ?? 0)
             }
-            engine.mamar_audio_play(message.bgm.length, message.variation, message.start.segment, message.start.tick)
+            engine.mamar_audio_play(message.bgm.length, message.variation, start.segment, start.tick)
             break
+        }
         case "pause":
             this.paused = message.paused
             break

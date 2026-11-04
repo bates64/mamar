@@ -37,9 +37,10 @@ export interface PlayerStatus {
 export interface SongPlayer {
     /**
      * Plays an encoded BGM from `start`, replacing whatever is playing, with `auxBanks` loaded into its aux banks: the
-     * sound bank's file index of each BK file, or 0 for none.
+     * sound bank's file index of each BK file, or 0 for none. If `start` is null, it plays from wherever the song it
+     * replaces has got to, or not at all if none is playing.
      */
-    load(bgm: Uint8Array, variation: number, start: SongPosition, auxBanks: number[]): void | Promise<void>
+    load(bgm: Uint8Array, variation: number, start: SongPosition | null, auxBanks: number[]): void | Promise<void>
     setPaused(paused: boolean): void | Promise<void>
     setTrackMute(track: number, mute: TrackMute): void
     /** Sets the proximity mix, as au_bgm_set_proximity_mix takes it, and whether alternate parts play. */

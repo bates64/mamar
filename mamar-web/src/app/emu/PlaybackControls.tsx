@@ -1,7 +1,7 @@
 import { ActionButton, Content, ContextualHelp, Heading, ToggleButton, Tooltip, TooltipTrigger, View } from "@adobe/react-spectrum"
 import Alert from "@spectrum-icons/workflow/Alert"
 import { Bgm } from "pm64-typegen"
-import { MutableRefObject, useCallback, useEffect, useId, useRef, useContext, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useContext, useState } from "react"
 import { Play, Repeat, SkipBack } from "react-feather"
 
 import styles from "./PlaybackControls.module.scss"
@@ -23,11 +23,10 @@ import VerticalDragNumberInput from "../VerticalDragNumberInput"
  * Loads the song when playback starts, and again when it changes while playing, from wherever it has got to. It reads
  * only the song as a whole, so it re-renders when any of it changes without reading all of it.
  */
-function SongLoader({ player, playing, timeline, songPosition }: {
+function SongLoader({ player, playing, timeline }: {
     player: SongPlayer
     playing: PlayheadContext["playing"]
     timeline: ReturnType<typeof useTimeline>
-    songPosition: MutableRefObject<SongPosition | null>
 }) {
     const [doc] = useDoc()
     const sbn = useOptionalSoundBank()
@@ -42,13 +41,9 @@ function SongLoader({ player, playing, timeline, songPosition }: {
             return
         }
 
-        let start = timeline.toPosition(playing.from)
+        let start: SongPosition | null = timeline.toPosition(playing.from)
         if (loaded.current?.playing === playing) {
-            if (loaded.current.variation !== activeVariation) {
-                start = { segment: 0, tick: 0 }
-            } else if (songPosition.current) {
-                start = songPosition.current
-            }
+            start = loaded.current.variation !== activeVariation ? { segment: 0, tick: 0 } : null
         }
         loaded.current = { playing, variation: activeVariation }
         const encoded = encodeForGame(bgm, sbn)
@@ -57,7 +52,7 @@ function SongLoader({ player, playing, timeline, songPosition }: {
             return
         }
         player.load(encoded, activeVariation, start, auxBankIndexes(sbn, bgm.aux_banks))
-    // timeline and songPosition change as the song does, which bgm tracks.
+    // timeline changes as the song does, which bgm tracks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player, bgm, activeVariation, playing, maxSongSize])
 
@@ -270,7 +265,7 @@ export default function PlaybackControls() {
     }
 
     return <View paddingX="size-200" paddingY="size-50" UNSAFE_className={styles.container}>
-        <SongLoader player={player} playing={playing} timeline={timeline} songPosition={songPosition} />
+        <SongLoader player={player} playing={playing} timeline={timeline} />
         <div ref={actionsRef} className={styles.actions} role="group" aria-label="Playback actions">
             <ActionButton
                 aria-label="Restart"
