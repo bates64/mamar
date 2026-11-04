@@ -31,9 +31,9 @@
         "10": "TR-808 Kick 1",
         "11": "TR-808 Snare 1",
         "12": "TR-808 Snare 2",
-        "13": null,
+        "13": "TR-808 Closed Hi-Hat",
         "14": "TR-808 Open Hi-Hat",
-        "15": null
+        "15": "Short Snare"
     },
     "PS03": {
         "0": "Standard 1 Low Bongo",
@@ -68,16 +68,16 @@
         "11": "Standard 1 Sticks",
         "12": "Standard 1 Side Stick",
         "13": "Standard 1 Vibra Slap",
-        "14": null,
+        "14": "Noise Burst",
         "15": "Standard 1 Snare Roll"
     },
     "PS05": {
-        "0": null,
-        "1": null,
-        "2": null,
-        "3": null,
-        "4": null,
-        "5": null,
+        "0": "TR-808 Low Tom 2",
+        "1": "TR-808 Low Tom 1",
+        "2": "TR-808 Mid Tom 2",
+        "3": "TR-808 Mid Tom 1",
+        "4": "TR-808 High Tom 2",
+        "5": "TR-808 High Tom 1",
         "6": "Heart Beat",
         "7": "Standard 1 Bell Tree",
         "8": "Standard 1 Jingle Bell",
@@ -90,21 +90,21 @@
         "15": "Standard 1 Kick 1"
     },
     "PS11": {
-        "0": null,
-        "1": null,
-        "2": null,
-        "3": null,
-        "4": null,
-        "5": null,
-        "6": null,
-        "7": null,
-        "8": null,
-        "9": null,
-        "10": null,
-        "11": null,
-        "12": null,
-        "13": null,
-        "14": null
+        "0": "Jungle Rattle",
+        "1": "Melodic Tom C6",
+        "2": "Jungle Snare 1",
+        "3": "Jungle Snare 2",
+        "4": "Electronic Electric Kick 2",
+        "5": "Jungle Kick",
+        "6": "Jungle Conga",
+        "7": "Jungle Shaker",
+        "8": "Machine Chug Loop",
+        "9": "Taiko C5",
+        "10": "Jungle Xylophone C6",
+        "11": "Jungle Xylophone C7",
+        "12": "Jungle Tick",
+        "13": "Jungle Thump",
+        "14": "Jungle Closed Hi-Hat"
     },
     "GM01": {
         "0": "Marimba C5",
@@ -309,29 +309,29 @@
         "0": "Harp"
     },
     "SPC3": {
-        "0": null,
-        "1": null,
-        "2": null,
-        "3": null,
-        "4": null,
-        "5": null,
-        "6": null,
-        "7": null,
-        "8": null,
-        "9": null,
-        "10": null
+        "0": "Island Sounds Lead C6",
+        "1": "Island Sounds Pluck B4",
+        "2": "Radio Bass C4",
+        "3": "Golden Oldies Lead C7",
+        "4": "Hot Hits Keys C6",
+        "5": "Hot Hits Bell C7",
+        "6": "Hot Hits Pluck C6",
+        "7": "Golden Oldies Buzz C8",
+        "8": "Golden Oldies Pad C6",
+        "9": "Radio Whistle C7",
+        "10": "Golden Oldies Snare"
     },
     "REC1": {
         "0": "Noise Grain",
-        "1": null,
-        "2": null,
-        "3": null,
-        "4": null,
-        "5": null,
-        "6": null,
-        "7": null,
-        "8": null,
-        "9": null
+        "1": "Phonograph Kick",
+        "2": "Phonograph High Tom",
+        "3": "Phonograph Low Tom",
+        "4": "Phonograph Snare",
+        "5": "Phonograph Brush",
+        "6": "Phonograph Bass C6",
+        "7": "Phonograph Lead C6",
+        "8": "Phonograph Lead C6",
+        "9": "Phonograph Click"
     },
     "STG5": {
         "0": "Chant Low Pitch",
@@ -343,7 +343,7 @@
         "6": "Jungle Rhythm"
     },
     "STG8": {
-        "0": null
+        "0": "Star Way Swell C6"
     },
     "CHO1": {
         "0": "Boing"
@@ -567,7 +567,7 @@
         "2": "NPC Jump",
         "3": "Huff N. Puff Jiggle",
         "4": "Huff N. Puff Wobble",
-        "5": null,
+        "5": "Ghost Funky",
         "6": "Ghost Transform",
         "7": "Bowser Star Rod Use",
         "8": "Bowser Star Rod Drain Wave",

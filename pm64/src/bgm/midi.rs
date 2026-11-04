@@ -1073,10 +1073,10 @@ fn pitch_of(key: u8) -> u8 {
 const GENERAL_MIDI_AUX_BANK: &str = "PS11";
 
 /// The General MIDI programs that play a sample of [GENERAL_MIDI_AUX_BANK] rather than one in the music banks, with the
-/// sample's number there. Jade Jungle plays tunes with these drums.
+/// sample's number there. Jade Jungle plays both.
 const GENERAL_MIDI_AUX_SAMPLES: [(u8, u8); 2] = [
-    (116, 11), // taiko drum
-    (117, 1),  // melodic tom
+    (116, 9), // taiko drum
+    (117, 1), // melodic tom
 ];
 
 /// The sample that plays `program`, read as `mapping` says, for a part whose highest key is `highest`. See
@@ -1636,7 +1636,7 @@ mod test {
         let general = import(&raw, MidiMapping::GeneralMidi, &[]).unwrap();
         let (_, instrument) = track(&general, "#1");
         assert_eq!(instrument.patch.bank_set, BankSetIndex::Aux);
-        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 11));
+        assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 9));
         assert_eq!(general.bgm.aux_banks, vec!["PS11".to_string()]);
 
         let paper_mario = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
