@@ -467,7 +467,7 @@ impl CommandSeq {
                 }
 
                 // Note
-                0x80..=0xD3 => {
+                _ if NOTE_PITCHES.contains(&cmd_byte) => {
                     let pitch = cmd_byte;
                     let velocity = f.read_u8()?;
                     let length = {

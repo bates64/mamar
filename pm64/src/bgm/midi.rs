@@ -32,7 +32,7 @@ pub struct MidiImport {
     pub track_keys: Vec<Option<String>>,
     /// Whether the file's markers set the sections.
     pub has_section_markers: bool,
-    /// Markers that couldn't be used, such as a `loop end` without a `loop start`.
+    /// What couldn't be imported, such as notes the game can't play or a `loop end` without a `loop start`.
     pub warnings: Vec<String>,
 }
 
@@ -84,6 +84,11 @@ struct Part<'a> {
 }
 
 impl Part<'_> {
+    /// Its MIDI track's name, or its key if the track has none.
+    fn display_name(&self) -> &str {
+        if self.name.is_empty() { &self.key } else { &self.name }
+    }
+
     fn note_count(&self) -> usize {
         self.events
             .iter()
@@ -289,6 +294,7 @@ pub fn import(raw: &[u8], mapping: MidiMapping, sample_reach: &[u8]) -> Result<M
             time_divisor,
             &mut bgm.instruments,
             fitted.instrument,
+            &mut warnings,
         );
         track_list.tracks[index + 1]
             .commands
@@ -561,11 +567,7 @@ fn fit_parts(mut parts: Vec<Fitted>, is_single_track: bool, mapping: MidiMapping
             let keep = kept.contains(&index);
             index += 1;
             if !keep {
-                let name = if fitted.part.name.is_empty() {
-                    fitted.part.key.as_str()
-                } else {
-                    fitted.part.name.as_str()
-                };
+                let name = fitted.part.display_name();
                 warnings.push(format!(
                     "{name} was left out, as the game has room for {NOTE_TRACKS} tracks of notes."
                 ));
@@ -1187,6 +1189,7 @@ fn part_to_track(
     time_divisor: f32,
     instruments: &mut Vec<Instrument>,
     instrument: Option<usize>,
+    warnings: &mut Vec<String>,
 ) -> Track {
     /// A note that has started and not yet ended
     #[derive(Clone, Copy)]
@@ -1421,6 +1424,16 @@ fn part_to_track(
 
     if !started_notes.is_empty() {
         log::warn!("{} unended notes", started_notes.len());
+    }
+
+    let command_count = timed.len();
+    timed.retain(|(_, command)| !matches!(command, Command::Note { pitch, .. } if !NOTE_PITCHES.contains(pitch)));
+    let left_out = command_count - timed.len();
+    if left_out > 0 {
+        warnings.push(format!(
+            "{left_out} notes of {} were left out, as they're too high or too low for the game to play.",
+            part.display_name()
+        ));
     }
 
     volume_fades(&mut timed);
@@ -1887,6 +1900,25 @@ mod test {
         assert!(matches!(start[..], [Command::SetTrackVoice { .. }]), "{start:?}");
         assert_eq!(instrument.pan, 20);
         assert_eq!((instrument.patch.bank, instrument.patch.instrument), (0, 5));
+    }
+
+    #[test]
+    fn notes_the_game_cant_play_are_left_out() {
+        let raw = midi(
+            48,
+            vec![
+                vec![],
+                vec![
+                    (0, note_on(0, 107)),
+                    (0, note_on(0, 108)),
+                    (48, note_off(0, 107)),
+                    (48, note_off(0, 108)),
+                ],
+            ],
+        );
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        assert_eq!(notes(track(&imported, "#1").0), vec![(0, pitch_of(107), 48)]);
+        assert_eq!(imported.warnings.len(), 1);
     }
 
     #[test]

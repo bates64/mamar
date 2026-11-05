@@ -1032,6 +1032,9 @@ pub struct Event {
     pub command: Command,
 }
 
+/// The pitches a [Command::Note] can play. The game reads other values as other commands.
+pub const NOTE_PITCHES: std::ops::RangeInclusive<u8> = 0x80..=0xD3;
+
 /// See audio.h union SeqArgs.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, TypeDef)]
 pub enum Command {
