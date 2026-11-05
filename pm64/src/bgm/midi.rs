@@ -1922,6 +1922,30 @@ mod test {
     }
 
     #[test]
+    fn sections_after_a_long_one_stay_reachable() {
+        // A section with more than the 16 KiB of commands a segment can reach past, too varied to compress
+        let mut seed = 1u32;
+        let mut events = Vec::new();
+        let mut time = 0;
+        for _ in 0..4500 {
+            seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
+            let key = 40 + (seed >> 16) as u8 % 50;
+            let length = 1 + (seed >> 8) % 23;
+            events.push((time, note_on(0, key)));
+            events.push((time + length, note_off(0, key)));
+            time += length + 1;
+        }
+        let section = time.next_multiple_of(48 * 4);
+        events.push((section, note_on(0, 60)));
+        events.push((section + 48, note_off(0, 60)));
+        let marker = TrackEventKind::Meta(MetaMessage::Marker(b"section"));
+        let raw = midi(48, vec![vec![(section, marker)], events]);
+        let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
+        let decoded = Bgm::from_bytes(&imported.bgm.as_bytes().unwrap()).unwrap();
+        assert_eq!(decoded.track_lists.len(), 2);
+    }
+
+    #[test]
     fn notes_shorter_than_a_tick_last_one() {
         let raw = midi(480, vec![vec![], vec![(0, note_on(0, 60)), (1, note_off(0, 60))]]);
         let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();

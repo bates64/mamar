@@ -133,11 +133,12 @@ impl Bgm {
         /*
         subseg0
         subseg1
-        tracks        [for subseg0]
-        sequences
-        tracks        [for subseg1]
+        tracks        [decoded, as they were, each followed by its sequences]
         sequences
         ...
+        tracks        [the rest, together, as segments can only reach so far]
+        ...
+        sequences     [of those tracks]
         sequences     [of tracks that branch]
         branch tables
         branch options
@@ -180,6 +181,7 @@ impl Bgm {
 
         let mut branch_refs = Vec::new();
         let mut branching_tracks = Vec::new();
+        let mut new_tracks = Vec::new();
 
         for (track_list_no, track_list_id) in track_list_ids.into_iter().enumerate() {
             let track_list = &self.track_lists[track_list_id];
@@ -199,8 +201,11 @@ impl Bgm {
 
             // Write offset in segment headers
             for (tracks_pos, segment_start) in track_list_refs.remove(track_list_id).unwrap_or_default() {
-                let pos = ((track_data_start - segment_start) >> 2) as u16;
-                f.write_u16_be_at(pos, SeekFrom::Start(tracks_pos))?;
+                let pos = (track_data_start - segment_start) >> 2;
+                if pos > MAX_TRACK_LIST_OFFSET {
+                    return Err(Error::TooBig);
+                }
+                f.write_u16_be_at(pos as u16, SeekFrom::Start(tracks_pos))?;
             }
 
             // Write flags
@@ -247,9 +252,14 @@ impl Bgm {
                 f.write_u16_be(flags)?;
             }
 
-            encode_tracks(f, todo_commands, &mut branch_refs)?;
+            if track_list.pos.is_some() {
+                encode_tracks(f, todo_commands, &mut branch_refs)?;
+            } else {
+                new_tracks.extend(todo_commands);
+            }
         }
 
+        encode_tracks(f, new_tracks, &mut branch_refs)?;
         encode_tracks(f, branching_tracks, &mut branch_refs)?;
 
         // Write branch tables
@@ -404,6 +414,10 @@ impl PatchAddress {
         Ok(())
     }
 }
+
+/// The furthest a track list can be from the segments that play it, in words. The game reads a segment's command from
+/// its upper 20 bits, leaving 12 for the offset.
+const MAX_TRACK_LIST_OFFSET: u64 = 0xFFF;
 
 impl Segment {
     pub fn encode<W: Write + Seek>(&self, f: &'_ mut W) -> Result<Option<(u64, TrackListId)>, Error> {
