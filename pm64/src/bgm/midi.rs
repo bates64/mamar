@@ -1941,8 +1941,11 @@ mod test {
         let marker = TrackEventKind::Meta(MetaMessage::Marker(b"section"));
         let raw = midi(48, vec![vec![(section, marker)], events]);
         let imported = import(&raw, MidiMapping::PaperMario, &[]).unwrap();
-        let decoded = Bgm::from_bytes(&imported.bgm.as_bytes().unwrap()).unwrap();
+        let encoded = imported.bgm.as_bytes().unwrap();
+        let decoded = Bgm::from_bytes(&encoded).unwrap();
         assert_eq!(decoded.track_lists.len(), 2);
+        // Opened again, it saves as it was
+        assert_eq!(decoded.as_bytes().unwrap(), encoded);
     }
 
     #[test]

@@ -181,10 +181,13 @@ impl Bgm {
 
         let mut branch_refs = Vec::new();
         let mut branching_tracks = Vec::new();
-        let mut new_tracks = Vec::new();
+        let mut grouped_tracks = Vec::new();
 
-        for (track_list_no, track_list_id) in track_list_ids.into_iter().enumerate() {
+        for (track_list_no, &track_list_id) in track_list_ids.iter().enumerate() {
             let track_list = &self.track_lists[track_list_id];
+            let next_pos = track_list_ids
+                .get(track_list_no + 1)
+                .and_then(|id| self.track_lists[id].pos);
 
             f.align(4)?; // This position needs to be right-shifted by 2 without loss
 
@@ -252,14 +255,17 @@ impl Bgm {
                 f.write_u16_be(flags)?;
             }
 
-            if track_list.pos.is_some() {
+            // A decoded track list's commands follow it, unless it was decoded from among track lists together
+            let header_end = f.pos()?.next_multiple_of(4);
+            let next_list_follows = next_pos.is_some_and(|pos| pos <= header_end);
+            if track_list.pos.is_some() && !next_list_follows && grouped_tracks.is_empty() {
                 encode_tracks(f, todo_commands, &mut branch_refs)?;
             } else {
-                new_tracks.extend(todo_commands);
+                grouped_tracks.extend(todo_commands);
             }
         }
 
-        encode_tracks(f, new_tracks, &mut branch_refs)?;
+        encode_tracks(f, grouped_tracks, &mut branch_refs)?;
         encode_tracks(f, branching_tracks, &mut branch_refs)?;
 
         // Write branch tables
