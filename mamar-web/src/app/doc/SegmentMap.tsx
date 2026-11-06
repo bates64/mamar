@@ -126,13 +126,13 @@ const Thumbnail = memo(({ commands: stored }: { commands: Event[] }) => {
     const c5 = 107 + 72
 
     // Determine pitch range
-    let minPitch = 256
-    let maxPitch = 0
+    let lowest = 256
+    let highest = 0
     let hasNoteInRange = false
     for (const command of commands) {
         if ("Note" in command) {
-            minPitch = Math.min(minPitch, command.Note.pitch)
-            maxPitch = Math.max(maxPitch, command.Note.pitch)
+            lowest = Math.min(lowest, command.Note.pitch)
+            highest = Math.max(highest, command.Note.pitch)
 
             if (command.Note.pitch >= c2 && command.Note.pitch <= c5) {
                 hasNoteInRange = true
@@ -140,16 +140,18 @@ const Thumbnail = memo(({ commands: stored }: { commands: Event[] }) => {
         }
     }
 
-    // Prefer C2-C5 range, but if there are no notes there, center on where the notes are
-    if (hasNoteInRange) {
-        minPitch = c2
-        maxPitch = c5
-    } else {
-        const middle = Math.floor((minPitch + maxPitch) / 2)
+    // Prefer C2-C5 range, but if there are no notes there, center on where the notes are. Either way, widen it to show
+    // every note.
+    let minPitch = c2
+    let maxPitch = c5
+    if (!hasNoteInRange) {
+        const middle = Math.floor((lowest + highest) / 2)
         const size = c5 - c2 + 1
         minPitch = middle - Math.floor(size / 2)
         maxPitch = middle + Math.floor(size / 2)
     }
+    minPitch = Math.min(minPitch, lowest)
+    maxPitch = Math.max(maxPitch, highest)
 
     // Render each note as an svg <rect>
     const notes = []

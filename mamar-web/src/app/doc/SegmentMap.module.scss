@@ -109,13 +109,13 @@ $versionHeight: 40px;
     }
 }
 
-// The notes, not the icons over them
+// The notes, not the icons over them. They span the segment's whole width, so they line up with the ruler.
 .pianoRollThumbnail > svg {
-    width: calc(100% - 12px);
+    width: 100%;
     height: calc(100% - 12px);
 
     position: absolute;
-    inset: 6px;
+    inset: 6px 0;
 
     pointer-events: none;
 
