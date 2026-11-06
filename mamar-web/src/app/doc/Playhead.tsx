@@ -25,10 +25,15 @@ export function PlayheadContextProvider({ children }: { children: React.ReactNod
     const [playing, setPlaying] = useState<{ from: number } | null>(null)
     const [doc] = useDoc()
 
-    // If the variation changes, reset the position
+    // A song opened, switched to or closed doesn't carry on what the last one was playing
     useEffect(() => {
         setStart(0)
-    }, [doc?.id, doc?.activeVariation])
+        setPlaying(null)
+    }, [doc?.id])
+
+    useEffect(() => {
+        setStart(0)
+    }, [doc?.activeVariation])
 
     const play = useCallback((from: number) => setPlaying({ from }), [])
     const stop = useCallback(() => setPlaying(null), [])
